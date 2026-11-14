@@ -1,13 +1,19 @@
 {
   "login": {
-    "student": { "ok": true, "user": { "id": "202530101", "nickname": "독일어과 새내기", "role": "student" } },
-    "staff": { "ok": true, "user": { "id": "staff01", "nickname": "국제교류팀", "role": "staff", "dept": "국제교류팀" } },
+    "student": { "ok": true, "user": { "colreg_no": "202530101", "status": "학생" } },
+    "staff": { "ok": true, "user": { "colreg_no": "staff01", "status": "직원", "crs_nm": "국제교류팀" } },
     "fail": { "ok": false, "reason": "아이디 또는 비밀번호가 맞지 않아요." }
   },
   "getMe": {
-    "id": "202530101", "nickname": "독일어과 새내기", "layer": "후배", "role": "student",
-    "college": "서양어대학", "major": "독일어과", "doubleMajor": "경영학부", "grade": 1,
-    "programs": [ { "name": "외대쌤", "type": "비교과", "semester": "2025-2" } ]
+    "status": "학생", "campus": "서울", "univ_cd": "서양어대", "crs_nm": "독일어과",
+    "colreg_no": "202530101", "regst_grad": 1, "buj_mjr_nm": "", "dbl_mjr_nm": "경영학",
+    "비교과이수내역": [
+      { "학년도": "2025", "학기": "2", "프로그램명": "외대쌤", "캠퍼스": "서울", "대학": "서양어대", "학과": "독일어과",
+        "운영부서": "가상부서", "프로그램구분": "비교과", "프로그램구분 소분류": "멘토링", "만족도": 5,
+        "한줄후기": "후배를 가르치면서 오히려 내가 더 많이 배웠다." }
+    ],
+    "귀국보고서": [],
+    "인턴십후기": []
   },
   "askBoo": {
     "exchange": {
@@ -106,34 +112,30 @@
       "officialUrl": "https://example.com/hufs/intern",
       "sections": [
         { "name": "지원동기", "interviewOnly": false, "lines": [
-          { "text": "전공 외국어를 무역 실무에서 써 보고 싶어서 지원했다는 후기가 있어요.", "sourceId": "R10-1-1", "lineId": "L-R10-1-1", "official": false }
+          { "text": "전공 외국어를 무역 실무에서 써 보고 싶어서 지원했다는 후기가 있어요.", "sourceId": "T01-1-1", "lineId": "L-T01-1-1", "official": false }
         ] },
         { "name": "업무내용", "interviewOnly": false, "lines": [
-          { "text": "해외 바이어 자료를 번역하고 정리하는 일을 주로 맡았어요.", "sourceId": "R10-2-1", "lineId": "L-R10-2-1", "official": false }
+          { "text": "해외 바이어 자료를 번역하고 정리하는 일을 주로 맡았어요.", "sourceId": "T01-2-1", "lineId": "L-T01-2-1", "official": false }
         ] },
         { "name": "배운점", "interviewOnly": false, "lines": [
-          { "text": "무역 용어와 문서 흐름을 익힌 것이 가장 도움이 됐다고 해요.", "sourceId": "R10-3-1", "lineId": "L-R10-3-1", "official": false }
+          { "text": "무역 용어와 문서 흐름을 익힌 것이 가장 도움이 됐다고 해요.", "sourceId": "T01-3-1", "lineId": "L-T01-3-1", "official": false }
         ] },
-        { "name": "지원", "interviewOnly": false, "lines": [
-          { "text": "서류는 직무와 연결한 경험 위주로 정리했다는 후기가 있어요.", "sourceId": "R10-4-1", "lineId": "L-R10-4-1", "official": false }
-        ] },
-        { "name": "선발", "interviewOnly": true, "lines": [] },
+        { "name": "지원·선발", "interviewOnly": true, "lines": [] },
         { "name": "근무조건", "interviewOnly": true, "lines": [] }
       ],
       "sources": {
-        "R10-1-1": { "docType": "인턴십후기", "program": "무역협회 인턴십", "semester": "2025-여름" },
-        "R10-2-1": { "docType": "인턴십후기", "program": "무역협회 인턴십", "semester": "2025-여름" },
-        "R10-3-1": { "docType": "인턴십후기", "program": "무역협회 인턴십", "semester": "2025-여름" },
-        "R10-4-1": { "docType": "인턴십후기", "program": "무역협회 인턴십", "semester": "2025-여름" }
+        "T01-1-1": { "docType": "인턴십후기", "program": "무역협회 인턴십", "semester": "2025-여름" },
+        "T01-2-1": { "docType": "인턴십후기", "program": "무역협회 인턴십", "semester": "2025-여름" },
+        "T01-3-1": { "docType": "인턴십후기", "program": "무역협회 인턴십", "semester": "2025-여름" }
       }
     }
   },
   "recommendSeniors": {
     "seniors": [
-      { "studentId": "202130012", "nickname": "뮌헨 다녀온 독일어과 4학년", "score": 14,
-        "reasons": ["같은 서양어대학", "같은 독일어과", "이중전공 경영학부 같음", "외대쌤 함께 이수"] },
-      { "studentId": "202130045", "nickname": "뮌헨 다녀온 스페인어과 4학년", "score": 5,
-        "reasons": ["같은 서양어대학", "같은 뮌헨대 교환"] }
+      { "studentId": "202130012", "nickname": "익명 1", "score": 14,
+        "reasons": ["같은 서양어대", "같은 독일어과", "이중전공 경영학 같음", "외대쌤 함께 이수"] },
+      { "studentId": "202130045", "nickname": "익명 2", "score": 5,
+        "reasons": ["같은 서양어대", "같은 뮌헨대 교환"] }
     ]
   },
   "checkMessage": {
@@ -143,7 +145,7 @@
   "sendMessage": { "ok": true, "threadId": "T-0001", "at": "2026-11-20T10:00:00+09:00" },
   "getMessages": {
     "threads": [
-      { "threadId": "T-0001", "withId": "202130012", "nickname": "뮌헨 다녀온 독일어과 4학년",
+      { "threadId": "T-0001", "withId": "202130012", "nickname": "익명 1",
         "accepted": true, "unread": 1,
         "messages": [
           { "from": "me", "text": "안녕하세요, 뮌헨대 교환 준비가 궁금해서 쪽지 드려요.", "at": "2026-11-20T10:00:00+09:00" },
