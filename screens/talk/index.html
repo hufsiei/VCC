@@ -3,10 +3,53 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>talk</title>
+<title>이야기하기 (임시 확인 화면)</title>
 <link rel="stylesheet" href="../../common/style.css">
 </head>
 <body>
-<div class="app"></div>
+<div class="app">
+  <h1>이야기하기 (임시)</h1>
+  <p class="sub">askBoo 확인용 임시 화면입니다. 실제 화면은 담당자가 만듭니다.</p>
+  <form id="form">
+    <label for="q">질문</label>
+    <textarea id="q" required></textarea>
+    <button type="submit">물어보기</button>
+  </form>
+  <div id="result"></div>
+</div>
+<script type="module">
+  import { askBoo } from "../../common/data.js";
+
+  const result = document.getElementById("result");
+
+  function render(res) {
+    result.replaceChildren();
+    const add = (tag, text, cls) => {
+      const el = document.createElement(tag);
+      el.textContent = text;
+      if (cls) el.className = cls;
+      result.appendChild(el);
+      return el;
+    };
+    if (res.error) { add("div", res.error, "problem"); return; }
+    if (res.status === "hold") {
+      add("div", res.message, "card");
+      return;
+    }
+    for (const line of res.lines) {
+      const s = res.sources[line.sourceId];
+      const card = add("div", "", "card");
+      card.append(line.text);
+      const small = document.createElement("small");
+      small.textContent = `${s.docType} · ${s.program} · ${s.semester}`;
+      card.append(document.createElement("br"), small);
+    }
+  }
+
+  document.getElementById("form").onsubmit = async (event) => {
+    event.preventDefault();
+    render(await askBoo(document.getElementById("q").value));
+  };
+</script>
 </body>
 </html>
