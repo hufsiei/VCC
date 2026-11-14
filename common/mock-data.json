@@ -1,13 +1,12 @@
 {
   "login": {
-    "student": { "ok": true, "user": { "colreg_no": "202530101", "nickname": "독일어과 새내기", "status": "학생" } },
-    "staff": { "ok": true, "user": { "colreg_no": "staff01", "nickname": "국제교류팀", "status": "직원", "crs_nm": "국제교류팀" } },
+    "student": { "ok": true, "user": { "colreg_no": "202530101", "status": "학생" } },
+    "staff": { "ok": true, "user": { "colreg_no": "staff01", "status": "직원", "crs_nm": "국제교류팀" } },
     "fail": { "ok": false, "reason": "아이디 또는 비밀번호가 맞지 않아요." }
   },
   "getMe": {
     "status": "학생", "campus": "서울", "univ_cd": "서양어대", "crs_nm": "독일어과",
-    "colreg_no": "202530101", "regst_grad": 1, "buj_mjr_nm": "", "dbl_mjr_nm": "경영학부",
-    "nickname": "독일어과 새내기",
+    "colreg_no": "202530101", "regst_grad": 1, "buj_mjr_nm": "", "dbl_mjr_nm": "경영학",
     "비교과이수내역": [
       { "학년도": "2025", "학기": "2", "프로그램명": "외대쌤", "캠퍼스": "서울", "대학": "서양어대", "학과": "독일어과",
         "운영부서": "가상부서", "프로그램구분": "비교과", "프로그램구분 소분류": "멘토링", "만족도": 5,
@@ -133,10 +132,10 @@
   },
   "recommendSeniors": {
     "seniors": [
-      { "studentId": "202130012", "nickname": "뮌헨 다녀온 독일어과 4학년", "score": 14,
-        "reasons": ["같은 서양어대학", "같은 독일어과", "이중전공 경영학부 같음", "외대쌤 함께 이수"] },
-      { "studentId": "202130045", "nickname": "뮌헨 다녀온 스페인어과 4학년", "score": 5,
-        "reasons": ["같은 서양어대학", "같은 뮌헨대 교환"] }
+      { "studentId": "202130012", "nickname": "익명 1", "score": 14,
+        "reasons": ["같은 서양어대", "같은 독일어과", "이중전공 경영학 같음", "외대쌤 함께 이수"] },
+      { "studentId": "202130045", "nickname": "익명 2", "score": 5,
+        "reasons": ["같은 서양어대", "같은 뮌헨대 교환"] }
     ]
   },
   "checkMessage": {
@@ -146,7 +145,7 @@
   "sendMessage": { "ok": true, "threadId": "T-0001", "at": "2026-11-20T10:00:00+09:00" },
   "getMessages": {
     "threads": [
-      { "threadId": "T-0001", "withId": "202130012", "nickname": "뮌헨 다녀온 독일어과 4학년",
+      { "threadId": "T-0001", "withId": "202130012", "nickname": "익명 1",
         "accepted": true, "unread": 1,
         "messages": [
           { "from": "me", "text": "안녕하세요, 뮌헨대 교환 준비가 궁금해서 쪽지 드려요.", "at": "2026-11-20T10:00:00+09:00" },
