@@ -141,9 +141,10 @@ payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"
 ```
 `satisfaction`은 비교과 노트만 숫자(`가상비교과만족도`의 `만족도(5점)`), 국제교류·현장실습은 `null` → 화면은 "–"(실제 체계에 학생별 만족도가 없음).
 `official: true`인 문장(학점 인정·장학금·자격 요건·선발 기준 같은 규정성 진술)은 화면이 "개인 경험이에요" 표시 + `officialUrl` 링크를 붙인다.
+`officialUrl`은 서버가 **프로그램의 `운영부서코드` → `departments.json`의 `공식안내URL`** 순서로 찾아 넣는다(프로그램 목록 시트에는 URL 열이 없다, PRD 6-2).
 
 ### recommendSeniors(noteId)
-payload `{noteId}`. `nickname`은 서버가 자동 생성한 익명 닉네임(쪽지창과 같은 값). 점수 계산은 `common/score.js`(원우). AI 없음.
+payload `{noteId}`. `nickname`은 서버가 만든 선배 표시명 「학과 + 선배 + 영문 대문자」(예: `"독일어과 선배 A"`, 디자인 규칙 1-2절). 같은 선배는 닮은선배·프로필·해봤노트 인용·쪽지창에서 같은 이름이다. 점수 계산은 `common/score.js`(원우). AI 없음.
 ```json
 { "seniors": [ { "studentId": "H0469", "nickname": "독일어과 선배 A", "score": 13,
                  "reasons": ["같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음", "합격 면접 취업특강(커리어랩) 함께 이수"] } ] }
