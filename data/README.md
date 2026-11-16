@@ -199,7 +199,7 @@
 |---|---|---|
 | id / program / type / oneLine / forWhom | 글자 | listNotes와 같음 |
 | evidenceCount / lastSemester / satisfaction | 숫자·글자 | listNotes와 같음 |
-| officialUrl | 글자 | 공식 안내 주소 |
+| officialUrl | 글자 | 공식 안내 주소. 프로그램의 `운영부서코드`로 `departments.json`의 `공식안내URL`을 찾아 넣음(프로그램 목록에는 URL 없음) |
 | sections[].name | 글자 | 칸 이름 |
 | sections[].interviewOnly | 참/거짓 | true면 선배 인터뷰로만 채워지는 칸 |
 | sections[].lines[].text / sourceId / lineId | 글자 | 문장, 출처, 문장 번호 |

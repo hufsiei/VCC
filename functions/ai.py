@@ -89,6 +89,8 @@ def call_hcx(messages, system, 설정):
     key = os.environ.get("CLOVA_KEY")
     if not key:
         raise RuntimeError('CLOVA_KEY가 없습니다. PowerShell에서 $env:CLOVA_KEY = "발급받은_키"')
+    if not key.isascii():
+        raise RuntimeError("CLOVA_KEY에 한글이 들어 있습니다. 예시 문구('발급받은_키') 대신 CLOVA Studio에서 받은 실제 키를 넣으세요.")
     msgs = ([{"role": "system", "content": system}] if system else []) + messages
     body = {"messages": msgs, "maxTokens": 설정.get("max_tokens", 256), "temperature": 설정.get("temperature", 0)}
     if "top_p" in 설정:
