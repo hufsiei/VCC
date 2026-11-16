@@ -12,12 +12,23 @@
       "user": {
         "colreg_no": "staff01",
         "status": "직원",
-        "부서명": "전체"
+        "부서명": "전체",
+        "권한": "총괄"
       }
     },
     "fail": {
       "ok": false,
       "reason": "아이디 또는 비밀번호가 맞지 않아요."
+    },
+    "staffDept": {
+      "ok": true,
+      "user": {
+        "colreg_no": "staff02",
+        "status": "직원",
+        "부서명": "혁신지원팀",
+        "부서코드": "D04",
+        "권한": "부서"
+      }
     }
   },
   "getMe": {
