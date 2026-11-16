@@ -15,7 +15,7 @@
 - 학기 표기는 `"2025-1"`, `"2025-2"`, `"2025-여름"`, `"2025-겨울"`.
 - 화면에는 학번을 보여 주지 않는다. 다른 사람은 서버가 자동 생성한 닉네임(`nickname`)으로만 표시한다(닮은 선배 카드, 익명 쪽지창). 닉네임은 시트·프로필에 두지 않는다. 형식은 **`학과 + " 선배 " + 영문 대문자`**(예: `"독일어과 선배 A"`)이고 학번·입학년도는 넣지 않는다. 글자는 보는 사람 기준으로 처음 만난 순서대로 A, B, C…를 주고, 그 사람에게는 카드·프로필·쪽지창에서 계속 같은 값을 쓴다.
 - **쪽지를 보낸 사람**은 다른 이름 체계를 쓴다: `"형용사 + 동물"`(예: `"용감한 수달"`). 쪽지 요청을 여는 순간 서버가 만들고 **대화(thread) 하나마다 새로** 정한다(같은 후배가 다른 선배에게 보내면 다른 이름). 선배 화면에서 보낸 사람은 이 이름 + 학년 + 관심 경험만 보이고 학과는 보이지 않는다. 보낸 사람 화면에서 선배는 계속 `"독일어과 선배 A"`다. 즉 **보는 사람 입장에서 상대 이름은 늘 하나**다.
-- 로그인한 사용자 정보는 화면이 `sessionStorage`의 `"me"`에 저장한다. 함수는 이를 따로 받지 않는다(서버 연결 후 미리가 처리).
+- 로그인한 사용자 정보는 `sessionStorage`의 `"me"`에 저장한다(탭마다 따로 — 두 창 시연). **저장은 `data.js`의 `login()`이 성공 응답의 `user`를 그대로 넣는다**(화면이 따로 저장하지 않음). 함수는 사용자를 payload로 받지 않고, `data.js`가 모든 서버 요청에 헤더 `X-User: <colreg_no>`를 붙인다(작업 51).
 - **데이터 열 이름은 `가상데이터_1000명.xlsx`의 헤더를 그대로 쓴다.** 가상학생 시트는 종합정보시스템 학적 영문 코드(`colreg_no`, `crs_nm`, `dbl_mjr_nm` 등), 나머지 시트는 한글 헤더(`학번`, `학년도`, `프로그램명` 등)가 JSON 키가 된다. 시트에 없는 값만 영어 이름을 붙인다(예: `docType`, 자동 생성 `nickname`). 자세한 대응은 9장.
 - **변환에서 빼는 열**: `studt_na_kr`(가상 성명)·`sex`·`나이(만)`은 시트에만 두고 `students.json`에 넣지 않는다(저장소가 공개돼도 명단처럼 보이지 않게). 사람을 구분하는 열쇠는 `colreg_no` 하나로 충분하다(1,001개 모두 고유, 다른 시트 학번과 100% 연결 확인).
 - **응답에 넣지 않는 열**: `비번`(로그인 대조만).
@@ -38,6 +38,18 @@
 - 로컬: 저장소 폴더에서 `python -m http.server 8000` → `http://localhost:8000/screens/login/`
 - 미리 개발 서버(미리 PC만): `functions/local_fn.py` → `http://localhost:8787`
 - 공개 주소(GitHub Pages 등): 미정. 정해지면 추가.
+
+### 2-1. 쓰기 저장소 (작업 51, 11/16 결정)
+
+쪽지·질문함·공개 동의·신고·내 경험노트·알림처럼 **사용자가 만들어 내는 기록**은 mock으로는 두 창 시연(A 창의 쪽지 → B 창 알림)이 안 되므로 서버가 저장한다.
+
+- **지금(로컬):** `functions/local_fn.py`가 시작할 때 `data/runtime/*.json`을 읽어 메모리에 두고, 기록이 바뀔 때마다 그 파일을 다시 쓴다(임시 파일에 쓴 뒤 바꿔 끼워 반쯤 쓰인 파일이 남지 않게). 서버를 껐다 켜도 남는다.
+- **Cloud Functions 이사 후:** 같은 파일 이름을 NCP **Object Storage**의 객체로 둔다. 바꾸는 곳은 `functions/store.py`의 저장 방식 한 곳뿐이다(`STORE_BACKEND=file|ncp`). 다른 코드는 `store.load(이름)`·`store.save(이름)`만 쓰고 파일을 직접 열지 않는다.
+- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `counters.json`(번호 매기기). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 8개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). 관리자 콘솔용 `reportSettings.json`·`issuedReports.json`·`suggestionStatus.json`은 작업 66에서 같은 방식으로 더한다.
+- **누가 부르는지:** 서버는 헤더 `X-User`로 사용자를 안다. 없으면 `{ "error": "로그인이 필요해요" }`.
+- **초기화:** 리허설 전 `python functions/reset_runtime.py` → runtime 파일을 비우고 시연 시작 상태로 돌린다.
+- `data/runtime/`은 커밋하지 않는다(`.gitignore`). 시연 중 쌓인 기록이 저장소에 섞이지 않게.
+- 화면은 아무것도 바꿀 필요가 없다. `data.js`에서 `USE_MOCK = false`로 바꾸면 같은 함수가 서버로 간다. 원우·민지는 mock으로 계속 작업하고, 두 창 확인은 미리 PC에서 한다.
 
 ## 3. data.js 동작
 
@@ -225,6 +237,7 @@ interviewNext(program, answers) · summarizeInterview(program, transcript) · sa
 listNotes(filter) · getNote(id) · reportStatement(lineId, reason)
 recommendSeniors(noteId) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept)
 getInbox() · getDeptReport(dept)
+currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이 성공 시 저장)
 ```
 
 ## 6. mock-data.json 작성 지시
