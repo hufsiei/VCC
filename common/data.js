@@ -20,13 +20,13 @@ function pickMock(m, name, p) {
       if (String(p.id || "").startsWith("staff")) return m.login.staff;
       return p.pw === "1" ? m.login.student : m.login.fail;
     case "askBoo":
-      return /교환|파견|독일|뮌헨/.test(p.question || "") ? m.askBoo.exchange : m.askBoo.hold;
+      return /교환|파견|독일|마르부르크/.test(p.question || "") ? m.askBoo.exchange : m.askBoo.hold;
     case "interviewNext": {
       const n = (p.answers || []).length;
       return n <= 2 ? m.interviewNext.steps[n] : m.interviewNext.done;
     }
     case "getNote":
-      return m.getNote[p.id] || m.getNote["N-munich"];
+      return m.getNote[p.id] || m.getNote["N-marburg"];
     case "checkMessage":
       return /\d{8,}/.test(p.text || "") ? m.checkMessage.blocked : m.checkMessage.ok;
     default:
@@ -62,7 +62,9 @@ export const getNote = (id) => call("getNote", { id });
 export const reportStatement = (lineId, reason) => call("reportStatement", { lineId, reason });
 export const recommendSeniors = (noteId) => call("recommendSeniors", { noteId });
 export const checkMessage = (text) => call("checkMessage", { text });
+export const previewNickname = (to) => call("previewNickname", { to });
 export const sendMessage = (to, text) => call("sendMessage", { to, text });
 export const getMessages = () => call("getMessages");
+export const respondRequest = (threadId, accept) => call("respondRequest", { threadId, accept });
 export const getInbox = () => call("getInbox");
 export const getDeptReport = (dept) => call("getDeptReport", { dept });
