@@ -17,7 +17,8 @@ function loadMock() {
 function pickMock(m, name, p) {
   switch (name) {
     case "login":
-      if (String(p.id || "").startsWith("staff")) return m.login.staff;
+      if (p.id === "staff01") return m.login.staff;               // 총괄 관리자
+      if (String(p.id || "").startsWith("staff")) return m.login.staffDept; // 부서 담당자
       return p.pw === "1" ? m.login.student : m.login.fail;
     case "askBoo":
       return /교환|파견|독일|마르부르크/.test(p.question || "") ? m.askBoo.exchange : m.askBoo.hold;
