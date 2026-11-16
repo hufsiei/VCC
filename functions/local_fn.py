@@ -5,37 +5,70 @@
 #   $env:ANTHROPIC_API_KEY = "발급받은_키"  # Claude 작업용(요약·일치검사 등을 쓸 때만)
 #   python local_fn.py
 #
+# 주소: POST http://localhost:8787/<함수 이름>   (예: /sendMessage)
+#   - 로그인한 사용자는 헤더 X-User(colreg_no)로 받는다. data.js가 붙여 준다.
+#   - 쓰기 기록(쪽지·질문함·동의·신고)은 runtime_fns.py → store.py → data/runtime/*.json (spec 2-1)
+#   - 경로 없이 POST / 는 연결 확인용 AI 연습 호출(그대로 둠)
+#
 # AI는 반드시 ai.py의 callAI(작업명, ...)로만 부른다. 모델 선택은 ai.py의 PROVIDER 표.
-# 지금은 연결 확인용 경로 하나뿐. askBoo 등은 작업 18부터 경로(/askBoo …)로 추가한다.
 import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import unquote
 
-from ai import callAI
+from runtime_fns import ROUTES
+
+NEEDS_NO_LOGIN = {"checkMessage"}
+
+
+def practice(question):
+    from ai import callAI
+    r = callAI(
+        "연습",
+        [{"role": "user", "content": question}],
+        system="너는 한국외대 선배 경험을 전하는 도우미다. 두 문장 이내로 답한다.",
+    )
+    return {"answer": r["text"], "model": r["model"]} if r["ok"] else {"error": r["error"]}
 
 
 class Handler(BaseHTTPRequestHandler):
     def cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-User")
 
     def do_OPTIONS(self):
         self.send_response(204); self.cors(); self.end_headers()
 
     def do_POST(self):
         n = int(self.headers.get("Content-Length", 0))
-        question = json.loads(self.rfile.read(n) or b"{}").get("question", "안녕하세요?")
-        r = callAI(
-            "연습",
-            [{"role": "user", "content": question}],
-            system="너는 한국외대 선배 경험을 전하는 도우미다. 두 문장 이내로 답한다.",
-        )
-        out = {"answer": r["text"], "model": r["model"]} if r["ok"] else {"error": r["error"]}
+        try:
+            payload = json.loads(self.rfile.read(n) or b"{}")
+        except ValueError:
+            return self.reply({"error": "요청 형식이 JSON이 아니에요"})
+        name = unquote(self.path.split("?")[0].strip("/"))
+        me = (self.headers.get("X-User") or "").strip()
+
+        if name in ("", "연습"):
+            return self.reply(practice(payload.get("question", "안녕하세요?")))
+        fn = ROUTES.get(name)
+        if fn is None:
+            return self.reply({"error": f"아직 서버에 없는 함수예요: {name}"})
+        if not me and name not in NEEDS_NO_LOGIN:
+            return self.reply({"error": "로그인이 필요해요"})
+        try:
+            self.reply(fn(me, payload))
+        except Exception as e:   # 시연 중 서버가 죽지 않게
+            self.reply({"error": f"서버 처리 중 문제가 생겼어요: {e}"})
+
+    def reply(self, out):
         b = json.dumps(out, ensure_ascii=False).encode()
         self.send_response(200); self.cors()
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.end_headers(); self.wfile.write(b)
 
+    def log_message(self, fmt, *args):   # 요청 로그를 한 줄로
+        print(f"{self.command} {unquote(self.path)} ({self.headers.get('X-User', '-')})")
+
 
 if __name__ == "__main__":
     print("개발 서버 함수 실행 중: http://localhost:8787  (끄려면 Ctrl+C)")
-    HTTPServer(("localhost", 8787), Handler).serve_forever()
+    ThreadingHTTPServer(("localhost", 8787), Handler).serve_forever()

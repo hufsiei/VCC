@@ -41,9 +41,12 @@ async function call(name, payload = {}) {
       const m = await loadMock();
       return structuredClone(pickMock(m, name, payload));
     }
+    const headers = { "Content-Type": "application/json" };
+    const me = currentUser();
+    if (me && me.colreg_no) headers["X-User"] = me.colreg_no; // 서버가 누가 불렀는지 안다 (spec 2-1)
     const res = await fetch(`${FN_BASE}/${name}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(payload),
     });
     return await res.json();
@@ -52,7 +55,21 @@ async function call(name, payload = {}) {
   }
 }
 
-export const login = (id, pw) => call("login", { id, pw });
+// 로그인한 사용자. 탭마다 따로(sessionStorage) — 두 창 시연용.
+export function currentUser() {
+  try {
+    return JSON.parse(sessionStorage.getItem("me") || "null");
+  } catch {
+    return null;
+  }
+}
+
+export const login = async (id, pw) => {
+  const res = await call("login", { id, pw });
+  if (res && res.ok && res.user) sessionStorage.setItem("me", JSON.stringify(res.user));
+  return res;
+};
+export const logout = () => sessionStorage.removeItem("me");
 export const getMe = () => call("getMe");
 export const askBoo = (question) => call("askBoo", { question });
 export const interviewNext = (program, answers) => call("interviewNext", { program, answers });
