@@ -1,179 +1,615 @@
 {
   "login": {
-    "student": { "ok": true, "user": { "colreg_no": "202530101", "status": "학생" } },
-    "staff": { "ok": true, "user": { "colreg_no": "staff01", "status": "직원", "crs_nm": "국제교류팀" } },
-    "fail": { "ok": false, "reason": "아이디 또는 비밀번호가 맞지 않아요." }
+    "student": {
+      "ok": true,
+      "user": {
+        "colreg_no": "H0143",
+        "status": "학생"
+      }
+    },
+    "staff": {
+      "ok": true,
+      "user": {
+        "colreg_no": "staff01",
+        "status": "직원",
+        "부서명": "전체"
+      }
+    },
+    "fail": {
+      "ok": false,
+      "reason": "아이디 또는 비밀번호가 맞지 않아요."
+    }
   },
   "getMe": {
-    "status": "학생", "campus": "서울", "univ_cd": "서양어대", "crs_nm": "독일어과",
-    "colreg_no": "202530101", "regst_grad": 1, "buj_mjr_nm": "", "dbl_mjr_nm": "경영학",
+    "colreg_no": "H0143",
+    "univ_nm": "서양어대학",
+    "crs_nm": "독일어과",
+    "dbl_mjr_nm": "경영학",
+    "regst_grad": 2,
+    "입학년도": 2025,
+    "해외경험": "없음",
+    "해외경험 유형": null,
+    "파견국가": null,
+    "파견대학": null,
+    "파견시기": null,
+    "현장실습·인턴십": "있음",
+    "인턴 유형": "국내 인턴십(학점 인정)",
+    "기관 유형(가상)": "국제기구 한국사무소",
+    "기관명(가상)": "국제이주정책연구소 서울사무소",
+    "인턴 시기": "2학년 동계방학",
+    "비교과 이수 건수": 3,
+    "비교과 유형": "1회성(1), 진로·취업 교육과정(1), 국제교류·버디 활동(1)",
+    "이수 비교과 프로그램": "합격 면접 취업특강(커리어랩) / 특수외국어 체험형 현장실습(온라인 인턴십) / ISO 국제학생회 STAFF",
+    "경험 조합": "인턴만",
     "비교과이수내역": [
-      { "학년도": "2025", "학기": "2", "프로그램명": "외대쌤", "캠퍼스": "서울", "대학": "서양어대", "학과": "독일어과",
-        "운영부서": "가상부서", "프로그램구분": "비교과", "프로그램구분 소분류": "멘토링", "만족도": 5,
-        "한줄후기": "후배를 가르치면서 오히려 내가 더 많이 배웠다." }
+      {
+        "학과(전공)": "독일어과",
+        "현재 학년": 2,
+        "이수학년도": 2025,
+        "이수학기(1~4)": 3,
+        "학기구분": "2학기",
+        "프로그램명": "합격 면접 취업특강(커리어랩)",
+        "비교과 유형": "1회성",
+        "이수 당시 학년": 1
+      },
+      {
+        "학과(전공)": "독일어과",
+        "현재 학년": 2,
+        "이수학년도": 2025,
+        "이수학기(1~4)": 3,
+        "학기구분": "2학기",
+        "프로그램명": "특수외국어 체험형 현장실습(온라인 인턴십)",
+        "비교과 유형": "진로·취업 교육과정",
+        "이수 당시 학년": 1
+      },
+      {
+        "학과(전공)": "독일어과",
+        "현재 학년": 2,
+        "이수학년도": 2025,
+        "이수학기(1~4)": 4,
+        "학기구분": "겨울방학",
+        "프로그램명": "ISO 국제학생회 STAFF",
+        "비교과 유형": "국제교류·버디 활동",
+        "이수 당시 학년": 1
+      }
     ],
     "귀국보고서": [],
-    "인턴십후기": []
+    "현장실습후기": []
   },
   "askBoo": {
     "exchange": {
       "status": "ok",
       "lines": [
-        { "text": "출국 3학기 전부터 TestDaF를 준비했다는 후기가 많아요.", "sourceId": "R03-1-1", "lineId": "L-R03-1-1" },
-        { "text": "기숙사는 합격 통보를 받은 직후 바로 신청해야 자리가 남아요.", "sourceId": "R03-1-2", "lineId": "L-R03-1-2" },
-        { "text": "첫 학기에는 수업보다 현지 생활에 적응하는 데 시간이 더 걸렸다고 해요.", "sourceId": "I05-1-1", "lineId": "L-I05-1-1" }
+        {
+          "text": "출국 3학기 전부터 TestDaF를 준비했다는 후기가 많아요.",
+          "sourceId": "R03-1-1",
+          "lineId": "L-R03-1-1"
+        },
+        {
+          "text": "기숙사는 합격 통보를 받은 직후 바로 신청해야 자리가 남아요.",
+          "sourceId": "R03-1-2",
+          "lineId": "L-R03-1-2"
+        },
+        {
+          "text": "첫 학기에는 수업보다 현지 생활에 적응하는 데 시간이 더 걸렸다고 해요.",
+          "sourceId": "I05-1-1",
+          "lineId": "L-I05-1-1"
+        }
       ],
       "sources": {
-        "R03-1-1": { "docType": "귀국보고서", "program": "독일 뮌헨대 교환", "semester": "2025-1" },
-        "R03-1-2": { "docType": "귀국보고서", "program": "독일 뮌헨대 교환", "semester": "2025-1" },
-        "I05-1-1": { "docType": "인터뷰", "program": "독일 뮌헨대 교환", "semester": "2025-1" }
+        "R03-1-1": {
+          "docType": "귀국보고서",
+          "program": "마르부르크필립스대학교",
+          "semester": "2024-1"
+        },
+        "R03-1-2": {
+          "docType": "귀국보고서",
+          "program": "마르부르크필립스대학교",
+          "semester": "2024-1"
+        },
+        "I05-1-1": {
+          "docType": "인터뷰",
+          "program": "마르부르크필립스대학교",
+          "semester": "2024-2"
+        }
       },
-      "noteId": "N-munich",
+      "noteId": "N-marburg",
       "suggestSenior": false
     },
     "hold": {
-      "status": "hold", "lines": [], "sources": {}, "questionId": "Q-0001", "suggestSenior": true,
+      "status": "hold",
+      "lines": [],
+      "sources": {},
+      "questionId": "Q-0001",
+      "suggestSenior": true,
       "message": "이 부분은 아직 들은 선배가 없어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?"
     }
   },
   "interviewNext": {
     "steps": [
-      { "done": false, "section": "지원", "question": "뮌헨대 교환은 언제부터 준비하셨어요?", "progress": { "filled": 0, "total": 5 } },
-      { "done": false, "section": "학점", "question": "현지에서 들은 수업은 학점으로 어떻게 인정받으셨어요?", "progress": { "filled": 1, "total": 5 } },
-      { "done": false, "section": "생활", "question": "기숙사나 현지 생활은 어땠나요?", "progress": { "filled": 2, "total": 5 } }
+      {
+        "done": false,
+        "section": "지원",
+        "question": "마르부르크 파견은 언제부터 준비하셨어요?",
+        "progress": {
+          "filled": 0,
+          "total": 6
+        }
+      },
+      {
+        "done": false,
+        "section": "학점",
+        "question": "현지에서 들은 수업은 학점으로 어떻게 인정받으셨어요?",
+        "progress": {
+          "filled": 1,
+          "total": 6
+        }
+      },
+      {
+        "done": false,
+        "section": "생활",
+        "question": "기숙사나 현지 생활은 어땠나요?",
+        "progress": {
+          "filled": 2,
+          "total": 6
+        }
+      }
     ],
-    "done": { "done": true, "progress": { "filled": 5, "total": 5 } }
+    "done": {
+      "done": true,
+      "progress": {
+        "filled": 6,
+        "total": 6
+      }
+    }
   },
   "summarizeInterview": {
-    "draftId": "D-0001", "program": "독일 뮌헨대 교환",
+    "draftId": "D-0001",
+    "program": "마르부르크필립스대학교",
     "myNote": {
       "sections": [
-        { "name": "지원", "lines": [ { "text": "나는 출국 3학기 전부터 TestDaF를 준비했다." } ] },
-        { "name": "생활", "lines": [ { "text": "나는 합격 직후 기숙사를 신청했고, 첫 학기에는 생활에 적응하느라 바빴다." } ] }
+        {
+          "name": "지원",
+          "lines": [
+            {
+              "text": "나는 출국 3학기 전부터 TestDaF를 준비했다."
+            }
+          ]
+        },
+        {
+          "name": "생활",
+          "lines": [
+            {
+              "text": "나는 합격 직후 기숙사를 신청했고, 첫 학기에는 생활에 적응하느라 바빴다."
+            }
+          ]
+        }
       ]
     },
     "publicDraft": {
       "sections": [
-        { "name": "지원", "lines": [ { "lineId": "L-D1-1", "text": "출국 3학기 전부터 TestDaF를 준비했어요.", "match": true } ] },
-        { "name": "생활", "lines": [
-          { "lineId": "L-D1-2", "text": "합격 직후 기숙사를 신청했어요.", "match": true },
-          { "lineId": "L-D1-3", "text": "첫 학기에는 생활에 적응하느라 바빴어요.", "match": true }
-        ] }
+        {
+          "name": "지원",
+          "lines": [
+            {
+              "lineId": "L-D1-1",
+              "text": "출국 3학기 전부터 TestDaF를 준비했어요.",
+              "match": true
+            }
+          ]
+        },
+        {
+          "name": "생활",
+          "lines": [
+            {
+              "lineId": "L-D1-2",
+              "text": "합격 직후 기숙사를 신청했어요.",
+              "match": true
+            },
+            {
+              "lineId": "L-D1-3",
+              "text": "첫 학기에는 생활에 적응하느라 바빴어요.",
+              "match": true
+            }
+          ]
+        }
       ]
     }
   },
-  "saveConsent": { "ok": true, "noteId": "N-munich", "added": 3 },
+  "saveConsent": {
+    "ok": true,
+    "noteId": "N-marburg",
+    "added": 3
+  },
   "listNotes": {
     "notes": [
-      { "id": "N-munich", "program": "독일 뮌헨대 교환", "type": "교환",
-        "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청", "forWhom": "독일어권 교환을 생각하는 1~2학년",
-        "evidenceCount": 7, "lastSemester": "2025-1", "satisfaction": 4.5 },
-      { "id": "N-trade-intern", "program": "무역협회 인턴십", "type": "인턴",
-        "oneLine": "직무 이해를 먼저 정리하고 지원하면 면접이 수월해요", "forWhom": "무역·경영 분야 인턴을 생각하는 2~3학년",
-        "evidenceCount": 3, "lastSemester": "2025-여름", "satisfaction": 4.0 }
+      {
+        "id": "N-marburg",
+        "program": "마르부르크필립스대학교",
+        "type": "교환",
+        "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청",
+        "forWhom": "독일어권 파견을 생각하는 1~2학년",
+        "evidenceCount": 7,
+        "lastSemester": "2026-1",
+        "satisfaction": null
+      },
+      {
+        "id": "N-kotra",
+        "program": "KOTRA 해외무역관(유럽 권역)",
+        "type": "인턴",
+        "oneLine": "전시·행사 지원 업무가 많아 현장 대응력이 길러져요",
+        "forWhom": "해외영업·전시 분야 현장실습을 생각하는 2~3학년",
+        "evidenceCount": 3,
+        "lastSemester": "2025-여름",
+        "satisfaction": null
+      }
     ]
   },
   "getNote": {
-    "N-munich": {
-      "id": "N-munich", "program": "독일 뮌헨대 교환", "type": "교환",
-      "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청", "forWhom": "독일어권 교환을 생각하는 1~2학년",
-      "evidenceCount": 7, "lastSemester": "2025-1", "satisfaction": 4.5,
+    "N-marburg": {
+      "id": "N-marburg",
+      "program": "마르부르크필립스대학교",
+      "type": "교환",
+      "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청",
+      "forWhom": "독일어권 파견을 생각하는 1~2학년",
+      "evidenceCount": 7,
+      "lastSemester": "2026-1",
+      "satisfaction": null,
       "officialUrl": "https://example.com/hufs/exchange",
       "sections": [
-        { "name": "지원", "interviewOnly": false, "lines": [
-          { "text": "출국 3학기 전부터 TestDaF를 준비했다는 후기가 많아요.", "sourceId": "R03-1-1", "lineId": "L-R03-1-1", "official": false },
-          { "text": "지원서의 학업계획서는 전공과 연결해 쓴 사람이 많았어요.", "sourceId": "R03-1-3", "lineId": "L-R03-1-3", "official": false }
-        ] },
-        { "name": "학점", "interviewOnly": false, "lines": [
-          { "text": "현지에서 들은 과목은 학과 승인을 받으면 학점으로 인정돼요.", "sourceId": "R03-2-1", "lineId": "L-R03-2-1", "official": true }
-        ] },
-        { "name": "비용", "interviewOnly": false, "lines": [] },
-        { "name": "생활", "interviewOnly": false, "lines": [
-          { "text": "기숙사는 합격 통보를 받은 직후 바로 신청해야 자리가 남아요.", "sourceId": "R03-1-2", "lineId": "L-R03-1-2", "official": false },
-          { "text": "첫 학기에는 수업보다 현지 생활에 적응하는 데 시간이 더 걸렸다고 해요.", "sourceId": "I05-1-1", "lineId": "L-I05-1-1", "official": false }
-        ] },
-        { "name": "팁", "interviewOnly": false, "lines": [
-          { "text": "출국 전에 현지 은행 계좌와 교통권 정보를 미리 알아 두면 편해요.", "sourceId": "R03-3-1", "lineId": "L-R03-3-1", "official": false }
-        ] }
+        {
+          "name": "지원",
+          "interviewOnly": false,
+          "lines": [
+            {
+              "text": "출국 3학기 전부터 TestDaF를 준비했다는 후기가 많아요.",
+              "sourceId": "R03-1-1",
+              "lineId": "L-R03-1-1",
+              "official": false
+            },
+            {
+              "text": "지원서의 학업계획서는 전공과 연결해 쓴 사람이 많았어요.",
+              "sourceId": "R03-1-3",
+              "lineId": "L-R03-1-3",
+              "official": false
+            }
+          ]
+        },
+        {
+          "name": "학점",
+          "interviewOnly": false,
+          "lines": [
+            {
+              "text": "현지에서 들은 과목은 학과 승인을 받으면 학점으로 인정돼요.",
+              "sourceId": "R03-2-1",
+              "lineId": "L-R03-2-1",
+              "official": true
+            }
+          ]
+        },
+        {
+          "name": "비용",
+          "interviewOnly": false,
+          "lines": []
+        },
+        {
+          "name": "생활",
+          "interviewOnly": false,
+          "lines": [
+            {
+              "text": "기숙사는 합격 통보를 받은 직후 바로 신청해야 자리가 남아요.",
+              "sourceId": "R03-1-2",
+              "lineId": "L-R03-1-2",
+              "official": false
+            },
+            {
+              "text": "첫 학기에는 수업보다 현지 생활에 적응하는 데 시간이 더 걸렸다고 해요.",
+              "sourceId": "I05-1-1",
+              "lineId": "L-I05-1-1",
+              "official": false
+            }
+          ]
+        },
+        {
+          "name": "팁",
+          "interviewOnly": false,
+          "lines": [
+            {
+              "text": "출국 전에 현지 은행 계좌와 교통권 정보를 미리 알아 두면 편해요.",
+              "sourceId": "R03-3-1",
+              "lineId": "L-R03-3-1",
+              "official": false
+            }
+          ]
+        },
+        {
+          "name": "배운점",
+          "interviewOnly": true,
+          "lines": [
+            {
+              "text": "\"낯선 행정 절차를 혼자 끝까지 처리하는 법을 배웠어요.\"",
+              "sourceId": "I05-1-2",
+              "lineId": "L-I05-1-2",
+              "official": false
+            }
+          ]
+        }
       ],
       "sources": {
-        "R03-1-1": { "docType": "귀국보고서", "program": "독일 뮌헨대 교환", "semester": "2025-1" },
-        "R03-1-2": { "docType": "귀국보고서", "program": "독일 뮌헨대 교환", "semester": "2025-1" },
-        "R03-1-3": { "docType": "귀국보고서", "program": "독일 뮌헨대 교환", "semester": "2025-1" },
-        "R03-2-1": { "docType": "귀국보고서", "program": "독일 뮌헨대 교환", "semester": "2025-1" },
-        "R03-3-1": { "docType": "귀국보고서", "program": "독일 뮌헨대 교환", "semester": "2025-1" },
-        "I05-1-1": { "docType": "인터뷰", "program": "독일 뮌헨대 교환", "semester": "2025-1" }
+        "R03-1-1": {
+          "docType": "귀국보고서",
+          "program": "마르부르크필립스대학교",
+          "semester": "2024-1"
+        },
+        "R03-1-2": {
+          "docType": "귀국보고서",
+          "program": "마르부르크필립스대학교",
+          "semester": "2024-1"
+        },
+        "R03-1-3": {
+          "docType": "귀국보고서",
+          "program": "마르부르크필립스대학교",
+          "semester": "2024-1"
+        },
+        "R03-2-1": {
+          "docType": "귀국보고서",
+          "program": "마르부르크필립스대학교",
+          "semester": "2024-1"
+        },
+        "R03-3-1": {
+          "docType": "귀국보고서",
+          "program": "마르부르크필립스대학교",
+          "semester": "2024-1"
+        },
+        "I05-1-1": {
+          "docType": "인터뷰",
+          "program": "마르부르크필립스대학교",
+          "semester": "2024-2"
+        },
+        "I05-1-2": {
+          "docType": "인터뷰",
+          "program": "마르부르크필립스대학교",
+          "semester": "2024-2"
+        }
       }
     },
-    "N-trade-intern": {
-      "id": "N-trade-intern", "program": "무역협회 인턴십", "type": "인턴",
-      "oneLine": "직무 이해를 먼저 정리하고 지원하면 면접이 수월해요", "forWhom": "무역·경영 분야 인턴을 생각하는 2~3학년",
-      "evidenceCount": 3, "lastSemester": "2025-여름", "satisfaction": 4.0,
+    "N-kotra": {
+      "id": "N-kotra",
+      "program": "KOTRA 해외무역관(유럽 권역)",
+      "type": "인턴",
+      "oneLine": "전시·행사 지원 업무가 많아 현장 대응력이 길러져요",
+      "forWhom": "해외영업·전시 분야 현장실습을 생각하는 2~3학년",
+      "evidenceCount": 3,
+      "lastSemester": "2025-여름",
+      "satisfaction": null,
       "officialUrl": "https://example.com/hufs/intern",
       "sections": [
-        { "name": "지원동기", "interviewOnly": false, "lines": [
-          { "text": "전공 외국어를 무역 실무에서 써 보고 싶어서 지원했다는 후기가 있어요.", "sourceId": "T01-1-1", "lineId": "L-T01-1-1", "official": false }
-        ] },
-        { "name": "업무내용", "interviewOnly": false, "lines": [
-          { "text": "해외 바이어 자료를 번역하고 정리하는 일을 주로 맡았어요.", "sourceId": "T01-2-1", "lineId": "L-T01-2-1", "official": false }
-        ] },
-        { "name": "배운점", "interviewOnly": false, "lines": [
-          { "text": "무역 용어와 문서 흐름을 익힌 것이 가장 도움이 됐다고 해요.", "sourceId": "T01-3-1", "lineId": "L-T01-3-1", "official": false }
-        ] },
-        { "name": "지원·선발", "interviewOnly": true, "lines": [] },
-        { "name": "근무조건", "interviewOnly": true, "lines": [] }
+        {
+          "name": "지원동기",
+          "interviewOnly": false,
+          "lines": [
+            {
+              "text": "전공 외국어를 무역 실무에서 써 보고 싶어서 지원했다는 후기가 있어요.",
+              "sourceId": "T01-1-1",
+              "lineId": "L-T01-1-1",
+              "official": false
+            }
+          ]
+        },
+        {
+          "name": "업무내용",
+          "interviewOnly": false,
+          "lines": [
+            {
+              "text": "해외 바이어 자료를 번역하고 정리하는 일을 주로 맡았어요.",
+              "sourceId": "T01-2-1",
+              "lineId": "L-T01-2-1",
+              "official": false
+            }
+          ]
+        },
+        {
+          "name": "배운점",
+          "interviewOnly": false,
+          "lines": [
+            {
+              "text": "무역 용어와 문서 흐름을 익힌 것이 가장 도움이 됐다고 해요.",
+              "sourceId": "T01-3-1",
+              "lineId": "L-T01-3-1",
+              "official": false
+            }
+          ]
+        },
+        {
+          "name": "지원·선발",
+          "interviewOnly": true,
+          "lines": []
+        },
+        {
+          "name": "근무조건",
+          "interviewOnly": true,
+          "lines": []
+        }
       ],
       "sources": {
-        "T01-1-1": { "docType": "인턴십후기", "program": "무역협회 인턴십", "semester": "2025-여름" },
-        "T01-2-1": { "docType": "인턴십후기", "program": "무역협회 인턴십", "semester": "2025-여름" },
-        "T01-3-1": { "docType": "인턴십후기", "program": "무역협회 인턴십", "semester": "2025-여름" }
+        "T01-1-1": {
+          "docType": "현장실습후기",
+          "program": "KOTRA 해외무역관(유럽 권역)",
+          "semester": "2025-여름"
+        },
+        "T01-2-1": {
+          "docType": "현장실습후기",
+          "program": "KOTRA 해외무역관(유럽 권역)",
+          "semester": "2025-여름"
+        },
+        "T01-3-1": {
+          "docType": "현장실습후기",
+          "program": "KOTRA 해외무역관(유럽 권역)",
+          "semester": "2025-여름"
+        }
       }
     }
   },
   "recommendSeniors": {
     "seniors": [
-      { "studentId": "202130012", "nickname": "익명 1", "score": 14,
-        "reasons": ["같은 서양어대", "같은 독일어과", "이중전공 경영학 같음", "외대쌤 함께 이수"] },
-      { "studentId": "202130045", "nickname": "익명 2", "score": 5,
-        "reasons": ["같은 서양어대", "같은 뮌헨대 교환"] }
+      {
+        "studentId": "H0469",
+        "nickname": "독일어과 선배 A",
+        "score": 13,
+        "reasons": [
+          "같은 서양어대학",
+          "같은 독일어과",
+          "이중전공 경영학 같음",
+          "합격 면접 취업특강(커리어랩) 함께 이수"
+        ]
+      },
+      {
+        "studentId": "H0745",
+        "nickname": "독일어과 선배 B",
+        "score": 8,
+        "reasons": [
+          "같은 서양어대학",
+          "같은 독일어과"
+        ]
+      }
     ]
   },
   "checkMessage": {
-    "ok": { "ok": true },
-    "blocked": { "ok": false, "reason": "연락처", "message": "전화번호나 학번은 보낼 수 없어요. 이메일은 괜찮아요." }
+    "ok": {
+      "ok": true
+    },
+    "blocked": {
+      "ok": false,
+      "reason": "연락처",
+      "message": "전화번호나 학번은 보낼 수 없어요. 이메일은 괜찮아요."
+    }
   },
-  "sendMessage": { "ok": true, "threadId": "T-0001", "at": "2026-11-20T10:00:00+09:00" },
+  "previewNickname": {
+    "myNickname": "용감한 수달"
+  },
+  "sendMessage": {
+    "ok": true,
+    "threadId": "T-0001",
+    "myNickname": "용감한 수달",
+    "at": "2026-11-20T10:00:00+09:00"
+  },
+  "respondRequest": {
+    "ok": true,
+    "accepted": true
+  },
   "getMessages": {
     "threads": [
-      { "threadId": "T-0001", "withId": "202130012", "nickname": "익명 1",
-        "accepted": true, "unread": 1,
+      {
+        "threadId": "T-0002",
+        "role": "senior",
+        "withId": "H0102",
+        "nickname": "조용한 고래",
+        "askerInfo": {
+          "학년": 1,
+          "관심": [
+            "교환학생·독일"
+          ]
+        },
+        "accepted": false,
+        "unread": 1,
         "messages": [
-          { "from": "me", "text": "안녕하세요, 뮌헨대 교환 준비가 궁금해서 쪽지 드려요.", "at": "2026-11-20T10:00:00+09:00" },
-          { "from": "them", "text": "반가워요! 궁금한 점을 편하게 물어보세요.", "at": "2026-11-20T11:30:00+09:00" }
-        ] }
+          {
+            "from": "them",
+            "text": "안녕하세요, 마르부르크 교환에서 학점 인정을 어떻게 받으셨는지 궁금해요.",
+            "at": "2026-11-21T09:10:00+09:00"
+          }
+        ]
+      },
+      {
+        "threadId": "T-0001",
+        "role": "asker",
+        "withId": "H0469",
+        "nickname": "독일어과 선배 A",
+        "myNickname": "용감한 수달",
+        "accepted": true,
+        "unread": 1,
+        "messages": [
+          {
+            "from": "me",
+            "text": "안녕하세요, 마르부르크 파견 준비가 궁금해서 쪽지 드려요.",
+            "at": "2026-11-20T10:00:00+09:00"
+          },
+          {
+            "from": "them",
+            "text": "반가워요! 궁금한 점을 편하게 물어보세요.",
+            "at": "2026-11-20T11:30:00+09:00"
+          }
+        ]
+      }
     ]
   },
   "getInbox": {
-    "myNotes": [ { "id": "N-munich", "program": "독일 뮌헨대 교환" } ],
-    "questions": [
-      { "questionId": "Q-0001", "text": "HUFS특강은 어떤 수업인가요?", "status": "waiting", "askedAt": "2026-11-18T09:00:00+09:00" },
-      { "questionId": "Q-0002", "text": "독일 교환 준비는 언제부터 하나요?", "status": "answered", "noteId": "N-munich" }
+    "myNotes": [
+      {
+        "id": "N-marburg",
+        "program": "마르부르크필립스대학교"
+      }
     ],
-    "scraps": [ { "noteId": "N-munich", "program": "독일 뮌헨대 교환" } ],
-    "alerts": [ { "text": "기다리던 질문에 새 노트가 생겼어요.", "noteId": "N-munich", "at": "2026-11-19T15:00:00+09:00" } ]
+    "questions": [
+      {
+        "questionId": "Q-0001",
+        "text": "HUFS특강은 어떤 수업인가요?",
+        "status": "waiting",
+        "askedAt": "2026-11-18T09:00:00+09:00"
+      },
+      {
+        "questionId": "Q-0002",
+        "text": "마르부르크 파견 준비는 언제부터 하나요?",
+        "status": "answered",
+        "noteId": "N-marburg"
+      }
+    ],
+    "scraps": [
+      {
+        "noteId": "N-marburg",
+        "program": "마르부르크필립스대학교"
+      }
+    ],
+    "alerts": [
+      {
+        "text": "기다리던 질문에 새 노트가 생겼어요.",
+        "noteId": "N-marburg",
+        "at": "2026-11-19T15:00:00+09:00"
+      }
+    ]
   },
-  "reportStatement": { "ok": true, "hidden": true },
+  "reportStatement": {
+    "ok": true,
+    "hidden": true
+  },
   "getDeptReport": {
-    "dept": "국제교류팀", "period": "2026-11",
+    "dept": "국제교류팀",
+    "period": "2026-11",
     "programs": [
-      { "program": "독일 뮌헨대 교환", "questions": 12, "unanswered": 3, "reports": 1 },
-      { "program": "무역협회 인턴십", "questions": 5, "unanswered": 2, "reports": 0 }
+      {
+        "program": "마르부르크필립스대학교",
+        "questions": 12,
+        "unanswered": 3,
+        "reports": 1
+      },
+      {
+        "program": "KOTRA 해외무역관(유럽 권역)",
+        "questions": 5,
+        "unanswered": 2,
+        "reports": 0
+      }
     ],
     "unansweredQuestions": [
-      { "text": "교환 기간 중 휴학 처리는 어떻게 하나요?", "count": 4 },
-      { "text": "인턴십 근무 시간은 어떻게 되나요?", "count": 2 }
+      {
+        "text": "교환 기간 중 휴학 처리는 어떻게 하나요?",
+        "count": 4
+      },
+      {
+        "text": "인턴십 근무 시간은 어떻게 되나요?",
+        "count": 2
+      }
     ],
     "reportedStatements": 1,
-    "summary": "이번 달에는 독일 뮌헨대 교환 관련 질문이 가장 많았고, 휴학 처리와 근무 조건처럼 선배 경험만으로 답하기 어려운 질문이 미해결로 남아 있어요."
+    "summary": "이번 달에는 마르부르크필립스대학교 관련 질문이 가장 많았고, 휴학 처리와 근무 조건처럼 선배 경험만으로 답하기 어려운 질문이 미해결로 남아 있어요."
   }
 }
