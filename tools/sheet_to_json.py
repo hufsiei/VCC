@@ -6,6 +6,8 @@
 #   - JSON 키는 시트 헤더 글자 그대로. 분포요약·생성기준 시트는 변환하지 않음
 #   - students.json에서 studt_na_kr·sex·나이(만) 제외
 #   - 가상질문은 봉인(Y) 행을 빼고 질문이 있는 행만 eval-questions.csv로
+#   - 학기 코드(1·2·3·4)로 semester("2024-1"·"2024-여름"·"2024-2"·"2024-겨울")를 만들어
+#     extracurricular·reports·internships·evidence 각 행에 덧붙임(시트에 없는 값이라 영어 키)
 # 필요: pip install openpyxl
 import csv, json, re, sys
 from pathlib import Path
@@ -25,6 +27,14 @@ REPORT_SECTIONS = {  # 문항 헤더 -> 칸 (spec 9장)
     "2-7. 기타 사항": "생활", "4. 후배들에게 남기고픈 한마디": "팁",
 }
 errors = []
+SEM_SUFFIX = {1: "1", 2: "여름", 3: "2", 4: "겨울"}
+
+
+def semester(year, code, where):
+    if year is None or code not in SEM_SUFFIX:
+        errors.append(f"{where}: 학기 코드 이상 ({year}, {code})")
+        return None
+    return f"{year}-{SEM_SUFFIX[code]}"
 
 
 def clean(v):
@@ -67,6 +77,13 @@ def main():
     manual = {r["프로그램명"]: r["수동 지정 부서코드"] for r in read(wb["비교과_부서배정(확인용)"], "프로그램명")
               if r.get("수동 지정 부서코드")}
     questions = read(wb["가상질문"], "질문")
+
+    # ── semester 덧붙이기 ──
+    for r in extra:
+        r["semester"] = semester(r.get("이수학년도"), r.get("이수학기(1~4)"), f"가상비교과 {r.get('번호')}")
+    for name, rows_ in [("가상귀국보고서", reports), ("가상현장실습후기", interns)]:
+        for r in rows_:
+            r["semester"] = semester(r.get("학년도"), r.get("학기"), f"{name} {r.get('학번')}")
 
     # ── 학생 열쇠 검사 ──
     ids = {s["colreg_no"] for s in students}
@@ -135,13 +152,13 @@ def main():
                 errors.append(f"가상귀국보고서: 문항 헤더 없음 {q}"); continue
             if r[q]:
                 evidence.append({"id": f"R{i:03d}-{q.split('.')[0]}", "docType": "귀국보고서", "학번": r["학번"],
-                                 "학년도": r["학년도"], "학기": r["학기"], "프로그램명": r["대학명"],
+                                 "학년도": r["학년도"], "학기": r["학기"], "semester": r["semester"], "프로그램명": r["대학명"],
                                  "문항": q, "칸": sec, "text": r[q]})
     for i, r in enumerate(interns, 1):
         paras = [p.strip() for p in re.split(r"\n\s*\n", r.get("후기") or "") if p.strip()]
         for j, p in enumerate(paras, 1):
             evidence.append({"id": f"I{i:03d}-{j}", "docType": "현장실습후기", "학번": r["학번"],
-                             "학년도": r["학년도"], "학기": r["학기"], "프로그램명": r["업체명"],
+                             "학년도": r["학년도"], "학기": r["학기"], "semester": r["semester"], "프로그램명": r["업체명"],
                              "문항": "후기", "칸": "", "text": p})
 
     # ── 저장 ──
