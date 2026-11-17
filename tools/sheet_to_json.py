@@ -4,7 +4,7 @@
 #   원본 엑셀은 저장소에 올리지 않는다(.gitignore 대상 아님 — 저장소 밖에 둘 것).
 # 규칙: docs/spec-v1.md 9장, data/README.md
 #   - JSON 키는 시트 헤더 글자 그대로. 분포요약·생성기준 시트는 변환하지 않음
-#   - students.json에서 studt_na_kr·sex·나이(만) 제외
+#   - 가상학생은 모든 열 변환(가상 성명·성별·나이 포함, 2026-11-17 결정)
 #   - 가상질문은 봉인(Y) 행을 빼고 질문이 있는 행만 eval-questions.csv로
 # 필요: pip install openpyxl
 import csv, json, re, sys
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT.parent / "가상데이터_1000명.xlsx"
 
-DROP_STUDENT = {"studt_na_kr", "sex", "나이(만)"}
+DROP_STUDENT = set()  # 뺄 열이 생기면 여기에
 ALIASES = {"마르부르크필립스대학교": ["마르부르크", "마르부르크대", "마부르크"]}
 REPORT_SECTIONS = {  # 문항 헤더 -> 칸 (spec 9장)
     "1-1. 입학허가서 신청시 유의사항": "지원", "1-2. 비자 취득, 항공권 및 유학생 보험 구입": "지원",
