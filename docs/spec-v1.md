@@ -47,7 +47,7 @@
 
 - **지금(로컬):** `functions/local_fn.py`가 시작할 때 `data/runtime/*.json`을 읽어 메모리에 두고, 기록이 바뀔 때마다 그 파일을 다시 쓴다(임시 파일에 쓴 뒤 바꿔 끼워 반쯤 쓰인 파일이 남지 않게). 서버를 껐다 켜도 남는다.
 - **Cloud Functions 이사 후:** 같은 파일 이름을 NCP **Object Storage**의 객체로 둔다. 바꾸는 곳은 `functions/store.py`의 저장 방식 한 곳뿐이다(`STORE_BACKEND=file|ncp`). 다른 코드는 `store.load(이름)`·`store.save(이름)`만 쓰고 파일을 직접 열지 않는다.
-- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `counters.json`(번호 매기기). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 8개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). 관리자 콘솔용 `reportSettings.json`·`issuedReports.json`·`suggestionStatus.json`은 작업 66에서 같은 방식으로 더한다.
+- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별로 지금까지 보여 준 추천 선배, 최대 9명) · `counters.json`(번호 매기기). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 8개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). 관리자 콘솔용 `reportSettings.json`·`issuedReports.json`·`suggestionStatus.json`은 작업 66에서 같은 방식으로 더한다.
 - **누가 부르는지:** 서버는 헤더 `X-User`로 사용자를 안다. 없으면 `{ "error": "로그인이 필요해요" }`.
 - **초기화:** 리허설 전 `python functions/reset_runtime.py` → runtime 파일을 비우고 시연 시작 상태로 돌린다.
 - `data/runtime/`은 커밋하지 않는다(`.gitignore`). 시연 중 쌓인 기록이 저장소에 섞이지 않게.
@@ -159,12 +159,23 @@ payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"
 `official: true`인 문장(학점 인정·장학금·자격 요건·선발 기준 같은 규정성 진술)은 화면이 "개인 경험이에요" 표시 + `officialUrl` 링크를 붙인다.
 `officialUrl`은 서버가 **프로그램의 `운영부서코드` → `departments.json`의 `공식안내URL`** 순서로 찾아 넣는다(프로그램 목록 시트에는 URL 열이 없다, PRD 6-2).
 
-### recommendSeniors(noteId)
-payload `{noteId}`. `nickname`은 서버가 만든 선배 표시명 「학과 + 선배 + 영문 대문자」(예: `"독일어과 선배 A"`, 디자인 규칙 1-2절). 같은 선배는 닮은선배·프로필·해봤노트 인용·쪽지창에서 같은 이름이다. 점수 계산은 `common/score.js`(원우). AI 없음.
+### recommendSeniors(noteId, more)
+payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명 「학과 + 선배 + 영문 대문자」(예: `"독일어과 선배 A"`, 디자인 규칙 1-2절). 같은 선배는 닮은선배·프로필·해봤노트 인용·쪽지창에서 같은 이름이다. 점수 계산은 `common/score.js`(원우). AI 없음.
+
+**인원 규칙(11/18, PRD 2-2·4-1):**
+- 후보 = 그 노트의 경험자 중 점수가 **3점 이상**(단과대 일치)인 사람, 점수 내림차순. 직원 행·본인은 뺀다.
+- `more` 없이 부르면 보는 사람에게 **지금까지 보여 준 목록 전체**를 돌려준다(처음이면 상위 3명을 보여 준 것으로 기록). `more: true`면 다음 3명을 더해 저장한 뒤 전체를 돌려준다.
+- 상한은 **9명**. 9명에 닿았거나 후보가 바닥나면 `hasMore: false`. `more: true`가 와도 더 늘리지 않는다. 날짜·횟수 제한은 없다.
+- 보여 준 목록(studentId 순서)은 보는 사람·noteId별로 `shownSeniors.json`에 저장한다. 글자는 `nicknames.json`의 만난 순서를 그대로 쓰므로 다시 들어와도 같은 사람·같은 글자(A~I)다.
+- 재추천(P1): 후보 중 아직 안 보여 준 사람이 새로 생기면(새 노트 공유) `newCount`로 알리고, 보는 사람의 비교과·이중전공이 바뀌면 `recomputed: true`와 함께 점수만 다시 매긴다(이미 보여 준 사람은 빼지 않는다).
 ```json
 { "seniors": [ { "studentId": "H0469", "nickname": "독일어과 선배 A", "score": 13,
-                 "reasons": ["같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음", "합격 면접 취업특강(커리어랩) 함께 이수"] } ] }
+                 "reasons": ["같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음", "합격 면접 취업특강(커리어랩) 함께 이수"] },
+               { "studentId": "H0745", "nickname": "독일어과 선배 B", "score": 8,
+                 "reasons": ["같은 서양어대학", "같은 독일어과"] } ],
+  "shown": 2, "hasMore": false, "newCount": 0 }
 ```
+`hasMore: true`일 때만 화면에 「선배 더 보기」를 두고, `false`면 「비슷한 선배를 모두 보여드렸어요」를 보인다. 시연 mock은 후보가 2명이므로 첫 화면부터 `hasMore: false`다.
 
 ### checkMessage(text)
 payload `{text}`. 연락처·학번은 코드(정규식), 비방은 AI 판정.
@@ -176,6 +187,11 @@ reason: `연락처` | `학번` | `비방`
 
 ### sendMessage(to, text)
 payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청이 된다.
+**요청 한도(11/18):** 같은 선배에게 열린 대화가 이미 있으면 새 요청을 만들지 않고 그 대화에 붙인다(선배 한 명당 요청 1건). 보낸 사람이 **수락 전(`status: "waiting"`)인 요청을 3건** 가지고 있으면 `{ "ok": false, "reason": "한도", "message": "답을 기다리는 쪽지가 3건이에요. 기다리는 요청을 취소하거나 선배가 답하면 더 보낼 수 있어요." }`. 닮은선배 추천 수를 제한하지 않는 대신 쪽지는 여기서 막는다.
+막힘 방지(응답 없는 선배 3명에게 갇히지 않게) 두 가지:
+- **보낸 사람이 취소(P0)**: `respondRequest(threadId, cancel: true)`로 기다리는 요청을 거둔다 → `status: "cancelled"`, 한도에서 빠진다. 취소한 선배에게는 7일 동안 다시 요청하지 못한다(반복 요청 방지). 선배 화면에서는 그 요청이 조용히 사라진다(알림 없음).
+- **자동 만료(P1)**: 보낸 뒤 **7일** 안에 선배가 수락·거절하지 않으면 서버가 `status: "expired"`로 바꾸고 한도에서 뺀다. 보낸 사람에게 알림 「선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?」(`alerts.json`). 만료 판정은 `getMessages`·`sendMessage` 호출 때 `requestedAt` 기준으로 한다(별도 스케줄러 없음). 시연에서는 7일이 지나지 않으므로 문구로만 설명한다.
+대화 상태 `status`: `waiting`(수락 대기) | `accepted` | `declined` | `cancelled` | `expired`. 한도에 세는 것은 `waiting`만이다. 기존 `accepted: true|false`는 `status`로 대신한다.
 첫 메시지일 때 서버가 이 대화에서 쓸 보낸 사람 닉네임(`myNickname`, 형용사 + 동물)을 만든다. 화면은 요청 시트를 열 때 `previewNickname(to)`로 같은 값을 미리 받아 「선배에게는 '용감한 수달'로 보여요」를 보여 준다.
 ```json
 { "ok": true, "threadId": "T-0001", "myNickname": "용감한 수달", "at": "2026-11-20T10:00:00+09:00" }
@@ -192,18 +208,23 @@ payload `{to}`. 이 선배에게 보낼 대화의 내 닉네임을 정해 돌려
 ```json
 { "threads": [
   { "threadId": "T-0001", "role": "asker", "withId": "H0469", "nickname": "독일어과 선배 A", "myNickname": "용감한 수달",
-    "accepted": true, "unread": 1,
+    "status": "accepted", "requestedAt": "2026-11-20T10:00:00+09:00", "unread": 1,
     "messages": [ { "from": "me", "text": "...", "at": "..." }, { "from": "them", "text": "...", "at": "..." } ] },
   { "threadId": "T-0002", "role": "senior", "withId": "H0102", "nickname": "조용한 고래",
     "askerInfo": { "학년": 1, "관심": ["교환학생·독일"] },
-    "accepted": false, "unread": 1,
-    "messages": [ { "from": "them", "text": "...", "at": "..." } ] } ] }
+    "status": "waiting", "requestedAt": "2026-11-21T09:00:00+09:00", "unread": 1,
+    "messages": [ { "from": "them", "text": "...", "at": "..." } ] } ],
+  "waitingCount": 1, "waitingLimit": 3 }
 ```
+`waitingCount`는 내가 asker로 보낸 `waiting` 요청 수. 화면은 `waitingCount >= waitingLimit`이면 「쪽지 요청」 버튼 대신 안내를 보인다(디자인 규칙 ④·⑤). `cancelled`·`expired` 대화는 asker에게만 보이고(선배 목록에서는 사라짐), 보낸 글은 남는다.
 
-### respondRequest(threadId, accept)
-받은 선배가 쪽지 요청을 수락·거절한다. payload `{threadId, accept: true|false}`
+### respondRequest(threadId, accept | cancel)
+payload `{threadId, accept: true|false}` 또는 `{threadId, cancel: true}`.
+- `accept`: 받은 선배가 수락·거절한다. `waiting`이 아닌 대화에는 `{ "ok": false, "reason": "상태" }`.
+- `cancel`: 보낸 사람이 기다리는 요청을 거둔다(`waiting` → `cancelled`). 자기 대화가 아니거나 `waiting`이 아니면 `{ "ok": false, "reason": "상태" }`.
 ```json
-{ "ok": true, "accepted": true }
+{ "ok": true, "status": "accepted" }
+{ "ok": true, "status": "cancelled" }
 ```
 
 ### getInbox()
@@ -237,7 +258,7 @@ payload `{lineId, reason?}`. 신고된 문장은 즉시 숨김, 부서 리포트
 login(id, pw) · getMe() · askBoo(question)
 interviewNext(program, answers) · summarizeInterview(program, transcript) · saveConsent(draftId, edits)
 listNotes(filter) · getNote(id) · reportStatement(lineId, reason)
-recommendSeniors(noteId) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept)
+recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept)
 getInbox() · getDeptReport(dept)
 currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이 성공 시 저장)
 ```
