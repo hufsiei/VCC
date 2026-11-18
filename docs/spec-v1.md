@@ -187,7 +187,11 @@ reason: `연락처` | `학번` | `비방`
 
 ### sendMessage(to, text)
 payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청이 된다.
-**요청 한도(11/18):** 같은 선배에게 열린 대화가 이미 있으면 새 요청을 만들지 않고 그 대화에 붙인다(선배 한 명당 요청 1건). 보낸 사람이 **수락 전인 요청을 3건** 가지고 있으면 `{ "ok": false, "reason": "한도", "message": "답을 기다리는 쪽지가 3건이에요. 선배가 수락하면 더 보낼 수 있어요." }`. 닮은선배 추천 수를 제한하지 않는 대신 쪽지는 여기서 막는다.
+**요청 한도(11/18):** 같은 선배에게 열린 대화가 이미 있으면 새 요청을 만들지 않고 그 대화에 붙인다(선배 한 명당 요청 1건). 보낸 사람이 **수락 전(`status: "waiting"`)인 요청을 3건** 가지고 있으면 `{ "ok": false, "reason": "한도", "message": "답을 기다리는 쪽지가 3건이에요. 기다리는 요청을 취소하거나 선배가 답하면 더 보낼 수 있어요." }`. 닮은선배 추천 수를 제한하지 않는 대신 쪽지는 여기서 막는다.
+막힘 방지(응답 없는 선배 3명에게 갇히지 않게) 두 가지:
+- **보낸 사람이 취소(P0)**: `respondRequest(threadId, cancel: true)`로 기다리는 요청을 거둔다 → `status: "cancelled"`, 한도에서 빠진다. 취소한 선배에게는 7일 동안 다시 요청하지 못한다(반복 요청 방지). 선배 화면에서는 그 요청이 조용히 사라진다(알림 없음).
+- **자동 만료(P1)**: 보낸 뒤 **7일** 안에 선배가 수락·거절하지 않으면 서버가 `status: "expired"`로 바꾸고 한도에서 뺀다. 보낸 사람에게 알림 「선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?」(`alerts.json`). 만료 판정은 `getMessages`·`sendMessage` 호출 때 `requestedAt` 기준으로 한다(별도 스케줄러 없음). 시연에서는 7일이 지나지 않으므로 문구로만 설명한다.
+대화 상태 `status`: `waiting`(수락 대기) | `accepted` | `declined` | `cancelled` | `expired`. 한도에 세는 것은 `waiting`만이다. 기존 `accepted: true|false`는 `status`로 대신한다.
 첫 메시지일 때 서버가 이 대화에서 쓸 보낸 사람 닉네임(`myNickname`, 형용사 + 동물)을 만든다. 화면은 요청 시트를 열 때 `previewNickname(to)`로 같은 값을 미리 받아 「선배에게는 '용감한 수달'로 보여요」를 보여 준다.
 ```json
 { "ok": true, "threadId": "T-0001", "myNickname": "용감한 수달", "at": "2026-11-20T10:00:00+09:00" }
@@ -204,18 +208,23 @@ payload `{to}`. 이 선배에게 보낼 대화의 내 닉네임을 정해 돌려
 ```json
 { "threads": [
   { "threadId": "T-0001", "role": "asker", "withId": "H0469", "nickname": "독일어과 선배 A", "myNickname": "용감한 수달",
-    "accepted": true, "unread": 1,
+    "status": "accepted", "requestedAt": "2026-11-20T10:00:00+09:00", "unread": 1,
     "messages": [ { "from": "me", "text": "...", "at": "..." }, { "from": "them", "text": "...", "at": "..." } ] },
   { "threadId": "T-0002", "role": "senior", "withId": "H0102", "nickname": "조용한 고래",
     "askerInfo": { "학년": 1, "관심": ["교환학생·독일"] },
-    "accepted": false, "unread": 1,
-    "messages": [ { "from": "them", "text": "...", "at": "..." } ] } ] }
+    "status": "waiting", "requestedAt": "2026-11-21T09:00:00+09:00", "unread": 1,
+    "messages": [ { "from": "them", "text": "...", "at": "..." } ] } ],
+  "waitingCount": 1, "waitingLimit": 3 }
 ```
+`waitingCount`는 내가 asker로 보낸 `waiting` 요청 수. 화면은 `waitingCount >= waitingLimit`이면 「쪽지 요청」 버튼 대신 안내를 보인다(디자인 규칙 ④·⑤). `cancelled`·`expired` 대화는 asker에게만 보이고(선배 목록에서는 사라짐), 보낸 글은 남는다.
 
-### respondRequest(threadId, accept)
-받은 선배가 쪽지 요청을 수락·거절한다. payload `{threadId, accept: true|false}`
+### respondRequest(threadId, accept | cancel)
+payload `{threadId, accept: true|false}` 또는 `{threadId, cancel: true}`.
+- `accept`: 받은 선배가 수락·거절한다. `waiting`이 아닌 대화에는 `{ "ok": false, "reason": "상태" }`.
+- `cancel`: 보낸 사람이 기다리는 요청을 거둔다(`waiting` → `cancelled`). 자기 대화가 아니거나 `waiting`이 아니면 `{ "ok": false, "reason": "상태" }`.
 ```json
-{ "ok": true, "accepted": true }
+{ "ok": true, "status": "accepted" }
+{ "ok": true, "status": "cancelled" }
 ```
 
 ### getInbox()
