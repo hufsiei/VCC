@@ -16,11 +16,10 @@ import json
 import re
 from pathlib import Path
 
-from ai import callAI
+from ai import callAI, load_prompt
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
-PROMPTS = ROOT / "docs" / "prompts"
 
 MAX_LINES = 3        # 답변 문장 수 상한 (spec 8장: 출처 달린 문장 3개)
 MAX_CANDIDATES = 30  # 고르기에 넣는 문장 수 상한 (최근 학기 순)
@@ -198,24 +197,8 @@ def split_sentences(text):
 
 
 # ── ③ 고르기 ──────────────────────────────────────────────────────────
-_PROMPT_CACHE = {}
-
-
-def _prompt(name):
-    """docs/prompts/askBoo-{name}.txt → (system, 예시 대화 messages).
-    파일 모양: 지시문 다음에 '### 예시 입력' / '### 예시 출력' 블록을 번갈아 적는다(HCX는 예시 대화를 더 잘 따른다)."""
-    if name not in _PROMPT_CACHE:
-        raw = (PROMPTS / f"askBoo-{name}.txt").read_text(encoding="utf-8")
-        parts = re.split(r"^### 예시 (입력|출력)\s*$", raw, flags=re.M)
-        system, shots = parts[0].strip(), []
-        for kind, body in zip(parts[1::2], parts[2::2]):
-            shots.append({"role": "user" if kind == "입력" else "assistant", "content": body.strip()})
-        _PROMPT_CACHE[name] = (system, shots)
-    return _PROMPT_CACHE[name]
-
-
 def _call(작업명, content):
-    system, shots = _prompt(작업명)
+    system, shots = load_prompt(f"askBoo-{작업명}")   # docs/prompts/askBoo-고르기.txt 등
     return callAI(작업명, shots + [{"role": "user", "content": content}], system=system)
 
 
