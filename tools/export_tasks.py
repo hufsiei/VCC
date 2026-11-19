@@ -26,7 +26,17 @@ def latest_xlsx():
         m = re.search(r"v(\d+(?:\.\d+)?)", os.path.basename(p)); return float(m.group(1)) if m else 0
     return max(files, key=ver)
 
+# 저장소가 공개이므로 개인 연락처는 내보내기 전에 가린다(학교 공용 @hufs.ac.kr 주소는 유지).
+_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@(?![A-Za-z0-9.-]*hufs\.ac\.kr\b)[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_PHONE = re.compile(r"01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}")
+
+def mask_private(s):
+    return _PHONE.sub("(연락처 생략)", _EMAIL.sub("(개인 메일 생략)", s))
+
 def cell(v):
+    return mask_private(_cell(v))
+
+def _cell(v):
     if v is None: return ""
     if isinstance(v, (datetime.datetime, datetime.date)): return v.strftime("%Y-%m-%d")
     if isinstance(v, float):
@@ -74,7 +84,8 @@ def main():
     os.makedirs(jdir_dst, exist_ok=True)
     for p in sorted(glob.glob(os.path.join(jdir_src, "*.md"))):
         name = os.path.basename(p)
-        shutil.copy2(p, os.path.join(jdir_dst, name))
+        with open(p, encoding="utf-8") as f: text = f.read()
+        with open(os.path.join(jdir_dst, name), "w", encoding="utf-8", newline="") as f: f.write(mask_private(text))
         who = next((w for w in ("미리", "원우", "민지") if w in name), "")
         out["journals"].append({"path": "docs/작업일지/" + name, "author": who,
                                 "updated": datetime.datetime.fromtimestamp(os.path.getmtime(p)).strftime("%Y-%m-%d")})
