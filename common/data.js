@@ -21,6 +21,7 @@ function pickMock(m, name, p) {
       if (String(p.id || "").startsWith("staff")) return m.login.staffDept; // 부서 담당자
       return p.pw === "1" ? m.login.student : m.login.fail;
     case "askBoo":
+      if (/평점|장학금|몇\s*학점|선발\s*(인원|기준)|휴학|등록금|초과학기|인정\s*신청|인정받을 수/.test(p.question || "")) return m.askBoo.official; // 규정 질문 (명세 4장)
       return /교환|파견|독일|마르부르크/.test(p.question || "") ? m.askBoo.exchange : m.askBoo.hold;
     case "interviewNext": {
       const n = (p.answers || []).length;

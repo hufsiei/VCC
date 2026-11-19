@@ -36,6 +36,16 @@
       add("div", res.message, "card");
       return;
     }
+    if (res.status === "official") {
+      const card = add("div", res.message, "card");
+      const link = document.createElement("a");
+      link.href = res.officialUrl;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "공식 안내 보기 ›";
+      card.append(document.createElement("br"), link);
+      return;
+    }
     for (const line of res.lines) {
       const s = res.sources[line.sourceId];
       const card = add("div", "", "card");

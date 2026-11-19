@@ -151,13 +151,14 @@
 
 | 필드 | 형식 | 뜻 |
 |---|---|---|
-| status | 글자 | `ok`(근거 있음) 또는 `hold`(근거 없음) |
+| status | 글자 | `ok`(근거 있음), `hold`(근거 없음), `official`(규정 질문, 공식 안내로 연결) |
 | lines[].text / sourceId / lineId | 글자 | 답변 문장과 출처, 문장 번호 |
 | sources | 객체 | sourceId별 `{docType, program, semester}` |
 | noteId | 글자 | `ok`일 때. 관련 노트 |
 | suggestSenior | 참/거짓 | 닮은 선배 추천을 권할지 |
-| questionId | 글자 | `hold`일 때. 질문함에 자동 저장된 질문 번호 |
-| message | 글자 | `hold`일 때. 안내 문구 |
+| questionId | 글자 | `hold`·`official`일 때. 질문함에 자동 저장된 질문 번호 |
+| officialUrl | 글자 | `official`일 때. 담당 부서의 공식 안내 주소 |
+| message | 글자 | `hold`·`official`일 때. 안내 문구 |
 
 ### interviewNext
 

@@ -8,6 +8,7 @@
 > 11/16 개정 ②(데이터 기준 확정): **최종 데이터 원본 = `@VCC/가상데이터/가상데이터_1000명.xlsx`**. 9장을 그 파일의 시트·헤더로 다시 썼다. 시연 인물을 그 파일의 실제 행(H0143·H0469·H0745)으로 바꾸고, 시연 프로그램을 데이터에 있는 `마르부르크필립스대학교`로, 공통 비교과를 `합격 면접 취업특강(커리어랩)`으로 바꿨다(1·3·4·6장 예시 포함). 후배1은 2학년(1학년은 이중전공 없음).
 > **11/19 개정(PRD v1.2, FDE 피드백)**: 노트 틀 네 종류에 **`후배 질문`**(인터뷰로만) 칸 추가(교환·파견 7칸, 인턴 6칸, 비교과 3칸). `interviewNext`가 같은 프로그램의 질문함 `hold` 질문을 먼저 묻고 `questionId`를 돌려준다. `summarizeInterview` 문장에 `answersQuestionId`, `saveConsent`가 질문을 `answered`로 바꾸고 질문자에게 알림. `getNote`·`listNotes`는 **사전 생성 `data/notes.json`(원문 인용) + `runtime/noteLines.json`(동의 통과 인터뷰 문장)** 합집합. askBoo 1단계에 인턴 직군·기관유형 사전 매칭. 모든 AI 호출은 `callAI` 입구에서 **마스킹 + 사용자별 호출 한도**(0장). 출처 칩은 **연도만** 표시. 현장실습후기 근거는 **문장 단위**(9장). 운영 보관기간(0장). 바뀐 곳은 **[11/19]** 표시.
 > 11/16 개정(PRD 4-1): 교환·파견 노트 틀에 `배운점`(인터뷰로만) 추가 → 6칸. `summarizeInterview`가 끝나면 myNote를 서버가 바로 저장(저장은 기본, 공유는 선택). `saveConsent`의 `edits.removed`가 문장 단위 비공개를 뜻함. 공개 초안 문장에 `identifying` 표시 추가. 사람 이름: 추천 선배는 `독일어과 선배 A`, 쪽지 보낸 사람은 `형용사 + 동물`(대화마다 새로) — `previewNickname`·`respondRequest` 신설, `sendMessage`·`getMessages`에 `myNickname`·`role`·`askerInfo` 추가.
+> **11/19 개정 ②(작업 18·22)**: askBoo 응답에 **`status: "official"`**(규정 질문 → 공식 안내 연결) 추가(3·4·6·8장). 닮은 선배 점수는 서버가 Python이므로 `common/score.js`를 없애고 **`functions/score.py`(원우)** 한 벌로 계산한다.
 
 ## 0. 공통 규칙
 
@@ -72,7 +73,7 @@ const FN_BASE = "http://localhost:8787";
 | 함수 | 규칙 |
 |---|---|
 | login | `id`가 `"staff01"`이면 `login.staff`, `"staff"`로 시작하는 다른 id면 `login.staffDept`, 그 외 비밀번호가 `"1"`이면 `login.student`, 아니면 `login.fail` |
-| askBoo | 질문에 `교환|파견|독일|마르부르크`가 있으면 `askBoo.exchange`, 그 외 `askBoo.hold` |
+| askBoo | 4장의 규정 질문 표현이 있으면 `askBoo.official`, 아니면 질문에 `교환\|파견\|독일\|마르부르크`가 있으면 `askBoo.exchange`, 그 외 `askBoo.hold` |
 | interviewNext | `answers.length`가 0~3이면 `interviewNext.steps[answers.length]`(**[11/19]** steps[0]은 「후배 질문」), 4 이상이면 `interviewNext.done` |
 | getNote | `getNote[id]`가 있으면 그것, 없으면 `getNote["N-marburg"]` |
 | checkMessage | 숫자가 8자리 이상 연속(전화·학번)이면 `checkMessage.blocked`, 그 외 `checkMessage.ok` |
@@ -105,7 +106,12 @@ payload `{id, pw}`
 귀국보고서 항목 예: `{ "학년도": 2024, "학기": 1, "국가": "독일", "대학명": "마르부르크필립스대학교" }` · 현장실습후기 항목 예: `{ "학년도": 2025, "학기": 2, "업체명": "KOTRA 해외무역관(유럽 권역)", "직군": "전시·행사 지원" }`(학기 2 = 여름방학). 학기 숫자를 화면에 낼 때는 9장의 학기 코드표로 바꾼다.
 
 ### askBoo(question)
-payload `{question}`. 근거가 있으면 `ok`, 없으면 `hold`(질문은 자동으로 질문함에 저장되고 `questionId`가 옴).
+payload `{question}`. 규정 질문이면 `official`, 근거가 있으면 `ok`, 없으면 `hold`(`hold`·`official` 질문은 자동으로 질문함에 저장되고 `questionId`가 옴).
+**[11/19] 규정 질문 판별(작업 18)**: 1단계보다 먼저 코드로 판별한다(AI 없음). 학교가 정하는 기준·금액·기한을 묻는 질문은 선배 경험으로 답하지 않고 공식 안내로 보낸다.
+- 판별 표현: `평점|장학금|몇\s*학점|선발\s*(인원|기준)|휴학|등록금|초과학기|인정\s*신청|인정받을 수` (`가상질문` 36~45번이 `official`).
+- 경험을 묻는 질문은 `official`이 아니다. "학점 인정 받을 때 주의할 점 있어요?"(5번)·"챙길 서류 있어요?"(15번)는 근거로 답한다. 그래서 "학점 인정"이라는 말만으로 판별하지 않는다.
+- `officialUrl`: 질문에서 프로그램을 찾으면 `운영부서코드` → `departments.json`의 `공식안내URL`(getNote와 같은 순서). 프로그램을 못 찾으면 `현장실습|인턴` → D02, `특교원|탄뎀` → D03, 그 외 D01.
+- 질문은 `questions.json`에 `status: "official"`로 저장한다. 내 보관함에는 「공식 안내」로 보이고, 콘솔 집계에 들어가며, `interviewNext`의 후배 질문으로는 쓰지 않는다.
 **[11/19] 1단계 보강(작업 81)**: 프로그램명 글자 대조가 실패하면 `data/intern-keywords.json`(직군·기관 유형·업체 약칭 → 업체명, 원우)으로 후보 업체를 1~3개 고른다("무역 쪽 인턴" → KOTRA 해외무역관…). 후보가 여럿이면 각 업체의 근거를 합쳐 2~5단계로 넘기고 `sources`의 `program`으로 구분한다. 사전으로도 못 잡으면 `hold`. (P1-여건, 58③) 경량 임베딩: 사전 계산한 후기 문장 임베딩과 질문 임베딩의 코사인 상위 10문장을 후보 근거로 — 벡터 DB 없이 함수 안에서.
 **[11/19] 근거 풀** = `data/notes.json`의 문장 + `runtime/noteLines.json`의 동의 통과 문장(「후배 질문」 칸의 A 문장 포함). 그래서 선배가 답한 후배 질문은 다음 후배의 근거가 된다.
 ```json
@@ -115,6 +121,9 @@ payload `{question}`. 근거가 있으면 `ok`, 없으면 `hold`(질문은 자�
   "noteId": "N-marburg", "suggestSenior": false }
 { "status": "hold", "lines": [], "sources": {}, "questionId": "Q-0001", "suggestSenior": true,
   "message": "이 부분은 아직 들은 선배가 없어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?" }
+{ "status": "official", "lines": [], "sources": {}, "questionId": "Q-0002", "suggestSenior": false,
+  "officialUrl": "https://oia.hufs.ac.kr",
+  "message": "학교 규정에 관한 질문이라 국제교류팀 공식 안내에서 정확한 내용을 확인해 주세요." }
 ```
 docType: `귀국보고서` | `현장실습후기` | `인터뷰`
 
@@ -184,7 +193,7 @@ payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"
 `officialUrl`은 서버가 **프로그램의 `운영부서코드` → `departments.json`의 `공식안내URL`** 순서로 찾아 넣는다(프로그램 목록 시트에는 URL 열이 없다, PRD 6-2).
 
 ### recommendSeniors(noteId, more)
-payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명 「학과 + 선배 + 영문 대문자」(예: `"독일어과 선배 A"`, 디자인 규칙 1-2절). 같은 선배는 닮은선배·프로필·해봤노트 인용·쪽지창에서 같은 이름이다. 점수 계산은 `common/score.js`(원우). AI 없음.
+payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명 「학과 + 선배 + 영문 대문자」(예: `"독일어과 선배 A"`, 디자인 규칙 1-2절). 같은 선배는 닮은선배·프로필·해봤노트 인용·쪽지창에서 같은 이름이다. 점수 계산은 `functions/score.py`(원우). AI 없음.
 
 **인원 규칙(11/18, PRD 2-2·4-1):**
 - 후보 = 그 노트의 경험자 중 점수가 **3점 이상**(단과대 일치)인 사람, 점수 내림차순. 직원 행·본인은 뺀다.
@@ -290,11 +299,11 @@ currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이
 
 ## 6. mock-data.json 작성 지시
 
-- 최상위 키는 함수 이름. 3장 pickMock 규칙에 나오는 하위 키(`login.student/staff/staffDept/fail`, `askBoo.exchange/hold`, `interviewNext.steps/done`, `getNote["N-marburg"]`, `checkMessage.ok/blocked`)를 만든다.
+- 최상위 키는 함수 이름. 3장 pickMock 규칙에 나오는 하위 키(`login.student/staff/staffDept/fail`, `askBoo.exchange/hold/official`, `interviewNext.steps/done`, `getNote["N-marburg"]`, `checkMessage.ok/blocked`)를 만든다.
 - 내용은 1장 시연 인물 기준. askBoo.exchange 문장 3개, getNote["N-marburg"]는 교환 6칸(지원·학점·비용·생활·팁·배운점) 중 4칸 채우고 비용은 빈 칸, 배운점은 `interviewOnly: true`로 선배 인용 1개(`docType: "인터뷰"`).
 - `getNote["N-kotra"]`도 하나: 현장실습 노트(`KOTRA 해외무역관(유럽 권역)`, 데이터에서 후기가 가장 많은 기관), 칸은 5개 [`지원동기`, `업무내용`, `배운점`, `지원·선발`, `근무조건`]. 마지막 두 칸은 `interviewOnly: true`이고 비어 있음. (`지원·선발`은 한 칸의 이름이다)
 - 출처 학기는 선배1의 보고서 `2024-1`, 선배2의 보고서 `2024-2`. 노트의 `lastSemester`는 마르부르크 보고서 중 최근인 `2026-1`.
-- recommendSeniors는 선배1(13점: 단과대 3+학과 5+이중전공 3+공통 비교과 2), 선배2(8점: 단과대·학과) 두 명(PRD·score.js 기본 가중치 기준). 가상 문장만 쓰고 실제 후기 원문을 옮기지 않는다.
+- recommendSeniors는 선배1(13점: 단과대 3+학과 5+이중전공 3+공통 비교과 2), 선배2(8점: 단과대·학과) 두 명(PRD·score.py 기본 가중치 기준). 가상 문장만 쓰고 실제 후기 원문을 옮기지 않는다.
 - **[11/19]** `getNote["N-marburg"]`에 7번째 칸 `후배 질문`(`interviewOnly: true`, Q·A 1쌍, `asked`·`answersQuestionId: "Q-0001"`). `interviewNext.steps[0]`은 `section: "후배 질문"`(questionId·asked·pendingQuestions 1), `steps[1..]`은 기존 칸, `total` 7. `summarizeInterview.publicDraft`에 `후배 질문` 칸 1문장. `saveConsent`에 `answered: ["Q-0001"]`. `getInbox.questions[1]`은 `answered`, `alerts[0]`은 「내 질문에 선배가 답했어요」. `getNote["N-kotra"]`는 칸 6개(…`근무조건`, `후배 질문`)이고 자동 분류 문장에 `autoClassified: true`.
 
 ## 7. data/frames.json (이번에 함께 생성)
@@ -312,7 +321,7 @@ currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이
 
 ## 8. 완료 확인
 
-- `screens/talk/index.html`에 askBoo를 부르는 임시 화면(입력창+버튼+결과)을 두고, "마르부르크 파견 준비 언제부터?"는 출처 달린 문장 3개, "HUFS특강 어때요?"는 보류 안내가 나온다.
+- `screens/talk/index.html`에 askBoo를 부르는 임시 화면(입력창+버튼+결과)을 두고, "마르부르크 파견 준비 언제부터?"는 출처 달린 문장 3개, "HUFS특강 어때요?"는 보류 안내, "교환학생 지원하려면 평점 몇 점 이상이어야 해요?"는 공식 안내 링크가 나온다.
 - data/README.md에는 이 문서 4장의 응답 모양을 표로 옮기고 "원본: docs/spec-v1.md"라고 적는다.
 
 ## 9. 데이터 파일 (원우: 시트 → data/)
