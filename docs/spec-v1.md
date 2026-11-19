@@ -9,6 +9,7 @@
 > **11/19 개정(PRD v1.2, FDE 피드백)**: 노트 틀 네 종류에 **`후배 질문`**(인터뷰로만) 칸 추가(교환·파견 7칸, 인턴 6칸, 비교과 3칸). `interviewNext`가 같은 프로그램의 질문함 `hold` 질문을 먼저 묻고 `questionId`를 돌려준다. `summarizeInterview` 문장에 `answersQuestionId`, `saveConsent`가 질문을 `answered`로 바꾸고 질문자에게 알림. `getNote`·`listNotes`는 **사전 생성 `data/notes.json`(원문 인용) + `runtime/noteLines.json`(동의 통과 인터뷰 문장)** 합집합. askBoo 1단계에 인턴 직군·기관유형 사전 매칭. 모든 AI 호출은 `callAI` 입구에서 **마스킹 + 사용자별 호출 한도**(0장). 출처 칩은 **연도만** 표시. 현장실습후기 근거는 **문장 단위**(9장). 운영 보관기간(0장). 바뀐 곳은 **[11/19]** 표시.
 > 11/16 개정(PRD 4-1): 교환·파견 노트 틀에 `배운점`(인터뷰로만) 추가 → 6칸. `summarizeInterview`가 끝나면 myNote를 서버가 바로 저장(저장은 기본, 공유는 선택). `saveConsent`의 `edits.removed`가 문장 단위 비공개를 뜻함. 공개 초안 문장에 `identifying` 표시 추가. 사람 이름: 추천 선배는 `독일어과 선배 A`, 쪽지 보낸 사람은 `형용사 + 동물`(대화마다 새로) — `previewNickname`·`respondRequest` 신설, `sendMessage`·`getMessages`에 `myNickname`·`role`·`askerInfo` 추가.
 > **11/19 개정 ②(작업 18·22)**: askBoo 응답에 **`status: "official"`**(규정 질문 → 공식 안내 연결) 추가(3·4·6·8장). 닮은 선배 점수는 서버가 Python이므로 `common/score.js`를 없애고 **`functions/score.py`(원우)** 한 벌로 계산한다.
+> **11/19 개정 ③(작업 18)**: askBoo `lines[]`에 **`fallback`**(사후 검증에 걸려 근거 원문을 보여 준 줄) 추가(4장). `noteId`는 `data/notes.json`이 생기기 전까지 프로그램 이름으로 나간다.
 
 ## 0. 공통 규칙
 
@@ -116,7 +117,8 @@ payload `{question}`. 규정 질문이면 `official`, 근거가 있으면 `ok`, 
 **[11/19] 근거 풀** = `data/notes.json`의 문장 + `runtime/noteLines.json`의 동의 통과 문장(「후배 질문」 칸의 A 문장 포함). 그래서 선배가 답한 후배 질문은 다음 후배의 근거가 된다.
 ```json
 { "status": "ok",
-  "lines": [ { "text": "...", "sourceId": "R03-1-1", "lineId": "L-R03-1-1" } ],
+  "lines": [ { "text": "...", "sourceId": "R03-1-1", "lineId": "L-R03-1-1" },
+             { "text": "...", "sourceId": "R03-2-4", "lineId": "L-R03-2-4", "fallback": true } ],
   "sources": { "R03-1-1": { "docType": "귀국보고서", "program": "마르부르크필립스대학교", "semester": "2024-1" } },
   "noteId": "N-marburg", "suggestSenior": false }
 { "status": "hold", "lines": [], "sources": {}, "questionId": "Q-0001", "suggestSenior": true,
@@ -126,6 +128,7 @@ payload `{question}`. 규정 질문이면 `official`, 근거가 있으면 `ok`, 
   "message": "학교 규정에 관한 질문이라 국제교류팀 공식 안내에서 정확한 내용을 확인해 주세요." }
 ```
 docType: `귀국보고서` | `현장실습후기` | `인터뷰`
+**[11/19] `lines[].fallback`(작업 18)**: AI가 바꾼 문장이 사후 검증(HCX 원칙 v2 3절 5단계: 원문에 없는 숫자·영문·고유명사·새 낱말, JSON 형식 오류, 반말)에 걸려 **근거 원문을 그대로 보여 준 줄**이면 `true`. 원문에서 앞머리 군말(「참고로」 등)과 「ㅎㅎ」·「!!」만 지우고 낱말은 바꾸지 않는다. AI 문장이면 이 필드를 넣지 않는다(없으면 거짓). 화면은 이 줄에 「근거 원문 보기」 표시를 붙일 수 있고, 무시해도 문장은 정상으로 보인다.
 
 ### interviewNext(program, answers)
 선배 인터뷰에서 다음 질문 하나. payload `{program, answers:[{section, question, answer, questionId?, skipped?}]}`

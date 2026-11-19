@@ -1,9 +1,8 @@
 # local_fn.py — Cloud Functions 대신 미리 PC에서 띄우는 개발용 서버 함수
 # 실행: PowerShell에서
 #   cd C:\dev\VCC\functions
-#   $env:CLOVA_KEY = "발급받은_키"          # HCX 작업용
-#   $env:ANTHROPIC_API_KEY = "발급받은_키"  # Claude 작업용(요약·일치검사 등을 쓸 때만)
 #   python local_fn.py
+# 키(CLOVA_KEY, ANTHROPIC_API_KEY)는 저장소 맨 위 .env에서 ai.py가 읽는다(이미 있는 환경변수가 먼저).
 #
 # 주소: POST http://localhost:8787/<함수 이름>   (예: /sendMessage)
 #   - 로그인한 사용자는 헤더 X-User(colreg_no)로 받는다. data.js가 붙여 준다.
@@ -15,8 +14,10 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote
 
+from askboo import askBoo
 from runtime_fns import ROUTES
 
+ROUTES = {**ROUTES, "askBoo": askBoo}   # AI를 쓰는 함수는 runtime_fns(AI 없음)와 따로 둔다
 NEEDS_NO_LOGIN = {"checkMessage"}
 
 

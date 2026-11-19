@@ -160,6 +160,7 @@
 |---|---|---|
 | status | 글자 | `ok`(근거 있음), `hold`(근거 없음), `official`(규정 질문, 공식 안내로 연결) |
 | lines[].text / sourceId / lineId | 글자 | 답변 문장과 출처, 문장 번호 |
+| lines[].fallback | 참/거짓 | AI 문장이 검증에 걸려 근거 원문을 그대로 보여 준 줄이면 true. 없으면 거짓 |
 | sources | 객체 | sourceId별 `{docType, program, semester}` |
 | noteId | 글자 | `ok`일 때. 관련 노트 |
 | suggestSenior | 참/거짓 | 닮은 선배 추천을 권할지 |
