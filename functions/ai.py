@@ -77,18 +77,19 @@ LOG_FILE = Path(__file__).parent / "logs" / "ai-calls.jsonl"   # .gitignore 대�
 
 
 # ── 3. 관문 ───────────────────────────────────────────────────────
-def callAI(작업명, messages, system=None):
+def callAI(작업명, messages, system=None, 측정모델=None, 측정설정=None):
     """작업명에 맞는 모델로 한 번 호출한다.
 
     messages: [{"role": "user"|"assistant", "content": "..."}]
     돌려주는 값: {"ok", "text", "json", "model", "error"?}
       text — 모델이 낸 글 전체 / json — text 안의 첫 번째 {...}를 읽은 것(없으면 None)
     화면에 보여 줄지는 부르는 쪽이 json을 검사해서 정한다(형식이 틀리면 버리고 폴백).
+    측정모델·측정설정: 모델 비교 측정 스크립트(eval_*.py) 전용. 서비스 코드는 넘기지 않는다(PROVIDER 표가 기준).
     """
     if 작업명 not in PROVIDER:
         raise ValueError(f"PROVIDER 표에 없는 작업명: {작업명}")
-    모델 = PROVIDER[작업명]
-    설정 = SETTINGS.get(작업명, {})
+    모델 = 측정모델 or PROVIDER[작업명]
+    설정 = 측정설정 or SETTINGS.get(작업명, {})
     시작 = time.time()
     try:
         if 모델 == "hcx":
@@ -163,6 +164,23 @@ def call_claude(messages, system, 설정):
 
 
 # ── 5. 도우미 ─────────────────────────────────────────────────────
+PROMPT_DIR = Path(__file__).resolve().parent.parent / "docs" / "prompts"
+_prompts = {}
+
+
+def load_prompt(name):
+    """docs/prompts/{name}.txt → (system, 예시 대화 messages).
+    파일 모양: 지시문 다음에 '### 예시 입력' / '### 예시 출력' 블록을 번갈아 적는다(HCX는 예시 대화를 더 잘 따른다)."""
+    if name not in _prompts:
+        import re
+        raw = (PROMPT_DIR / f"{name}.txt").read_text(encoding="utf-8")
+        parts = re.split(r"^### 예시 (입력|출력)\s*$", raw, flags=re.M)
+        shots = [{"role": "user" if kind == "입력" else "assistant", "content": body.strip()}
+                 for kind, body in zip(parts[1::2], parts[2::2])]
+        _prompts[name] = (parts[0].strip(), shots)
+    return _prompts[name]
+
+
 def first_json(text):
     """글 안의 첫 번째 {...}만 읽는다. HCX가 JSON 뒤에 말을 덧붙여도 앞의 JSON만 쓴다(원칙 v2 5절)."""
     start = text.find("{")
