@@ -14,11 +14,15 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote
 
+import limits
 from askboo import askBoo
 from runtime_fns import ROUTES
 
 ROUTES = {**ROUTES, "askBoo": askBoo}   # AI를 쓰는 함수는 runtime_fns(AI 없음)와 따로 둔다
 NEEDS_NO_LOGIN = {"checkMessage"}
+# 사용자별 호출 한도(limits.py, 분당 10·일 100)를 세는 함수. AI를 부르는 함수를 새로 연결하면 여기에 더한다
+# (interviewNext·summarizeInterview는 작업 21, checkMessage의 비방 판정은 작업 27).
+AI_ROUTES = {"askBoo"}
 
 
 def practice(question):
@@ -55,6 +59,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply({"error": f"아직 서버에 없는 함수예요: {name}"})
         if not me and name not in NEEDS_NO_LOGIN:
             return self.reply({"error": "로그인이 필요해요"})
+        if name in AI_ROUTES:
+            over = limits.check(me)
+            if over:
+                return self.reply(over)
         try:
             self.reply(fn(me, payload))
         except Exception as e:   # 시연 중 서버가 죽지 않게
