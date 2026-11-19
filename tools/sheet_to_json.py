@@ -18,7 +18,27 @@ DATA = ROOT / "data"
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT.parent / "가상데이터_1000명.xlsx"
 
 DROP_STUDENT = {"studt_na_kr", "sex", "나이(만)"}
-ALIASES = {"마르부르크필립스대학교": ["마르부르크", "마르부르크대", "마부르크"]}
+# ── 프로그램 별칭 사전 (작업 82) ──
+# 줄임말·옛 이름·오타 → 프로그램명. 시연·개발 질문에 쓰는 것만 넣는다.
+# 넣지 않는 것: "리옹"(리옹2·리옹3 둘 다), "소르본"(파리 제4·제13 둘 다), "KOTRA"·"코트라"만 단독(권역 3곳),
+#   가짜 이름(하이델베르크·리스본신대학교·KOTRA 아시아 — 함정 질문용).
+# 대조 규칙(check_alias_match.py와 같음): 띄어쓰기를 지우고 영문은 소문자로 바꾼 뒤 질문 안에 들어 있으면 일치,
+#   여러 개가 걸리면 긴 이름이 짧은 이름을 덮는다(긴 이름 우선).
+ALIASES = {
+    "마르부르크필립스대학교": ["마르부르크", "마르부르크대", "마부르크"],
+    "밀라노대학교": ["밀라노", "밀라노대"],
+    "국립동양언어문화대학교 (이날코)": ["이날코", "국립동양언어문화대학교", "국립동양언어문화대"],
+    "쟝 물랑 리옹 3 대학": ["리옹3", "리옹 제3대학", "장 물랑 리옹3", "쟝 물랑"],
+    "뤼미에르 리옹 2대학": ["리옹2", "리옹 제2대학", "뤼미에르 리옹"],
+    "파리시테대학교(구 파리7 디드로)": ["파리 제7대학교", "파리7", "파리 디드로", "파리시테대학교", "파리시테"],
+    "㈜트랜스허브코리아": ["트랜스허브코리아", "트랜스허브"],
+    "K-컬처랩(온라인)": ["K-컬처랩", "K컬처랩", "케이컬처랩"],
+    "KOTRA 해외무역관(중남미 권역)": ["KOTRA 중남미 무역관", "KOTRA 중남미", "코트라 중남미"],
+}
+# 긴 이름 우선으로 풀리는 겹침(의도한 것만). (별칭, 겹치는 다른 프로그램명)
+ALIAS_OVERLAP_OK = {
+    ("밀라노", "밀라노 협력기관(온라인)"),  # "밀라노 협력기관"이 있으면 긴 이름이 이김. "밀라노"만 쓰면 교환(대학교)
+}
 REPORT_SECTIONS = {  # 문항 헤더 -> 칸 (spec 9장)
     "1-1. 입학허가서 신청시 유의사항": "지원", "1-2. 비자 취득, 항공권 및 유학생 보험 구입": "지원",
     "1-3. 기타 유의사항": "지원", "2-2. 수강신청": "학점", "2-3. 수업내용 및 프로그램 과정": "학점",
@@ -62,6 +82,29 @@ def read(ws, key):
 def dump(name, obj):
     (DATA / name).write_text(json.dumps(obj, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"  {name}: {len(obj)}건")
+
+
+def check_aliases(programs):
+    """한 별칭이 두 프로그램에 걸리면 오류(작업 82)."""
+    from check_alias_match import norm
+    names = {p["프로그램명"] for p in programs}
+    for k in ALIASES:
+        if k not in names:
+            errors.append(f"별칭: 목록에 없는 프로그램 {k}")
+    terms = [(norm(p["프로그램명"]), p["프로그램명"], p["프로그램명"]) for p in programs]
+    terms += [(norm(a), a, k) for k, al in ALIASES.items() for a in al]
+    found = []
+    for t, a, k in terms:
+        if a == k:
+            continue  # 프로그램명 자체는 검사 대상 아님(시트 원본)
+        for t2, a2, k2 in terms:
+            if k2 == k:
+                continue
+            if t == t2:
+                found.append(f"별칭 중복: '{a}'가 {k}·{k2} 둘 다에 걸림")
+            elif t in t2 and (a, k2) not in ALIAS_OVERLAP_OK:
+                found.append(f"별칭 겹침: '{a}'({k})가 '{a2}'({k2}) 안에 들어 있음")
+    errors.extend(dict.fromkeys(found))
 
 
 def main():
@@ -127,6 +170,7 @@ def main():
     for p in programs:
         if p["프로그램명"] in ALIASES:
             p["별칭"] = ALIASES[p["프로그램명"]]
+    check_aliases(programs)
 
     # ── 프로그램명 대조 ──
     names = {p["프로그램명"] for p in programs}
