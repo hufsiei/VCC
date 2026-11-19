@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>공통 부품 데모</title>
+<link rel="stylesheet" href="../../common/style.css">
+<style>
+  /* 데모 페이지 배치용. 색은 style.css 변수만 쓴다. */
+  .demo-section { display: flex; flex-direction: column; gap: 12px; margin-top: var(--space-xl); }
+  .demo-section > .sub { margin-top: -4px; }
+  .demo-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+  .demo-stack { display: flex; flex-direction: column; gap: 12px; }
+  .demo-caption { font-size: var(--font-size-caption); font-weight: 600; color: var(--color-text-muted); }
+  .demo-frame { overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-card); }
+  .demo-frame .header { position: relative; }
+  .demo-wide { flex: 1; max-width: 100%; }
+</style>
+</head>
+<body>
+<div class="app has-tabbar">
+
+  <!-- 부품 2: 메인 헤더(1단계 화면) -->
+  <header class="header">
+    <button class="icon-btn" type="button" aria-label="메뉴"><i data-lucide="menu" class="icon"></i></button>
+    <a class="header__brand" href="#">
+      <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
+      외대人사이드
+    </a>
+    <div class="header__actions">
+      <button class="icon-btn" type="button" aria-label="알림, 새 알림 있음">
+        <i data-lucide="bell" class="icon"></i><span class="icon-btn__dot"></span>
+      </button>
+    </div>
+  </header>
+
+  <main class="page">
+    <h1 class="page-title">공통 부품</h1>
+    <p class="sub">작업 17 · design-rules v4.3 부품 8종 확인용 화면입니다. 문구는 예시입니다.</p>
+
+    <!-- ① 상태 라벨 -->
+    <section class="demo-section">
+      <h2 class="section-title">1. 상태 라벨</h2>
+      <p class="sub">3-4절. 색 + 아이콘 + 문구를 함께 씁니다.</p>
+      <div class="demo-row">
+        <span class="status-label status-label--info"><i data-lucide="info" class="icon"></i>공식 안내</span>
+        <span class="status-label status-label--success"><i data-lucide="check" class="icon"></i>선배가 답했어요</span>
+        <span class="status-label status-label--warning"><i data-lucide="triangle-alert" class="icon"></i>나를 알아볼 수 있는 내용이에요</span>
+        <span class="status-label status-label--error"><i data-lucide="circle-alert" class="icon"></i>전송 실패</span>
+        <span class="status-label status-label--neutral"><i data-lucide="clock" class="icon"></i>답을 기다려요</span>
+        <span class="status-label status-label--neutral"><i data-lucide="trending-up" class="icon"></i>12% 전월 대비</span>
+        <span class="status-label status-label--ai"><i data-lucide="sparkles" class="icon"></i>정리하는 중…</span>
+      </div>
+    </section>
+
+    <!-- ② 헤더 -->
+    <section class="demo-section">
+      <h2 class="section-title">2. 헤더</h2>
+      <p class="sub">5-1·5-2절. 1단계는 메인 헤더(이 페이지 맨 위), 2단계 이상은 상세 헤더.</p>
+      <span class="demo-caption">메인 헤더 · 직원 계정</span>
+      <div class="demo-frame">
+        <header class="header">
+          <button class="icon-btn" type="button" aria-label="메뉴"><i data-lucide="menu" class="icon"></i></button>
+          <a class="header__brand" href="#">
+            <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
+            외대人사이드
+          </a>
+          <div class="header__actions">
+            <a class="icon-btn" href="#" aria-label="관리자 콘솔"><i data-lucide="chart-column" class="icon"></i></a>
+            <button class="icon-btn" type="button" aria-label="알림"><i data-lucide="bell" class="icon"></i></button>
+          </div>
+        </header>
+      </div>
+      <span class="demo-caption">상세 헤더</span>
+      <div class="demo-frame">
+        <header class="header">
+          <button class="icon-btn" type="button" aria-label="뒤로"><i data-lucide="arrow-left" class="icon"></i></button>
+          <h2 class="header__title">마르부르크필립스대학교</h2>
+          <button class="icon-btn" type="button" aria-label="더 보기"><i data-lucide="ellipsis-vertical" class="icon"></i></button>
+        </header>
+      </div>
+    </section>
+
+    <!-- ③ 하단 탭 -->
+    <section class="demo-section">
+      <h2 class="section-title">3. 하단 탭</h2>
+      <p class="sub">5-3절. 화면 아래에 고정되어 있습니다. 활성은 SOFT BLUE 알약 + NAVY.</p>
+    </section>
+
+    <!-- ④ 말풍선 -->
+    <section class="demo-section">
+      <h2 class="section-title">4. 말풍선</h2>
+      <p class="sub">5-8절. BOO는 흰 말풍선 + 프로필, 사용자는 SOFT BLUE.</p>
+      <div class="chat">
+        <div class="msg msg--ai">
+          <img class="msg__avatar" src="../../assets/boo-portrait.png" alt="BOO">
+          <div class="msg__body">
+            <span class="msg__sender">BOO</span>
+            <p class="msg__bubble">
+              <span class="msg__lead">후배가 이렇게 물었어요</span>
+              <span class="msg__quote">TestDaF는 언제부터 준비하면 되나요?</span>
+              경험이 있으면 들려주세요.
+            </p>
+            <div class="msg__actions"><button class="btn btn--text" type="button">경험이 없어요</button></div>
+            <span class="msg__time">오후 2:10</span>
+          </div>
+        </div>
+        <div class="msg msg--user">
+          <div class="msg__body">
+            <p class="msg__bubble">출국 3학기 전부터 학원을 다녔어요.</p>
+            <span class="msg__time">오후 2:11</span>
+          </div>
+        </div>
+        <div class="msg msg--ai">
+          <img class="msg__avatar" src="../../assets/boo-portrait.png" alt="BOO">
+          <div class="msg__body">
+            <span class="msg__sender">BOO</span>
+            <div class="msg__bubble" aria-label="BOO가 입력 중"><span class="typing"><span></span><span></span><span></span></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑤ 근거/출처 블록 -->
+    <section class="demo-section">
+      <h2 class="section-title">5. 근거/출처 블록</h2>
+      <p class="sub">6-1·6-2절. 출처 한 줄은 종류 + 연도만.</p>
+
+      <span class="demo-caption">기본 (펼친 상태)</span>
+      <details class="evidence" open>
+        <summary class="evidence__head">
+          <span class="evidence__summary">
+            <i data-lucide="sparkles" class="icon"></i>
+            <span>근거 <span class="evidence__num">4</span>건 · 결과보고서 <span class="evidence__num">2</span> · 선배 인터뷰 <span class="evidence__num">2</span> · 최근 2025-2학기</span>
+          </span>
+          <span class="evidence__side">
+            <span class="evidence__toggle"><span class="evidence__toggle-closed">펼치기</span><span class="evidence__toggle-open">접기</span><i data-lucide="chevron-down" class="icon"></i></span>
+          </span>
+        </summary>
+        <ul class="evidence__list">
+          <li class="evidence__item">선배 인터뷰 <span class="evidence__sep">|</span> 2025</li>
+          <li class="evidence__item">선배 인터뷰 <span class="evidence__sep">|</span> 2025</li>
+          <li class="evidence__item">결과보고서 <span class="evidence__sep">|</span> 2024</li>
+          <li class="evidence__item">결과보고서 <span class="evidence__sep">|</span> 2024</li>
+        </ul>
+      </details>
+      <div class="evidence-after">
+        <a class="link-more" href="#">공식 안내 보기 ›</a>
+      </div>
+
+      <span class="demo-caption">근거 적음 + 자동 분류 (현장실습)</span>
+      <details class="evidence">
+        <summary class="evidence__head">
+          <span class="evidence__summary">
+            <i data-lucide="sparkles" class="icon"></i>
+            <span>근거 <span class="evidence__num">1</span>건 · 현장실습후기 <span class="evidence__num">1</span> · 선배 인터뷰 – · 최근 2025 하계방학</span>
+          </span>
+          <span class="evidence__side">
+            <span class="status-label status-label--neutral"><i data-lucide="user" class="icon"></i>선배 1명의 경험이에요</span>
+            <span class="evidence__toggle"><span class="evidence__toggle-closed">펼치기</span><span class="evidence__toggle-open">접기</span><i data-lucide="chevron-down" class="icon"></i></span>
+          </span>
+        </summary>
+        <ul class="evidence__list">
+          <li class="evidence__item">현장실습후기 <span class="evidence__sep">|</span> 2025 <span class="status-label status-label--neutral">자동 분류</span></li>
+        </ul>
+      </details>
+
+      <span class="demo-caption">오래된 근거</span>
+      <details class="evidence">
+        <summary class="evidence__head">
+          <span class="evidence__summary">
+            <i data-lucide="sparkles" class="icon"></i>
+            <span>근거 <span class="evidence__num">2</span>건 · 결과보고서 <span class="evidence__num">2</span> · 선배 인터뷰 – · 최근 2022-2학기</span>
+          </span>
+          <span class="evidence__side">
+            <span class="status-label status-label--neutral"><i data-lucide="user" class="icon"></i>선배 2명의 경험이에요</span>
+            <span class="evidence__toggle"><span class="evidence__toggle-closed">펼치기</span><span class="evidence__toggle-open">접기</span><i data-lucide="chevron-down" class="icon"></i></span>
+          </span>
+        </summary>
+        <ul class="evidence__list">
+          <li class="evidence__item">결과보고서 <span class="evidence__sep">|</span> 2022</li>
+          <li class="evidence__item">결과보고서 <span class="evidence__sep">|</span> 2022</li>
+        </ul>
+      </details>
+      <div class="evidence-after">
+        <span class="status-label status-label--info"><i data-lucide="info" class="icon"></i>최근 경험이 없어요</span>
+        <button class="btn btn--outline" type="button">질문함에 담기</button>
+      </div>
+
+      <span class="demo-caption">근거 없음 (0건)</span>
+      <div class="evidence evidence--empty">
+        <div class="evidence__head">
+          <span class="evidence__summary">
+            <i data-lucide="sparkles" class="icon"></i>
+            <span>근거 <span class="evidence__num">0</span>건 · 결과보고서 – · 선배 인터뷰 – · 최근 –</span>
+          </span>
+        </div>
+        <div class="evidence__empty-body">
+          <p>아직 이 항목을 경험한 선배의 이야기가 없어요.</p>
+          <button class="btn btn--outline" type="button">질문함에 담기</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑥ hold-box -->
+    <section class="demo-section">
+      <h2 class="section-title">6. hold-box</h2>
+      <p class="sub">물어보기에서 근거가 없을 때(askBoo hold). 답을 지어내지 않습니다.</p>
+      <div class="msg msg--ai">
+        <img class="msg__avatar" src="../../assets/boo-portrait.png" alt="BOO">
+        <div class="msg__body demo-wide">
+          <span class="msg__sender">BOO</span>
+          <div class="hold-box">
+            <p class="hold-box__text">이 부분은 아직 들은 선배가 없어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?</p>
+            <div class="evidence evidence--empty">
+              <div class="evidence__head">
+                <span class="evidence__summary">
+                  <i data-lucide="sparkles" class="icon"></i>
+                  <span>근거 <span class="evidence__num">0</span>건 · 결과보고서 – · 선배 인터뷰 – · 최근 –</span>
+                </span>
+              </div>
+            </div>
+            <button class="btn btn--secondary btn--block" type="button">닮은선배 보기</button>
+          </div>
+        </div>
+      </div>
+      <div><span class="toast"><i data-lucide="check" class="icon"></i>질문함에 담았어요</span></div>
+    </section>
+
+    <!-- ⑦ 노트 커버 -->
+    <section class="demo-section">
+      <h2 class="section-title">7. 노트 커버</h2>
+      <p class="sub">7-③절. 커버 5항목: 한 줄 요약 · 추천 대상 · 근거 수 · 최근 경험 학기 · 만족도.</p>
+      <div class="demo-stack">
+        <article class="note-card cat-global">
+          <div class="note-card__band">
+            <span class="category-tag">국제교류</span>
+            <span class="note-card__kind">교환학생 · 독일</span>
+            <button class="icon-btn" type="button" aria-label="스크랩" aria-pressed="false"><i data-lucide="bookmark" class="icon"></i></button>
+          </div>
+          <div class="note-card__body">
+            <h3 class="note-card__title">마르부르크필립스대학교</h3>
+            <p class="note-card__summary">TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청</p>
+            <p class="note-card__target">독일어권 파견을 생각하는 1~2학년</p>
+            <p class="note-card__meta">근거 7건 · 최근 2026-1학기 · <span class="note-card__star"><i data-lucide="star" class="icon"></i>–</span></p>
+          </div>
+        </article>
+        <article class="note-card cat-practice">
+          <div class="note-card__band">
+            <span class="category-tag">현장실습</span>
+            <span class="note-card__kind">해외 인턴 · 유럽</span>
+            <button class="icon-btn" type="button" aria-label="스크랩 취소" aria-pressed="true"><i data-lucide="bookmark" class="icon"></i></button>
+          </div>
+          <div class="note-card__body">
+            <h3 class="note-card__title">KOTRA 해외무역관(유럽 권역)</h3>
+            <p class="note-card__summary">전시·행사 지원 업무가 많아 현장 대응력이 길러져요</p>
+            <p class="note-card__target">해외영업·전시 분야 현장실습을 생각하는 2~3학년</p>
+            <p class="note-card__meta">근거 3건 · 최근 2025 하계방학 · <span class="note-card__star"><i data-lucide="star" class="icon"></i>–</span></p>
+          </div>
+        </article>
+        <article class="note-card cat-extra">
+          <div class="note-card__band">
+            <span class="category-tag">비교과</span>
+            <span class="note-card__kind">진로·취업 교육과정</span>
+            <button class="icon-btn" type="button" aria-label="스크랩" aria-pressed="false"><i data-lucide="bookmark" class="icon"></i></button>
+          </div>
+          <div class="note-card__body">
+            <h3 class="note-card__title">합격 면접 취업특강(커리어랩)</h3>
+            <p class="note-card__summary">모의 면접 피드백을 바로 받을 수 있어요</p>
+            <p class="note-card__target">면접을 앞둔 3~4학년</p>
+            <p class="note-card__meta">근거 5건 · 최근 2025-2학기 · <span class="note-card__star"><i data-lucide="star" class="icon"></i>4.5</span></p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ⑧ 선배 카드 -->
+    <section class="demo-section">
+      <h2 class="section-title">8. 선배 카드</h2>
+      <p class="sub">7-④절. 중립 아바타 + 「학과 + 선배 + 영문 대문자」.</p>
+      <article class="card senior-card">
+        <div class="senior-card__top">
+          <span class="avatar"><i data-lucide="user" class="icon"></i></span>
+          <h3 class="senior-card__name">독일어과 선배 A</h3>
+        </div>
+        <div class="tag-row">
+          <span class="category-tag cat-global">국제교류</span>
+          <span class="category-tag cat-extra">비교과</span>
+        </div>
+        <p class="senior-card__reason">
+          <span class="ai-mark"><i data-lucide="sparkles" class="icon"></i></span>
+          <span>같은 독일어과에 이중전공 경영학도 같고, 취업특강을 함께 들었어요.</span>
+        </p>
+        <div class="tag-row">
+          <span class="ai-chip">관심 경험</span>
+          <span class="ai-chip">전공</span>
+          <span class="ai-chip">단과대</span>
+          <span class="ai-chip">비교과</span>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn--outline" type="button">프로필 보기</button>
+          <button class="btn btn--primary" type="button">쪽지 요청</button>
+        </div>
+      </article>
+      <span class="demo-caption">잠김 (6-6)</span>
+      <div>
+        <button class="btn btn--block" type="button" disabled>쪽지 요청</button>
+        <p class="btn-reason"><i data-lucide="lock" class="icon"></i>첫 대화를 마치면 선배 추천이 열려요</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- 부품 3: 하단 탭 -->
+  <nav class="tabbar" aria-label="주 메뉴">
+    <a class="tabbar__item" href="#"><i data-lucide="message-circle" class="icon"></i>인터BOO</a>
+    <a class="tabbar__item" href="#" aria-current="page"><i data-lucide="notebook-text" class="icon"></i>해봤노트</a>
+    <a class="tabbar__item" href="#"><i data-lucide="users" class="icon"></i>닮은선배</a>
+    <a class="tabbar__item" href="#"><i data-lucide="archive" class="icon"></i>내 보관함</a>
+  </nav>
+</div>
+
+<script src="../../assets/lucide/lucide.min.js"></script>
+<script>
+  lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
+</script>
+</body>
+</html>
