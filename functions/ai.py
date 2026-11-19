@@ -18,6 +18,26 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
+
+def _load_env():
+    """저장소 맨 위의 .env(KEY=값 줄)를 환경변수로 읽는다. 이미 있는 환경변수는 덮지 않는다. 값은 출력하지 않는다."""
+    path = Path(__file__).resolve().parent.parent / ".env"
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k, v = k.strip(), v.strip().strip('"').strip("'")
+        if k and v and k not in os.environ:
+            os.environ[k] = v
+
+
+_load_env()
+
 # ── 1. 작업별 모델 표 ──────────────────────────────────────────────
 # "hcx" | "claude". 측정 결과(작업 30·53·54)에 따라 이 표만 바꾼다.
 PROVIDER = {
@@ -79,7 +99,7 @@ def callAI(작업명, messages, system=None):
     except Exception as e:  # 실패해도 서버가 죽지 않게. 화면은 폴백 문구를 보여 준다
         usage = {}
         out = {"ok": False, "text": "", "json": None, "model": 모델, "error": f"{type(e).__name__}: {e}"}
-    _기록(작업명, 모델, usage, 시작, out["ok"])
+    _기록(작업명, 모델, usage, 시작, out["ok"], out.get("error"))
     return out
 
 
@@ -100,11 +120,20 @@ def call_hcx(messages, system, 설정):
         data=json.dumps(body).encode(),
         headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
     )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            data = json.load(r)
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"CLOVA {e.code}: {e.read().decode('utf-8', 'replace')[:300]}")
+    for attempt in range(4):   # 429(테스트 키 분당 한도)·5xx는 쉬었다가 세 번까지 다시(2·4·8초, Retry-After가 있으면 그 값)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                data = json.load(r)
+            break
+        except urllib.error.HTTPError as e:
+            if (e.code == 429 or e.code >= 500) and attempt < 3:
+                try:
+                    wait = float(e.headers.get("Retry-After") or 0)
+                except ValueError:
+                    wait = 0
+                time.sleep(min(max(wait, 2 ** (attempt + 1)), 15))
+                continue
+            raise RuntimeError(f"CLOVA {e.code}: {e.read().decode('utf-8', 'replace')[:300]}")
     result = data.get("result", {})
     text = result.get("message", {}).get("content", "")
     u = result.get("usage", {})
@@ -163,8 +192,8 @@ def first_json(text):
     return None
 
 
-def _기록(작업명, 모델, usage, 시작, ok):
-    """호출 한 건마다 한 줄. 작업 55(질문 1건당 원가·운영비)와 작업 30(모델 비교)의 재료."""
+def _기록(작업명, 모델, usage, 시작, ok, error=None):
+    """호출 한 건마다 한 줄. 작업 55(질문 1건당 원가·운영비)와 작업 30(모델 비교)의 재료. 실패면 이유도(키는 담기지 않음)."""
     try:
         LOG_FILE.parent.mkdir(exist_ok=True)
         row = {
@@ -173,6 +202,8 @@ def _기록(작업명, 모델, usage, 시작, ok):
             "입력토큰": usage.get("input"), "출력토큰": usage.get("output"),
             "ms": int((time.time() - 시작) * 1000), "ok": ok,
         }
+        if error:
+            row["error"] = error[:200]
         with LOG_FILE.open("a", encoding="utf-8") as f:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
     except OSError:
