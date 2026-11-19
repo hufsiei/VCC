@@ -7,7 +7,8 @@
     엑셀    = 저장소 위 드라이브 폴더 @VCC 의 가장 최신 "@VCC작업내역 v*.xlsx"
     작업일지 = 같은 폴더의 작업일지/*.md  → docs/작업일지/ 로 복사
 출력:
-    docs/tasks.json  { generatedAt, source, tasks[], notices[], roles[], journals[] }
+    docs/tasks.json     { generatedAt, source, tasks[], notices[], roles[], journals[] }  (커밋 대상)
+    docs/hub-data.json  위 내용 + 기준 문서 전문 + 최근 커밋 40개 묶음 (커밋하지 않음, 팀 문서함에 「자료 올리기」)
 작업내역을 고치거나 작업일지가 올라오면 다시 실행하고 커밋한다(작업 49와 함께, 하루 끝에).
 담당: 미리(이 스크립트만 tools/ 안에서 미리가 관리한다).
 """
@@ -81,6 +82,29 @@ def main():
     dst = os.path.join(ROOT, "docs", "tasks.json")
     json.dump(out, open(dst, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print("wrote", dst, "tasks", len(out["tasks"]), "notices", len(out["notices"]), "journals", len(out["journals"]), "from", out["source"])
+
+    # ---- 팀 문서함 「이틀 가이드」가 읽는 묶음 파일 (아티팩트는 외부 fetch가 막혀 있어 파일로 올린다) ----
+    import subprocess
+    def read(rel):
+        try: return open(os.path.join(ROOT, rel), encoding="utf-8").read()
+        except Exception as e: return ""
+    docs = {"PRD": read("docs/PRD-v1.md"), "spec": read("docs/spec-v1.md"), "디자인 규칙": read("docs/design-rules.md"),
+            "CLAUDE.md": read("CLAUDE.md"), "HCX 원칙": read("docs/HCX-원칙-v2.md"), "frames.json": read("data/frames.json"),
+            "data/README": read("data/README.md")}
+    for j in out["journals"]:
+        j["text"] = read(j["path"])
+    commits, sha = [], ""
+    try:
+        log = subprocess.run(["git", "log", "-n", "40", "--date=short", "--pretty=format:%h|%ad|%an|%s", "origin/main"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
+        for ln in log.stdout.splitlines():
+            h, d, a, m = ln.split("|", 3); commits.append({"sha": h, "date": d, "author": a, "message": m})
+        sha = commits[0]["sha"] if commits else ""
+    except Exception: pass
+    bundle = {"kind": "vcc-hub-data", "version": 1, "generatedAt": out["generatedAt"], "source": out["source"], "head": sha,
+              "tasks": out["tasks"], "notices": out["notices"], "roles": out["roles"], "journals": out["journals"], "commits": commits, "docs": docs}
+    bdst = os.path.join(ROOT, "docs", "hub-data.json")
+    json.dump(bundle, open(bdst, "w", encoding="utf-8"), ensure_ascii=False)
+    print("wrote", bdst, "%.0f KB" % (os.path.getsize(bdst) / 1024), "head", sha, "-> 팀 문서함 > 새 가이드 만들기 > 「자료 올리기」로 올리세요")
 
 if __name__ == "__main__":
     main()
