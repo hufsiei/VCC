@@ -24,7 +24,7 @@ function pickMock(m, name, p) {
       return /교환|파견|독일|마르부르크/.test(p.question || "") ? m.askBoo.exchange : m.askBoo.hold;
     case "interviewNext": {
       const n = (p.answers || []).length;
-      return n <= 2 ? m.interviewNext.steps[n] : m.interviewNext.done;
+      return n <= 3 ? m.interviewNext.steps[n] : m.interviewNext.done; // 11/19: steps[0]은 「후배 질문」
     }
     case "getNote":
       return m.getNote[p.id] || m.getNote["N-marburg"];

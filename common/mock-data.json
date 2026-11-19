@@ -140,12 +140,29 @@
     "steps": [
       {
         "done": false,
+        "section": "후배 질문",
+        "questionId": "Q-0001",
+        "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+        "question": "후배가 이렇게 물었어요 — \"마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?\" 경험이 있으면 들려주세요.",
+        "progress": {
+          "filled": 0,
+          "total": 7
+        },
+        "pendingQuestions": 1
+      },
+      {
+        "done": false,
         "section": "지원",
         "question": "마르부르크 파견은 언제부터 준비하셨어요?",
         "progress": {
           "filled": 0,
-          "total": 6
-        }
+          "total": 7
+        },
+        "examples": [
+          "출국 3학기 전",
+          "1년 전",
+          "합격 후"
+        ]
       },
       {
         "done": false,
@@ -153,7 +170,7 @@
         "question": "현지에서 들은 수업은 학점으로 어떻게 인정받으셨어요?",
         "progress": {
           "filled": 1,
-          "total": 6
+          "total": 7
         }
       },
       {
@@ -162,15 +179,15 @@
         "question": "기숙사나 현지 생활은 어땠나요?",
         "progress": {
           "filled": 2,
-          "total": 6
+          "total": 7
         }
       }
     ],
     "done": {
       "done": true,
       "progress": {
-        "filled": 6,
-        "total": 6
+        "filled": 7,
+        "total": 7
       }
     }
   },
@@ -192,6 +209,16 @@
           "lines": [
             {
               "text": "나는 합격 직후 기숙사를 신청했고, 첫 학기에는 생활에 적응하느라 바빴다."
+            }
+          ]
+        },
+        {
+          "name": "후배 질문",
+          "lines": [
+            {
+              "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+              "answersQuestionId": "Q-0001",
+              "text": "나는 학기 중에는 수업이 많아 인턴을 못 했고, 방학에 단기 인턴을 했다."
             }
           ]
         }
@@ -223,14 +250,32 @@
               "match": true
             }
           ]
+        },
+        {
+          "name": "후배 질문",
+          "lines": [
+            {
+              "lineId": "L-D1-7",
+              "answersQuestionId": "Q-0001",
+              "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+              "text": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.",
+              "match": true,
+              "identifying": false
+            }
+          ]
         }
       ]
-    }
+    },
+    "saved": true,
+    "myNoteId": "M-0001"
   },
   "saveConsent": {
     "ok": true,
     "noteId": "N-marburg",
-    "added": 3
+    "added": 3,
+    "answered": [
+      "Q-0001"
+    ]
   },
   "listNotes": {
     "notes": [
@@ -263,7 +308,7 @@
       "type": "교환",
       "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청",
       "forWhom": "독일어권 파견을 생각하는 1~2학년",
-      "evidenceCount": 7,
+      "evidenceCount": 8,
       "lastSemester": "2026-1",
       "satisfaction": null,
       "officialUrl": "https://example.com/hufs/exchange",
@@ -344,6 +389,20 @@
               "official": false
             }
           ]
+        },
+        {
+          "name": "후배 질문",
+          "interviewOnly": true,
+          "lines": [
+            {
+              "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+              "answersQuestionId": "Q-0001",
+              "text": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.",
+              "sourceId": "I-0003",
+              "lineId": "L-I-0003",
+              "official": false
+            }
+          ]
         }
       ],
       "sources": {
@@ -381,6 +440,11 @@
           "docType": "인터뷰",
           "program": "마르부르크필립스대학교",
           "semester": "2024-2"
+        },
+        "I-0003": {
+          "docType": "인터뷰",
+          "program": "마르부르크필립스대학교",
+          "semester": "2024-1"
         }
       }
     },
@@ -403,7 +467,8 @@
               "text": "전공 외국어를 무역 실무에서 써 보고 싶어서 지원했다는 후기가 있어요.",
               "sourceId": "T01-1-1",
               "lineId": "L-T01-1-1",
-              "official": false
+              "official": false,
+              "autoClassified": true
             }
           ]
         },
@@ -415,7 +480,8 @@
               "text": "해외 바이어 자료를 번역하고 정리하는 일을 주로 맡았어요.",
               "sourceId": "T01-2-1",
               "lineId": "L-T01-2-1",
-              "official": false
+              "official": false,
+              "autoClassified": true
             }
           ]
         },
@@ -427,7 +493,8 @@
               "text": "무역 용어와 문서 흐름을 익힌 것이 가장 도움이 됐다고 해요.",
               "sourceId": "T01-3-1",
               "lineId": "L-T01-3-1",
-              "official": false
+              "official": false,
+              "autoClassified": true
             }
           ]
         },
@@ -438,6 +505,11 @@
         },
         {
           "name": "근무조건",
+          "interviewOnly": true,
+          "lines": []
+        },
+        {
+          "name": "후배 질문",
           "interviewOnly": true,
           "lines": []
         }
@@ -563,16 +635,17 @@
     ],
     "questions": [
       {
-        "questionId": "Q-0001",
+        "questionId": "Q-0003",
         "text": "HUFS특강은 어떤 수업인가요?",
-        "status": "waiting",
+        "status": "hold",
         "askedAt": "2026-11-18T09:00:00+09:00"
       },
       {
-        "questionId": "Q-0002",
-        "text": "마르부르크 파견 준비는 언제부터 하나요?",
+        "questionId": "Q-0001",
+        "text": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
         "status": "answered",
-        "noteId": "N-marburg"
+        "noteId": "N-marburg",
+        "answeredAt": "2026-11-19T15:00:00+09:00"
       }
     ],
     "scraps": [
@@ -583,7 +656,8 @@
     ],
     "alerts": [
       {
-        "text": "기다리던 질문에 새 노트가 생겼어요.",
+        "text": "내 질문에 선배가 답했어요 · 마르부르크필립스대학교 해봤노트",
+        "questionId": "Q-0001",
         "noteId": "N-marburg",
         "at": "2026-11-19T15:00:00+09:00"
       }
