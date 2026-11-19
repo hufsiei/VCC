@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud Functions 호출 테스트 (작업 47 ④)</title>
+<style>
+  body { font-family: "Noto Sans KR", system-ui, sans-serif; max-width: 720px; margin: 32px auto; padding: 0 16px; color: #1a1a2e; }
+  h1 { font-size: 20px; }
+  input { width: 100%; padding: 8px; font-size: 14px; box-sizing: border-box; }
+  button { margin: 12px 8px 0 0; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+  pre { background: #f4f5f8; padding: 12px; white-space: pre-wrap; word-break: break-all; min-height: 80px; }
+  .ok { color: #0a7a3a; font-weight: bold; }
+  .fail { color: #c0392b; font-weight: bold; }
+  small { color: #666; }
+</style>
+</head>
+<body>
+<h1>Cloud Functions 호출 테스트 (작업 47 ④)</h1>
+<p><small>브라우저 → API Gateway → Cloud Functions(vcc/hello). 이 페이지에는 AI 키나 CLOVA 주소가 없습니다.</small></p>
+<label>함수 주소<input id="url" value="https://x1ey63q7ei.apigw.ntruss.com/vcc-api/dev/hello"></label>
+<button id="get">GET 호출</button>
+<button id="post">POST(JSON) 호출 — CORS 사전 요청 포함</button>
+<p id="status"></p>
+<pre id="out"></pre>
+<script>
+const $ = (id) => document.getElementById(id);
+async function call(method) {
+  const url = $("url").value.trim();
+  $("status").textContent = "호출 중…"; $("status").className = ""; $("out").textContent = "";
+  const t0 = performance.now();
+  try {
+    const opt = { method };
+    if (method === "POST") {
+      opt.headers = { "Content-Type": "application/json" };
+      opt.body = JSON.stringify({ test: "cors" });
+    }
+    const res = await fetch(url, opt);
+    const text = await res.text();
+    const ms = Math.round(performance.now() - t0);
+    $("status").textContent = `${res.ok ? "성공" : "실패"} · ${method} · HTTP ${res.status} · ${ms}ms · ${new Date().toLocaleString("ko-KR")}`;
+    $("status").className = res.ok ? "ok" : "fail";
+    $("out").textContent = text;
+  } catch (e) {
+    $("status").textContent = `실패 · ${method} · ${e.message} (F12 콘솔에 CORS 오류가 있는지 확인)`;
+    $("status").className = "fail";
+  }
+}
+$("get").onclick = () => call("GET");
+$("post").onclick = () => call("POST");
+</script>
+</body>
+</html>
