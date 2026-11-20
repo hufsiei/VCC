@@ -18,6 +18,12 @@ DATA = ROOT / "data"
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT.parent / "가상데이터_1000명.xlsx"
 
 DROP_STUDENT = {"studt_na_kr", "sex", "나이(만)"}
+
+
+def split_sentences(text):
+    """후기 문단 → 문장. 마침표·물음표·느낌표(연달아 쓴 것 포함) 뒤 공백에서 나눈다. '3.5'처럼 공백 없는 점은 나누지 않는다."""
+    parts = re.split(r"(?<=[.!?])\s+", (text or "").strip())
+    return [p.strip() for p in parts if p.strip()]
 # ── 프로그램 별칭 사전 (작업 82) ──
 # 줄임말·옛 이름·오타 → 프로그램명. 시연·개발 질문에 쓰는 것만 넣는다.
 # 넣지 않는 것: "리옹"(리옹2·리옹3 둘 다), "소르본"(파리 제4·제13 둘 다), "KOTRA"·"코트라"만 단독(권역 3곳),
@@ -200,12 +206,17 @@ def main():
                 evidence.append({"id": f"R{i:03d}-{q.split('.')[0]}", "docType": "귀국보고서", "학번": r["학번"],
                                  "학년도": r["학년도"], "학기": r["학기"], "semester": r["semester"], "프로그램명": r["대학명"],
                                  "문항": q, "칸": sec, "text": r[q]})
+    # [11/20 작업 50] 현장실습후기는 문장 단위: 한 문장 = 근거 한 건, id = I{후기 번호}-{후기 안 문장 순번}.
+    #   한 문단에 업무·배운점이 섞여 있어 문단 단위로는 칸 하나로 나눌 수 없다(spec 9장). '문단'은 원래 문단 번호(추적용).
     for i, r in enumerate(interns, 1):
         paras = [p.strip() for p in re.split(r"\n\s*\n", r.get("후기") or "") if p.strip()]
+        k = 0
         for j, p in enumerate(paras, 1):
-            evidence.append({"id": f"I{i:03d}-{j}", "docType": "현장실습후기", "학번": r["학번"],
-                             "학년도": r["학년도"], "학기": r["학기"], "semester": r["semester"], "프로그램명": r["업체명"],
-                             "문항": "후기", "칸": "", "text": p})
+            for s in split_sentences(p):
+                k += 1
+                evidence.append({"id": f"I{i:03d}-{k}", "docType": "현장실습후기", "학번": r["학번"],
+                                 "학년도": r["학년도"], "학기": r["학기"], "semester": r["semester"], "프로그램명": r["업체명"],
+                                 "문항": "후기", "문단": j, "칸": "", "text": s})
 
     # ── 저장 ──
     print("저장:")
