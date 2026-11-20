@@ -24,12 +24,17 @@ def main():
     elif r[0]["reasons"] != [FIRST_REASON, "같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음",
                              "한국외국어대학교 직무탐색 집중교육 함께 이수"]:
         bad.append(f"선배1 이유 틀림: {r[0]['reasons']}")
+    # 선배2(H0241) 2위 12점(학과 5 + 이중전공 4 + 단과대 3, 공통 비교과 없음)
+    if len(r) < 2 or r[1]["studentId"] != "H0241" or r[1]["score"] != 12:
+        bad.append(f"시연 2위 틀림: {r[1:2]}")
+    elif r[1]["reasons"] != [FIRST_REASON, "같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음"]:
+        bad.append(f"선배2 이유 틀림: {r[1]['reasons']}")
     h745 = next((x for x in r if x["studentId"] == "H0745"), None)
     if not h745 or h745["score"] != 8:
-        bad.append(f"선배2(H0745) 8점 아님: {h745}")
+        bad.append(f"H0745 8점 아님: {h745}")
 
     # 2) 모든 프로그램 × 보는 사람 몇 명: 후보·정렬·이유 규칙
-    viewers = ["H0143", "H0469", "H0745", "H0001", "H0500", "H1000"]
+    viewers = ["H0143", "H0469", "H0241", "H0745", "H0001", "H0500", "H1000"]
     t = time.time()
     n = 0
     for p in programs:
