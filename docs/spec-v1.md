@@ -74,7 +74,7 @@ const FN_BASE = "http://localhost:8787";
 
 | 함수 | 규칙 |
 |---|---|
-| login | `id`가 `"staff01"`이면 `login.staff`, `"staff"`로 시작하는 다른 id면 `login.staffDept`, 그 외 비밀번호가 `"1"`이면 `login.student`, 아니면 `login.fail` |
+| login | `id`가 `"staff01"`이면 `login.staff`, `"staff"`로 시작하는 다른 id면 `login.staffDept`, 그 외 `id`가 학번 모양(`H` + 숫자 4자리)이고 비밀번호가 비어 있지 않으면 `login.student`, 아니면 `login.fail`(비번은 대조하지 않는다 — 공개 코드에 비번을 두지 않음) |
 | askBoo | 4장의 규정 질문 표현이 있으면 `askBoo.official`, 아니면 질문에 `교환\|파견\|독일\|마르부르크`가 있으면 `askBoo.exchange`, 그 외 `askBoo.hold` |
 | interviewNext | **[11/20]** `program`이 `interviewNext.byProgram`에 있으면(마르부르크 시연 대본) `answers.length`번째 `steps`, 다 쓰면 `done`(steps[0]은 「후배 질문」). 그 밖의 프로그램은 서버(`interview.py`)처럼 `data/programs.json`의 `분야` → `data/frames.json` 노트 틀을 고르고, 아직 답하지 않은 칸을 틀 순서대로(「배운점」은 마지막) `interviewNext.questions[칸]` 문장으로 묻는다(`{p}` = 별칭 첫째 또는 프로그램명). 꼬리 질문·후배 질문은 없다(`pendingQuestions: 0`) |
 | getNote | `getNote[id]`가 있으면 그것, 없으면 `getNote["N-marburg"]` |
