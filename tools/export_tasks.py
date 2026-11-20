@@ -9,10 +9,13 @@
     3) 둘 다 없으면 작업내역 공유 링크(VCC_XLSX_URL)에서 xlsx를 받아 씀
     엑셀    = @VCC 폴더의 가장 최신 "@VCC작업내역 v*.xlsx" (3번은 링크의 파일)
     작업일지 = @VCC/작업일지/*.md → docs/작업일지/ 로 복사 (3번이면 복사 없이 저장소에 있는 docs/작업일지/ 를 그대로 씀)
+              줄바꿈은 LF로 맞추고, 파일마다 드라이브 수정 시각과 저장소 시각(마지막 커밋, 커밋 전 수정이면 파일 수정 시각)을 비교한다.
+              내용이 같으면 그대로, 드라이브가 최신이면 덮어씀, 저장소가 최신이면 건너뜀, 드라이브에만 있으면 새로 복사 → 실행 출력에 파일별로 나온다.
 출력:
     docs/tasks.json     { generatedAt, source, tasks[], notices[], roles[], journals[] }  (커밋 대상)
     docs/hub-data.json  위 내용 + 기준 문서 전문 + 최근 커밋 40개 묶음 (커밋하지 않음, 팀 문서함에 「자료 올리기」)
 작업내역을 고치거나 작업일지가 올라오면 다시 실행하고 커밋한다(작업 49와 함께, 하루 끝에).
+    docs/tasks.json은 커밋한다. 작업일지는 출력에서 「덮어씀」「새 파일」로 나온 것만 내용을 확인하고 함께 커밋한다(아니면 git restore).
 담당: 미리(이 스크립트만 tools/ 안에서 미리가 관리한다).
 """
 import glob, io, json, os, re, string, sys, datetime, urllib.parse, urllib.request
@@ -54,6 +57,25 @@ def git_date(path):
         if r.stdout.strip(): return r.stdout.strip()
     except Exception: pass
     return datetime.datetime.fromtimestamp(os.path.getmtime(path)).strftime("%Y-%m-%d")
+
+def repo_time(path):
+    """저장소 파일이 마지막으로 바뀐 시각(초). 커밋 뒤 고치지 않았으면 마지막 커밋 시각, 고쳤거나 커밋 전이면 파일 수정 시각."""
+    import subprocess
+    try:
+        st = subprocess.run(["git", "status", "--porcelain", "--", path],
+                            cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
+        if not st.stdout.strip():
+            r = subprocess.run(["git", "log", "-1", "--format=%ct", "--", path],
+                               cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
+            if r.stdout.strip(): return int(r.stdout.strip())
+    except Exception: pass
+    return os.path.getmtime(path)
+
+def lf(s):
+    return s.replace("\r\n", "\n").replace("\r", "\n")
+
+def hm(t):
+    return datetime.datetime.fromtimestamp(t).strftime("%m-%d %H:%M")
 
 def download_xlsx():
     """공유 링크에서 xlsx를 받아 (파일 이름, 메모리 파일)로 돌려준다."""
@@ -137,10 +159,25 @@ def main():
         srcs = sorted(glob.glob(os.path.join(jdir_dst, "*.md")))
     for p in srcs:
         name = os.path.basename(p)
-        if drive:
-            with open(p, encoding="utf-8") as f: text = f.read()
-            with open(os.path.join(jdir_dst, name), "w", encoding="utf-8", newline="") as f: f.write(mask_private(text))
-            updated = datetime.datetime.fromtimestamp(os.path.getmtime(p)).strftime("%Y-%m-%d")
+        if drive:  # 줄바꿈은 LF로 맞추고, 저장소가 더 최신이면 덮어쓰지 않는다
+            with open(p, encoding="utf-8") as f: text = lf(mask_private(f.read()))
+            d, t_drive = os.path.join(jdir_dst, name), os.path.getmtime(p)
+            updated = datetime.datetime.fromtimestamp(t_drive).strftime("%Y-%m-%d")
+            if os.path.exists(d):
+                with open(d, encoding="utf-8") as f: old = f.read()
+                t_repo = repo_time(d)
+                if lf(old) == text:
+                    if old != text:  # 내용은 같고 줄바꿈만 다름 → LF로만 맞춤
+                        with open(d, "w", encoding="utf-8", newline="") as f: f.write(text)
+                    action = None
+                elif t_drive > t_repo: action = "덮어씀(드라이브가 최신 %s > 저장소 %s)" % (hm(t_drive), hm(t_repo))
+                else:
+                    action = None; updated = git_date(d)
+                    print("  작업일지 건너뜀(저장소가 최신 %s ≥ 드라이브 %s): %s" % (hm(t_repo), hm(t_drive), name))
+            else: action = "새 파일(드라이브에만 있음)"
+            if action:
+                with open(d, "w", encoding="utf-8", newline="") as f: f.write(text)
+                print("  작업일지 %s: %s  ← 내용 확인 후 커밋" % (action, name))
         else:
             updated = git_date(p)
         who = next((w for w in ("미리", "원우", "민지") if w in name), "")
