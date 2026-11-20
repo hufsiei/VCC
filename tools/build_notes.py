@@ -121,7 +121,7 @@ def build():
             line = {"text": e["text"], "sourceId": e["id"], "lineId": f"L-{e['id']}", "official": bool(OFFICIAL_RE.search(e["text"]))}
             sources[e["id"]] = {"docType": e["docType"], "program": name, "semester": e["semester"]}
             sec = e["칸"] or classified.get(e["id"])
-            if ntype == "인턴" and not e["칸"] and sec:
+            if ntype == "인턴" and sec and (e.get("autoClassified") or not e["칸"]):   # 작업 50 자동 분류 칸 → 화면 「자동 분류」 라벨
                 line["autoClassified"] = True
             if sec in frame["칸"] and sec not in frame["인터뷰로만"]:
                 lines_by[sec].append(line)

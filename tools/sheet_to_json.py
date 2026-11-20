@@ -208,15 +208,33 @@ def main():
                                  "문항": q, "칸": sec, "text": r[q]})
     # [11/20 작업 50] 현장실습후기는 문장 단위: 한 문장 = 근거 한 건, id = I{후기 번호}-{후기 안 문장 순번}.
     #   한 문단에 업무·배운점이 섞여 있어 문단 단위로는 칸 하나로 나눌 수 없다(spec 9장). '문단'은 원래 문단 번호(추적용).
+    # [11/20] 작업 50 자동 분류 결과는 data/intern-sections.json({sourceId: 칸})에 따로 두고 변환할 때마다 다시 입힌다.
+    #   evidence.json에만 써 두면 이 스크립트를 다시 돌릴 때 칸이 빈 값으로 돌아가 분류 결과가 사라지기 때문.
+    sec_path = DATA / "intern-sections.json"
+    sections = json.loads(sec_path.read_text(encoding="utf-8")) if sec_path.exists() else {}
+    frames = json.loads((DATA / "frames.json").read_text(encoding="utf-8"))
+    allowed = [s for s in frames["인턴"]["칸"] if s not in frames["인턴"]["인터뷰로만"]]
+    for sid, s in sections.items():
+        if s not in allowed:
+            errors.append(f"intern-sections.json: {sid}의 칸 '{s}'은 인턴 틀의 사전 생성 칸({'·'.join(allowed)})이 아님")
+    intern_ids = set()
     for i, r in enumerate(interns, 1):
         paras = [p.strip() for p in re.split(r"\n\s*\n", r.get("후기") or "") if p.strip()]
         k = 0
         for j, p in enumerate(paras, 1):
             for s in split_sentences(p):
                 k += 1
-                evidence.append({"id": f"I{i:03d}-{k}", "docType": "현장실습후기", "학번": r["학번"],
-                                 "학년도": r["학년도"], "학기": r["학기"], "semester": r["semester"], "프로그램명": r["업체명"],
-                                 "문항": "후기", "문단": j, "칸": "", "text": s})
+                sid = f"I{i:03d}-{k}"
+                intern_ids.add(sid)
+                row = {"id": sid, "docType": "현장실습후기", "학번": r["학번"],
+                       "학년도": r["학년도"], "학기": r["학기"], "semester": r["semester"], "프로그램명": r["업체명"],
+                       "문항": "후기", "문단": j, "칸": sections.get(sid, ""), "text": s}
+                if sid in sections:
+                    row["autoClassified"] = True
+                evidence.append(row)
+    stray = sorted(set(sections) - intern_ids)
+    if stray:
+        errors.append(f"intern-sections.json: 근거에 없는 id {len(stray)}개(예: {stray[:3]}) — 후기 문장이 바뀌었으면 분류를 다시 해야 함")
 
     # ── 저장 ──
     print("저장:")
