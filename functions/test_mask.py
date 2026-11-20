@@ -41,6 +41,20 @@ MASKED = [
     # 메신저 아이디
     ("카톡 아이디 hufs_boo123 추가해 주세요", "[연락처] 추가해 주세요"),
     ("인스타 @boo.hufs 로 DM 주세요", "[연락처] 로 DM 주세요"),
+    # 한글에 붙여 쓴 경우(\w가 한글을 포함하는 문제 회귀 시험)
+    ("번호010-1234-5678로 주세요", "번호[연락처]로 주세요"),
+    ("전화01012345678", "전화[연락처]"),
+    ("번호+82 10-1234-5678", "번호[연락처]"),
+    ("홈페이지hufs.ac.kr 참고", "홈페이지[링크] 참고"),
+    ("인스타는@boo_hufs", "[연락처]"),   # 메신저 이름까지 함께 가림(인스타 @… 와 같음)
+    ("학번202301234번입니다", "학번[학번]번입니다"),
+    ("제학번은H0745", "제학번은[학번]"),
+    ("메일은kim@naver.com", "메일은[메일]"),
+    ("kim 골뱅이 naver.com", "[메일]"),
+    ("카톡 아이디는 boo2026", "[연락처]"),
+    ("카톡: hufsboo", "[연락처]"),
+    ("서울 종로구 세종대로 209", "[주소]"),
+    ("부산광역시 해운대구 해운대로 570번길 12", "[주소]"),
 ]
 
 # 바뀌면 안 되는 문장(금액·날짜·학기·수량·프로그램명 숫자)
@@ -53,7 +67,15 @@ ORDINARY = [
     "K-컬처랩(온라인) 실습은 화상으로 했어요.", "Celpe-Bras 대비 과정을 들었어요.", "B2 이상이 필요해요.",
     "외대 앞 이문로에서 자취했어요.", "학교 홈페이지 공지를 확인하세요.", "메일로 교수님께 문의했어요.",
     "2023-2024 학년도 기준이에요.", "5천 원이면 한 끼 먹어요.", "오후 2시부터 6시까지 근무했어요.",
+    # 주소·메신저 오탐 회귀 시험
+    "그래서 다시 제가 1등 했어요.", "다시 정상으로 1등", "다시 활동 1등", "친구 집으로 3", "연구 방향으로 2차 실험",
+    "혹시 그쪽으로 2번 가면", "생산 라인 PM팀", "카카오 Map 앱으로 찾았어요", "인스타 감성 카페가 많아요",
+    "다섯시 퇴근길 1시간", "역시 이 길 3번째", "동시 통역 2025년", "2025-12-31까지 제출", "3-4학년 대상",
+    "010 이라는 앞자리", "02-1234", "시차 7-8시간", "H04690", "20학번 선배예요", "2019학번입니다",
+    "100유로 10-20분", "견적 123456789 원", "총 987654321원짜리 계약", "이메일 주소는 학교 공지 참고", "공지는 @VCC 폴더가 아니라 학과 게시판에",
 ]
+# 위 마지막 문장의 '@VCC'는 @아이디 규칙에 걸린다(지나치게 가리는 쪽) — 아래에서 따로 확인
+KNOWN_OVERMASK = {"공지는 @VCC 폴더가 아니라 학과 게시판에"}
 
 
 def main():
@@ -63,6 +85,10 @@ def main():
         if got != want:
             bad.append(f"치환 틀림: {src!r}\n      기대 {want!r}\n      결과 {got!r}")
     for s in ORDINARY:
+        if s in KNOWN_OVERMASK:
+            if mask(s) == s:
+                bad.append(f"알려진 과마스킹이 사라짐(목록 정리 필요): {s!r}")
+            continue
         if mask(s) != s:
             bad.append(f"오탐: {s!r} → {mask(s)!r}")
 
@@ -72,6 +98,24 @@ def main():
     rows = list(csv.DictReader(open(root / "eval-questions.csv", encoding="utf-8-sig")))
     bad += [f"개발 질문 오탐: {r['번호']} {find(r['질문'])}" for r in rows if mask(r["질문"]) != r["질문"]]
 
+    # 근거 문단 사이에 개인정보를 끼워 넣으면 그 부분만 바뀌어야 한다(앞뒤 문맥 영향 시험)
+    PII = [("010-1234-5678", "[연락처]"), ("someone@example.com", "[메일]"), ("H0469", "[학번]"),
+           ("https://open.kakao.com/o/abc", "[링크]"), ("서울특별시 동대문구 이문로 107", "[주소]"), ("202301234", "[학번]")]
+    inserted = 0
+    for i, e in enumerate(evidence[::19]):
+        for pii, tok in PII:
+            head, _, tail = e["text"].partition(" ")
+            for src, want in ((f"{head} {pii} {tail}", f"{head} {tok} {tail}"), (f"{e['text']} {pii}", f"{e['text']} {tok}")):
+                inserted += 1
+                if mask(src) != want:
+                    bad.append(f"끼워 넣기 틀림: {e['id']} {pii} → {mask(src)[:80]!r}")
+
+    blocks = [{"role": "user", "content": [{"type": "text", "text": "H0143 010-1234-5678"}, {"type": "image", "source": {}}]}]
+    got = mask_messages(blocks)
+    if got[0]["content"][0]["text"] != "[학번] [연락처]" or got[0]["content"][1] != {"type": "image", "source": {}} \
+            or blocks[0]["content"][0]["text"] != "H0143 010-1234-5678":
+        bad.append(f"블록형 mask_messages 틀림: {got}")
+
     msgs = [{"role": "user", "content": "제 번호 010-1111-2222"}]
     out = mask_messages(msgs)
     if out[0]["content"] != "제 번호 [연락처]" or msgs[0]["content"] != "제 번호 010-1111-2222":
@@ -80,8 +124,9 @@ def main():
     if kinds != ["학번", "연락처", "메일"]:
         bad.append(f"find 틀림: {kinds}")
 
-    n = len(MASKED) + len(ORDINARY) + len(evidence) + len(rows)
-    print(f"마스킹 시험 {n}건(치환 {len(MASKED)} · 일반 {len(ORDINARY)} · 근거 {len(evidence)} · 질문 {len(rows)}) 중 틀림 {len(bad)}건")
+    n = len(MASKED) + len(ORDINARY) + len(evidence) + len(rows) + inserted
+    print(f"마스킹 시험 {n}건(치환 {len(MASKED)} · 일반 {len(ORDINARY)} · 근거 {len(evidence)} · 질문 {len(rows)}"
+          f" · 끼워 넣기 {inserted}) 중 틀림 {len(bad)}건")
     for b in bad:
         print("  -", b)
     sys.exit(1 if bad else 0)
