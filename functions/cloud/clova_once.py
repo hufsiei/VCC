@@ -6,7 +6,8 @@
 #
 # 기본 파라미터(콘솔 > 액션 > 기본 파라미터)
 #   CLOVA_KEY     CLOVA Studio API 키 — 콘솔에만 넣는다. 코드·저장소·채팅·캡처에 쓰지 않는다.
-#   ALLOW_ORIGIN  (선택) 예: https://hufsiei.github.io (없으면 "*")
+#   ALLOW_ORIGIN  (선택) CORS를 허용할 화면 origin, 쉼표로 여러 개. 없으면 아래 ALLOWED_ORIGINS
+#                 (GitHub Pages 공개 주소 + 로컬 시연 주소). "*"는 쓰지 않는다(공개 저장소, PRD 9장).
 #   CLOVA_URL     (선택) 없으면 아래 기본값(HCX-005)
 #
 # 설정 근거: HCX 대응 원칙 v2 5절 — Temperature 0, Thinking 끔, Max tokens는 출력 크기에 맞게(30),
@@ -26,13 +27,24 @@ SYSTEM = '너는 JSON만 출력한다. 다른 말은 쓰지 않는다. 형식: {
 USER = '형식 그대로 {"ok":true,"msg":"hello"} 만 출력해.'
 
 
+# 화면 공개 주소(https://hufsiei.github.io/VCC/의 origin)와 로컬 시연 주소(python -m http.server 8000)만 허용한다.
+# origin은 경로 없이 "프로토콜://호스트[:포트]"까지만 쓴다.
+ALLOWED_ORIGINS = ("https://hufsiei.github.io", "http://localhost:8000", "http://127.0.0.1:8000")
+
+
 def _cors(args):
-    return {
-        "Access-Control-Allow-Origin": args.get("ALLOW_ORIGIN") or "*",
+    """요청 Origin이 허용 목록에 있을 때만 그 Origin을 돌려준다. 없으면 허용 헤더를 붙이지 않아 브라우저가 막는다."""
+    allowed = [o.strip() for o in str(args.get("ALLOW_ORIGIN") or "").split(",") if o.strip()] or ALLOWED_ORIGINS
+    origin = (args.get("__ow_headers") or {}).get("origin", "")  # 웹 액션은 헤더 이름을 소문자로 넘긴다
+    headers = {
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, X-User",
         "Access-Control-Max-Age": "600",
+        "Vary": "Origin",
     }
+    if origin in allowed:
+        headers["Access-Control-Allow-Origin"] = origin
+    return headers
 
 
 def _reply(args, status, data):
