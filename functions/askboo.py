@@ -78,7 +78,25 @@ def _norm(s):
     return re.sub(r"\s+", "", s or "").lower()
 
 
-_TERMS = [(_norm(a), name) for name, p in PROGRAMS.items() for a in [name, *p.get("별칭", [])] if _norm(a)]
+# (정규화한 말, 프로그램명, 별칭 여부) — 별칭에만 아래 '학교 종류 꼬리' 규칙을 적용한다
+_TERMS = [(_norm(a), name, i > 0) for name, p in PROGRAMS.items()
+          for i, a in enumerate([name, *p.get("별칭", [])]) if _norm(a)]
+
+# (11/20, tools/check_alias_match.py 4)와 같은 규칙) 별칭 바로 뒤에 학교 종류 말 + 대학/대가 붙으면 다른 학교로 보고 걸지 않는다.
+# 예) '파리시테예술대학교'는 별칭 '파리시테'가 들어 있어도 파리시테대학교가 아님 → 보류. '밀라노대학교'처럼 바로 대학이 오면 건다.
+SCHOOL_KIND = ("공과", "공업", "과학기술", "기술", "응용과학", "예술", "음악", "미술", "의과", "약학",
+               "경영", "경제", "국립", "주립", "시립", "가톨릭", "카톨릭", "사범", "교육", "외국어", "신학")
+SCHOOL_TAIL = re.compile(r"(?:" + "|".join(SCHOOL_KIND) + r")(?:대학교|대학|대)")
+
+
+def _alias_ok(t, q):
+    """별칭이 나오는 자리 중 하나라도 뒤에 다른 학교 꼬리가 없으면 인정."""
+    start = q.find(t)
+    while start != -1:
+        if not SCHOOL_TAIL.match(q, start + len(t)):
+            return True
+        start = q.find(t, start + 1)
+    return False
 
 # 사후 검증용 고유명사 사전: 프로그램명·별칭·국가·부서명 + 자주 지어내는 시험·기관 이름
 PROPER_NOUNS = sorted({w for name, p in PROGRAMS.items() for w in [name, *p.get("별칭", []), p.get("세부", "")]
@@ -140,7 +158,7 @@ def askBoo(me, payload, save=True):
 # ── ① 프로그램 대조 ───────────────────────────────────────────────────
 def match_programs(question):
     q = _norm(question)
-    hits = [(t, name) for t, name in _TERMS if t in q]
+    hits = [(t, name) for t, name, is_alias in _TERMS if t in q and (not is_alias or _alias_ok(t, q))]
     keep = [(t, name) for t, name in hits if not any(t != t2 and t in t2 for t2, _ in hits)]
     found = sorted({name for _, name in keep})
     if found:
