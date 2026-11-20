@@ -12,7 +12,7 @@ import store
 
 PER_MINUTE = 10
 PER_DAY = 100
-EXEMPT = {"H0143", "H0469", "H0745", "staff01", "staff02"}   # 시연 계정(spec 0장)
+EXEMPT = {"H0143", "H0469", "H0241", "H0745", "staff01", "staff02"}   # 시연 계정(spec 0장)
 MESSAGE = "잠시 뒤에 다시 시도해 주세요"
 KST = timezone(timedelta(hours=9))
 

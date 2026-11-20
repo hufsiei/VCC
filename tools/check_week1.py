@@ -59,7 +59,7 @@ def check_data():
         p = r.get("관련 프로그램", "")
         if p and p not in programs:
             errs.append(f"eval-questions {r['번호']}번: 관련 프로그램 '{p}' 없음")
-    for sid in ("H0143", "H0469", "H0745", "staff01", "staff02"):  # 시연 인물·직원 계정
+    for sid in ("H0143", "H0469", "H0241", "H0745", "staff01", "staff02"):  # 시연 인물·직원 계정
         if sid not in students:
             errs.append(f"시연 계정 {sid} 없음")
     return errs, f"evidence {len(ev)} · 학생 {len(students)} · 프로그램 {len(programs)} · 질문 {len(q)}"
