@@ -2,6 +2,8 @@
 
 외대人사이드 본선 저장소. 함수·응답 명세는 [docs/spec-v1.md](docs/spec-v1.md)를 따릅니다.
 
+> **가상 데이터 PoC입니다. 실제 학생 정보가 없습니다.** `data/`의 학생(H0001~H1000)·귀국보고서·실습 후기·질문 로그는 모두 생성한 가상 데이터이고, 이름 열은 아예 없습니다. 실제 학번(9자리)·실명·연락처는 어디에도 올리지 않습니다. 자세한 것은 [data/README.md](data/README.md).
+
 ## 접속 주소
 
 - 로컬: 저장소 폴더에서 `python -m http.server 8000` 실행 후 `http://localhost:8000/screens/login/`
