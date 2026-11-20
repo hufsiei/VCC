@@ -172,7 +172,16 @@ function renderLines() {
 let switchSeq = 0;
 function lineRow(sectionName, line) {
   const id = `consent-sw-${++switchSeq}`;
-  const offNote = el("span", { className: "consent-line__off", text: "내 경험노트에만 남아요" });
+  // 끈 문장: 진한 남색 + 자물쇠로 「내 경험노트에만 남아요」
+  const offNote = el("span", { className: "consent-line__off" }, [icon("lock"), "내 경험노트에만 남아요"]);
+  // 본인 식별 문장을 켰을 때 주의 문구 (임시 문장 — 민지 11/20, 문구 확정 시 교체)
+  const riskNote = line.identifying === true
+    ? el("span", { className: "consent-line__risk" }, [icon("triangle-alert"), "내 개인 정보가 유출될 수 있어요"])
+    : null;
+  const showNotes = (on) => {
+    offNote.hidden = on;
+    if (riskNote) riskNote.hidden = !on;
+  };
 
   const sw = el("input", {
     className: "switch",
@@ -181,7 +190,7 @@ function lineRow(sectionName, line) {
       change: (e) => {
         state.on.set(line.lineId, e.currentTarget.checked);
         row.classList.toggle("consent-line--off", !e.currentTarget.checked);
-        offNote.hidden = e.currentTarget.checked;
+        showNotes(e.currentTarget.checked);
         renderTarget();
         update();
         drawIcons();
@@ -189,7 +198,7 @@ function lineRow(sectionName, line) {
     },
   });
   sw.checked = state.on.get(line.lineId) === true;
-  offNote.hidden = sw.checked;
+  showNotes(sw.checked);
 
   const text = el("label", { className: "consent-line__text", attrs: { for: id } }, [
     // 후배 질문 칸: Q(후배 질문 원문, 인용) + A(내 답)
@@ -204,6 +213,7 @@ function lineRow(sectionName, line) {
       // AI 원문 일치 검사에 걸린 문장(spec summarizeInterview.match)
       line.match === false ? statusLabel("neutral", "info", "원문과 다를 수 있어요") : null,
       offNote,
+      riskNote,
     ]),
     sw,
   ]);
@@ -259,11 +269,14 @@ submitBtn.addEventListener("click", async () => {
   state.busy = false;
   submitBtn.textContent = "동의하고 공유";
   if (!res || res.error || res.ok === false) {
-    // 화면 안 오류(6-5): 시트는 닫지 않고 고른 상태를 그대로 둔다
+    // 화면 안 오류(6-5): 시트는 닫지 않고 고른 상태를 그대로 둔다.
+    // 서버가 문장을 막으면(ok:false + message) 그 문구를 그대로 보여 준다
+    // 예: "해봤노트에는 연락처·메일·링크·주소를 넣을 수 없어요."
     agreeError.replaceChildren(
       statusLabel("error", "circle-alert", "공유하지 못했어요"),
-      el("p", { className: "sub", text: (res && res.error) || "잠시 뒤에 다시 시도해 주세요." }),
+      el("p", { className: "sub", text: (res && (res.message || res.error)) || "잠시 뒤에 다시 시도해 주세요." }),
     );
+    agreeError.scrollIntoView({ block: "nearest" });
     update();
     drawIcons();
     return;
