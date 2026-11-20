@@ -10,7 +10,8 @@
 #       앞 경계를 \w가 아니라 영문·숫자로만 막아야 한다(_NB).
 import re
 
-_NB = r"(?<![0-9A-Za-z])"          # 앞이 영문·숫자가 아님(한글·공백·기호는 허용)
+_NB = r"(?<![0-9A-Za-z０-９])"      # 앞이 영문·숫자가 아님(한글·공백·기호는 허용)
+_S = r"[\s\-.‐‑‒–—―－]"            # 전화 구분자(긴 하이픈·전각 하이픈 포함)
 # 숫자 바로 뒤에 붙으면 금액·수량이지 학번·주소가 아니다
 _UNIT = r"(?:원|만|천|억|유로|달러|엔|파운드|프랑|크로나|코루나|루블|헤알|개|명|번(?!길|지)|시간|분|초|주|일|년|월|학기|학년|학점|점|%|가지|군데|살|층|등|차|위|회|km|m\b|kg)"
 _MONEY = r"(?:원|만|천|억|유로|달러|엔|파운드|프랑|크로나|코루나|루블|헤알|%)"
@@ -22,17 +23,23 @@ _ROAD = r"[가-힣0-9]{0,9}[가-힣0-9](?<!으)(?:로|길)"   # '~으로'(조사
 
 PATTERNS = [
     ("메일", "[메일]", re.compile(
-        r"[A-Za-z0-9._%+-]+\s*(?:@|＠|\(at\)|\[at\]|골뱅이)\s*[A-Za-z0-9-]+(?:\s*(?:\.|\(dot\)|\[dot\])\s*[A-Za-z0-9-]+)*"
+        r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+\s*(?:@|＠|\(at\)|\[at\]|골뱅이)\s*[A-Za-z0-9-]+(?:\s*(?:\.|\(dot\)|\[dot\])\s*[A-Za-z0-9-]+)*"
         r"\s*(?:\.|\(dot\)|\[dot\])\s*[A-Za-z]{2,}", re.I)),
     ("링크", "[링크]", re.compile(
         r"(?:https?://|www\.)[^\s가-힣<>\"'()\[\]]+"
-        r"|(?<![A-Za-z0-9@.\-])(?:[A-Za-z0-9-]+\.)+(?:com|net|org|kr|io|me|ly|gl|link|be|tv|edu|info|app)\b(?:/[^\s가-힣<>\"'()\[\]]*)?",
+        r"|(?<![A-Za-z0-9@.\-])(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,6}/[^\s가-힣<>\"'()\[\]]*"          # 경로가 있으면 어떤 도메인이든
+        r"|(?<![A-Za-z0-9@.\-])(?:[A-Za-z0-9-]+\.)+(?:com|net|org|kr|io|me|ly|gl|link|be|tv|edu|info|app|ai|site"
+        r"|de|fr|nl|se|ru|jp|cn|uk|eu|ch|pt|br|ee)\b",                                              # 경로 없으면 이 목록만
         re.I)),
     ("연락처", "[연락처]", re.compile(
-        _NB + r"(?:\+82[\s\-.)]*\(?0?|\(?0)\d{1,2}\)?[\s\-.)]*\d{3,4}[\s\-.]*\d{4}(?!\d)"   # 010-1234-5678, 02)123-4567, +82 10…
-        r"|" + _NB + r"01[016-9]\d{7,8}(?!\d)"                                            # 01012345678
-        r"|" + _NB + r"1[5-9]\d{2}[\s\-.]\d{4}(?!\d)"                                     # 1588-1234 대표번호
-        r"|내선\s*(?:번호)?\s*[:：]?\s*\d{3,4}(?!\d)")),                                   # 내선 2678
+        _NB + r"(?:[+＋]82(?:" + _S + r"|\))*\(?[0０]?|\(?[0０])\d{1,2}\)?(?:" + _S + r"|\))*\d{3,4}" + _S + r"*\d{4}(?!\d)"  # 010-1234-5678, 02)123-4567, +82 10…
+        r"|" + _NB + r"[0０][1１][016-9０１６-９]\d{7,8}(?!\d)"                             # 01012345678
+        r"|" + _NB + r"1[5-9]\d{2}" + _S + r"\d{4}(?!\d)"                                  # 1588-1234 대표번호
+        )),
+    # 지역번호 없는 번호는 '내선·전화·번호·tel·☎' 바로 뒤에 올 때만. 숫자 부분(v)만 바꾼다. 위 전화 규칙 다음에 돌아야 한다
+    ("연락처", "[연락처]", re.compile(
+        r"(?:내선|전화|번호|연락처|tel|☎|📞)\.?\s*(?:번호)?\s*(?:는|은)?\s*[:：]?\s*"
+        r"(?P<v>\d{3,4}(?:" + _S + r"\d{4})?)(?!\d)(?!" + _UNIT.replace("번(?!길|지)|", "") + ")", re.I)),   # '내선 2678번'도 가림           # 내선 2678, 전화 2173-2678
     ("학번", "[학번]", re.compile(
         r"(?<![A-Za-z0-9])H\d{4}(?!\d)"
         r"|(?<![\d,.\-])\d{9}(?![\d,.\-])(?!" + _MONEY + r")(?!\s+" + _MONEY + r"(?![가-힣]))", re.I)),   # '…원'은 금액, ' 만들어'는 학번
@@ -58,13 +65,29 @@ PATTERNS = [
 ]
 
 
+def _span(m):
+    """가릴 범위. 이름 붙은 그룹 v가 있으면 그 부분만(앞의 '전화' 같은 말은 남긴다)."""
+    return m.span("v") if "v" in m.re.groupindex and m.group("v") is not None else m.span()
+
+
+def _replace(rx, text, make):
+    out, last = [], 0
+    for m in rx.finditer(text):
+        a, b = _span(m)
+        out += [text[last:a], make(text[a:b])]
+        last = b
+    out.append(text[last:])
+    return "".join(out)
+
+
 def find(text):
     """가릴 곳 목록 [(종류, 시작, 끝, 원문)]. 쪽지 검사처럼 '무엇이 들어 있나'만 알고 싶을 때 쓴다."""
     out, cur = [], text or ""
     for kind, token, rx in PATTERNS:
         for m in rx.finditer(cur):
-            out.append((kind, m.start(), m.end(), m.group()))
-        cur = rx.sub(lambda m: "\0" * len(m.group()), cur)   # 같은 자리를 두 번 잡지 않게 길이를 유지한 채 지움
+            a, b = _span(m)
+            out.append((kind, a, b, text[a:b]))
+        cur = _replace(rx, cur, lambda s: "\0" * len(s))   # 같은 자리를 두 번 잡지 않게 길이를 유지한 채 지움
     return sorted(out, key=lambda x: x[1])
 
 
@@ -73,7 +96,7 @@ def mask(text):
     if not text:
         return text
     for _, token, rx in PATTERNS:
-        text = rx.sub(token, text)
+        text = _replace(rx, text, lambda s, t=token: t)
     return text
 
 
