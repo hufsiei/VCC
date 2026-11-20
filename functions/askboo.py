@@ -5,7 +5,9 @@
 #   ①  코드: 프로그램명·별칭 대조 (tools/check_alias_match.py와 같은 규칙, 긴 이름 우선)
 #        실패하면 data/intern-keywords.json(작업 81, 있을 때만)으로 업체 1~3개. 그래도 없으면 hold
 #   ②  코드: 근거 추출 — 질문 주제어 → 보고서 문항으로 좁히고, 문단을 문장으로 쪼개 같은 문장은 하나만
-#        주제어가 없거나 인터뷰로만 채우는 칸(근무조건 등)이면 AI 없이 hold
+#        근거 풀 = evidence.json + 공개 동의를 통과한 인터뷰 문장(notes.interview_lines, 작업 26·74).
+#        인터뷰 문장은 주제어의 칸과 같은 칸 문장, 그리고 「후배 질문」 칸의 A 문장(주제어가 없어도 후보)
+#        후보가 없거나 인터뷰로만 채우는 칸(근무조건 등)에 인터뷰 문장도 없으면 AI 없이 hold
 #   ③  AI(고르기): 관련 문장 번호 {"관련":[..]} — 빈 목록이면 hold
 #   ④  AI(변환): 고른 문장 하나씩 해요체 한 문장 {"1":"..."}
 #   ⑤  코드: 사후 검증 — 원문에 없는 숫자·영문·고유명사·새 내용어가 있으면 그 문장을 버리고 원문 인용(fallback)
@@ -16,6 +18,7 @@ import json
 import re
 from pathlib import Path
 
+import notes
 from ai import callAI, load_prompt
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -70,7 +73,6 @@ for _e in _json("evidence.json", []):
     EVIDENCE.setdefault(_e["프로그램명"], []).append(_e)
 for _rows in EVIDENCE.values():
     _rows.sort(key=lambda e: (e.get("학년도", 0), e.get("학기", 0)), reverse=True)   # 최근 학기 먼저
-NOTE_IDS = {n.get("program"): n.get("id") for n in _json("notes.json", []) if isinstance(n, dict)}
 INTERN_KEYWORDS = _json("intern-keywords.json", {})   # 작업 81(원우). 없으면 빈 사전
 
 
@@ -152,7 +154,7 @@ def askBoo(me, payload, save=True):
 
     main_program = picked[0]["program"]
     return {"status": "ok", "lines": lines, "sources": sources,
-            "noteId": NOTE_IDS.get(main_program) or main_program, "suggestSenior": False}
+            "noteId": notes.note_id(main_program), "suggestSenior": False}
 
 
 # ── ① 프로그램 대조 ───────────────────────────────────────────────────
@@ -177,23 +179,34 @@ def extract(question, programs):
     rows, section = [], None
     for name in programs:
         ev = EVIDENCE.get(name, [])
-        if not ev:
+        iv = notes.interview_lines(name)            # 최근 동의 먼저. 후보 상한(30)에 밀리지 않게 앞에 둔다
+        answers = [r for r in iv if r["칸"] == notes.QUESTION_SECTION]   # 후배 질문의 A 문장
+        if not ev and not iv:
             continue
         if PROGRAMS.get(name, {}).get("분야") == "현장실습":
             if INTERVIEW_ONLY_INTERN.search(question):
-                return [], "근무조건", "인터뷰로만 채우는 칸(근무조건)"
-            rows += ev
+                only = [r for r in iv if r["칸"] in ("근무조건", "지원·선발", notes.QUESTION_SECTION)]
+                if not only:
+                    return [], "근무조건", "인터뷰로만 채우는 칸(근무조건)"
+                section = section or "근무조건"
+                rows += only
+                continue
+            rows += iv + ev
         else:
             items = []
             for pattern, nums in TOPICS_EXCHANGE:
                 if re.search(pattern, question):
                     items += [n for n in nums if n not in items]
             if not items:
+                rows += answers   # 보고서 칸에 없는 주제는 후배 질문 답만 후보(고르기 AI가 관련 없으면 비운다)
                 continue
             section = section or SECTION_BY_ITEM.get(items[0])
+            sections = {SECTION_BY_ITEM.get(i) for i in items}
+            rows += [r for r in iv if r["칸"] in sections or r["칸"] == notes.QUESTION_SECTION]
             rows += [e for e in ev if e["문항"].split(".")[0] in items]
     if not rows:
-        return [], section, "근거 없음" if not any(EVIDENCE.get(n) for n in programs) else "보고서 칸에 없는 주제"
+        has_any = any(EVIDENCE.get(n) or notes.interview_lines(n) for n in programs)
+        return [], section, "보고서 칸에 없는 주제" if has_any else "근거 없음"
 
     cands, keys = [], set()
     for e in rows:
