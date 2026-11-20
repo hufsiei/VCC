@@ -200,7 +200,7 @@ payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명
 
 **[11/20 개정] 후보·점수 규칙 (작업 22):**
 - 후보 = 그 노트(희망 프로그램)의 경험자 **전부**. 점수 하한은 없다(단과대가 달라도 그 경험을 한 선배는 추천한다). 직원 행·본인은 뺀다.
-- 점수(순서용): **학과 일치 5 · 단과대 일치 4 · 이중전공 일치 3 · 공통 비교과 2**(공통 비교과가 여러 개여도 2점 한 번). 학과가 같으면 단과대도 같으므로 같은 학과 선배는 9점 이상이다.
+- 점수(순서용): **학과 일치 5 · 이중전공 일치 4 · 단과대 일치 3 · 공통 비교과 2**(공통 비교과가 여러 개여도 2점 한 번). 학과가 같으면 단과대도 같으므로 같은 학과 선배는 8점 이상이다.
 - 정렬: 점수 내림차순 → 동점이면 ① 수락 대기 요청이 적은 선배 ② 최근 학기에 다녀온 선배 순.
 - `reasons` 맨 앞은 항상 **「희망 프로그램을 경험했어요」**, 겹치는 점이 있으면 그 뒤에 더한다(0점 선배도 카드가 비지 않는다).
 
@@ -218,7 +218,7 @@ payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명
 ```json
 { "seniors": [ { "studentId": "H0469", "nickname": "독일어과 선배 A", "score": 14, "requestsFull": false,
                  "reasons": ["희망 프로그램을 경험했어요", "같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음", "합격 면접 취업특강(커리어랩) 함께 이수"] },
-               { "studentId": "H0745", "nickname": "독일어과 선배 B", "score": 9, "requestsFull": false,
+               { "studentId": "H0745", "nickname": "독일어과 선배 B", "score": 8, "requestsFull": false,
                  "reasons": ["희망 프로그램을 경험했어요", "같은 서양어대학", "같은 독일어과"] } ],
   "shown": 2, "hasMore": false, "newCount": 0 }
 ```
@@ -318,7 +318,7 @@ currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이
 - 내용은 1장 시연 인물 기준. askBoo.exchange 문장 3개, getNote["N-marburg"]는 교환 6칸(지원·학점·비용·생활·팁·배운점) 중 4칸 채우고 비용은 빈 칸, 배운점은 `interviewOnly: true`로 선배 인용 1개(`docType: "인터뷰"`).
 - `getNote["N-kotra"]`도 하나: 현장실습 노트(`KOTRA 해외무역관(유럽 권역)`, 데이터에서 후기가 가장 많은 기관), 칸은 5개 [`지원동기`, `업무내용`, `배운점`, `지원·선발`, `근무조건`]. 마지막 두 칸은 `interviewOnly: true`이고 비어 있음. (`지원·선발`은 한 칸의 이름이다)
 - 출처 학기는 선배1의 보고서 `2024-1`, 선배2의 보고서 `2024-2`. 노트의 `lastSemester`는 마르부르크 보고서 중 최근인 `2026-1`.
-- recommendSeniors는 선배1(14점: 학과 5+단과대 4+이중전공 3+공통 비교과 2), 선배2(9점: 학과·단과대) 두 명(11/20 가중치 기준), reasons 맨 앞은 「희망 프로그램을 경험했어요」. 가상 문장만 쓰고 실제 후기 원문을 옮기지 않는다.
+- recommendSeniors는 선배1(14점: 학과 5+이중전공 4+단과대 3+공통 비교과 2), 선배2(8점: 학과·단과대) 두 명(11/20 가중치 기준), reasons 맨 앞은 「희망 프로그램을 경험했어요」. 가상 문장만 쓰고 실제 후기 원문을 옮기지 않는다.
 - **[11/19]** `getNote["N-marburg"]`에 7번째 칸 `후배 질문`(`interviewOnly: true`, Q·A 1쌍, `asked`·`answersQuestionId: "Q-0001"`). `interviewNext.steps[0]`은 `section: "후배 질문"`(questionId·asked·pendingQuestions 1), `steps[1..]`은 기존 칸, `total` 7. `summarizeInterview.publicDraft`에 `후배 질문` 칸 1문장. `saveConsent`에 `answered: ["Q-0001"]`. `getInbox.questions[1]`은 `answered`, `alerts[0]`은 「내 질문에 선배가 답했어요」. `getNote["N-kotra"]`는 칸 6개(…`근무조건`, `후배 질문`)이고 자동 분류 문장에 `autoClassified: true`.
 
 ## 7. data/frames.json (이번에 함께 생성)
