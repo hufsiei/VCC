@@ -633,6 +633,7 @@ async function runSummary() {
   }
 
   summaryResult = res;
+  shareBtn.textContent = "해봤노트에 공유";
   // 요약이 끝나면 항상 내 경험노트에 저장됨(서버 saved: true)
   summaryStatus.replaceChildren(res.saved
     ? statusLabel("success", "check", "요약 완료 · 내 경험노트에 저장됨")
@@ -665,10 +666,20 @@ function summaryCard(res) {
   return card;
 }
 
-// 「해봤노트에 공유」 → 공개 동의 시트(작업 70에서 연결)
+// 「해봤노트에 공유」 → 공개 동의 시트(consent.js, 작업 70)
 shareBtn.addEventListener("click", () => {
   if (!summaryResult) return;
   document.dispatchEvent(new CustomEvent("open-consent", { detail: summaryResult }));
+});
+
+// 공유가 끝나면(consent.js가 알림): 토스트 + 내 경험노트에 「반영 중」(중립) + 버튼은 「공유 범위 바꾸기」(7-②, 8절)
+document.addEventListener("consent-saved", (event) => {
+  if (!summaryResult || event.detail.draftId !== summaryResult.draftId) return;
+  summaryStatus.querySelector(".status-label--neutral")?.remove();
+  summaryStatus.append(" ", statusLabel("neutral", "clock", "반영 중"));
+  shareBtn.textContent = "공유 범위 바꾸기";
+  measureDock();
+  toast("해봤노트에 반영하고 있어요");
 });
 
 // 「나중에 할게요」 → 내 보관함 · 내 경험노트 탭(토스트는 보관함 화면이 from=later를 보고 띄운다)

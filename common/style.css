@@ -70,6 +70,8 @@
   --content-max-width: 480px;
   --shadow-card: 0 1px 3px rgba(15, 23, 42, .06);
   --shadow-float: 0 8px 24px rgba(15, 23, 42, .12);
+  /* 바텀시트 뒤 어두운 막(5-10) — 그림자와 같은 바탕색, 투명도만 다름 (작업 70) */
+  --color-scrim: rgba(15, 23, 42, .4);
   --focus-ring: 0 0 0 2px #FFFFFF, 0 0 0 4px #002D56;
 }
 
@@ -999,6 +1001,222 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .skeleton { animation: none; }
 }
+
+/* ===================================================================
+   [추가 부품 — 작업 70, 11/20] 바텀시트 · 스위치 · 체크박스 · 공개 동의
+   =================================================================== */
+
+/* ---------- 바텀시트 — 5-10 (상단 20px 모서리, 손잡이, 하단 Primary + Text) ---------- */
+
+.sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;                  /* 헤더(10)·고정 영역(9) 위, 토스트(30) 아래 */
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+.sheet-scrim { position: absolute; inset: 0; background: var(--color-scrim); }
+.sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--content-max-width);
+  max-height: 85vh;             /* 최대 화면의 85%, 안쪽 스크롤(7-②) */
+  max-height: 85dvh;
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-float);
+  animation: sheet-up .2s ease-out;
+}
+.sheet:focus { outline: none; }
+.sheet__handle {
+  flex: none;
+  width: 40px;
+  height: 4px;
+  margin: var(--space-sm) auto 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+}
+.sheet__title {
+  flex: none;
+  padding: 12px var(--page-gutter) var(--space-sm);
+  font-size: var(--font-size-card-title);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-heading);
+}
+.sheet__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--page-gutter) var(--space-lg);
+}
+/* 안쪽이 스크롤될 때 내용 블록이 납작해지지 않게 */
+.sheet__body > * { flex-shrink: 0; }
+/* 주요 버튼은 시트 하단 고정 */
+.sheet__footer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-xs);
+  padding: 12px var(--page-gutter) calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.sheet__footer .btn-reason { justify-content: center; margin-top: 0; }
+.sheet__footer .btn--text { align-self: center; min-width: 88px; }
+/* 시트가 열려 있는 동안 뒤 화면은 스크롤하지 않음 */
+body.sheet-open { overflow: hidden; }
+@keyframes sheet-up {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet { animation: none; }
+}
+
+/* ---------- 스위치 — 켬 NAVY / 끔 TEXT MUTED (터치 영역 44px) ---------- */
+
+.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  margin: 9px 0;                /* 위아래 여백으로 터치 높이 44px */
+  border-radius: var(--radius-pill);
+  background: var(--color-text-muted);
+  cursor: pointer;
+  transition: background-color .15s;
+}
+.switch::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  transition: transform .15s;
+}
+.switch:checked { background: var(--color-primary); }
+.switch:checked::before { transform: translateX(18px); }
+.switch:disabled { background: var(--color-neutral-bg); cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) {
+  .switch, .switch::before { transition: none; }
+}
+
+/* ---------- 체크박스 — 5-9 (20px, 체크하면 NAVY, 줄 전체 터치 44px) ---------- */
+
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 44px;
+  padding: 12px var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  font-size: var(--font-size-body);
+  cursor: pointer;
+}
+.checkbox {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--color-hufs-navy);
+  cursor: pointer;
+}
+
+/* ---------- 공개 동의 시트 내용 — 7-② · 8절 ---------- */
+
+/* ① 반영될 해봤노트: 흰 카드 + BORDER, 분야색은 태그에만 */
+.consent-target {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.consent-target__label { font-size: var(--font-size-caption); font-weight: 600; color: var(--color-text-muted); }
+.consent-target__title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
+.consent-target__name { font-size: var(--font-size-body); font-weight: 600; color: var(--color-heading); }
+/* 「근거 6건 → 7건」: AI가 정리하는 근거 표시라 HUFS GREEN */
+.consent-target__count {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ai);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+}
+.consent-target__count .icon { width: 16px; height: 16px; }
+
+/* ② 칸별 문장 + 스위치 */
+.consent-lines { display: flex; flex-direction: column; gap: var(--space-md); margin-top: 12px; }
+.consent-section { display: flex; flex-direction: column; }
+.consent-section__name {
+  padding-bottom: var(--space-xs);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.consent-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-border);
+}
+.consent-line__main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.consent-line__text { display: flex; flex-direction: column; gap: 6px; color: var(--color-text); word-break: keep-all; cursor: pointer; }
+.sheet__body .sub, .check-row { word-break: keep-all; }
+.consent-line__text .msg__quote { margin: 0; }
+/* 끈 문장: 글자를 흐리게 + 「내 경험노트에만 남아요」 문구로도 알림(색만으로 알리지 않음) */
+.consent-line--off .consent-line__text { color: var(--color-text-muted); }
+.consent-line__off { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+.consent-line .status-label { white-space: normal; height: auto; min-height: 24px; padding-top: 4px; padding-bottom: 4px; }
+
+/* ③ 공개되는 것 / 공개되지 않는 것 */
+.consent-scope {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.consent-scope__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: 12px;
+  border-radius: var(--radius-card);
+  background: var(--color-neutral-bg);
+}
+.consent-scope__title { font-size: var(--font-size-secondary); font-weight: 600; color: var(--color-heading); }
+.consent-scope__col ul { display: flex; flex-direction: column; gap: var(--space-xs); }
+.consent-scope__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-secondary);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.consent-scope__item .icon { width: 14px; height: 14px; color: var(--color-hufs-navy); }
+.consent-error { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); }
+.consent-error:empty { display: none; }
 
 /* 같은 html 안에서 화면(1단계·2단계)을 바꿀 때 쓰는 숨김 */
 [hidden] { display: none !important; }
