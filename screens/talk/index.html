@@ -22,6 +22,19 @@
   .empty { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-lg) 0; text-align: center; }
   .empty__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
   .dock__buttons { display: flex; flex-direction: column; gap: var(--space-sm); }
+  /* 진행 칩 줄은 대화를 내려도 헤더 바로 아래에 붙어 있게(틀 고정) */
+  #chips {
+    position: sticky;
+    top: var(--header-height);
+    z-index: 5;
+    margin: 0 calc(-1 * var(--page-gutter));
+    padding: var(--space-sm) var(--page-gutter);
+    background: var(--color-background);
+    border-bottom: 1px solid var(--color-border);
+  }
+  /* 질문이 끝난 뒤 진행 칩을 눌러 칸을 골라 이어서 쓰기: 칩 32px + 위아래 6px = 터치 영역 44px(칩 줄 위아래 여백 8px 안) */
+  button.progress-chip { position: relative; font: inherit; font-size: var(--font-size-secondary); font-weight: 500; cursor: pointer; }
+  button.progress-chip::after { content: ""; position: absolute; inset: -6px 0; }
 </style>
 </head>
 <body>

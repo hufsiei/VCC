@@ -1187,7 +1187,20 @@ body.sheet-open { overflow: hidden; }
 .consent-line__text .msg__quote { margin: 0; }
 /* 끈 문장: 글자를 흐리게 + 「내 경험노트에만 남아요」 문구로도 알림(색만으로 알리지 않음) */
 .consent-line--off .consent-line__text { color: var(--color-text-muted); }
-.consent-line__off { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+/* 끈 문장 안내: 진한 남색 + 자물쇠로 눈에 띄게 */
+.consent-line__off,
+.consent-line__risk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-secondary);
+  font-weight: 600;
+}
+.consent-line__off { color: var(--color-hufs-navy); }
+/* 본인 식별 문장을 켰을 때: 주의색 + 경고 아이콘 + 문구(3-4) */
+.consent-line__risk { color: var(--status-warning-fg); }
+.consent-line__off .icon,
+.consent-line__risk .icon { width: 14px; height: 14px; }
 .consent-line .status-label { white-space: normal; height: auto; min-height: 24px; padding-top: 4px; padding-bottom: 4px; }
 
 /* ③ 공개되는 것 / 공개되지 않는 것 */

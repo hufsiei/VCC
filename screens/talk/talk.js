@@ -121,8 +121,14 @@ function typingMessage() {
 function addTo(chat, node) {
   chat.append(node);
   drawIcons();
-  requestAnimationFrame(() => node.scrollIntoView({ block: "end", behavior: "smooth" }));
+  scrollToLatest();
   return node;
+}
+
+// 마지막 말풍선이 고정 입력줄 위에 보이도록 화면을 맨 아래까지 내린다
+// (본문 아래 여백 = 입력줄 높이라서, 맨 아래까지 내리면 가려지지 않음)
+function scrollToLatest() {
+  requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" }));
 }
 
 // ---------------------------------------------------------------------------
@@ -219,12 +225,15 @@ tabAsk.addEventListener("click", () => setMode("ask"));
 
 // 입력줄: 모드별 안내 문구, 보낼 수 있을 때만 전송 버튼 활성
 function updateComposer() {
-  const tellReady = mode === "tell" && tell.step && !tell.step.done && !tell.busy;
+  // 질문이 끝난 뒤에도 칸을 고르면 이어서 쓸 수 있다
+  const tellReady = mode === "tell" && tell.step && !tell.busy && (!tell.step.done || tell.extra);
   const enabled = mode === "ask" ? !ask.busy : tellReady;
   composerInput.disabled = !enabled;
   composerInput.placeholder = mode === "ask"
     ? "예: 마르부르크 파견은 어학을 언제부터 준비해요?"
-    : tell.step && tell.step.done ? "모든 항목을 들려주셨어요" : "경험을 들려주세요";
+    : tell.step && tell.step.done
+      ? (tell.extra ? `「${tell.extra}」에 이어서 쓰기` : "위 칸을 골라 이어서 써 주세요")
+      : "경험을 들려주세요";
   sendBtn.disabled = !enabled || composerInput.value.trim() === "";
 }
 composerInput.addEventListener("input", updateComposer);
@@ -364,7 +373,9 @@ const tell = {
   answers: [],     // spec: [{section, question, answer, questionId?, skipped?}]
   step: null,      // 마지막 interviewNext 응답
   pending: 0,      // pendingQuestions
+  extra: null,     // 질문이 끝난 뒤 「이어서 쓰기」로 고른 칸 이름
 };
+const EXTRA_QUESTION = "더 들려주고 싶은 이야기";
 
 // getMe의 이수 기록에서 들려줄 수 있는 경험 목록을 만든다(국제교류 → 현장실습 → 비교과)
 function myExperiences(meInfo) {
@@ -453,19 +464,26 @@ function filledSections() {
 function renderChips() {
   const frame = FRAMES[tell.program.kind] || FRAMES["교환"];
   const filled = filledSections();
-  const current = tell.step && !tell.step.done ? tell.step.section : null;
+  const picking = Boolean(tell.step && tell.step.done); // 질문이 끝나면 칩을 눌러 칸을 골라 이어서 쓴다
+  const current = picking ? tell.extra : tell.step ? tell.step.section : null;
+  chipsBox.classList.toggle("progress-chips--pick", picking);
   chipsBox.replaceChildren(...frame.map((name) => {
     const isCurrent = name === current;
     const isFilled = !isCurrent && filled.has(name);
-    const chip = el("span", {
+    const canPick = picking && name !== QUESTION_SECTION; // 후배 질문은 질문이 있어야 답할 수 있음
+    const chip = el(canPick ? "button" : "span", {
       className: `progress-chip${isCurrent ? " progress-chip--current" : isFilled ? " progress-chip--filled" : ""}`,
+      attrs: canPick ? { type: "button", "aria-pressed": String(isCurrent), "aria-label": `${name}에 이어서 쓰기` } : null,
+      on: canPick ? { click: () => pickExtra(name) } : null,
     }, [isFilled ? icon("check") : null, name]);
     if (name === QUESTION_SECTION && tell.pending > 0) chip.append(el("span", { className: "progress-chip__badge", text: tell.pending }));
-    if (isCurrent) chip.setAttribute("aria-current", "step");
+    if (isCurrent && !picking) chip.setAttribute("aria-current", "step");
     return chip;
   }));
   drawIcons();
-  chipsBox.querySelector(".progress-chip--current")?.scrollIntoView({ inline: "center", block: "nearest" });
+  // 지금 칸이 칩 줄 가운데 오게 — 칩 줄만 가로로 움직이고 화면은 세로로 움직이지 않게
+  const currentChip = chipsBox.querySelector(".progress-chip--current");
+  if (currentChip) chipsBox.scrollLeft = currentChip.offsetLeft - (chipsBox.clientWidth - currentChip.offsetWidth) / 2;
 
   // AI 요약 바: 노트 틀(후배 질문 제외 칸) 채운 수 / 전체 칸
   const content = frame.filter((n) => n !== QUESTION_SECTION);
@@ -497,7 +515,7 @@ async function askNext() {
   renderNotice();
 
   if (res.done) {
-    addTo(tellChat, booText("고마워요. 노트 틀을 모두 채웠어요. 아래 「AI 요약」을 눌러 정리해 보세요."));
+    addTo(tellChat, booText("고마워요. 노트 틀을 모두 채웠어요. 더 들려줄 이야기가 있으면 위 칸을 골라 이어서 써 주세요. 다 됐으면 아래 「AI 요약」을 눌러 정리해 보세요."));
   } else if (res.section === QUESTION_SECTION) {
     addTo(tellChat, juniorQuestion(res));
   } else {
@@ -566,9 +584,29 @@ function interviewQuestion(step) {
   return msg;
 }
 
+// 질문이 끝난 뒤 칩을 눌러 칸 고르기
+function pickExtra(name) {
+  if (tell.busy) return;
+  tell.extra = name;
+  renderChips();
+  updateComposer();
+  composerInput.focus({ preventScroll: true });
+}
+
 function sendAnswer(text) {
   const step = tell.step;
-  if (!step || step.done || tell.busy) return;
+  if (!step || tell.busy) return;
+
+  if (step.done) {
+    // 이어서 쓰기: 고른 칸의 답으로 더한다(서버를 다시 부르지 않음 — 요약할 때 함께 보낸다)
+    if (!tell.extra) return;
+    addTo(tellChat, userText(text));
+    tell.answers.push({ section: tell.extra, question: EXTRA_QUESTION, answer: text });
+    addTo(tellChat, booText(`「${tell.extra}」에 더했어요.`));
+    renderChips();
+    return;
+  }
+
   addTo(tellChat, userText(text));
   const answer = { section: step.section, question: step.section === QUESTION_SECTION ? step.asked : step.question, answer: text };
   if (step.questionId) answer.questionId = step.questionId;
