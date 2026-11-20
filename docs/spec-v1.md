@@ -176,7 +176,9 @@ payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"
 ```json
 { "notes": [ { "id": "N-marburg", "program": "마르부르크필립스대학교", "type": "교환",
   "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청", "forWhom": "독일어권 교환을 생각하는 1~2학년",
-  "evidenceCount": 7, "lastSemester": "2026-1", "satisfaction": null } ] }
+  "evidenceCount": 7, "lastSemester": "2026-1", "satisfaction": null, "completedCount": null },
+  { "id": "N-3ca17d", "program": "HUFS 동문멘토링 데이", "type": "비교과",
+  "oneLine": "...", "forWhom": "...", "evidenceCount": 0, "lastSemester": "2026-1", "satisfaction": 4.2, "completedCount": 150 } ] }
 ```
 
 ### getNote(id)
@@ -187,7 +189,7 @@ payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"
 - `sources[*].semester`는 그대로 보내고 화면이 연도만 표시한다(0장). 근거 1~2건인 칸은 화면이 「선배 1명의 경험이에요」 라벨(`lines.length`로 판단, 서버 필드 없음).
 ```json
 { "id": "N-marburg", "program": "마르부르크필립스대학교", "type": "교환",
-  "oneLine": "...", "forWhom": "...", "evidenceCount": 7, "lastSemester": "2026-1", "satisfaction": null,
+  "oneLine": "...", "forWhom": "...", "evidenceCount": 7, "lastSemester": "2026-1", "satisfaction": null, "completedCount": null,
   "officialUrl": "https://...",
   "sections": [ { "name": "지원", "interviewOnly": false,
                   "lines": [ { "text": "...", "sourceId": "R03-1-1", "lineId": "L-R03-1-1", "official": false } ] },
@@ -198,6 +200,7 @@ payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"
                "I-0003": { "docType": "인터뷰", "program": "마르부르크필립스대학교", "semester": "2025-1" } } }
 ```
 `satisfaction`은 비교과 노트만 숫자(`가상비교과만족도`의 `만족도(5점)`), 국제교류·현장실습은 `null` → 화면은 "–"(실제 체계에 학생별 만족도가 없음).
+**[11/20]** `completedCount`(이수 인원)도 비교과 노트만 숫자(`가상비교과만족도`의 `이수 인원(가상)`), 교환·파견·인턴은 `null`. 노트 커버에 「이수 n명 · 만족도 4.2」처럼 보여 주는 용도만 쓰고 닮은선배·콘솔 집계에는 쓰지 않는다. `evidenceCount`(근거 문장 수)와 다른 값이다.
 `official: true`인 문장(학점 인정·장학금·자격 요건·선발 기준 같은 규정성 진술)은 화면이 "개인 경험이에요" 표시 + `officialUrl` 링크를 붙인다.
 `officialUrl`은 서버가 **프로그램의 `운영부서코드` → `departments.json`의 `공식안내URL`** 순서로 찾아 넣는다(프로그램 목록 시트에는 URL 열이 없다, PRD 6-2).
 
