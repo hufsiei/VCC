@@ -38,7 +38,7 @@
 ## AI 호출 규칙
 
 - 서버 함수에서 AI는 `functions/ai.py`의 `callAI(작업명, messages, system)`로만 부른다. CLOVA·Claude를 직접 부르지 않는다.
-- 작업마다 어떤 모델(hcx | claude)을 쓸지는 `ai.py`의 `PROVIDER` 표 한 곳에서만 바꾼다. 새 작업을 만들면 `PROVIDER`와 `SETTINGS`에 함께 추가한다.
+- 작업마다 어떤 모델(hcx | sonnet | opus)을 쓸지는 `ai.py`의 `PROVIDER` 표 한 곳에서만 바꾼다. 새 작업을 만들면 `PROVIDER`와 `SETTINGS`에 함께 추가한다.
 - AI 출력은 JSON으로 받고 `callAI`가 돌려주는 `json`(첫 번째 `{...}`)만 쓴다. `json`이 없거나 형식이 틀리면 버리고 기본 문구로 대신한다. 기준은 HCX 대응 원칙 v2.
 
 ## 올리면 안 되는 것

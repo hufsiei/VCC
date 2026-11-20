@@ -3,7 +3,9 @@
 # 실행:  cd C:\dev\VCC\functions
 #        python eval_prompts.py                  # 6종 모두 HCX로
 #        python eval_prompts.py 요약 일치검사      # 고른 종류만
-#        python eval_prompts.py --claude 요약 일치검사   # Claude로 같은 사례(비교용, Anthropic 크레딧 필요)
+#        python eval_prompts.py --sonnet 요약 일치검사   # Claude Sonnet으로 같은 사례(비교용, Anthropic 크레딧 필요)
+#        python eval_prompts.py --opus 일치검사          # Claude Opus로. --claude는 CLAUDE_MODEL(기본 Sonnet)
+#        결과: logs/eval-prompts-{hcx|sonnet|opus|claude}.json — 모델마다 다른 파일이라 서로 덮지 않는다
 #
 # 프롬프트: docs/prompts/{작업명}.txt · 사례: functions/eval53_cases.json(종류마다 정상 5·함정 5, 가상 문장)
 # 채점은 첫 JSON 파싱 후 기준(HCX 원칙 v2 2절). 합격선(작업 53): 판정·분류 9/10 이상, 요약·일치 검사는 근거 밖 내용 0건.
@@ -18,15 +20,23 @@ import sys
 from pathlib import Path
 
 import askboo
-from ai import callAI, load_prompt
+from ai import SETTINGS, callAI, load_prompt
 
 HERE = Path(__file__).parent
 CASES = json.loads((HERE / "eval53_cases.json").read_text(encoding="utf-8"))
 SECTIONS = ["지원동기", "업무내용", "배운점"]
 
 # HCX로 잴 때 설정(원칙 v2 5절: 사실을 다루는 호출은 T=0, Max는 출력 크기에 맞게). PROVIDER가 hcx인 작업은 SETTINGS 그대로.
-HCX_SETTINGS = {"요약": {"max_tokens": 300, "temperature": 0}, "일치검사": {"max_tokens": 30, "temperature": 0}}
-CLAUDE_SETTINGS = {"max_tokens": 1000, "effort": "low"}
+HCX_SETTINGS = {"요약": {"max_tokens": 300, "temperature": 0}, "일치검사": {"max_tokens": 30, "temperature": 0},
+                "문단분류": {"max_tokens": 30, "temperature": 0}}
+# Claude로 잴 때는 서비스와 같은 설정(ai.SETTINGS)으로 잰다. Opus 5.5는 생각을 끌 수 없고 생각 토큰도 max_tokens에 들어가므로
+# 1000처럼 작게 잡으면 답이 잘려 'JSON 없음'으로 오답 처리될 수 있다. PROVIDER가 hcx인 작업(문단분류 등)은 2000/low.
+CLAUDE_FALLBACK = {"max_tokens": 2000, "effort": "low"}
+
+
+def claude_settings(kind):
+    s = SETTINGS.get(kind, {})
+    return s if "effort" in s else CLAUDE_FALLBACK
 
 
 def user_text(kind, c):
@@ -108,7 +118,7 @@ def run(kinds, model):
         rows, right, miss_outside, outside_lines = [], 0, 0, 0
         for i, c in enumerate(CASES[kind], 1):
             r = callAI(kind, shots + [{"role": "user", "content": user_text(kind, c)}], system=system,
-                       측정모델=model, 측정설정=CLAUDE_SETTINGS if model == "claude" else HCX_SETTINGS.get(kind))
+                       측정모델=model, 측정설정=HCX_SETTINGS.get(kind) if model == "hcx" else claude_settings(kind))
             ok, memo = grade(kind, c, r.get("json")) if r["ok"] else (False, r.get("error"))
             right += ok
             if kind == "일치검사" and c["기대"] is False and r.get("json", {}) and r["json"].get("일치") is True:
@@ -138,6 +148,6 @@ def run(kinds, model):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    model = "claude" if "--claude" in args else "hcx"
+    model = next((m for m in ("sonnet", "opus", "claude") if f"--{m}" in args), "hcx")
     kinds = [a for a in args if not a.startswith("--")] or [k for k in CASES if not k.startswith("_")]
     run(kinds, model)

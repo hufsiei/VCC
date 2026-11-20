@@ -16,18 +16,38 @@ def norm(s):
     return re.sub(r"\s+", "", s or "").lower()
 
 
+#   4) (11/20) 별칭 바로 뒤에 학교 종류 말(공과·예술·음악 등)+대학/대가 붙으면 다른 학교로 보고 걸지 않는다.
+#      예) '파리시테예술대학교'는 별칭 '파리시테'가 들어 있어도 파리시테대학교가 아님 → 보류.
+#      '밀라노대학교'·'뤼미에르 리옹 2대학'처럼 종류 말 없이 바로 대학이 오면 그대로 건다.
+SCHOOL_KIND = ("공과", "공업", "과학기술", "기술", "응용과학", "예술", "음악", "미술", "의과", "약학",
+               "경영", "경제", "국립", "주립", "시립", "가톨릭", "카톨릭", "사범", "교육", "외국어", "신학")
+SCHOOL_TAIL = re.compile(r"(?:" + "|".join(SCHOOL_KIND) + r")(?:대학교|대학|대)")
+
+
 def build_terms(programs):
+    # (정규화한 말, 프로그램명, 별칭 여부)
     terms = []
     for p in programs:
-        terms.append((norm(p["프로그램명"]), p["프로그램명"]))
+        terms.append((norm(p["프로그램명"]), p["프로그램명"], False))
         for a in p.get("별칭", []):
-            terms.append((norm(a), p["프로그램명"]))
+            terms.append((norm(a), p["프로그램명"], True))
     return terms
+
+
+def _alias_ok(t, q):
+    # 별칭이 나오는 자리 중 하나라도 뒤에 다른 학교 꼬리가 없으면 인정
+    start = q.find(t)
+    while start != -1:
+        if not SCHOOL_TAIL.match(q, start + len(t)):
+            return True
+        start = q.find(t, start + 1)
+    return False
 
 
 def match(question, terms):
     q = norm(question)
-    hits = [(t, prog) for t, prog in terms if t and t in q]
+    hits = [(t, prog) for t, prog, is_alias in terms
+            if t and t in q and (not is_alias or _alias_ok(t, q))]
     keep = [(t, prog) for t, prog in hits
             if not any(t != t2 and t in t2 for t2, _ in hits)]
     return sorted({prog for _, prog in keep})

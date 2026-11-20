@@ -547,8 +547,10 @@
       {
         "studentId": "H0469",
         "nickname": "독일어과 선배 A",
-        "score": 13,
+        "score": 14,
+        "requestsFull": false,
         "reasons": [
+          "희망 프로그램을 경험했어요",
           "같은 서양어대학",
           "같은 독일어과",
           "이중전공 경영학 같음",
@@ -559,7 +561,9 @@
         "studentId": "H0745",
         "nickname": "독일어과 선배 B",
         "score": 8,
+        "requestsFull": false,
         "reasons": [
+          "희망 프로그램을 경험했어요",
           "같은 서양어대학",
           "같은 독일어과"
         ]

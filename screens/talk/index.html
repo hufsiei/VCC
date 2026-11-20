@@ -2,64 +2,124 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>이야기하기 (임시 확인 화면)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>인터BOO · 외대人사이드</title>
 <link rel="stylesheet" href="../../common/style.css">
+<style>
+  /* 인터BOO 화면 배치용. 색은 style.css 변수만 쓴다. */
+  .talk-top { display: flex; flex-direction: column; gap: var(--space-md); }
+  .talk-panel { display: flex; flex-direction: column; gap: var(--space-md); margin-top: var(--space-lg); }
+  /* 고정 입력줄(dock)에 마지막 말풍선이 가리지 않게: 높이는 talk.js가 잰다 */
+  #viewMain .page { padding-bottom: calc(var(--dock-h, 120px) + var(--space-md)); }
+  #viewSummary .page { padding-bottom: calc(var(--dock-h, 180px) + var(--space-md)); }
+  /* 근거 블록이 들어가는 BOO 답변은 말풍선보다 넓게 */
+  .msg__body--wide { flex: 1; max-width: calc(100% - 44px); }
+  .msg__bubble p + p { margin-top: var(--space-sm); }
+  .line-fallback { margin-left: var(--space-xs); vertical-align: middle; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+  .chip-row .btn { min-height: 44px; font-size: var(--font-size-secondary); border-radius: var(--radius-pill); }
+  .summary-top { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+  .empty { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-lg) 0; text-align: center; }
+  .empty__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
+  .dock__buttons { display: flex; flex-direction: column; gap: var(--space-sm); }
+</style>
 </head>
 <body>
 <div class="app">
-  <h1>이야기하기 (임시)</h1>
-  <p class="sub">askBoo 확인용 임시 화면입니다. 실제 화면은 담당자가 만듭니다.</p>
-  <form id="form">
-    <label for="q">질문</label>
-    <textarea id="q" required></textarea>
-    <button type="submit">물어보기</button>
-  </form>
-  <div id="result"></div>
+
+  <!-- ===== 1단계: 인터BOO (메인 헤더 + 하단 탭) ===== -->
+  <section id="viewMain" class="has-tabbar">
+    <header class="header">
+      <button class="icon-btn" id="menuBtn" type="button" aria-label="메뉴"><i data-lucide="menu" class="icon"></i></button>
+      <a class="header__brand" href="../talk/">
+        <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
+        외대人사이드
+      </a>
+      <div class="header__actions">
+        <!-- 직원 계정일 때만 보임(5-1): PC 관리자 콘솔을 새 탭으로 -->
+        <a class="icon-btn" id="consoleBtn" href="../admin/" target="_blank" rel="noopener" aria-label="관리자 콘솔" hidden><i data-lucide="chart-column" class="icon"></i></a>
+        <a class="icon-btn" href="../questions/#alerts" aria-label="알림"><i data-lucide="bell" class="icon"></i></a>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="talk-top">
+        <div class="page-intro">
+          <div class="page-intro__text">
+            <h1 class="page-title">인터BOO</h1>
+            <p class="sub" id="modeDesc">선배들의 해봤노트를 근거로 답해 드려요.</p>
+          </div>
+          <img class="boo-illust" src="../../assets/boo-portrait.png" alt="BOO">
+        </div>
+
+        <div class="segment" role="tablist" aria-label="인터BOO 모드">
+          <button class="segment__btn" id="tabTell" type="button" role="tab" aria-controls="panelTell" aria-selected="false">들려주기</button>
+          <button class="segment__btn" id="tabAsk" type="button" role="tab" aria-controls="panelAsk" aria-selected="true">물어보기</button>
+        </div>
+      </div>
+
+      <!-- 물어보기 -->
+      <div class="talk-panel" id="panelAsk" role="tabpanel" aria-labelledby="tabAsk">
+        <div class="chat" id="askChat" aria-live="polite"></div>
+      </div>
+
+      <!-- 들려주기 -->
+      <div class="talk-panel" id="panelTell" role="tabpanel" aria-labelledby="tabTell" hidden>
+        <div id="tellNotice"></div>
+        <div class="progress-chips" id="chips" aria-label="노트 틀 진행" hidden></div>
+        <div class="chat" id="tellChat" aria-live="polite"></div>
+      </div>
+    </main>
+
+    <!-- 하단 탭 위 고정: (들려주기) AI 요약 바 + 입력줄 -->
+    <div class="dock" id="mainDock">
+      <div id="summaryArea" hidden>
+        <div class="summary-bar">
+          <span class="summary-bar__text"><i data-lucide="sparkles" class="icon"></i><span id="summaryCount">노트 틀 0/7 채움</span></span>
+          <button class="summary-bar__btn" id="summaryBtn" type="button" disabled><i data-lucide="sparkles" class="icon"></i>AI 요약</button>
+        </div>
+        <p class="btn-reason" id="summaryReason"><i data-lucide="lock" class="icon"></i>한 항목 이상 이야기하면 요약할 수 있어요</p>
+      </div>
+      <form class="composer" id="composer">
+        <input class="input" id="composerInput" autocomplete="off" aria-label="메시지 입력">
+        <button class="send-btn" id="sendBtn" type="submit" aria-label="보내기" disabled><i data-lucide="arrow-up" class="icon"></i></button>
+      </form>
+    </div>
+
+    <nav class="tabbar" aria-label="주 메뉴">
+      <a class="tabbar__item" href="../talk/" aria-current="page"><i data-lucide="message-circle" class="icon"></i>인터BOO</a>
+      <a class="tabbar__item" href="../note/"><i data-lucide="notebook-text" class="icon"></i>해봤노트</a>
+      <a class="tabbar__item" href="../senior/"><i data-lucide="users" class="icon"></i>닮은선배</a>
+      <a class="tabbar__item" href="../questions/"><i data-lucide="archive" class="icon"></i>내 보관함</a>
+    </nav>
+  </section>
+
+  <!-- ===== 2단계: AI 요약 미리보기 (상세 헤더, 하단 탭 숨김 — 5-2, 7-②) ===== -->
+  <section id="viewSummary" hidden>
+    <header class="header">
+      <button class="icon-btn" id="summaryBack" type="button" aria-label="뒤로"><i data-lucide="arrow-left" class="icon"></i></button>
+      <h1 class="header__title">AI 요약 미리보기</h1>
+    </header>
+    <main class="page">
+      <div class="summary-top">
+        <img class="boo-illust boo-illust--sm" src="../../assets/boo-portrait.png" alt="BOO">
+        <div id="summaryStatus"></div>
+      </div>
+      <div id="summaryBody" style="margin-top: var(--space-lg)"></div>
+    </main>
+    <div class="dock dock--bottom" id="summaryDock">
+      <div class="dock__buttons">
+        <button class="btn btn--primary btn--block" id="shareBtn" type="button" disabled>해봤노트에 공유</button>
+        <button class="btn btn--secondary btn--block" id="laterBtn" type="button" disabled>나중에 할게요</button>
+        <button class="btn btn--text" id="continueBtn" type="button">대화 이어가기</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast-host" id="toastHost" role="status" aria-live="polite"></div>
 </div>
-<script type="module">
-  import { askBoo } from "../../common/data.js";
 
-  const result = document.getElementById("result");
-
-  function render(res) {
-    result.replaceChildren();
-    const add = (tag, text, cls) => {
-      const el = document.createElement(tag);
-      el.textContent = text;
-      if (cls) el.className = cls;
-      result.appendChild(el);
-      return el;
-    };
-    if (res.error) { add("div", res.error, "problem"); return; }
-    if (res.status === "hold") {
-      add("div", res.message, "card");
-      return;
-    }
-    if (res.status === "official") {
-      const card = add("div", res.message, "card");
-      const link = document.createElement("a");
-      link.href = res.officialUrl;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.textContent = "공식 안내 보기 ›";
-      card.append(document.createElement("br"), link);
-      return;
-    }
-    for (const line of res.lines) {
-      const s = res.sources[line.sourceId];
-      const card = add("div", "", "card");
-      card.append(line.text);
-      const small = document.createElement("small");
-      small.textContent = `${s.docType} · ${s.program} · ${s.semester}`;
-      card.append(document.createElement("br"), small);
-    }
-  }
-
-  document.getElementById("form").onsubmit = async (event) => {
-    event.preventDefault();
-    render(await askBoo(document.getElementById("q").value));
-  };
-</script>
+<script src="../../assets/lucide/lucide.min.js"></script>
+<script type="module" src="./talk.js"></script>
 </body>
 </html>

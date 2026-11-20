@@ -22,7 +22,7 @@
 - **데이터 열 이름은 `가상데이터_1000명.xlsx`의 헤더를 그대로 쓴다.** 가상학생 시트는 종합정보시스템 학적 영문 코드(`colreg_no`, `crs_nm`, `dbl_mjr_nm` 등), 나머지 시트는 한글 헤더(`학번`, `학년도`, `프로그램명` 등)가 JSON 키가 된다. 시트에 없는 값만 영어 이름을 붙인다(예: `docType`, 자동 생성 `nickname`). 자세한 대응은 9장.
 - **변환에서 빼는 열**: `studt_na_kr`(가상 성명)·`sex`·`나이(만)`은 시트에만 두고 `students.json`에 넣지 않는다(저장소가 공개돼도 명단처럼 보이지 않게). 사람을 구분하는 열쇠는 `colreg_no` 하나로 충분하다(1,001개 모두 고유, 다른 시트 학번과 100% 연결 확인).
 - **응답에 넣지 않는 열**: `비번`(로그인 대조만).
-- **[11/19] 외부 AI로 나가는 글은 서버가 먼저 마스킹한다.** `functions/mask.py`(작업 72, 원우 27 정규식 공용화)가 전화(지역번호·휴대폰 전부)·이메일·학번(`H`+숫자 4자리, 9자리 숫자)·URL·주소 패턴을 `[연락처]` `[메일]` `[학번]` `[링크]` `[주소]`로 바꾼 뒤 `callAI`로 넘긴다. 로그 `ai-calls.jsonl`도 마스킹 뒤 값만 남긴다. AI에게 마스킹 판단을 맡기지 않는다.
+- **[11/19] 외부 AI로 나가는 글은 서버가 먼저 마스킹한다.** `functions/mask.py`(작업 72, 원우 27 정규식 공용화)가 전화(지역번호·휴대폰 전부)·이메일·학번(`H`+숫자 4자리, 9자리 숫자)·URL·주소 패턴을 `[연락처]` `[메일]` `[학번]` `[링크]` `[주소]`로 바꾼다. **[11/20]** 주소는 넓은 단위(시·도·시군구·읍면동·도로명)는 남기고 건물번호·지번·동·층·호만 `[주소]`로 가린다(예: `동대문구 이문로 107, 101동 1203호` → `동대문구 이문로 [주소], [주소]`, 붙여 쓴 주소도 같다). 가리는 곳은 `callAI` 입구(messages·system)이고, 로그의 오류 문구도 가린 뒤 남긴다. 로그 `ai-calls.jsonl`도 마스킹 뒤 값만 남긴다. AI에게 마스킹 판단을 맡기지 않는다.
 - **[11/19] 사용자별 AI 호출 한도.** `X-User` 기준 분당 10회·일 100회(`runtime/aiUsage.json`). 초과 시 `{ "error": "잠시 뒤에 다시 시도해 주세요" }`. 시연 계정(H0143·H0469·H0745·staff01·staff02)은 제외 목록. 닮은선배·집계·노트 조회는 AI를 안 부르므로 한도와 무관. **세는 단위는 AI를 쓰는 함수 요청 1건**이다(askBoo 질문 1개 = 1회. 안에서 AI를 몇 번 부르는지는 세지 않음). 구현: `functions/limits.py`, 대상 함수는 `local_fn.py`의 `AI_ROUTES`(작업 72).
 - **[11/19] 출처 표기는 연도만.** 응답의 `semester`는 그대로 두되, 화면의 출처 칩은 `"2024"`처럼 연도만 보여 준다(학과+파견교+학기가 함께 보이면 소수 학과에서 사람이 특정됨 — PRD 9-1). 노트 커버의 `lastSemester`는 학기까지 표시해도 된다(프로그램 단위 집계값).
 - **[11/19] 보관기간(운영 규칙, PRD 9-3).** 쪽지 원문 90일, 인터뷰 답변 원문은 요약·동의 처리 뒤 30일, 질문 로그는 학번 제거 후 통계만, 대회 종료(12/9) 후 runtime 전체 삭제(`reset_runtime.py`). 시연 기간에는 삭제 스케줄러를 만들지 않고 규칙만 문서화한다.
@@ -46,7 +46,7 @@
 
 - 로컬: 저장소 폴더에서 `python -m http.server 8000` → `http://localhost:8000/screens/login/`
 - 미리 개발 서버(미리 PC만): `functions/local_fn.py` → `http://localhost:8787`
-- 공개 주소(GitHub Pages 등): 미정. 정해지면 추가.
+- 공개 주소(GitHub Pages, 11/20 작업 80): https://hufsiei.github.io/VCC/screens/login/
 
 ### 2-1. 쓰기 저장소 (작업 51, 11/16 결정)
 
@@ -54,7 +54,7 @@
 
 - **지금(로컬):** `functions/local_fn.py`가 시작할 때 `data/runtime/*.json`을 읽어 메모리에 두고, 기록이 바뀔 때마다 그 파일을 다시 쓴다(임시 파일에 쓴 뒤 바꿔 끼워 반쯤 쓰인 파일이 남지 않게). 서버를 껐다 켜도 남는다.
 - **Cloud Functions 이사 후:** 같은 파일 이름을 NCP **Object Storage**의 객체로 둔다. 바꾸는 곳은 `functions/store.py`의 저장 방식 한 곳뿐이다(`STORE_BACKEND=file|ncp`). 다른 코드는 `store.load(이름)`·`store.save(이름)`만 쓰고 파일을 직접 열지 않는다.
-- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별로 지금까지 보여 준 추천 선배, 최대 9명) · `counters.json`(번호 매기기) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(인터뷰 중간 저장, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 8개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). 관리자 콘솔용 `reportSettings.json`·`issuedReports.json`·`suggestionStatus.json`은 작업 66에서 같은 방식으로 더한다.
+- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별 지금 추천 목록 최대 9명과 노트 버전) · `counters.json`(번호 매기기) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(인터뷰 중간 저장, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 8개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). 관리자 콘솔용 `reportSettings.json`·`issuedReports.json`·`suggestionStatus.json`은 작업 66에서 같은 방식으로 더한다.
 - **누가 부르는지:** 서버는 헤더 `X-User`로 사용자를 안다. 없으면 `{ "error": "로그인이 필요해요" }`. **[11/19] 남의 기록은 서버가 막는다**: `getMessages`·`respondRequest`는 `me`가 그 대화의 asker·senior일 때만, 내 경험노트·`saveConsent`는 `owner == me`일 때만, 관리자 함수는 `권한`이 있을 때만 응답하고 그 외는 `{ "error": "볼 수 없는 기록이에요" }`. (P1-여건, 작업 73) `login`이 난수 토큰을 발급하고 `data.js`가 `X-Token`으로 보내면 서버가 `sessions.json`으로 사용자를 확인한다 — 헤더 `X-User`만 믿는 지금 구조는 헤더를 바꾸면 남의 계정 행세가 가능하므로, 11/29 점검에서 여유가 있으면 넣는다.
 - **초기화:** 리허설 전 `python functions/reset_runtime.py` → runtime 파일을 비우고 시연 시작 상태로 돌린다.
 - `data/runtime/`은 커밋하지 않는다(`.gitignore`). 시연 중 쌓인 기록이 저장소에 섞이지 않게.
@@ -198,17 +198,28 @@ payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"
 ### recommendSeniors(noteId, more)
 payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명 「학과 + 선배 + 영문 대문자」(예: `"독일어과 선배 A"`, 디자인 규칙 1-2절). 같은 선배는 닮은선배·프로필·해봤노트 인용·쪽지창에서 같은 이름이다. 점수 계산은 `functions/score.py`(원우). AI 없음.
 
-**인원 규칙(11/18, PRD 2-2·4-1):**
-- 후보 = 그 노트의 경험자 중 점수가 **3점 이상**(단과대 일치)인 사람, 점수 내림차순. 직원 행·본인은 뺀다.
-- `more` 없이 부르면 보는 사람에게 **지금까지 보여 준 목록 전체**를 돌려준다(처음이면 상위 3명을 보여 준 것으로 기록). `more: true`면 다음 3명을 더해 저장한 뒤 전체를 돌려준다.
-- 상한은 **9명**. 9명에 닿았거나 후보가 바닥나면 `hasMore: false`. `more: true`가 와도 더 늘리지 않는다. 날짜·횟수 제한은 없다.
-- 보여 준 목록(studentId 순서)은 보는 사람·noteId별로 `shownSeniors.json`에 저장한다. 글자는 `nicknames.json`의 만난 순서를 그대로 쓰므로 다시 들어와도 같은 사람·같은 글자(A~I)다.
-- 재추천(P1): 후보 중 아직 안 보여 준 사람이 새로 생기면(새 노트 공유) `newCount`로 알리고, 보는 사람의 비교과·이중전공이 바뀌면 `recomputed: true`와 함께 점수만 다시 매긴다(이미 보여 준 사람은 빼지 않는다).
+**[11/20 개정] 후보·점수 규칙 (작업 22):**
+- 후보 = 그 노트(희망 프로그램)의 경험자 **전부**. 점수 하한은 없다(단과대가 달라도 그 경험을 한 선배는 추천한다). 직원 행·본인은 뺀다.
+- 점수(순서용): **학과 일치 5 · 이중전공 일치 4 · 단과대 일치 3 · 공통 비교과 2**(공통 비교과가 여러 개여도 2점 한 번). 학과가 같으면 단과대도 같으므로 같은 학과 선배는 8점 이상이다.
+- 정렬: 점수 내림차순 → 동점이면 ① 수락 대기 요청이 적은 선배 ② 최근 학기에 다녀온 선배 순.
+- `reasons` 맨 앞은 항상 **「희망 프로그램을 경험했어요」**, 겹치는 점이 있으면 그 뒤에 더한다(0점 선배도 카드가 비지 않는다).
+
+**인원 규칙(11/18, 11/20 개정, PRD 2-2·4-1):**
+- 상한 **9명은 "한 번에 보이는 목록"의 크기**다(평생 누적 9명이 아니다). 목록은 늘 위 정렬의 상위 9명이다.
+- 처음에는 상위 3명, `more: true`면 3명씩 더해 최대 9명. 9명에 닿았거나 후보가 바닥나면 `hasMore: false`. 날짜·횟수 제한은 없다.
+- 지금 목록(studentId 순서)은 보는 사람·noteId별로 `shownSeniors.json`에 노트 버전과 함께 저장한다. 다시 계산하는 때는 세 가지뿐이고, 그 밖에는 저장된 목록을 그대로 돌려준다(호출할 때 버전 숫자만 비교).
+  - 그 노트에 새 경험이 공유될 때(saveConsent → 노트 버전 +1) — P0
+  - 학기가 바뀔 때(학기마다 1회 일괄) — P1
+  - 보는 사람의 비교과·이중전공이 바뀔 때(`recomputed: true`) — P1
+- 다시 계산해서 새로 들어온 선배 수는 `newCount`로 알린다(화면 배지 「새로 비슷한 선배 N명」).
+- 목록에서 밀려난 선배는 보관함에 남기지 않는다. 내 보관함에는 **쪽지를 주고받은 선배만** 남는다(「선배 저장」 최대 9명은 P1).
+- 글자는 `nicknames.json`에 만난 순서대로 따로 기억하므로, 목록에서 빠졌다가 다시 나타나도 같은 사람은 같은 글자다(I 다음은 J, K…).
+- 받는 한도: 선배의 수락 대기(`waiting`) 요청이 **5건**이면 그 선배 카드에 `requestsFull: true`. 화면은 「지금은 요청이 많아요」를 보이고 쪽지 버튼 대신 「질문함으로 묻기」를 둔다(sendMessage 요청 한도 참고).
 ```json
-{ "seniors": [ { "studentId": "H0469", "nickname": "독일어과 선배 A", "score": 13,
-                 "reasons": ["같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음", "합격 면접 취업특강(커리어랩) 함께 이수"] },
-               { "studentId": "H0745", "nickname": "독일어과 선배 B", "score": 8,
-                 "reasons": ["같은 서양어대학", "같은 독일어과"] } ],
+{ "seniors": [ { "studentId": "H0469", "nickname": "독일어과 선배 A", "score": 14, "requestsFull": false,
+                 "reasons": ["희망 프로그램을 경험했어요", "같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음", "합격 면접 취업특강(커리어랩) 함께 이수"] },
+               { "studentId": "H0745", "nickname": "독일어과 선배 B", "score": 8, "requestsFull": false,
+                 "reasons": ["희망 프로그램을 경험했어요", "같은 서양어대학", "같은 독일어과"] } ],
   "shown": 2, "hasMore": false, "newCount": 0 }
 ```
 `hasMore: true`일 때만 화면에 「선배 더 보기」를 두고, `false`면 「비슷한 선배를 모두 보여드렸어요」를 보인다. 시연 mock은 후보가 2명이므로 첫 화면부터 `hasMore: false`다.
@@ -224,6 +235,7 @@ reason: `연락처` | `학번` | `비방`
 ### sendMessage(to, text)
 payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청이 된다.
 **요청 한도(11/18):** 같은 선배에게 열린 대화가 이미 있으면 새 요청을 만들지 않고 그 대화에 붙인다(선배 한 명당 요청 1건). 보낸 사람이 **수락 전(`status: "waiting"`)인 요청을 3건** 가지고 있으면 `{ "ok": false, "reason": "한도", "message": "답을 기다리는 쪽지가 3건이에요. 기다리는 요청을 취소하거나 선배가 답하면 더 보낼 수 있어요." }`. 닮은선배 추천 수를 제한하지 않는 대신 쪽지는 여기서 막는다.
+**[11/20] 받는 한도:** 받는 선배의 수락 대기 요청이 이미 **5건**이면 `{ "ok": false, "reason": "선배한도", "message": "지금은 이 선배에게 요청이 많아요. 질문함에 남기면 선배 인터뷰 때 함께 물어볼게요." }`. 인기 선배에게 쪽지가 몰리지 않게 하고, 같은 질문은 질문함 → 인터뷰(작업 74) → 해봤노트로 한 번에 답하게 한다. 「당분간 쪽지 쉬기」 스위치는 P1.
 막힘 방지(응답 없는 선배 3명에게 갇히지 않게) 두 가지:
 - **보낸 사람이 취소(P0)**: `respondRequest(threadId, cancel: true)`로 기다리는 요청을 거둔다 → `status: "cancelled"`, 한도에서 빠진다. 취소한 선배에게는 7일 동안 다시 요청하지 못한다(반복 요청 방지). 선배 화면에서는 그 요청이 조용히 사라진다(알림 없음).
 - **자동 만료(P1)**: 보낸 뒤 **7일** 안에 선배가 수락·거절하지 않으면 서버가 `status: "expired"`로 바꾸고 한도에서 뺀다. 보낸 사람에게 알림 「선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?」(`alerts.json`). 만료 판정은 `getMessages`·`sendMessage` 호출 때 `requestedAt` 기준으로 한다(별도 스케줄러 없음). 시연에서는 7일이 지나지 않으므로 문구로만 설명한다.
@@ -306,7 +318,7 @@ currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이
 - 내용은 1장 시연 인물 기준. askBoo.exchange 문장 3개, getNote["N-marburg"]는 교환 6칸(지원·학점·비용·생활·팁·배운점) 중 4칸 채우고 비용은 빈 칸, 배운점은 `interviewOnly: true`로 선배 인용 1개(`docType: "인터뷰"`).
 - `getNote["N-kotra"]`도 하나: 현장실습 노트(`KOTRA 해외무역관(유럽 권역)`, 데이터에서 후기가 가장 많은 기관), 칸은 5개 [`지원동기`, `업무내용`, `배운점`, `지원·선발`, `근무조건`]. 마지막 두 칸은 `interviewOnly: true`이고 비어 있음. (`지원·선발`은 한 칸의 이름이다)
 - 출처 학기는 선배1의 보고서 `2024-1`, 선배2의 보고서 `2024-2`. 노트의 `lastSemester`는 마르부르크 보고서 중 최근인 `2026-1`.
-- recommendSeniors는 선배1(13점: 단과대 3+학과 5+이중전공 3+공통 비교과 2), 선배2(8점: 단과대·학과) 두 명(PRD·score.py 기본 가중치 기준). 가상 문장만 쓰고 실제 후기 원문을 옮기지 않는다.
+- recommendSeniors는 선배1(14점: 학과 5+이중전공 4+단과대 3+공통 비교과 2), 선배2(8점: 학과·단과대) 두 명(11/20 가중치 기준), reasons 맨 앞은 「희망 프로그램을 경험했어요」. 가상 문장만 쓰고 실제 후기 원문을 옮기지 않는다.
 - **[11/19]** `getNote["N-marburg"]`에 7번째 칸 `후배 질문`(`interviewOnly: true`, Q·A 1쌍, `asked`·`answersQuestionId: "Q-0001"`). `interviewNext.steps[0]`은 `section: "후배 질문"`(questionId·asked·pendingQuestions 1), `steps[1..]`은 기존 칸, `total` 7. `summarizeInterview.publicDraft`에 `후배 질문` 칸 1문장. `saveConsent`에 `answered: ["Q-0001"]`. `getInbox.questions[1]`은 `answered`, `alerts[0]`은 「내 질문에 선배가 답했어요」. `getNote["N-kotra"]`는 칸 6개(…`근무조건`, `후배 질문`)이고 자동 분류 문장에 `autoClassified: true`.
 
 ## 7. data/frames.json (이번에 함께 생성)
