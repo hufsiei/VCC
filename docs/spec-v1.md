@@ -76,7 +76,7 @@ const FN_BASE = "http://localhost:8787";
 |---|---|
 | login | `id`가 `"staff01"`이면 `login.staff`, `"staff"`로 시작하는 다른 id면 `login.staffDept`, 그 외 비밀번호가 `"1"`이면 `login.student`, 아니면 `login.fail` |
 | askBoo | 4장의 규정 질문 표현이 있으면 `askBoo.official`, 아니면 질문에 `교환\|파견\|독일\|마르부르크`가 있으면 `askBoo.exchange`, 그 외 `askBoo.hold` |
-| interviewNext | `answers.length`가 0~3이면 `interviewNext.steps[answers.length]`(**[11/19]** steps[0]은 「후배 질문」), 4 이상이면 `interviewNext.done` |
+| interviewNext | **[11/20]** `program`이 `interviewNext.byProgram`에 있으면(마르부르크 시연 대본) `answers.length`번째 `steps`, 다 쓰면 `done`(steps[0]은 「후배 질문」). 그 밖의 프로그램은 서버(`interview.py`)처럼 `data/programs.json`의 `분야` → `data/frames.json` 노트 틀을 고르고, 아직 답하지 않은 칸을 틀 순서대로(「배운점」은 마지막) `interviewNext.questions[칸]` 문장으로 묻는다(`{p}` = 별칭 첫째 또는 프로그램명). 꼬리 질문·후배 질문은 없다(`pendingQuestions: 0`) |
 | getNote | `getNote[id]`가 있으면 그것, 없으면 `getNote["N-marburg"]` |
 | checkMessage | 숫자가 8자리 이상 연속(전화·학번)이면 `checkMessage.blocked`, 그 외 `checkMessage.ok` |
 | 나머지 | `m[name]` 그대로 |
@@ -315,12 +315,12 @@ currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이
 
 ## 6. mock-data.json 작성 지시
 
-- 최상위 키는 함수 이름. 3장 pickMock 규칙에 나오는 하위 키(`login.student/staff/staffDept/fail`, `askBoo.exchange/hold/official`, `interviewNext.steps/done`, `getNote["N-marburg"]`, `checkMessage.ok/blocked`)를 만든다.
+- 최상위 키는 함수 이름. 3장 pickMock 규칙에 나오는 하위 키(`login.student/staff/staffDept/fail`, `askBoo.exchange/hold/official`, `interviewNext.byProgram[프로그램명].steps/done`·`interviewNext.questions`, `getNote["N-marburg"]`, `checkMessage.ok/blocked`)를 만든다.
 - 내용은 1장 시연 인물 기준. askBoo.exchange 문장 3개, getNote["N-marburg"]는 교환 6칸(지원·학점·비용·생활·팁·배운점) 중 4칸 채우고 비용은 빈 칸, 배운점은 `interviewOnly: true`로 선배 인용 1개(`docType: "인터뷰"`).
 - `getNote["N-kotra"]`도 하나: 현장실습 노트(`KOTRA 해외무역관(유럽 권역)`, 데이터에서 후기가 가장 많은 기관), 칸은 5개 [`지원동기`, `업무내용`, `배운점`, `지원·선발`, `근무조건`]. 마지막 두 칸은 `interviewOnly: true`이고 비어 있음. (`지원·선발`은 한 칸의 이름이다)
 - 출처 학기는 선배1(H0469)의 보고서 `2025-1`, H0745의 보고서 `2025-2`. 노트의 `lastSemester`는 마르부르크 보고서 중 최근인 `2026-1`.
 - recommendSeniors는 선배1(H0469, 14점: 학과 5+이중전공 4+단과대 3+공통 비교과 `한국외국어대학교 직무탐색 집중교육` 2), 선배2(H0241, 12점: 학과·이중전공·단과대, 공통 비교과 없음) 두 명(11/20 가중치 기준. 실제 데이터의 3~5위 H0751·H0995·H0745는 8점), reasons 맨 앞은 「희망 프로그램을 경험했어요」. 가상 문장만 쓰고 실제 후기 원문을 옮기지 않는다.
-- **[11/19]** `getNote["N-marburg"]`에 7번째 칸 `후배 질문`(`interviewOnly: true`, Q·A 1쌍, `asked`·`answersQuestionId: "Q-0001"`). `interviewNext.steps[0]`은 `section: "후배 질문"`(questionId·asked·pendingQuestions 1), `steps[1..]`은 기존 칸, `total` 7. `summarizeInterview.publicDraft`에 `후배 질문` 칸 1문장. `saveConsent`에 `answered: ["Q-0001"]`. `getInbox.questions[1]`은 `answered`, `alerts[0]`은 「내 질문에 선배가 답했어요」. `getNote["N-kotra"]`는 칸 6개(…`근무조건`, `후배 질문`)이고 자동 분류 문장에 `autoClassified: true`.
+- **[11/19]** `getNote["N-marburg"]`에 7번째 칸 `후배 질문`(`interviewOnly: true`, Q·A 1쌍, `asked`·`answersQuestionId: "Q-0001"`). `interviewNext.byProgram["마르부르크필립스대학교"].steps[0]`은 `section: "후배 질문"`(questionId·asked·pendingQuestions 1), `steps[1..]`은 기존 칸, `total` 7. `summarizeInterview.publicDraft`에 `후배 질문` 칸 1문장. `saveConsent`에 `answered: ["Q-0001"]`. `getInbox.questions[1]`은 `answered`, `alerts[0]`은 「내 질문에 선배가 답했어요」. `getNote["N-kotra"]`는 칸 6개(…`근무조건`, `후배 질문`)이고 자동 분류 문장에 `autoClassified: true`.
 
 ## 7. data/frames.json (이번에 함께 생성)
 

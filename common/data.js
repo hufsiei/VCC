@@ -8,9 +8,39 @@ const FN_BASE = "http://localhost:8787";
 let mockPromise = null;
 function loadMock() {
   if (!mockPromise) {
-    mockPromise = fetch(new URL("mock-data.json", import.meta.url)).then((r) => r.json());
+    // interviewNext mock이 서버처럼 프로그램 분야 → 노트 틀을 고르도록 data/의 두 파일도 함께 읽는다
+    const get = (path) => fetch(new URL(path, import.meta.url)).then((r) => r.json());
+    mockPromise = Promise.all([get("mock-data.json"), get("../data/programs.json"), get("../data/frames.json")])
+      .then(([m, programs, frames]) => ({ ...m, _programs: programs, _frames: frames }));
   }
   return mockPromise;
+}
+
+// interviewNext mock (functions/interview.py의 순서를 흉내 낸다. AI 꼬리 질문은 없음)
+// - interviewNext.byProgram에 있는 프로그램(마르부르크 시연 대본)은 답한 수대로 steps를 그대로 낸다.
+// - 그 밖의 프로그램은 programs.json 분야 → frames.json 칸 순서로 아직 답하지 않은 칸을 묻고, 「배운점」은 마지막.
+//   후배 질문은 mock 질문함에 없으므로 묻지 않는다(pendingQuestions 0).
+const KIND_BY_FIELD = { 국제교류: "교환", 현장실습: "인턴", 비교과: "비교과" };
+const QUESTION_SECTION = "후배 질문";
+const LAST_SECTION = "배운점";
+
+function mockInterview(m, p) {
+  const iv = m.interviewNext;
+  const answers = p.answers || [];
+  const script = (iv.byProgram || {})[p.program];
+  if (script) return answers.length < script.steps.length ? script.steps[answers.length] : script.done;
+
+  const info = (m._programs || []).find((x) => x["프로그램명"] === p.program) || {};
+  const frame = (m._frames || {})[KIND_BY_FIELD[info["분야"]] || "교환"] || { 칸: [] };
+  const sections = frame["칸"].filter((s) => s !== QUESTION_SECTION);
+  const answered = new Set(answers.filter((a) => !a.skipped && a.answer).map((a) => a.section));
+  const progress = { filled: sections.filter((s) => answered.has(s)).length, total: frame["칸"].length };
+  const order = [...sections.filter((s) => s !== LAST_SECTION), ...sections.filter((s) => s === LAST_SECTION)];
+  const next = order.find((s) => !answered.has(s));
+  if (!next) return { done: true, progress };
+  const short = (info["별칭"] || [])[0] || p.program;
+  const template = iv.questions[next] || iv.questions["*"];
+  return { done: false, section: next, question: template.replaceAll("{p}", short).replaceAll("{s}", next), progress, pendingQuestions: 0 };
 }
 
 // 입력에 따라 다른 mock을 고르는 곳은 여기 한 곳입니다 (명세 3장).
@@ -23,10 +53,8 @@ function pickMock(m, name, p) {
     case "askBoo":
       if (/평점|장학금|몇\s*학점|선발\s*(인원|기준)|휴학|등록금|초과학기|인정\s*신청|인정받을 수/.test(p.question || "")) return m.askBoo.official; // 규정 질문 (명세 4장)
       return /교환|파견|독일|마르부르크/.test(p.question || "") ? m.askBoo.exchange : m.askBoo.hold;
-    case "interviewNext": {
-      const n = (p.answers || []).length;
-      return n <= 3 ? m.interviewNext.steps[n] : m.interviewNext.done; // 11/19: steps[0]은 「후배 질문」
-    }
+    case "interviewNext":
+      return mockInterview(m, p); // 고른 경험(program)에 맞는 노트 틀로 묻는다
     case "getNote":
       return m.getNote[p.id] || m.getNote["N-marburg"];
     case "checkMessage":
