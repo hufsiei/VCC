@@ -201,7 +201,7 @@ def respondRequest(me, p):
     with store.lock():
         t = store.load("messages", {}).get(tid)
         if not t or t["senior"] != me:
-            return {"error": "이 요청에 답할 수 없어요"}
+            return {"error": "볼 수 없는 기록이에요"}
         if t["status"] != "requested":
             return {"ok": True, "accepted": t["status"] == "accepted"}
         accept = bool(p.get("accept"))
