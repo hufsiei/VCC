@@ -47,9 +47,11 @@ function mockInterview(m, p) {
 function pickMock(m, name, p) {
   switch (name) {
     case "login":
-      if (p.id === "staff01") return m.login.staff;               // 총괄 관리자
-      if (String(p.id || "").startsWith("staff")) return m.login.staffDept; // 부서 담당자
-      return p.pw === "1" ? m.login.student : m.login.fail;
+      // mock은 비번을 대조하지 않는다(공개 코드에 비번을 두지 않음). 시연 아이디 모양이고 비번이 비어 있지 않으면 성공
+      if (!p.pw) return m.login.fail;
+      if (p.id === "staff01") return m.login.staff; // 총괄 관리자
+      if (p.id === "staff02") return m.login.staffDept; // 부서 담당자
+      return /^H\d{4}$/.test(String(p.id || "")) ? m.login.student : m.login.fail;
     case "askBoo":
       if (/평점|장학금|몇\s*학점|선발\s*(인원|기준)|휴학|등록금|초과학기|인정\s*신청|인정받을 수/.test(p.question || "")) return m.askBoo.official; // 규정 질문 (명세 4장)
       return /교환|파견|독일|마르부르크/.test(p.question || "") ? m.askBoo.exchange : m.askBoo.hold;

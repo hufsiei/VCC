@@ -4,7 +4,7 @@
 #   원본 엑셀은 저장소에 올리지 않는다(.gitignore 대상 아님 — 저장소 밖에 둘 것).
 # 규칙: docs/spec-v1.md 9장, data/README.md
 #   - JSON 키는 시트 헤더 글자 그대로. 분포요약·생성기준 시트는 변환하지 않음
-#   - students.json에서 studt_na_kr·sex·나이(만) 제외
+#   - students.json에서 studt_na_kr·sex·나이(만)·비번 제외
 #   - 가상질문은 봉인(Y) 행을 빼고 질문이 있는 행만 eval-questions.csv로
 #   - 학기 코드(1·2·3·4)로 semester("2024-1"·"2024-여름"·"2024-2"·"2024-겨울")를 만들어
 #     extracurricular·reports·internships·evidence 각 행에 덧붙임(시트에 없는 값이라 영어 키)
@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT.parent / "가상데이터_1000명.xlsx"
 
-DROP_STUDENT = {"studt_na_kr", "sex", "나이(만)"}
+DROP_STUDENT = {"studt_na_kr", "sex", "나이(만)", "비번"}   # 비번은 서버 환경변수 VCC_LOGIN_PW에만 둔다(작업 73)
 
 
 def split_sentences(text):

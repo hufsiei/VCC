@@ -23,8 +23,13 @@ def check(label, ok):
 r = account.login("", {"id": "H0143", "pw": "test-pw"})
 check("맞는 비번 → ok+token", r.get("ok") is True and r["user"].get("token") and sessions.resolve(r["user"]["token"]) == "H0143")
 check("틀린 비번 → FAIL", account.login("", {"id": "H0143", "pw": "1"}) == account.FAIL)
-# H0469는 students.json에 있지만 VCC_LOGIN_PW에는 없다(비번 열이 `1`이어도 거절)
+# H0469는 students.json에 있지만 VCC_LOGIN_PW에는 없다 → 거절
 check("표에 없는 학번 → FAIL", account.login("", {"id": "H0469", "pw": "1"}) == account.FAIL)
+# 데이터 행에 비번 필드가 끼어 들어와도 서버는 믿지 않는다(옛 students.json 모양)
+_orig = account.student
+account.student = lambda uid: {**(_orig(uid) or {}), "비번": "1"}
+check("행의 비번 필드는 무시 → FAIL", account.login("", {"id": "H0469", "pw": "1"}) == account.FAIL)
+account.student = _orig
 check("없는 학번 → FAIL", account.login("", {"id": "H9999", "pw": "test-pw"}) == account.FAIL)
 check("빈 비번 → FAIL", account.login("", {"id": "H0143", "pw": ""}) == account.FAIL)
 s = account.login("", {"id": "staff01", "pw": "staff-pw"})
