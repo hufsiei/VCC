@@ -8,7 +8,7 @@
 #   CLOVA_KEY          CLOVA Studio API 키
 #   CLOVA_URL          (선택) 플레이그라운드 '코드 보기'의 주소. 없으면 아래 기본값
 #   ANTHROPIC_API_KEY  Claude API 키 (또는 `ant auth login` 프로필)
-#   CLAUDE_MODEL       (선택) 기본 claude-opus-5-5
+#   CLAUDE_MODEL       (선택) PROVIDER가 "claude"인 작업·측정의 기본 모델. 기본 claude-sonnet-5-5
 
 import json
 import os
@@ -41,24 +41,26 @@ def _load_env():
 _load_env()
 
 # ── 1. 작업별 모델 표 ──────────────────────────────────────────────
-# "hcx" | "claude". 측정 결과(작업 30·53·54)에 따라 이 표만 바꾼다.
+# "hcx" | "sonnet" | "opus" ("claude"는 CLAUDE_MODEL). 측정 결과(작업 30·53·54)에 따라 이 표만 바꾼다.
+# 11/20 작업 53 세 모델 비교(HCX 원칙 v2 8절): HCX가 합격한 판정·질문 3종은 HCX(CLOVA 유지),
+# HCX가 미달한 요약·문단분류는 Sonnet, 일치검사는 요약과 다른 모델(Opus)로 검사한다.
 PROVIDER = {
     "연습":     "hcx",     # local_fn.py 연결 확인용
     "고르기":   "hcx",     # askBoo ③ 근거 번호 고르기 — 11/14 검증. 정확도 90% 미만이면 claude
     "변환":     "hcx",     # askBoo ④ 근거 → 해요체 한 문장
-    "충분판정": "hcx",     # 인터뷰 답이 칸을 채웠나 {"충분":true}
-    "꼬리질문": "hcx",     # 인터뷰 꼬리 질문 1개
-    "요약":     "claude",  # 인터뷰 요약 — 사실을 만드는 자유 생성이라 claude 권장
-    "일치검사": "claude",  # 요약 문장 ↔ 원문 일치 — 만드는 모델과 검사하는 모델을 분리
-    "쪽지검사": "hcx",     # 비방 판정 (연락처·학번은 코드 정규식이 먼저)
-    "문단분류": "hcx",     # 현장실습 후기 문단 → 칸 {"칸":"업무내용"}
-    "개선제안": "claude",  # 관리자 콘솔 개선 제안 (사전 생성·캐시)
-    "리포트요약": "claude", # 관리자 리포트 요약 한 단락
+    "충분판정": "hcx",     # 인터뷰 답이 칸을 채웠나 {"충분":true} — HCX 10/10
+    "꼬리질문": "hcx",     # 인터뷰 꼬리 질문 1개 — HCX 9/10
+    "요약":     "sonnet",  # 인터뷰 요약 — HCX 0/10(형식 실패), Sonnet 9/10·Opus 9/10
+    "일치검사": "opus",    # 요약 문장 ↔ 원문 일치 — 만드는 모델(요약=Sonnet)과 검사하는 모델을 분리. Opus 10/10
+    "쪽지검사": "hcx",     # 비방 판정 (연락처·학번은 코드 정규식이 먼저) — HCX 10/10
+    "문단분류": "sonnet",  # 현장실습 후기 문장 → 칸 {"칸":"업무내용"} — HCX 8/10 미달, Sonnet 9/10
+    "개선제안": "sonnet",  # 관리자 콘솔 개선 제안 (사전 생성·캐시) — 미측정, 작업 67에서 출력 보고 확정
+    "리포트요약": "sonnet", # 관리자 리포트 요약 한 단락 — 미측정, 작업 66에서 확정
 }
 
 # ── 2. 작업별 설정 ─────────────────────────────────────────────────
 # HCX: temperature·maxTokens 를 출력 크기에 딱 맞게(원칙 v2 5절).
-# Claude(Opus 5.5): 생각(thinking)은 끌 수 없고 effort로만 깊이를 조절한다. 기본 medium.
+# Claude(Sonnet·Opus 5.5): 생각(thinking)은 끌 수 없고 effort로만 깊이를 조절한다. 생각 토큰도 max_tokens에 들어간다.
 SETTINGS = {
     "연습":     {"max_tokens": 256,  "temperature": 0.5},
     "고르기":   {"max_tokens": 30,   "temperature": 0, "top_p": 0.1},
@@ -68,13 +70,14 @@ SETTINGS = {
     "요약":     {"max_tokens": 4000, "effort": "medium"},
     "일치검사": {"max_tokens": 2000, "effort": "medium"},
     "쪽지검사": {"max_tokens": 30,   "temperature": 0},
-    "문단분류": {"max_tokens": 30,   "temperature": 0},
+    "문단분류": {"max_tokens": 2000, "effort": "low"},   # 11/20 Sonnet 측정 설정 그대로
     "개선제안": {"max_tokens": 2000, "effort": "medium"},
     "리포트요약": {"max_tokens": 2000, "effort": "medium"},
 }
 
 CLOVA_URL = os.environ.get("CLOVA_URL", "https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-005")
-CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
+CLAUDE_MODELS = {"sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", CLAUDE_MODELS["sonnet"])   # PROVIDER·측정모델이 "claude"일 때
 LOG_FILE = Path(__file__).parent / "logs" / "ai-calls.jsonl"   # .gitignore 대상
 
 
@@ -99,7 +102,7 @@ def callAI(작업명, messages, system=None, 측정모델=None, 측정설정=Non
         if 모델 == "hcx":
             text, usage = call_hcx(messages, system, 설정)
         else:
-            text, usage = call_claude(messages, system, 설정)
+            text, usage = call_claude(messages, system, 설정, claude_model_id(모델))
         out = {"ok": True, "text": text, "json": first_json(text), "model": 모델}
     except Exception as e:  # 실패해도 서버가 죽지 않게. 화면은 폴백 문구를 보여 준다
         usage = {}
@@ -145,13 +148,22 @@ def call_hcx(messages, system, 설정):
     return text, {"input": u.get("promptTokens"), "output": u.get("completionTokens")}
 
 
-def call_claude(messages, system, 설정):
+def claude_model_id(모델):
+    """PROVIDER 값 → Claude 모델 ID. "claude"는 CLAUDE_MODEL(환경변수), 표에 없는 값은 오류."""
+    if 모델 == "claude":
+        return CLAUDE_MODEL
+    if 모델 not in CLAUDE_MODELS:
+        raise ValueError(f"알 수 없는 모델: {모델} (hcx | sonnet | opus | claude)")
+    return CLAUDE_MODELS[모델]
+
+
+def call_claude(messages, system, 설정, model_id):
     """Claude API(공식 anthropic SDK). 정책상 거절되면 서버가 다른 모델로 이어서 답한다(fallbacks)."""
     import anthropic  # pip install anthropic — Claude를 쓰는 작업이 있을 때만 필요
 
     client = anthropic.Anthropic()  # ANTHROPIC_API_KEY 또는 ant 로그인 프로필
     kwargs = dict(
-        model=CLAUDE_MODEL,
+        model=model_id,
         max_tokens=설정.get("max_tokens", 4000),
         messages=messages,
         output_config={"effort": 설정.get("effort", "medium")},
@@ -216,13 +228,20 @@ def first_json(text):
     return None
 
 
+def _모델ID(모델):
+    try:
+        return claude_model_id(모델)
+    except ValueError:
+        return 모델
+
+
 def _기록(작업명, 모델, usage, 시작, ok, error=None):
     """호출 한 건마다 한 줄. 작업 55(질문 1건당 원가·운영비)와 작업 30(모델 비교)의 재료. 실패면 이유도(키는 담기지 않음)."""
     try:
         LOG_FILE.parent.mkdir(exist_ok=True)
         row = {
             "at": datetime.now().isoformat(timespec="seconds"),
-            "작업": 작업명, "모델": CLAUDE_MODEL if 모델 == "claude" else "HCX-005",
+            "작업": 작업명, "모델": "HCX-005" if 모델 == "hcx" else _모델ID(모델),
             "입력토큰": usage.get("input"), "출력토큰": usage.get("output"),
             "ms": int((time.time() - 시작) * 1000), "ok": ok,
         }
