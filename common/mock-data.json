@@ -232,6 +232,14 @@
           ]
         },
         {
+          "name": "학점",
+          "lines": [
+            {
+              "text": "나는 학점 4.3으로 성적우수 장학금을 받았다."
+            }
+          ]
+        },
+        {
           "name": "생활",
           "lines": [
             {
@@ -260,6 +268,17 @@
               "lineId": "L-D1-1",
               "text": "출국 3학기 전부터 TestDaF를 준비했어요.",
               "match": true
+            }
+          ]
+        },
+        {
+          "name": "학점",
+          "lines": [
+            {
+              "lineId": "L-D1-4",
+              "text": "학점 4.3으로 성적우수 장학금을 받았어요.",
+              "match": true,
+              "identifying": true
             }
           ]
         },
