@@ -596,7 +596,7 @@
     "blocked": {
       "ok": false,
       "reason": "연락처",
-      "message": "전화번호나 학번은 보낼 수 없어요. 이메일은 괜찮아요."
+      "message": "전화번호·주소·링크는 보낼 수 없어요. 이메일은 괜찮아요."
     }
   },
   "previewNickname": {

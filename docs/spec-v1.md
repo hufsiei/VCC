@@ -226,10 +226,10 @@ payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명
 `hasMore: true`일 때만 화면에 「선배 더 보기」를 두고, `false`면 「비슷한 선배를 모두 보여드렸어요」를 보인다. 시연 mock은 후보가 2명이므로 첫 화면부터 `hasMore: false`다.
 
 ### checkMessage(text)
-payload `{text}`. 연락처·학번은 코드(정규식), 비방은 AI 판정.
+payload `{text}`. 연락처·학번은 코드(정규식), 비방은 AI 판정. **[11/20]** 코드 검사는 `mask.find()`(callAI 마스킹과 같은 규칙)에서 메일만 뺀 것: 학번(`H`+숫자, 9자리, `staff`)은 `학번`, 전화·주소(건물번호·동·호)·링크는 `연락처`.
 ```json
 { "ok": true }
-{ "ok": false, "reason": "연락처", "message": "전화번호나 학번은 보낼 수 없어요. 이메일은 괜찮아요." }
+{ "ok": false, "reason": "연락처", "message": "전화번호·주소·링크는 보낼 수 없어요. 이메일은 괜찮아요." }
 ```
 reason: `연락처` | `학번` | `비방`
 
