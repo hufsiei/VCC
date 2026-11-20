@@ -95,6 +95,23 @@
 
 함수 응답의 `studentId`, `withId`, `to`는 모두 `colreg_no` 값입니다.
 
+### usage-log.json (사용 로그 시드 — 시트가 아니라 `tools/make_usage_log.py`가 생성, 작업 65)
+
+관리자 콘솔 집계(작업 66)의 재료입니다. 같은 seed(`20261120`)면 결과가 한 글자도 같습니다. 모든 문장은 템플릿 생성이고 실제 학생·후기 문장은 없습니다. 직원 계정과 시연 인물(H0143·H0469·H0745)은 넣지 않습니다. 점검: `python tools/make_usage_log.py --check`.
+
+| 키 | 건수 | 한 행 |
+|---|---|---|
+| meta | — | `seed` · `기간`(2025-09-01~2026-11-30) · `건수` |
+| questions | 1,200 | `id`(UQ-0001) · `at` · `colreg_no` · `crs_nm` · `regst_grad` · `프로그램명`(없으면 null) · `분야` · `칸` · `status`(ok·hold·official) · `질문` · `근거수` · `noteId`(null) · `운영부서코드`(없으면 null = '분류 안 됨') |
+| interviews | 40 | `id`(UI-001) · `at` · `colreg_no`(그 프로그램 이수자) · `프로그램명` · `분야` · `문장수` · `후배질문답` |
+| consents | 32 | `id`(UC-001) · `at` · `interviewId` · `colreg_no` · `프로그램명` · `공개문장수` · `제외문장수` |
+| reports | 12 | `id`(UR-001) · `at` · `colreg_no`(신고자) · `프로그램명` · `lineId`(L-근거id) · `sourceId` · `사유` · `status`(숨김 중·공식 안내 연결됨·복구) |
+| requests | 60 | `id`(UM-001) · `at` · `from`(미이수자) · `to`(이수자) · `프로그램명` · `status`(accepted 38·declined·pending) |
+
+- `questions` 행은 서버가 시연 중 쌓는 `runtime/questions.json`(`add_question`)과 같은 모양에 `분야`·`근거수`를 더한 것입니다. 집계 때 둘을 합칩니다.
+- 상태는 askBoo 규칙과 같습니다: 규정 표현(평점·장학금·몇 학점·선발 인원/기준·휴학·등록금·초과학기·인정 신청)이면 official, 근거가 있으면 ok, 없으면 hold(노트 없는 프로그램·보고서에 칸이 없는 주제·인턴 근무조건).
+- 비율: hold 28%(336건), official 120건 = '학점·장학·선발'이 든 질문의 60%. 분야 몫은 국제교류 55·현장실습 20·비교과 15·분류 안 됨 10%이고, 분야 안에서는 이수 인원에 비례합니다(분야를 가리지 않고 비례하면 비교과가 76%가 되어 보류율 28%를 맞출 수 없음). 시연 프로그램 마르부르크필립스대학교는 ×6 가중으로 질문 1위입니다.
+
 ## 공통 규칙
 
 | 규칙 | 내용 |
