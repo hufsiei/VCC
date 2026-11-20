@@ -14,14 +14,15 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote
 
+import account
 import limits
 from askboo import askBoo
 from interview import interviewNext, summarizeInterview
 from runtime_fns import ROUTES
 
-# AI를 쓰는 함수는 runtime_fns(AI 없음)와 따로 둔다
-ROUTES = {**ROUTES, "askBoo": askBoo, "interviewNext": interviewNext, "summarizeInterview": summarizeInterview}
-NEEDS_NO_LOGIN = {"checkMessage"}
+# AI를 쓰는 함수는 runtime_fns(AI 없음)와 따로 둔다. login·getMe는 account.py
+ROUTES = {**ROUTES, **account.ROUTES, "askBoo": askBoo, "interviewNext": interviewNext, "summarizeInterview": summarizeInterview}
+NEEDS_NO_LOGIN = {"checkMessage", "login"}
 # 사용자별 호출 한도(limits.py, 분당 10·일 100)를 세는 함수. AI를 부르는 함수를 새로 연결하면 여기에 더한다
 # (checkMessage의 비방 판정은 작업 27).
 AI_ROUTES = {"askBoo", "interviewNext", "summarizeInterview"}
