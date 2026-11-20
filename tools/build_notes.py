@@ -4,7 +4,9 @@
 # 원칙: 칸 문장 = 근거 문단 원문 그대로 1:1(text = evidence.text, sourceId = evidence.id). AI 없음.
 #       서버(getNote·listNotes)는 이 파일 + runtime/noteLines.json(동의 통과 인터뷰 문장)을 합쳐 응답한다.
 #
-# 노트 = 근거가 있는 프로그램마다 1건(국제교류 = 귀국보고서 있는 학교, 현장실습 = 후기 있는 업체). 비교과는 근거가 없어 아직 없다.
+# 노트 = 국제교류(귀국보고서 있는 학교)·현장실습(후기 있는 업체)·비교과(이수 기록 있는 프로그램 전부)마다 1건.
+#   비교과는 근거 문단이 없어 칸이 비어 있고(인터뷰로 채움) oneLine은 ''(화면은 '–'), 커버에 satisfaction(만족도 5점)과
+#   completedCount(이수 인원)를 넣는다(11/20 결정: 해봤노트에 보여 주는 용도만). 교환·인턴은 둘 다 null.
 # id    : 'N-' + 프로그램명 해시 6자리(데이터가 바뀌어도 그대로 — noteLines가 noteId로 묶이므로). 시연 학교만 'N-marburg'.
 # type  : 국제교류는 그 학교 경험자 중 교환학생이 1명이라도 있으면 '교환', 없으면 '파견'(두 틀은 칸이 같다). 현장실습은 '인턴'.
 # 인턴  : 후기는 칸이 없는 자유 서술이다. 작업 50(문장 자동 분류)의 결과 data/intern-sections.json({sourceId: 칸})이 있으면
@@ -45,6 +47,21 @@ def first_sentence(text):
     return FILLER_RE.sub("", s).strip() or s
 
 
+def _grade_range(records):
+    """이수 당시 학년 중 많은 순으로 60% 이상을 덮는 학년들의 범위(예: '1~2', '3')."""
+    c = Counter(r["이수 당시 학년"] for r in records if r.get("이수 당시 학년"))
+    if not c:
+        return "전"
+    got, total, acc = [], sum(c.values()), 0
+    for g, n in sorted(c.items(), key=lambda x: (-x[1], x[0])):
+        got.append(g)
+        acc += n
+        if acc / total >= 0.6:
+            break
+    lo, hi = min(got), max(got)
+    return f"{lo}" if lo == hi else f"{lo}~{hi}"
+
+
 def item_key(e):
     """보고서 문항 순서(1-1 < 1-2 < … < 2-7 < 3 < 4), 같은 문항이면 최근 학기 먼저, 그다음 id."""
     head = e["문항"].split(".")[0]
@@ -72,19 +89,28 @@ def build():
     job = defaultdict(Counter)
     for r in interns:
         job[r["업체명"]][r["직군"]] += 1
+    taken = defaultdict(list)                                # 비교과 이수 기록(학기·이수 당시 학년)
+    for r in load("extracurricular.json"):
+        taken[r["프로그램명"]].append(r)
+    sat = {r["프로그램명"]: r for r in load("extracurricular-satisfaction.json")}
 
     notes = []
     for p in programs:
         name = p["프로그램명"]
-        rows = ev_by.get(name)
-        if not rows:
-            continue
-        if p["분야"] == "국제교류":
+        rows = ev_by.get(name, [])
+        satisfaction = completed = None
+        if p["분야"] == "국제교류" and rows:
             ntype = "교환" if exch[name].get("교환학생") else "파견"
             for_whom = f"{p['세부']}권 {ntype}을 생각하는 1~2학년"
-        elif p["분야"] == "현장실습":
+        elif p["분야"] == "현장실습" and rows:
             ntype = "인턴"
             for_whom = f"{job[name].most_common(1)[0][0]} 분야 현장실습을 생각하는 2~3학년"
+        elif p["분야"] == "비교과" and taken.get(name):
+            # 비교과는 근거 문단이 없다 → 칸은 비워 두고 인터뷰로 채운다. 커버에 만족도·이수 인원(11/20 결정: 보여 주는 용도만)
+            ntype = "비교과"
+            for_whom = f"{_grade_range(taken[name])}학년이 많이 이수한 비교과"
+            satisfaction = p.get("만족도(5점)")
+            completed = sat.get(name, {}).get("이수 인원(가상)", len(taken[name]))
         else:
             continue
         frame = frames[ntype]
@@ -104,11 +130,12 @@ def build():
         sections = [{"name": s, "interviewOnly": s in frame["인터뷰로만"], "lines": lines_by.get(s, [])} for s in frame["칸"]]
         biggest = max(sections, key=lambda s: len(s["lines"]))       # 같으면 틀 순서상 앞 칸
         one_src = biggest["lines"][0]["text"] if biggest["lines"] else (unclassified[0]["text"] if unclassified else "")
+        sems = [e["semester"] for e in rows] or [r["semester"] for r in taken[name]]
         note = {
             "id": note_id(name), "program": name, "type": ntype,
-            "oneLine": first_sentence(one_src), "forWhom": for_whom,
-            "evidenceCount": len(rows), "lastSemester": max((e["semester"] for e in rows), key=term_key),
-            "satisfaction": None,
+            "oneLine": first_sentence(one_src) if one_src else "", "forWhom": for_whom,
+            "evidenceCount": len(rows), "lastSemester": max(sems, key=term_key),
+            "satisfaction": satisfaction, "completedCount": completed,
             "sections": sections, "sources": sources,
         }
         if unclassified:
@@ -122,6 +149,13 @@ def check(notes):
     evidence = {e["id"]: e for e in load("evidence.json")}
     frames = load("frames.json")
     names = {p["프로그램명"] for p in load("programs.json")}
+    ex_names = {p["프로그램명"] for p in load("programs.json") if p["분야"] == "비교과"}
+    comp, last_ex = Counter(), defaultdict(list)
+    for r in load("extracurricular.json"):
+        comp[r["프로그램명"]] += 1
+        last_ex[r["프로그램명"]].append(r["semester"])
+    if {n["program"] for n in notes if n["type"] == "비교과"} != ex_names:
+        bad.append("비교과 노트가 비교과 프로그램 전부와 다름")
     seen = Counter()
     if json.dumps(build(), ensure_ascii=False) != json.dumps(notes, ensure_ascii=False):
         bad.append("다시 만들면 결과가 다름 — data/가 바뀌었으면 인자 없이 다시 생성")
@@ -156,10 +190,24 @@ def check(notes):
                     bad.append(f"근거 칸과 노트 칸이 다름: {l['sourceId']} {e['칸']} → {s['name']}")
         if n["evidenceCount"] != len(all_lines):
             bad.append(f"evidenceCount ≠ 문장 수: {n['id']}")
-        if n["lastSemester"] != max((n["sources"][l["sourceId"]]["semester"] for l in all_lines), key=term_key):
-            bad.append(f"lastSemester 틀림: {n['id']}")
-        if not n["oneLine"] or not n["forWhom"]:
-            bad.append(f"커버 빈 칸: {n['id']}")
+        if all_lines:
+            if n["lastSemester"] != max((n["sources"][l["sourceId"]]["semester"] for l in all_lines), key=term_key):
+                bad.append(f"lastSemester 틀림: {n['id']}")
+            if not n["oneLine"]:
+                bad.append(f"근거가 있는데 oneLine 빈 칸: {n['id']}")
+        elif n["type"] != "비교과" or n["oneLine"]:
+            bad.append(f"근거 없는 노트는 비교과만, oneLine은 빈 값(화면은 '–'): {n['id']}")
+        if not n["forWhom"]:
+            bad.append(f"forWhom 빈 칸: {n['id']}")
+        if n["type"] == "비교과":
+            if not isinstance(n["satisfaction"], (int, float)) or not n["completedCount"]:
+                bad.append(f"비교과 노트에 만족도·이수 인원 없음: {n['id']}")
+            if n["completedCount"] != comp.get(n["program"]):
+                bad.append(f"이수 인원이 비교과 기록 수와 다름: {n['id']}")
+            if n["lastSemester"] != max(last_ex[n["program"]], key=term_key):
+                bad.append(f"비교과 lastSemester 틀림: {n['id']}")
+        elif n["satisfaction"] is not None or n["completedCount"] is not None:
+            bad.append(f"교환·인턴 노트에 만족도·이수 인원이 있음: {n['id']}")
     missing = set(evidence) - set(seen)
     if missing:
         bad.append(f"노트에 안 들어간 근거 {len(missing)}건(예: {sorted(missing)[:3]})")
