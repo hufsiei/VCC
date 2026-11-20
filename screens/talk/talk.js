@@ -713,9 +713,11 @@ shareBtn.addEventListener("click", () => {
 // 공유가 끝나면(consent.js가 알림): 토스트 + 내 경험노트에 「반영 중」(중립) + 버튼은 「공유 범위 바꾸기」(7-②, 8절)
 document.addEventListener("consent-saved", (event) => {
   if (!summaryResult || event.detail.draftId !== summaryResult.draftId) return;
+  shareBtn.textContent = "공유 범위 바꾸기";
+  // 서버가 문장을 모두 거절해 실제로 들어간 문장이 없으면 「반영 중」·토스트를 띄우지 않는다
+  if (event.detail.shared === 0) return;
   summaryStatus.querySelector(".status-label--neutral")?.remove();
   summaryStatus.append(" ", statusLabel("neutral", "clock", "반영 중"));
-  shareBtn.textContent = "공유 범위 바꾸기";
   measureDock();
   toast("해봤노트에 반영하고 있어요");
 });

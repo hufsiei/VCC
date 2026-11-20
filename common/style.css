@@ -1112,6 +1112,8 @@ body.sheet-open { overflow: hidden; }
 .switch:checked { background: var(--color-primary); }
 .switch:checked::before { transform: translateX(18px); }
 .switch:disabled { background: var(--color-neutral-bg); cursor: not-allowed; }
+/* 잠겼지만 켜진 스위치(공유 결과 화면): 켬 상태가 보이도록 남색을 흐리게 */
+.switch:disabled:checked { background: var(--color-primary); opacity: .5; }
 @media (prefers-reduced-motion: reduce) {
   .switch, .switch::before { transition: none; }
 }
@@ -1201,6 +1203,24 @@ body.sheet-open { overflow: hidden; }
 .consent-line__risk { color: var(--status-warning-fg); }
 .consent-line__off .icon,
 .consent-line__risk .icon { width: 14px; height: 14px; }
+/* 서버가 거절한 문장(saveConsent.rejected): 오류색 바탕 + ⊘ + 서버 message (3-4: 색·아이콘·문구) */
+.consent-line__rejected {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: 6px 10px;
+  border-radius: var(--radius-button);
+  background: var(--status-error-bg);
+  color: var(--status-error-fg);
+  font-size: var(--font-size-secondary);
+  font-weight: 600;
+  word-break: keep-all;
+}
+.consent-line__rejected .icon { width: 14px; height: 14px; margin-top: 3px; }
+/* 거절된 문장은 해봤노트에 안 들어감: 글자를 흐리게 + 취소선 */
+.consent-line--rejected .consent-line__text > span:last-child { text-decoration: line-through; }
+/* 공유 결과(시트 맨 위) */
+.consent-result { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); }
 .consent-line .status-label { white-space: normal; height: auto; min-height: 24px; padding-top: 4px; padding-bottom: 4px; }
 
 /* ③ 공개되는 것 / 공개되지 않는 것 */

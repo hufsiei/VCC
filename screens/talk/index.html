@@ -136,6 +136,8 @@
       <div class="sheet__handle" aria-hidden="true"></div>
       <h2 class="sheet__title" id="consentTitle">해봤노트 공개 동의</h2>
       <div class="sheet__body">
+        <!-- 공유 후 서버가 일부 문장을 거절했을 때 결과(saveConsent.rejected) -->
+        <div class="consent-result" id="consentResult" role="status" hidden></div>
         <!-- ① 반영될 해봤노트 -->
         <div class="consent-target" id="consentTarget"></div>
         <!-- ② 칸별 문장 + 공개 스위치 -->

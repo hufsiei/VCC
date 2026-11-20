@@ -5,6 +5,7 @@
 // 흐름: talk.js가 document에 "open-consent"(detail = summarizeInterview 응답)를 보낸다
 //   → 시트를 연다 → 「동의하고 공유」 → saveConsent(draftId, {removed:[끈 lineId]})
 //   → 성공하면 시트를 닫고 document에 "consent-saved"(detail = {draftId, result, shared, removed})를 보낸다(토스트는 talk.js가 띄움).
+//   → 응답에 rejected(서버가 거절한 문장)가 있으면 시트를 닫지 않고 그 문장 아래에 message를 보여 준 뒤 「확인」으로 닫는다.
 // 끈 문장은 removed로만 보낸다. 내 경험노트(myNote)는 서버가 이미 저장했으므로 끈 문장도 거기에는 남는다.
 
 import { saveConsent, listNotes } from "../../common/data.js";
@@ -46,6 +47,7 @@ const agreeError = document.getElementById("consentError");
 const submitBtn = document.getElementById("consentSubmit");
 const submitReason = document.getElementById("consentReason");
 const cancelBtn = document.getElementById("consentCancel");
+const resultBox = document.getElementById("consentResult");
 
 const state = {
   draft: null,        // summarizeInterview 응답
@@ -53,10 +55,13 @@ const state = {
   lineCount: 0,
   note: undefined,    // 반영될 해봤노트(listNotes 한 줄) · null이면 새 노트 · undefined면 아직 모름
   busy: false,
+  done: false,        // 공유는 됐지만 서버가 일부 문장을 거절해 결과를 보여 주는 중
+  rejected: new Map(), // lineId → 서버가 준 message (saveConsent.rejected, spec 4장 [11/20])
   lastFocus: null,
 };
 // 같은 요약 초안을 다시 열면 고른 상태를 그대로 보여 준다(공유 범위 바꾸기)
 const remembered = new Map(); // draftId → Map(lineId → bool)
+const rememberedRejected = new Map(); // draftId → Map(lineId → message)
 
 document.addEventListener("open-consent", (event) => openSheet(event.detail));
 
@@ -64,18 +69,27 @@ function openSheet(draft) {
   if (!draft || !draft.publicDraft) return;
   state.draft = draft;
   state.busy = false;
+  state.done = false;
   state.lastFocus = document.activeElement;
+  state.rejected = new Map(rememberedRejected.get(draft.draftId) || []);
 
   const prev = remembered.get(draft.draftId);
   state.on = new Map();
   for (const line of allLines(draft)) {
     // 기본 켬. 본인 식별 문장(identifying)은 기본 꺼짐 — 판단은 사용자가 한다(7-②)
-    state.on.set(line.lineId, prev && prev.has(line.lineId) ? prev.get(line.lineId) : line.identifying !== true);
+    // 서버가 거절한 문장은 해봤노트에 들어가지 않았으므로 꺼짐
+    const on = prev && prev.has(line.lineId) ? prev.get(line.lineId) : line.identifying !== true;
+    state.on.set(line.lineId, state.rejected.has(line.lineId) ? false : on);
   }
   state.lineCount = state.on.size;
 
   agreeBox.checked = false;
+  agreeBox.disabled = false;
   agreeError.replaceChildren();
+  resultBox.replaceChildren();
+  resultBox.hidden = true;
+  submitBtn.textContent = "동의하고 공유";
+  cancelBtn.hidden = false;
   renderLines();
   renderTarget();
   update();
@@ -178,6 +192,11 @@ function lineRow(sectionName, line) {
   const riskNote = line.identifying === true
     ? el("span", { className: "consent-line__risk" }, [icon("triangle-alert"), "내 개인 정보가 유출될 수 있어요"])
     : null;
+  // 서버가 거절한 문장(saveConsent.rejected): 문장 바로 아래에 서버 message를 그대로
+  const rejectedMsg = state.rejected.get(line.lineId);
+  const rejectNote = rejectedMsg !== undefined
+    ? el("span", { className: "consent-line__rejected" }, [icon("circle-alert"), rejectedMsg || "이 문장은 해봤노트에 넣을 수 없어요."])
+    : null;
   const showNotes = (on) => {
     offNote.hidden = on;
     if (riskNote) riskNote.hidden = !on;
@@ -198,6 +217,8 @@ function lineRow(sectionName, line) {
     },
   });
   sw.checked = state.on.get(line.lineId) === true;
+  // 거절된 문장은 켤 수 없게, 결과를 보여 주는 동안은 모든 스위치를 잠근다
+  sw.disabled = Boolean(rejectNote) || state.done;
   showNotes(sw.checked);
 
   const text = el("label", { className: "consent-line__text", attrs: { for: id } }, [
@@ -206,10 +227,13 @@ function lineRow(sectionName, line) {
     el("span", { text: sectionName === QUESTION_SECTION ? `A. ${line.text}` : line.text }),
   ]);
 
-  const row = el("div", { className: `consent-line${sw.checked ? "" : " consent-line--off"}` }, [
+  const row = el("div", {
+    className: `consent-line${sw.checked ? "" : " consent-line--off"}${rejectNote ? " consent-line--rejected" : ""}`,
+  }, [
     el("div", { className: "consent-line__main" }, [
       line.identifying === true ? statusLabel("warning", "triangle-alert", "나를 알아볼 수 있는 내용이에요") : null,
       text,
+      rejectNote,
       // AI 원문 일치 검사에 걸린 문장(spec summarizeInterview.match)
       line.match === false ? statusLabel("neutral", "info", "원문과 다를 수 있어요") : null,
       offNote,
@@ -242,6 +266,12 @@ function renderScope() {
 
 function update() {
   renderScope();
+  if (state.done) {
+    // 결과를 보여 주는 중: 「확인」만 누를 수 있다
+    submitBtn.disabled = false;
+    submitReason.hidden = true;
+    return;
+  }
   const on = onCount();
   const ready = on > 0 && agreeBox.checked && !state.busy;
   submitBtn.disabled = !ready;
@@ -256,6 +286,10 @@ function update() {
 agreeBox.addEventListener("change", update);
 
 submitBtn.addEventListener("click", async () => {
+  if (state.done) {
+    closeSheet(); // 결과 확인 뒤 「확인」
+    return;
+  }
   if (submitBtn.disabled || !state.draft) return;
   const removed = [...state.on].filter(([, v]) => !v).map(([id]) => id);
 
@@ -283,11 +317,48 @@ submitBtn.addEventListener("click", async () => {
   }
 
   const draftId = state.draft.draftId;
-  closeSheet();
+  // 서버가 고친 문장 중 일부를 거절한 경우(spec 4장 saveConsent [11/20]):
+  // 그 문장만 해봤노트에서 빠지고 나머지는 저장됐다 → 시트를 닫지 않고 문장마다 message를 보여 준다
+  const rejected = (Array.isArray(res.rejected) ? res.rejected : []).filter((r) => r && state.on.has(r.lineId));
+  if (rejected.length === 0) {
+    closeSheet();
+    document.dispatchEvent(new CustomEvent("consent-saved", {
+      detail: { draftId, result: res, shared: onCount(), removed },
+    }));
+    return;
+  }
+
+  for (const r of rejected) {
+    state.rejected.set(r.lineId, typeof r.message === "string" ? r.message : "");
+    state.on.set(r.lineId, false); // 해봤노트에 안 들어감
+  }
+  rememberedRejected.set(draftId, new Map(state.rejected));
+  state.done = true;
+  showResult(rejected.length);
+  renderLines();
+  renderTarget();
+  update();
+  drawIcons();
+  linesBox.querySelector(".consent-line--rejected")?.scrollIntoView({ block: "center" });
   document.dispatchEvent(new CustomEvent("consent-saved", {
-    detail: { draftId, result: res, shared: onCount(), removed },
+    detail: { draftId, result: res, shared: onCount(), removed: [...state.on].filter(([, v]) => !v).map(([id]) => id) },
   }));
 });
+
+// 일부 거절 결과(시트 맨 위): 반영 상태 + 「N문장은 해봤노트에 넣지 못했어요」
+function showResult(rejectedCount) {
+  const shared = onCount();
+  resultBox.replaceChildren(
+    shared > 0
+      ? statusLabel("success", "check", "해봤노트에 반영하고 있어요")
+      : statusLabel("warning", "triangle-alert", "해봤노트에 넣은 문장이 없어요"),
+    el("p", { className: "sub", text: `${rejectedCount}문장은 해봤노트에 넣지 못했어요. 내 경험노트에는 남아 있어요.` }),
+  );
+  resultBox.hidden = false;
+  agreeBox.disabled = true;
+  cancelBtn.hidden = true;
+  submitBtn.textContent = "확인";
+}
 
 // ---------------------------------------------------------------------------
 // 닫기: 「취소」 · 바깥(어두운 면) · Esc. 시트 안에서 Tab이 밖으로 나가지 않게
