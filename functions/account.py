@@ -1,11 +1,15 @@
 # account.py — login·getMe 서버 함수 (작성: 미리)
 # 응답 모양은 docs/spec-v1.md 4장 login·getMe. 읽기만 하고 저장하지 않는다. AI 없음.
 #
-#   login(me, {id, pw})  — students.json 행의 비번과 대조. 로그인 전이라 me는 비어 있다.
+#   login(me, {id, pw})  — 환경변수 VCC_LOGIN_PW(JSON {"학번":"비번"})와 대조하고 토큰을 발급한다(작업 73).
+#                          students.json의 비번 열은 읽지 않는다. 로그인 전이라 me는 비어 있다.
+#   logout(me, {token})  — 토큰을 폐기한다.
 #   getMe(me, {})        — 내 학생 행(번호·비번 제외) + 이수 기록 3종(시트 헤더 그대로, 본문 칸 제외)
 import json
+import os
 from pathlib import Path
 
+import sessions
 from runtime_fns import student
 
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -18,6 +22,31 @@ REPORT_KEYS = ["학년도", "학기", "국가", "대학명"]
 INTERN_KEYS = ["학년도", "학기", "업체명", "직군"]
 
 _cache = {}
+
+
+def _load_env():
+    """저장소 맨 위의 .env(KEY=값 줄)를 환경변수로 읽는다(ai.py와 같은 규칙). 이미 있는 환경변수는 덮지 않는다."""
+    try:
+        text = (DATA.parent / ".env").read_text(encoding="utf-8")
+    except OSError:
+        return
+    for line in text.splitlines():
+        k, sep, v = line.strip().partition("=")
+        k, v = k.strip(), v.strip().strip('"').strip("'")
+        if sep and k and v and not k.startswith("#") and k not in os.environ:
+            os.environ[k] = v
+
+
+_load_env()
+
+
+def _passwords():
+    """VCC_LOGIN_PW(JSON 문자열)를 {학번: 비번}으로. 없거나 형식이 틀리면 빈 표(아무도 로그인 못 함)."""
+    try:
+        pw = json.loads(os.environ.get("VCC_LOGIN_PW") or "{}")
+    except ValueError:
+        return {}
+    return pw if isinstance(pw, dict) else {}
 
 
 def _rows(name):
@@ -36,16 +65,23 @@ def _pick(rows, id_key, me, keys):
 def login(me, p):
     uid = str(p.get("id") or "").strip()
     row = student(uid)
-    if not row or str(p.get("pw") or "") != str(row.get("비번") or ""):
+    expected = _passwords().get(uid)
+    if not row or expected is None or str(p.get("pw") or "") != str(expected):
         return FAIL
+    token = sessions.issue(uid)
     if not uid.startswith("staff"):
-        return {"ok": True, "user": {"colreg_no": uid, "status": "학생"}}
+        return {"ok": True, "user": {"colreg_no": uid, "status": "학생", "token": token}}
     dept = row.get("crs_nm") or ""
-    user = {"colreg_no": uid, "status": "직원", "부서명": dept, "권한": "총괄" if dept == "전체" else "부서"}
+    user = {"colreg_no": uid, "token": token, "status": "직원", "부서명": dept, "권한": "총괄" if dept == "전체" else "부서"}
     code = next((d["부서코드"] for d in _rows("departments") if d.get("부서명") == dept), None)
     if code:
         user["부서코드"] = code
     return {"ok": True, "user": user}
+
+
+def logout(me, p):
+    sessions.revoke(p.get("token"))
+    return {"ok": True}
 
 
 def getMe(me, p):
@@ -59,4 +95,4 @@ def getMe(me, p):
     return out
 
 
-ROUTES = {"login": login, "getMe": getMe}
+ROUTES = {"login": login, "logout": logout, "getMe": getMe}

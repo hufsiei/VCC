@@ -72,9 +72,10 @@ async function call(name, payload = {}) {
     }
     const headers = { "Content-Type": "application/json" };
     const me = currentUser();
-    if (me && me.colreg_no) headers["X-User"] = me.colreg_no; // 서버가 누가 불렀는지 안다 (spec 2-1)
+    if (me && me.token) headers["X-Token"] = me.token; // 서버가 토큰으로 누가 불렀는지 안다 (spec 2-1)
     const res = await fetch(`${FN_BASE}/${name}`, {
       method: "POST",
+      keepalive: true, // 로그아웃 직후 화면이 바뀌어도 요청이 끊기지 않게
       headers,
       body: JSON.stringify(payload),
     });
@@ -98,7 +99,12 @@ export const login = async (id, pw) => {
   if (res && res.ok && res.user) sessionStorage.setItem("me", JSON.stringify(res.user));
   return res;
 };
-export const logout = () => sessionStorage.removeItem("me");
+export const logout = () => {
+  // 서버에서 토큰 폐기. call()이 헤더를 먼저 만든 뒤 지우므로 기다리지 않아도 토큰이 실려 간다(화면은 바로 이동).
+  const done = USE_MOCK ? Promise.resolve() : call("logout");
+  sessionStorage.removeItem("me");
+  return done;
+};
 export const getMe = () => call("getMe");
 export const askBoo = (question) => call("askBoo", { question });
 export const interviewNext = (program, answers) => call("interviewNext", { program, answers });

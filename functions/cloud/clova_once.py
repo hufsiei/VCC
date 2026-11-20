@@ -8,6 +8,8 @@
 #   CLOVA_KEY     CLOVA Studio API 키 — 콘솔에만 넣는다. 코드·저장소·채팅·캡처에 쓰지 않는다.
 #   ALLOW_ORIGIN  (선택) CORS를 허용할 화면 origin, 쉼표로 여러 개. 없으면 아래 ALLOWED_ORIGINS
 #                 (GitHub Pages 공개 주소 + 로컬 시연 주소). "*"는 쓰지 않는다(공개 저장소, PRD 9장).
+#   VCC_LOGIN_PW  (login을 배포하는 함수에서) 로그인 비번 표, JSON 문자열 {"H0143":"...","staff01":"..."}.
+#                 CLOVA_KEY와 같은 방식으로 콘솔에만 넣는다(작업 73). 코드·저장소에 쓰지 않는다.
 #   CLOVA_URL     (선택) 없으면 아래 기본값(HCX-005)
 #
 # 설정 근거: HCX 대응 원칙 v2 5절 — Temperature 0, Thinking 끔, Max tokens는 출력 크기에 맞게(30),
@@ -38,7 +40,7 @@ def _cors(args):
     origin = (args.get("__ow_headers") or {}).get("origin", "")  # 웹 액션은 헤더 이름을 소문자로 넘긴다
     headers = {
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, X-User",
+        "Access-Control-Allow-Headers": "Content-Type, X-Token",
         "Access-Control-Max-Age": "600",
         "Vary": "Origin",
     }

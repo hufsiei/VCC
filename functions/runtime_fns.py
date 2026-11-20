@@ -2,7 +2,7 @@
 # 응답 모양은 docs/spec-v1.md 4장. 저장은 store.py만 거친다. AI 없음.
 #
 # 모든 함수 모양: 함수(me, payload) -> dict
-#   me = 요청 헤더 X-User의 colreg_no (local_fn.py가 넣어 준다)
+#   me = 요청 헤더 X-Token을 sessions.resolve()로 바꾼 colreg_no (local_fn.py가 넣어 준다)
 #
 # 다른 작업에서 쓰라고 열어 둔 도우미:
 #   add_question(me, text, ...)    — askBoo가 hold일 때 질문함에 넣기(작업 18)
