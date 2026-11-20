@@ -51,6 +51,7 @@ PROVIDER = {
     "충분판정": "hcx",     # 인터뷰 답이 칸을 채웠나 {"충분":true} — HCX 10/10
     "꼬리질문": "hcx",     # 인터뷰 꼬리 질문 1개 — HCX 9/10
     "요약":     "sonnet",  # 인터뷰 요약 — HCX 0/10(형식 실패), Sonnet 9/10·Opus 9/10
+    "1인칭":    "sonnet",  # 작업 21: 검증된 요약 문장 → 내 경험노트용 1인칭 해라체 (일괄 1회). 미측정, 실패하면 해요체 그대로
     "일치검사": "opus",    # 요약 문장 ↔ 원문 일치 — 만드는 모델(요약=Sonnet)과 검사하는 모델을 분리. Opus 10/10
     "쪽지검사": "hcx",     # 비방 판정 (연락처·학번은 코드 정규식이 먼저) — HCX 10/10
     "문단분류": "sonnet",  # 현장실습 후기 문장 → 칸 {"칸":"업무내용"} — HCX 8/10 미달, Sonnet 9/10
@@ -68,6 +69,7 @@ SETTINGS = {
     "충분판정": {"max_tokens": 30,   "temperature": 0},
     "꼬리질문": {"max_tokens": 100,  "temperature": 0.3},
     "요약":     {"max_tokens": 4000, "effort": "medium"},
+    "1인칭":    {"max_tokens": 3000, "effort": "low"},
     "일치검사": {"max_tokens": 2000, "effort": "medium"},
     "쪽지검사": {"max_tokens": 30,   "temperature": 0},
     "문단분류": {"max_tokens": 2000, "effort": "low"},   # 11/20 Sonnet 측정 설정 그대로
