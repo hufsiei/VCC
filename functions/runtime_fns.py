@@ -8,11 +8,14 @@
 #   add_question(me, text, ...)    — askBoo가 hold일 때 질문함에 넣기(작업 18)
 #   save_my_note(me, ...)          — summarizeInterview가 내 경험노트를 저장할 때(작업 21)
 #   senior_label(viewer, senior)   — recommendSeniors 카드 이름(작업 22). 쪽지창과 같은 값
+# saveConsent → publish_lines: 동의 통과 문장을 noteLines에 쌓고, 후배 질문 답이면 질문 answered + 질문자 알림(작업 74).
+# 노트 읽기(getNote·listNotes)와 askBoo 근거 풀은 notes.py.
 import json
 import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import notes
 import store
 from msg_check import check_message, check_public_text
 
@@ -259,22 +262,80 @@ def saveConsent(me, p):
             removed.add(ch.get("lineId"))
             rejected.append({"lineId": ch.get("lineId"), "reason": r["reasons"][0], "message": r["message"]})
     with store.lock():
-        note = next((v for v in store.load("myNotes", {}).values()
-                     if v["owner"] == me and v["draftId"] == draft_id), None)
-        lines = [ln for sec in (note or {}).get("publicDraft", {}).get("sections", []) for ln in sec.get("lines", [])]
-        added = sum(1 for ln in lines if ln.get("lineId") not in removed)
+        mid, note = next(((k, v) for k, v in store.load("myNotes", {}).items()
+                          if v["owner"] == me and v["draftId"] == draft_id), (None, None))
+        if note is None:   # 남의 초안이거나 없는 초안(spec 2-1)
+            return {"error": "볼 수 없는 기록이에요"}
+        new_text = {c["lineId"]: c for c in changed}
+        passing = []
+        for sec in note.get("publicDraft", {}).get("sections", []):
+            for ln in sec.get("lines", []):
+                if ln.get("lineId") in removed:
+                    continue
+                c = new_text.get(ln.get("lineId"))
+                passing.append({"section": sec.get("name"), "draftLineId": ln.get("lineId"),
+                                "text": c["text"] if c else ln.get("text", ""),
+                                "official": c["official"] if c else bool(ln.get("official")),
+                                **{k: ln[k] for k in ("answersQuestionId", "asked") if ln.get(k)}})
+        added = len(passing)
         store.load("consents", {})[draft_id] = {"owner": me, "at": now(), "removed": sorted(removed),
                                                 "changed": changed, "rejected": rejected, "added": added}
         store.save("consents")
-        if note:
-            note["share"] = "partial" if removed else "shared"
-            store.save("myNotes")
+        nid, answered = publish_lines(me, note["program"], mid, passing)
+        note["share"] = "partial" if removed else "shared"
+        note["noteId"] = nid
+        store.save("myNotes")
         _alert(me, "해봤노트에 반영하고 있어요")
-        # 해봤노트 합성(작업 26)이 noteId를 정한다. 그 전까지는 프로그램 이름으로 돌려준다.
-        out = {"ok": True, "noteId": (note or {}).get("program"), "added": added}
+        out = {"ok": True, "noteId": nid, "added": added, "answered": answered}
         if rejected:
             out["rejected"] = rejected     # 화면은 걸린 문장마다 message를 보여 준다
         return out
+
+
+def publish_lines(me, program, my_note_id, passing):
+    """동의 통과 문장을 runtime/noteLines.json에 쌓는다(작업 26·74, spec 4장 saveConsent).
+    같은 내 경험노트로 다시 동의하면 그 노트의 문장을 이번 범위로 바꾼다(sourceId는 문장마다 유지).
+    answersQuestionId가 붙은 문장이 통과했을 때만 그 질문을 answered로 바꾸고 질문자에게 알린다.
+    칸 이름이 「후배 질문」이라는 이유만으로는 알리지 않는다. 돌려주는 값: (noteId, 이번에 알린 질문 id 목록)"""
+    nid = notes.note_id(program)
+    semester = notes.experience_semester(me, program)
+    with store.lock():
+        questions = {q.get("id"): q for q in store.load("questions", [])}
+
+        def real_question(qid):
+            # 같은 프로그램·남이 한·질문함(hold/answered) 질문만. 화면이 보낸 questionId를 그대로 믿지 않는다.
+            q = questions.get(qid)
+            return bool(q) and q.get("프로그램명") == program and q.get("colreg_no") != me \
+                and q.get("status") in ("hold", "answered")
+
+        rows = store.load("noteLines", [])
+        prev = [r for r in rows if r.get("myNoteId") == my_note_id]
+        prev_sid = {r.get("draftLineId"): r["sourceId"] for r in prev}
+        prev_q = {r.get("answersQuestionId") for r in prev if r.get("answersQuestionId")}
+        at = now()
+        fresh = []
+        for ln in passing:
+            row = {"noteId": nid, "program": program, "section": ln["section"], "text": ln["text"],
+                   "sourceId": prev_sid.get(ln["draftLineId"]) or store.next_id("I"), "semester": semester,
+                   "official": ln["official"], "owner": me, "myNoteId": my_note_id, "draftLineId": ln["draftLineId"], "at": at}
+            if ln.get("asked"):
+                row["asked"] = ln["asked"]
+            if ln.get("answersQuestionId") and real_question(ln["answersQuestionId"]):
+                row["answersQuestionId"] = ln["answersQuestionId"]
+            fresh.append(row)
+        rows[:] = [r for r in rows if r.get("myNoteId") != my_note_id] + fresh
+        store.save("noteLines")
+
+        answered = []
+        for qid in dict.fromkeys(r["answersQuestionId"] for r in fresh if r.get("answersQuestionId")):
+            q = questions[qid]
+            if q["status"] == "hold":
+                q.update(status="answered", noteId=nid, answeredAt=at)
+            if qid not in prev_q:   # 같은 선배가 다시 동의해도 알림은 한 번. 다른 선배가 답하면 또 알린다(A가 쌓임)
+                _alert(q["colreg_no"], f"내 질문에 선배가 답했어요 · {program} 해봤노트", questionId=qid, noteId=nid)
+                answered.append(qid)
+        store.save("questions")
+        return nid, answered
 
 
 def reportStatement(me, p):
@@ -294,7 +355,8 @@ def getInbox(me, p):
         questions = [{"questionId": q["id"], "text": q["질문"], "askedAt": q["at"],
                       "status": "answered" if q["status"] == "answered" else
                                 ("official" if q["status"] == "official" else "waiting"),
-                      **({"noteId": q["noteId"]} if q.get("noteId") else {})}
+                      **({"noteId": q["noteId"]} if q.get("noteId") else {}),
+                      **({"answeredAt": q["answeredAt"]} if q.get("answeredAt") else {})}
                      for q in store.load("questions", []) if q["colreg_no"] == me]
         questions.sort(key=lambda q: (q["status"] != "answered", q["askedAt"]))   # 답변 도착이 맨 위
         alerts = sorted(store.load("alerts", {}).get(me, []), key=lambda a: a["at"], reverse=True)
@@ -310,4 +372,5 @@ ROUTES = {
     "saveConsent": saveConsent,
     "reportStatement": reportStatement,
     "getInbox": getInbox,
+    **notes.ROUTES,      # getNote·listNotes (AI 없음, 작업 26·74)
 }
