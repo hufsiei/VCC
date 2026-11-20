@@ -165,6 +165,11 @@ payload `{draftId, edits:{removed:[lineId], changed:[{lineId, text}]}, consent:t
 ```json
 { "ok": true, "noteId": "N-marburg", "added": 3, "answered": ["Q-0001"] }
 ```
+**[11/20]** `changed`의 문장은 저장 전에 `functions/msg_check.py`의 `check_public_text`로 다시 검사한다(학번·연락처·메일·링크·주소·금지어). **걸린 문장만 공개에서 빼고**(내 경험노트에는 남음) 나머지는 저장하며, 응답에 `rejected`를 붙인다. 화면은 문장마다 `message`를 보여 준다.
+```json
+{ "ok": true, "noteId": "N-marburg", "added": 2,
+  "rejected": [{ "lineId": "L3", "reason": "연락처", "message": "해봤노트에는 연락처·메일·링크·주소를 넣을 수 없어요." }] }
+```
 
 ### listNotes(filter)
 payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"}}`
@@ -226,10 +231,10 @@ payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명
 `hasMore: true`일 때만 화면에 「선배 더 보기」를 두고, `false`면 「비슷한 선배를 모두 보여드렸어요」를 보인다. 시연 mock은 후보가 2명이므로 첫 화면부터 `hasMore: false`다.
 
 ### checkMessage(text)
-payload `{text}`. 연락처·학번은 코드(정규식), 비방은 AI 판정.
+payload `{text}`. 연락처·학번은 코드(정규식), 비방은 AI 판정. **[11/20]** 코드 검사는 `functions/msg_check.py`의 `check_message`(작업 27): 연락처·학번은 `mask.find()`(callAI 마스킹과 같은 규칙)에서 메일만 뺀 것 — 학번(`H`+숫자, 9자리, `staff`)은 `학번`, 전화·한글로 쓴 번호·메신저 아이디·주소(건물번호·동·호)·링크는 `연락처` — 에 금지어(명백한 욕설) `비방`을 더한다. 숫자 8자리 규칙은 쓰지 않는다('2024 2025학년도' 오탐).
 ```json
 { "ok": true }
-{ "ok": false, "reason": "연락처", "message": "전화번호나 학번은 보낼 수 없어요. 이메일은 괜찮아요." }
+{ "ok": false, "reason": "연락처", "message": "전화번호나 SNS 아이디는 보낼 수 없어요. 이메일은 괜찮아요." }
 ```
 reason: `연락처` | `학번` | `비방`
 
