@@ -159,6 +159,8 @@ def call_claude(messages, system, 설정):
     response = client.beta.messages.create(**kwargs)
     if response.stop_reason == "refusal":
         raise RuntimeError("Claude가 요청을 거절했습니다(refusal)")
+    if response.stop_reason == "max_tokens":  # 생각 토큰까지 max_tokens에 들어가므로 잘리면 이유를 남긴다
+        raise RuntimeError(f"max_tokens({kwargs['max_tokens']})에 걸려 답이 잘렸습니다")
     text = "".join(b.text for b in response.content if b.type == "text")
     return text, {"input": response.usage.input_tokens, "output": response.usage.output_tokens}
 
