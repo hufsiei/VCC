@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 OUT = DATA / "usage-log.json"
 KST = timezone(timedelta(hours=9))
-START, END = datetime(2025, 9, 1, tzinfo=KST), datetime(2026, 11, 30, 23, 59, tzinfo=KST)
+START, END = datetime(2025, 9, 1, tzinfo=KST), datetime(2026, 11, 30, 23, 59, 59, tzinfo=KST)
 DEMO = {"H0143", "H0469", "H0745"}          # 시연 인물은 로그에 넣지 않는다(내 보관함이 시연 대본과 섞이지 않게)
 MARBURG = "마르부르크필립스대학교"
 
@@ -97,13 +97,16 @@ def load(name):
     return json.loads((DATA / name).read_text(encoding="utf-8"))
 
 
-def display_name(p, aliases, rnd):
-    """질문에 쓰는 이름: 별칭이 있으면 30% 별칭, ㈜·(유)·[특교원] 같은 꾸밈은 뺀다(학생이 그렇게 쓰지 않음)."""
-    if aliases.get(p) and rnd.random() < 0.3:
-        return rnd.choice(aliases[p])
+def display_name(p, aliases, rnd, field):
+    """질문에 쓰는 이름: 별칭이 있으면 30% 별칭, ㈜·(유)·[특교원] 같은 꾸밈은 뺀다(학생이 그렇게 쓰지 않음).
+    난수는 별칭 유무와 상관없이 같은 횟수만 쓴다(별칭이 늘어도 다른 행이 바뀌지 않게)."""
+    use_alias, k = rnd.random() < 0.3, rnd.random()
+    if aliases.get(p) and use_alias:
+        return aliases[p][int(k * len(aliases[p]))]
     s = re.sub(r"^\[[^\]]+\]\s*", "", p).replace("\xad", "")
     s = re.sub(r"㈜|\(주\)|\(유\)", "", s).strip()
-    if len(s) > 18:   # 긴 비교과 공식 명칭은 학생이 줄여 쓴다: 콜론·꺾쇠·괄호 앞까지
+    if field == "비교과" and len(s) > 18:   # 긴 비교과 공식 명칭은 학생이 줄여 쓴다: 콜론·꺾쇠·괄호 앞까지
+                                            # (교환·인턴은 줄이지 않는다 — 'KOTRA 해외무역관(중남미 권역)'처럼 줄이면 어디인지 모름)
         s = re.split(r"\s*[:<(]", s)[0].strip() or s
     return s
 
@@ -218,7 +221,7 @@ def build(seed=SEED):
         else:                                                    # 분류 안 됨: 프로그램 없음
             text, f2, sec = rnd.choice(UN_OFF if kind == "official" else UN_HOLD)
         if text is None:
-            text = t.format(p=display_name(prog, aliases, rnd))
+            text = t.format(p=display_name(prog, aliases, rnd, field))
         asker = pick_asker(field, prog)
         rows.append({
             "id": None, "at": pick_time(field), "colreg_no": asker["colreg_no"], "crs_nm": asker.get("crs_nm"),
@@ -240,11 +243,17 @@ def build(seed=SEED):
     interviews = []
     mix = ["국제교류"] * 22 + ["현장실습"] * 10 + ["비교과"] * 8
     rnd.shuffle(mix)
+    seen = set()
     for field in mix:
-        prog = pick_program(field, need=lambda p: bool(done[p] - DEMO))
+        while True:                                     # 같은 사람이 같은 프로그램을 두 번 인터뷰하지 않게
+            prog = pick_program(field, need=lambda p: bool(done[p] - DEMO))
+            who = completer(prog)
+            if (who, prog) not in seen:
+                seen.add((who, prog))
+                break
         at = pick_time(field)
         n = rnd.randint(4, 9)
-        interviews.append({"id": None, "at": at, "colreg_no": completer(prog), "프로그램명": prog, "분야": field,
+        interviews.append({"id": None, "at": at, "colreg_no": who, "프로그램명": prog, "분야": field,
                            "문장수": n, "후배질문답": rnd.randint(0, 2)})
     interviews.sort(key=lambda r: r["at"])
     for i, r in enumerate(interviews, 1):
@@ -252,7 +261,7 @@ def build(seed=SEED):
     consents = []
     for r in rnd.sample(interviews, COUNTS["consents"]):
         removed = rnd.choice([0, 0, 0, 1, 1, 2])
-        consents.append({"id": None, "at": r["at"] + timedelta(minutes=rnd.randint(3, 40)), "interviewId": r["id"],
+        consents.append({"id": None, "at": min(r["at"] + timedelta(minutes=rnd.randint(3, 40)), END), "interviewId": r["id"],
                          "colreg_no": r["colreg_no"], "프로그램명": r["프로그램명"],
                          "공개문장수": r["문장수"] - removed, "제외문장수": removed})
     consents.sort(key=lambda r: r["at"])
@@ -308,7 +317,7 @@ def check(log):
     staff = {s["colreg_no"] for s in load("students.json") if not str(s["colreg_no"]).startswith("H")}
     q = log["questions"]
     if json.dumps(build(log["meta"]["seed"]), ensure_ascii=False) != json.dumps(log, ensure_ascii=False):
-        bad.append("같은 seed로 다시 만들면 결과가 다름")
+        bad.append("같은 seed로 다시 만들면 결과가 다름 — data/(programs·evidence 등)가 바뀌었으면 인자 없이 다시 생성")
     want = {"questions": TOTAL, "interviews": COUNTS["interviews"], "consents": COUNTS["consents"],
             "reports": COUNTS["reports"], "requests": COUNTS["requests"]}
     for k, n in want.items():
@@ -366,6 +375,11 @@ def check(log):
     ev_ids = {e["id"] for e in load("evidence.json")}
     if any(r["sourceId"] not in ev_ids for r in log["reports"]):
         bad.append("신고 근거 id가 evidence.json에 없음")
+    if len({(r["colreg_no"], r["프로그램명"]) for r in log["interviews"]}) != len(log["interviews"]):
+        bad.append("같은 사람·같은 프로그램 인터뷰 중복")
+    for k in ("interviews", "consents", "reports", "requests"):
+        if any(not (START.isoformat() <= r["at"] <= END.isoformat()) for r in log[k]):
+            bad.append(f"{k}: 기간 밖 시각")
     iv = {r["id"] for r in log["interviews"]}
     if any(c["interviewId"] not in iv for c in log["consents"]) or len({c["interviewId"] for c in log["consents"]}) != len(log["consents"]):
         bad.append("공개 동의의 인터뷰 id가 없거나 중복")
