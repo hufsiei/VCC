@@ -18,6 +18,8 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
+from mask import mask, mask_messages  # 작업 72: 외부 AI로 나가는 글은 코드가 먼저 가린다(AI에 맡기지 않음)
+
 
 def _load_env():
     """저장소 맨 위의 .env(KEY=값 줄)를 환경변수로 읽는다. 이미 있는 환경변수는 덮지 않는다. 값은 출력하지 않는다."""
@@ -90,6 +92,8 @@ def callAI(작업명, messages, system=None, 측정모델=None, 측정설정=Non
         raise ValueError(f"PROVIDER 표에 없는 작업명: {작업명}")
     모델 = 측정모델 or PROVIDER[작업명]
     설정 = 측정설정 or SETTINGS.get(작업명, {})
+    messages = mask_messages(messages)  # 연락처·메일·학번·링크·주소 → [연락처] 등
+    system = mask(system) if system else system
     시작 = time.time()
     try:
         if 모델 == "hcx":
@@ -223,7 +227,7 @@ def _기록(작업명, 모델, usage, 시작, ok, error=None):
             "ms": int((time.time() - 시작) * 1000), "ok": ok,
         }
         if error:
-            row["error"] = error[:200]
+            row["error"] = mask(error)[:200]  # 오류 문구에 요청 내용이 섞일 수 있어 가린 뒤 자른다
         with LOG_FILE.open("a", encoding="utf-8") as f:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
     except OSError:
