@@ -1,10 +1,10 @@
 # eval_pick.py — 작업 54 askBoo 고르기 정확도 실측 (작성: 미리)
 #
 # 실행:  cd C:\dev\VCC\functions
-#        python eval_pick.py           # 답변 기대 25개 고르기 채점 + 테스트 키 한도 확인
+#        python eval_pick.py           # 답변 기대 40개 고르기 채점 + 테스트 키 한도 확인
 #        python eval_pick.py --no-probe   # 한도 확인(연속 호출) 없이 채점만
 #
-# 기준(작업 54, HCX 원칙 v2 4절): 답변 기대 25개에 askBoo ①② 코드 단계를 그대로 돌리고 ③ 고르기(HCX)만 채점한다.
+# 기준(작업 54, HCX 원칙 v2 4절): 답변 기대 40개(11/20 확정, 처음 11/19는 25개)에 askBoo ①② 코드 단계를 그대로 돌리고 ③ 고르기(HCX)만 채점한다.
 #   정답 = 고른 근거 중 하나라도 '기대 근거ID'에 있으면. 정확도 90% 미만이면 askBoo 고르기를 claude로(PROVIDER 표).
 # 진단 지표(판정에는 쓰지 않음):
 #   엄격     — 고른 근거가 전부 기대 근거ID 안

@@ -1,9 +1,9 @@
-# eval_askboo.py — askBoo 개발 질문 53개 채점 (작업 18 완료 기준)
+# eval_askboo.py — askBoo 개발 질문 70개 채점 (작업 18 완료 기준)
 #
 # 실행:  cd C:\dev\VCC\functions
-#        python eval_askboo.py            # 53개 전부 (HCX 호출, 키는 .env)
+#        python eval_askboo.py            # 70개 전부 (HCX 호출, 키는 .env)
 #        python eval_askboo.py 2 23 30    # 고른 번호만
-# 완료 기준: 보류 18개 전부 hold · 공식안내 10개 전부 official · 답변 25개 전부 ok이고 근거 밖 문장 0건
+# 완료 기준: 보류 20개 전부 hold · 공식안내 10개 전부 official · 답변 40개 전부 ok이고 근거 밖 문장 0건
 # 근거 밖 판정: 답변 문장마다 askboo.verify(문장, 출처 문단 원문)를 다시 돌린다(숫자·영문·고유명사·새 낱말).
 #   폴백 줄(군말만 지운 원문)도 같은 검사를 거친다. 질문함에는 저장하지 않는다(save=False).
 # 결과 전체는 functions/logs/eval-askboo.json (.gitignore 대상)에 남긴다 — 사람이 문장을 직접 훑어보는 용도.
