@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import store
+from mask import find  # 쪽지 검사도 callAI 마스킹과 같은 규칙(작업 72)
 
 KST = timezone(timedelta(hours=9))
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -94,12 +95,16 @@ def _alert(to, text, **extra):
 
 # ---------- 쪽지 ----------
 def checkMessage(me, p):
-    """연락처·학번은 코드가 막는다. 비방 판정(AI)은 작업 27에서 더한다."""
+    """연락처·학번은 코드가 막는다. 비방 판정(AI)은 작업 27에서 더한다.
+    규칙은 mask.find()(callAI 마스킹과 같은 정규식)를 쓰고, 쪽지는 메일을 허용하므로 '메일'만 뺀다(11/20 원우 제안).
+    주소(건물번호·동·호)·링크도 연락 수단이라 '연락처'로 막는다. find가 못 잡는 직원 계정(staff01)과
+    숫자 8자리 이상(구분자 사이)은 예전 규칙을 보조로 남긴다."""
     text = p.get("text", "")
-    if re.search(r"\b(H\d{4}|staff\d+)\b", text, re.I):
+    kinds = {k for k, _a, _b, _s in find(text)} - {"메일"}
+    if "학번" in kinds or re.search(r"(?<![A-Za-z0-9])staff\d+", text, re.I):
         return {"ok": False, "reason": "학번", "message": "학번은 보낼 수 없어요."}
-    if re.search(r"\d{8,}", re.sub(r"[\s\-.]", "", text)):
-        return {"ok": False, "reason": "연락처", "message": "전화번호나 학번은 보낼 수 없어요. 이메일은 괜찮아요."}
+    if kinds & {"연락처", "주소", "링크"} or re.search(r"\d{8,}", re.sub(r"[\s\-.]", "", text)):
+        return {"ok": False, "reason": "연락처", "message": "전화번호·주소·링크는 보낼 수 없어요. 이메일은 괜찮아요."}
     return {"ok": True}
 
 
