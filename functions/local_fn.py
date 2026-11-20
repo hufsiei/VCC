@@ -5,7 +5,7 @@
 # 키(CLOVA_KEY, ANTHROPIC_API_KEY)는 저장소 맨 위 .env에서 ai.py가 읽는다(이미 있는 환경변수가 먼저).
 #
 # 주소: POST http://localhost:8787/<함수 이름>   (예: /sendMessage)
-#   - 로그인한 사용자는 헤더 X-User(colreg_no)로 받는다. data.js가 붙여 준다.
+#   - 로그인한 사용자는 헤더 X-Token으로 받는다(data.js가 붙여 준다). sessions.resolve()가 colreg_no로 바꾼다(작업 73).
 #   - 쓰기 기록(쪽지·질문함·동의·신고)은 runtime_fns.py → store.py → data/runtime/*.json (spec 2-1)
 #   - 경로 없이 POST / 는 연결 확인용 AI 연습 호출(그대로 둠)
 #
@@ -16,6 +16,7 @@ from urllib.parse import unquote
 
 import account
 import limits
+import sessions
 from askboo import askBoo
 from interview import interviewNext, summarizeInterview
 from runtime_fns import ROUTES
@@ -41,7 +42,7 @@ def practice(question):
 class Handler(BaseHTTPRequestHandler):
     def cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-User")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Token")
 
     def do_OPTIONS(self):
         self.send_response(204); self.cors(); self.end_headers()
@@ -53,7 +54,8 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             return self.reply({"error": "요청 형식이 JSON이 아니에요"})
         name = unquote(self.path.split("?")[0].strip("/"))
-        me = (self.headers.get("X-User") or "").strip()
+        token = (self.headers.get("X-Token") or "").strip()
+        me = sessions.resolve(token)
 
         if name in ("", "연습"):
             return self.reply(practice(payload.get("question", "안녕하세요?")))
@@ -62,10 +64,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply({"error": f"아직 서버에 없는 함수예요: {name}"})
         if not me and name not in NEEDS_NO_LOGIN:
             return self.reply({"error": "로그인이 필요해요"})
-        if name in AI_ROUTES:
+        if name in AI_ROUTES:   # 순서: 토큰 확인(위) → 전역 상한 → 사용자별 한도 (limits.check가 이 순서로 본다)
             over = limits.check(me)
             if over:
                 return self.reply(over)
+        if name == "logout":   # 폐기할 토큰은 헤더의 것만 쓴다(본문 값은 믿지 않는다)
+            payload = {**payload, "token": token}
         try:
             self.reply(fn(me, payload))
         except Exception as e:   # 시연 중 서버가 죽지 않게
@@ -78,7 +82,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers(); self.wfile.write(b)
 
     def log_message(self, fmt, *args):   # 요청 로그를 한 줄로
-        print(f"{self.command} {unquote(self.path)} ({self.headers.get('X-User', '-')})")
+        print(f"{self.command} {unquote(self.path)} ({'로그인' if self.headers.get('X-Token') else '-'})")
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ def _cors(args):
     origin = (args.get("__ow_headers") or {}).get("origin", "")  # 웹 액션은 헤더 이름을 소문자로 넘긴다
     headers = {
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, X-User",
+        "Access-Control-Allow-Headers": "Content-Type, X-Token",
         "Access-Control-Max-Age": "600",
         "Vary": "Origin",
     }
