@@ -2,11 +2,109 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>로그인 · 외대人사이드</title>
 <link rel="stylesheet" href="../../common/style.css">
+<style>
+  /* 로그인 화면 배치용. 색은 style.css 변수만 쓴다. */
+  .login { display: flex; flex-direction: column; gap: var(--space-lg); padding-top: var(--space-xl); }
+  .login__brand { display: flex; align-items: center; justify-content: center; gap: var(--space-sm);
+                  color: var(--color-hufs-navy); font-size: 20px; font-weight: 700; }
+  .login__brand img { width: 28px; height: 28px; object-fit: contain; }
+  .login__hero { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); text-align: center; }
+  .login__form { display: flex; flex-direction: column; gap: var(--space-md); }
+  .login__note { display: flex; justify-content: center; }
+</style>
 </head>
 <body>
-<div class="app"></div>
+<div class="app">
+  <main class="page login">
+    <div class="login__brand">
+      <img src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
+      외대人사이드
+    </div>
+
+    <div class="login__hero">
+      <img class="boo-illust" src="../../assets/boo-portrait.png" alt="BOO">
+      <h1 class="page-title">먼저 해 본 선배를 만나요</h1>
+      <p class="sub">BOO가 선배의 경험을 모아 노트로 쌓고, 궁금한 후배와 이어 드려요.</p>
+    </div>
+
+    <form class="login__form" id="form" novalidate>
+      <div class="field">
+        <label class="field__label" for="id">학번</label>
+        <input class="input" id="id" name="id" autocomplete="username" autocapitalize="characters" spellcheck="false" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="pw">비밀번호</label>
+        <input class="input" id="pw" name="pw" type="password" autocomplete="current-password" required aria-describedby="error">
+        <p class="field__error" id="error" role="alert" hidden><i data-lucide="circle-alert" class="icon"></i><span id="errorText"></span></p>
+      </div>
+      <button class="btn btn--primary btn--block" id="submit" type="submit">로그인</button>
+    </form>
+
+    <div class="login__note">
+      <span class="status-label status-label--info"><i data-lucide="info" class="icon"></i>가상 데이터로 만든 시연용 화면이에요</span>
+    </div>
+  </main>
+</div>
+
+<script src="../../assets/lucide/lucide.min.js"></script>
+<script type="module">
+  import { login, currentUser } from "../../common/data.js";
+
+  lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
+
+  // 직원 계정은 PC 관리자 콘솔로, 학생은 인터BOO로 (PRD 4장)
+  const destination = (user) => (user.status === "직원" ? "../admin/" : "../talk/");
+
+  // 이 탭에서 이미 로그인했으면 바로 이동 (sessionStorage — 탭마다 따로)
+  const me = currentUser();
+  if (me) location.replace(destination(me));
+
+  const form = document.getElementById("form");
+  const idInput = document.getElementById("id");
+  const pwInput = document.getElementById("pw");
+  const submit = document.getElementById("submit");
+  const error = document.getElementById("error");
+  const errorText = document.getElementById("errorText");
+
+  // input이 null이면 두 칸 모두 오류 표시(어느 쪽이 틀렸는지 알려 주지 않음)
+  function showError(message, input) {
+    errorText.textContent = message; // 화면 글은 textContent로만(XSS 방지)
+    error.hidden = false;
+    for (const el of [idInput, pwInput]) {
+      el.setAttribute("aria-invalid", String(input === null || el === input));
+    }
+    (input || pwInput).focus();
+  }
+
+  function clearError() {
+    error.hidden = true;
+    idInput.removeAttribute("aria-invalid");
+    pwInput.removeAttribute("aria-invalid");
+  }
+
+  idInput.addEventListener("input", clearError);
+  pwInput.addEventListener("input", clearError);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const id = idInput.value.trim();
+    const pw = pwInput.value;
+    if (!id) return showError("학번을 입력해 주세요.", idInput);
+    if (!pw) return showError("비밀번호를 입력해 주세요.", pwInput);
+
+    submit.disabled = true;
+    submit.textContent = "확인하는 중…";
+    const res = await login(id, pw);
+    submit.disabled = false;
+    submit.textContent = "로그인";
+
+    if (res.error) return showError(res.error, null);
+    if (!res.ok) return showError(res.reason || "아이디 또는 비밀번호가 맞지 않아요.", null);
+    location.replace(destination(res.user));
+  });
+</script>
 </body>
 </html>

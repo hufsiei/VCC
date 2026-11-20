@@ -713,3 +713,292 @@ button { font: inherit; color: inherit; }
   font-size: var(--font-size-secondary);
   box-shadow: var(--shadow-float);
 }
+
+/* ===================================================================
+   [추가 부품 — 작업 20, 11/20] 로그인·인터BOO에서 쓰는 공통 부품
+   =================================================================== */
+
+/* ---------- 화면 상단 안내 — 7-① (제목 + 설명 1줄 + BOO 96px) ---------- */
+
+.page-intro { display: flex; align-items: center; gap: var(--space-md); }
+.page-intro__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-xs); }
+/* BOO 원본은 흰 원 안에(2-2: 배경을 투명이라 가정하지 않음) */
+.boo-illust {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  object-fit: contain;
+}
+.boo-illust--sm { width: 80px; height: 80px; }
+
+/* ---------- 입력창·폼 — 5-9 ---------- */
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+/* 라벨은 입력창 위 14px 600(placeholder로 대신하지 않음) */
+.field__label { font-size: var(--font-size-secondary); font-weight: 600; color: var(--color-text); }
+.input {
+  width: 100%;
+  height: var(--button-height);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-body);
+}
+.input::placeholder { color: var(--color-text-muted); }
+/* 포커스: 2px NAVY 테두리 */
+.input:focus { outline: none; border-color: var(--color-hufs-navy); box-shadow: 0 0 0 1px var(--color-hufs-navy); }
+/* 오류: 2px 오류색 테두리 + 아래 14px 문구와 아이콘 */
+.input[aria-invalid="true"] { border-color: var(--status-error-fg); box-shadow: 0 0 0 1px var(--status-error-fg); }
+.field__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-secondary);
+  color: var(--status-error-fg);
+}
+.field__error .icon { width: 14px; height: 14px; }
+
+/* ---------- 세그먼트 — 7-① 들려주기 / 물어보기 ---------- */
+
+/* 트랙 NEUTRAL BG, 선택된 쪽은 흰 알약 + NAVY 글자 + 그림자 */
+.segment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--color-neutral-bg);
+}
+.segment__btn {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+.segment__btn[aria-selected="true"] {
+  background: var(--color-surface);
+  color: var(--color-hufs-navy);
+  box-shadow: var(--shadow-card);
+}
+
+/* ---------- 노트 틀 진행 칩 — 5-7 (번호 없음, 가로 스크롤) ---------- */
+
+.progress-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: var(--space-xs);
+  scrollbar-width: none;
+}
+.progress-chips::-webkit-scrollbar { display: none; }
+.progress-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.progress-chip .icon { width: 14px; height: 14px; }
+/* 채워짐: SOFT MINT + HUFS GREEN + ✓ */
+.progress-chip--filled { border-color: transparent; background: var(--color-ai-bg); color: var(--color-ai); }
+/* 지금 질문 중: NAVY + 흰 글자 */
+.progress-chip--current { border-color: transparent; background: var(--color-hufs-navy); color: var(--color-on-primary); }
+/* 「후배 질문 1」 작은 배지 */
+.progress-chip__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-soft-blue);
+  color: var(--color-hufs-navy);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.progress-chip--current .progress-chip__badge { background: var(--color-surface); }
+
+/* ---------- 선택형 칩 — 5-6 키워드 칩 ---------- */
+
+.choice-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;            /* 터치 영역 44px(4-3) */
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+.choice-chip[aria-pressed="true"] { border-color: transparent; background: var(--color-hufs-navy); color: var(--color-on-primary); }
+.choice-list { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); }
+
+/* ---------- 채팅 입력줄 — 5-8 (입력 48px + 전송 40px 원형 NAVY) ---------- */
+
+.composer { display: flex; align-items: center; gap: var(--space-sm); }
+.composer .input { flex: 1; }
+.send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;                  /* 원 40px + 터치 여유 */
+  height: 44px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  background-clip: content-box;
+  color: var(--color-on-primary);
+  cursor: pointer;
+}
+.send-btn .icon { width: 20px; height: 20px; }
+.send-btn:disabled { background-color: var(--color-neutral-bg); color: var(--color-text-disabled); cursor: not-allowed; }
+
+/* 화면 아래 고정 영역: 하단 탭 위(1단계) 또는 맨 아래(2단계 --bottom) */
+.dock {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px));
+  z-index: 9;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: var(--content-max-width);
+  padding: var(--space-sm) 12px;
+  background: var(--color-background);
+  border-top: 1px solid var(--color-border);
+}
+.dock--bottom {
+  bottom: 0;
+  padding-bottom: calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---------- AI 요약 바 — 7-① (들려주기에만) ---------- */
+
+.summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-height: 44px;
+  padding: 0 6px 0 12px;
+  border-radius: var(--radius-card);
+  background: var(--color-ai-bg);
+}
+.summary-bar__text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ai);
+  font-size: var(--font-size-secondary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.summary-bar__text .icon { width: 16px; height: 16px; }
+/* 「AI 요약」 버튼: 32px 알약, NAVY + 흰 글자 14px 600 */
+.summary-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--font-size-secondary);
+  font-weight: 600;
+  cursor: pointer;
+}
+.summary-bar__btn .icon { width: 14px; height: 14px; }
+.summary-bar__btn:disabled { background: var(--color-neutral-bg); color: var(--color-text-disabled); cursor: not-allowed; }
+
+/* ---------- 요약 카드 — 7-② (머리 띠 SOFT MINT + 흰 본문) ---------- */
+
+.summary-card {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.summary-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 12px var(--space-md);
+  background: var(--color-ai-bg);
+  color: var(--color-ai);
+  font-size: var(--font-size-secondary);
+  font-weight: 600;
+}
+.summary-card__head .icon { width: 16px; height: 16px; }
+.summary-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: 12px var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+.summary-card__head + .summary-row { border-top: 0; }
+.summary-row__name { font-size: var(--font-size-caption); font-weight: 600; color: var(--color-text-muted); }
+.summary-row__empty { color: var(--color-text-muted); }
+
+/* ---------- 토스트 자리 — 5-10 (하단 탭 위 16px, 3초) ---------- */
+
+.toast-host {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px) + var(--space-md));
+  z-index: 30;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  width: calc(100% - 2 * var(--page-gutter));
+  max-width: calc(var(--content-max-width) - 2 * var(--page-gutter));
+  pointer-events: none;
+}
+.toast-host:empty { display: none; }
+
+/* ---------- 스켈레톤 — 6-3 ---------- */
+
+.skeleton {
+  border-radius: var(--radius-card);
+  background: var(--color-neutral-bg);
+  animation: skeleton 1.4s infinite ease-in-out;
+}
+@keyframes skeleton {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+
+/* 같은 html 안에서 화면(1단계·2단계)을 바꿀 때 쓰는 숨김 */
+[hidden] { display: none !important; }
