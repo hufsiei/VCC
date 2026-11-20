@@ -10,11 +10,11 @@
 #   senior_label(viewer, senior)   — recommendSeniors 카드 이름(작업 22). 쪽지창과 같은 값
 import json
 import random
-import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import store
+from msg_check import check_message, check_public_text
 
 KST = timezone(timedelta(hours=9))
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -94,13 +94,9 @@ def _alert(to, text, **extra):
 
 # ---------- 쪽지 ----------
 def checkMessage(me, p):
-    """연락처·학번은 코드가 막는다. 비방 판정(AI)은 작업 27에서 더한다."""
-    text = p.get("text", "")
-    if re.search(r"\b(H\d{4}|staff\d+)\b", text, re.I):
-        return {"ok": False, "reason": "학번", "message": "학번은 보낼 수 없어요."}
-    if re.search(r"\d{8,}", re.sub(r"[\s\-.]", "", text)):
-        return {"ok": False, "reason": "연락처", "message": "전화번호나 학번은 보낼 수 없어요. 이메일은 괜찮아요."}
-    return {"ok": True}
+    """학번·연락처·금지어는 코드 규칙(msg_check.py, 작업 27)이 막는다. 메일은 허용.
+    비방 AI 판정(P1, callAI("쪽지검사"))은 이 규칙을 통과한 쪽지에만 이어서 붙인다."""
+    return check_message(p.get("text", ""))
 
 
 def previewNickname(me, p):
@@ -251,20 +247,34 @@ def saveConsent(me, p):
     draft_id = p.get("draftId")
     edits = p.get("edits") or {}
     removed = set(edits.get("removed") or [])
+    # 선배가 고친 문장은 해봤노트에 실리기 전에 다시 검사한다(msg_check.check_public_text, 작업 27).
+    # 걸린 문장만 공개에서 빼고(removed에 더함) 나머지는 그대로 저장한다. 내 경험노트에는 남는다.
+    changed, rejected = [], []
+    for ch in edits.get("changed") or []:
+        r = check_public_text(ch.get("text", ""))
+        if r["ok"]:
+            changed.append({"lineId": ch.get("lineId"), "text": ch.get("text", ""),
+                            "identifying": r["identifying"], "official": r["official"]})
+        else:
+            removed.add(ch.get("lineId"))
+            rejected.append({"lineId": ch.get("lineId"), "reason": r["reasons"][0], "message": r["message"]})
     with store.lock():
         note = next((v for v in store.load("myNotes", {}).values()
                      if v["owner"] == me and v["draftId"] == draft_id), None)
         lines = [ln for sec in (note or {}).get("publicDraft", {}).get("sections", []) for ln in sec.get("lines", [])]
         added = sum(1 for ln in lines if ln.get("lineId") not in removed)
         store.load("consents", {})[draft_id] = {"owner": me, "at": now(), "removed": sorted(removed),
-                                                "changed": edits.get("changed") or [], "added": added}
+                                                "changed": changed, "rejected": rejected, "added": added}
         store.save("consents")
         if note:
             note["share"] = "partial" if removed else "shared"
             store.save("myNotes")
         _alert(me, "해봤노트에 반영하고 있어요")
         # 해봤노트 합성(작업 26)이 noteId를 정한다. 그 전까지는 프로그램 이름으로 돌려준다.
-        return {"ok": True, "noteId": (note or {}).get("program"), "added": added}
+        out = {"ok": True, "noteId": (note or {}).get("program"), "added": added}
+        if rejected:
+            out["rejected"] = rejected     # 화면은 걸린 문장마다 message를 보여 준다
+        return out
 
 
 def reportStatement(me, p):

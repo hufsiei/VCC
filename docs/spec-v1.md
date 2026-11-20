@@ -165,6 +165,11 @@ payload `{draftId, edits:{removed:[lineId], changed:[{lineId, text}]}, consent:t
 ```json
 { "ok": true, "noteId": "N-marburg", "added": 3, "answered": ["Q-0001"] }
 ```
+**[11/20]** `changed`의 문장은 저장 전에 `functions/msg_check.py`의 `check_public_text`로 다시 검사한다(학번·연락처·메일·링크·주소·금지어). **걸린 문장만 공개에서 빼고**(내 경험노트에는 남음) 나머지는 저장하며, 응답에 `rejected`를 붙인다. 화면은 문장마다 `message`를 보여 준다.
+```json
+{ "ok": true, "noteId": "N-marburg", "added": 2,
+  "rejected": [{ "lineId": "L3", "reason": "연락처", "message": "해봤노트에는 연락처·메일·링크·주소를 넣을 수 없어요." }] }
+```
 
 ### listNotes(filter)
 payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"}}`
