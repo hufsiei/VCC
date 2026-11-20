@@ -15,6 +15,7 @@
     docs/tasks.json     { generatedAt, source, tasks[], notices[], roles[], journals[] }  (커밋 대상)
     docs/hub-data.json  위 내용 + 기준 문서 전문 + 최근 커밋 40개 묶음 (커밋하지 않음, 팀 문서함에 「자료 올리기」)
 작업내역을 고치거나 작업일지가 올라오면 다시 실행하고 커밋한다(작업 49와 함께, 하루 끝에).
+공개 저장소용 필터(메일·연락처·함수 주소·내부 메모)는 mask_private()에 있고 `--test`로 자가 점검한다.
     docs/tasks.json은 커밋한다. 작업일지는 출력에서 「덮어씀」「새 파일」로 나온 것만 내용을 확인하고 함께 커밋한다(아니면 git restore).
 담당: 미리(이 스크립트만 tools/ 안에서 미리가 관리한다).
 """
@@ -90,12 +91,46 @@ def download_xlsx():
     name = urllib.parse.unquote(m.group(1)) if m else "@VCC작업내역(공유 링크).xlsx"
     return name, io.BytesIO(data)
 
-# 저장소가 공개이므로 개인 연락처는 내보내기 전에 가린다(학교 공용 @hufs.ac.kr 주소는 유지).
-_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@(?![A-Za-z0-9.-]*hufs\.ac\.kr\b)[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+# ---- 공개용 필터 -------------------------------------------------------------
+# 저장소가 공개(GitHub Pages)라 tasks.json·작업일지는 누구나 읽는다. 내보내기 전에 아래를 가린다.
+#   ① 메일 주소 전부(학교 공용 eac@hufs.ac.kr도 GitHub 소유·결제 계정이라 가린다)
+#   ② 휴대폰 번호
+#   ③ 서버 함수 공개 주소(API Gateway) — 호출 주소는 코드·캡처에만
+#   ④ 내부용 문장: 결제·계정·모델 평가 같은 팀 안에서만 할 말이 든 줄은 그 줄만 지운다
+# 규칙을 바꾸면 `python -X utf8 tools/export_tasks.py --test`로 확인한다.
+_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _PHONE = re.compile(r"01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}")
+_GATEWAY = re.compile(r"https?://[A-Za-z0-9.-]*apigw\.ntruss\.com[^\s)\]'\"]*")
+_INTERNAL = re.compile(r"멍청|결제|Sub ?Account|서브 ?계정|크레딧은 제|제 계정으로", re.I)
+_REPLACED_LINE = "(내부 메모 생략)"
 
 def mask_private(s):
-    return _PHONE.sub("(연락처 생략)", _EMAIL.sub("(개인 메일 생략)", s))
+    s = _GATEWAY.sub("(함수 주소 생략)", s)
+    s = _PHONE.sub("(연락처 생략)", _EMAIL.sub("(메일 생략)", s))
+    out, dropped = [], False
+    for ln in s.split("\n"):
+        if _INTERNAL.search(ln):
+            if not dropped: out.append(_REPLACED_LINE)   # 연속으로 지운 줄은 한 번만 표시
+            dropped = True
+        else:
+            out.append(ln); dropped = False
+    return "\n".join(out)
+
+def _self_test():
+    cases = [
+        ("저장소를 eac@hufs.ac.kr 계정에 만들고", "저장소를 (메일 생략) 계정에 만들고"),
+        ("문의 someone@example.com / 010-1234-5678", "문의 (메일 생략) / (연락처 생략)"),
+        ("주소 https://x1ey63q7ei.apigw.ntruss.com/vcc-api/dev/hello 확인", "주소 (함수 주소 생략) 확인"),
+        ("A줄\n클로바가 멍청해서 범위를 줄였어요\n결제는 제가 할게요\nB줄", "A줄\n(내부 메모 생략)\nB줄"),
+        ("두 분을 서브 계정(Sub Account)으로 등록", "(내부 메모 생략)"),
+        ("CLOVA Studio 주소 https://clovastudio.stream.ntruss.com/v3 유지", "CLOVA Studio 주소 https://clovastudio.stream.ntruss.com/v3 유지"),
+        ("평범한 줄은 그대로", "평범한 줄은 그대로"),
+        ("login·getMe(비번은 응답에서 제외)", "login·getMe(비번은 응답에서 제외)"),   # 기능 설명은 지우지 않는다
+    ]
+    bad = [(i, o, mask_private(i)) for i, o in cases if mask_private(i) != o]
+    for i, o, got in bad: print("FAIL\n  in  :", repr(i), "\n  want:", repr(o), "\n  got :", repr(got))
+    print("export filter self-test:", "OK %d/%d" % (len(cases) - len(bad), len(cases)) if not bad else "FAILED")
+    sys.exit(1 if bad else 0)
 
 def cell(v):
     return mask_private(_cell(v))
@@ -218,4 +253,5 @@ def main():
     print("wrote", bdst, "%.0f KB" % (os.path.getsize(bdst) / 1024), "head", sha, "-> 팀 문서함 > 새 가이드 만들기 > 「자료 올리기」로 올리세요")
 
 if __name__ == "__main__":
+    if "--test" in sys.argv: _self_test()
     main()
