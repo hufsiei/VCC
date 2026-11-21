@@ -18,24 +18,14 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
+import paths
 from mask import mask, mask_messages  # 작업 72: 외부 AI로 나가는 글은 코드가 먼저 가린다(AI에 맡기지 않음)
 
 
 def _load_env():
-    """저장소 맨 위의 .env(KEY=값 줄)를 환경변수로 읽는다. 이미 있는 환경변수는 덮지 않는다. 값은 출력하지 않는다."""
-    path = Path(__file__).resolve().parent.parent / ".env"
-    try:
-        lines = path.read_text(encoding="utf-8-sig").splitlines()
-    except OSError:
-        return
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if k and v and k not in os.environ:
-            os.environ[k] = v
+    """.env(KEY=값 줄)를 환경변수로 읽는다. 이미 있는 환경변수는 덮지 않는다. 값은 출력하지 않는다.
+    worktree에서 돌려도 본 저장소(C:\\dev\\VCC)의 .env를 읽는다(paths.py, 11/21)."""
+    paths.load_env()
 
 
 _load_env()
@@ -80,7 +70,7 @@ SETTINGS = {
 CLOVA_URL = os.environ.get("CLOVA_URL", "https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-005")
 CLAUDE_MODELS = {"sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", CLAUDE_MODELS["sonnet"])   # PROVIDER·측정모델이 "claude"일 때
-LOG_FILE = Path(__file__).parent / "logs" / "ai-calls.jsonl"   # .gitignore 대상
+LOG_FILE = paths.LOGS / "ai-calls.jsonl"   # .gitignore 대상. worktree에서 돌려도 본 저장소에 쌓인다(paths.py)
 
 
 # ── 3. 관문 ───────────────────────────────────────────────────────
@@ -240,7 +230,7 @@ def _모델ID(모델):
 def _기록(작업명, 모델, usage, 시작, ok, error=None):
     """호출 한 건마다 한 줄. 작업 55(질문 1건당 원가·운영비)와 작업 30(모델 비교)의 재료. 실패면 이유도(키는 담기지 않음)."""
     try:
-        LOG_FILE.parent.mkdir(exist_ok=True)
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
         row = {
             "at": datetime.now().isoformat(timespec="seconds"),
             "작업": 작업명, "모델": "HCX-005" if 모델 == "hcx" else _모델ID(모델),

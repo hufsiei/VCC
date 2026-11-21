@@ -53,7 +53,8 @@ def main(only):
     hit = {k: sum(1 for x in results if x["기대"] == v and x["결과"].get("status") == v) for k, v in EXPECT.items()}
     print(f"\n답변 {hit['답변']}/{n['답변']} · 보류 {hit['보류']}/{n['보류']} · 공식안내 {hit['공식안내']}/{n['공식안내']}"
           f" · 근거 밖 의심 문장 {outside}건 · 원문 폴백 {fallbacks}줄")
-    out = Path(__file__).parent / "logs" / "eval-askboo.json"
+    import paths
+    out = paths.LOGS / "eval-askboo.json"   # 본 저장소 logs(paths.py)
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     sys.exit(1 if wrong or outside else 0)

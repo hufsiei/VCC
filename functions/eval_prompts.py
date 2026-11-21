@@ -137,7 +137,8 @@ def run(kinds, model):
         summary[kind] = s
         report[kind] = rows
         print(f"== {kind}: {s}\n")
-    out = HERE / "logs" / f"eval-prompts-{model}.json"
+    import paths
+    out = paths.LOGS / f"eval-prompts-{model}.json"   # 본 저장소 logs(paths.py)
     out.parent.mkdir(exist_ok=True)
     old = json.loads(out.read_text(encoding="utf-8")) if out.exists() else {"결과": {}, "합계": {}}
     old["결과"].update(report)

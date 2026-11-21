@@ -5,6 +5,7 @@
 #                          students.json의 비번 열은 읽지 않는다. 로그인 전이라 me는 비어 있다.
 #   logout(me, {token})  — 토큰을 폐기한다.
 #   getMe(me, {})        — 내 학생 행(번호·비번 제외) + 이수 기록 3종(시트 헤더 그대로, 본문 칸 제외)
+import paths
 import json
 import re
 import os
@@ -26,16 +27,8 @@ _cache = {}
 
 
 def _load_env():
-    """저장소 맨 위의 .env(KEY=값 줄)를 환경변수로 읽는다(ai.py와 같은 규칙). 이미 있는 환경변수는 덮지 않는다."""
-    try:
-        text = (DATA.parent / ".env").read_text(encoding="utf-8")
-    except OSError:
-        return
-    for line in text.splitlines():
-        k, sep, v = line.strip().partition("=")
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if sep and k and v and not k.startswith("#") and k not in os.environ:
-            os.environ[k] = v
+    """.env를 환경변수로 읽는다(ai.py와 같은 규칙 — paths.load_env, worktree면 본 저장소의 .env도)."""
+    paths.load_env()
 
 
 _load_env()
