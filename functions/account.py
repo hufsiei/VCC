@@ -42,7 +42,8 @@ _load_env()
 
 
 def _passwords():
-    """VCC_LOGIN_PW(JSON 문자열)를 {학번: 비번}으로. 없거나 형식이 틀리면 빈 표(아무도 로그인 못 함)."""
+    """VCC_LOGIN_PW(JSON 문자열)를 {학번: 비번}으로. "*"는 학생 전원의 공용 비번(개별 항목이 우선, 직원에는 적용 안 됨).
+    없거나 형식이 틀리면 빈 표(아무도 로그인 못 함)."""
     try:
         pw = json.loads(os.environ.get("VCC_LOGIN_PW") or "{}")
     except ValueError:
@@ -76,7 +77,10 @@ def _normalize_id(s):
 def login(me, p):
     uid = _normalize_id(p.get("id"))
     row = student(uid)
-    expected = _passwords().get(uid)
+    table = _passwords()
+    expected = table.get(uid)
+    if expected is None and uid.startswith("H"):   # 학생은 공용 비번("*")으로도 로그인. 직원은 반드시 개별 항목
+        expected = table.get("*")
     if not row or expected is None or str(p.get("pw") or "") != str(expected):
         return FAIL
     token = sessions.issue(uid)
