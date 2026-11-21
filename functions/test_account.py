@@ -22,6 +22,8 @@ def check(label, ok):
 
 r = account.login("", {"id": "H0143", "pw": "test-pw"})
 check("맞는 비번 → ok+token", r.get("ok") is True and r["user"].get("token") and sessions.resolve(r["user"]["token"]) == "H0143")
+r2 = account.login("", {"id": "h0143", "pw": "test-pw"})
+check("소문자 h0143도 ok, user.colreg_no는 H0143", r2.get("ok") is True and r2["user"]["colreg_no"] == "H0143")
 check("틀린 비번 → FAIL", account.login("", {"id": "H0143", "pw": "1"}) == account.FAIL)
 # H0469는 students.json에 있지만 VCC_LOGIN_PW에는 없다 → 거절
 check("표에 없는 학번 → FAIL", account.login("", {"id": "H0469", "pw": "1"}) == account.FAIL)
@@ -32,6 +34,8 @@ check("행의 비번 필드는 무시 → FAIL", account.login("", {"id": "H0469
 account.student = _orig
 check("없는 학번 → FAIL", account.login("", {"id": "H9999", "pw": "test-pw"}) == account.FAIL)
 check("빈 비번 → FAIL", account.login("", {"id": "H0143", "pw": ""}) == account.FAIL)
+s0 = account.login("", {"id": "STAFF01", "pw": "staff-pw"})
+check("대문자 STAFF01도 ok, colreg_no는 staff01", s0.get("ok") is True and s0["user"]["colreg_no"] == "staff01")
 s = account.login("", {"id": "staff01", "pw": "staff-pw"})
 check("직원 로그인 → token 포함", s.get("ok") is True and s["user"].get("token") and s["user"]["status"] == "직원")
 check("응답에 비번 없음", "비번" not in json.dumps(r, ensure_ascii=False) and "test-pw" not in json.dumps(r))
