@@ -8,9 +8,13 @@
 #   1) 세션을 열 때마다 C:\dev\VCC를 pull — main이고 고친 파일이 없을 때만(--ff-only). 아니면 건너뛰고 이유만 알린다.
 #   2) 그날 첫 세션에만 상태 한 줄: main 최신 여부 · 남은 작업 폴더(VCC-*) · 열린 PR · .env 키 개수(값은 읽어도 출력 안 함)
 # 출력: {"systemMessage": 사람에게 보일 한 줄, "hookSpecificOutput": {"additionalContext": Claude에게 줄 같은 내용}}
+#   VS Code 패널은 systemMessage를 화면에 띄우지 않으므로(11/21 확인) Windows 알림(풍선)으로도 띄우고,
+#   Claude에게는 "첫 답변 맨 위에 이 줄을 보여 주라"고 함께 전한다.
+# 다시 보기: python -X utf8 C:/dev/VCC/.claude/hooks/session_start.py --force  (그날 이미 봤어도 상태 한 줄)
 # 실패해도 세션을 막지 않는다(항상 종료코드 0).
 import json
 import subprocess
+import sys as _sys
 import sys
 from datetime import date
 from pathlib import Path
@@ -69,6 +73,23 @@ def status_bits():
     return bits
 
 
+def notify(text):
+    """Windows 알림(풍선). 기다리지 않도록 별도 PowerShell을 띄우고 바로 돌아온다. 실패해도 무시."""
+    if not _sys.platform.startswith("win"):
+        return
+    safe = text.replace("'", "''")
+    ps = ("Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; "
+          "$n = New-Object System.Windows.Forms.NotifyIcon; $n.Icon = [System.Drawing.SystemIcons]::Information; "
+          f"$n.Visible = $true; $n.BalloonTipTitle = 'VCC'; $n.BalloonTipText = '{safe}'; "
+          "$n.ShowBalloonTip(10000); Start-Sleep -Seconds 10; $n.Dispose()")
+    try:
+        subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        pass
+
+
 def main():
     if not (REPO / ".git").exists():
         return                                   # 이 PC에 저장소가 없으면 아무것도 안 함
@@ -78,7 +99,8 @@ def main():
         msg, changed = f"pull 건너뜀({type(e).__name__})", False
 
     today = date.today().isoformat()
-    first = not STAMP.exists() or STAMP.read_text(encoding="utf-8").strip() != today
+    force = "--force" in _sys.argv
+    first = force or not STAMP.exists() or STAMP.read_text(encoding="utf-8").strip() != today
     parts = []
     if first:
         try:
@@ -92,8 +114,12 @@ def main():
     if not parts:
         return
     line = "[VCC] " + " · ".join(parts)
+    if not force:
+        notify(line[6:])
+    context = (f"{line}\n(SessionStart hook 결과. VS Code 패널에는 이 줄이 보이지 않으니, 이번 세션의 첫 답변 맨 위에 "
+               f"이 줄을 그대로 한 번 보여 줄 것.)")
     print(json.dumps({"systemMessage": line,
-                      "hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": line}},
+                      "hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}},
                      ensure_ascii=False))
 
 
