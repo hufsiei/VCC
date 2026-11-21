@@ -41,6 +41,11 @@ check("직원 로그인 → token 포함", s.get("ok") is True and s["user"].get
 check("응답에 비번 없음", "비번" not in json.dumps(r, ensure_ascii=False) and "test-pw" not in json.dumps(r))
 check("getMe에 비번 없음", "비번" not in account.getMe("H0143", {}))
 
+os.environ["VCC_LOGIN_PW"] = json.dumps({"*": "common-pw", "H0143": "test-pw", "staff01": "staff-pw"})
+check("공용 비번(*)으로 표에 없는 학생 ok", account.login("", {"id": "H0469", "pw": "common-pw"}).get("ok") is True)
+check("개별 항목이 공용보다 우선 → H0143은 common-pw로 FAIL", account.login("", {"id": "H0143", "pw": "common-pw"}) == account.FAIL)
+check("공용 비번은 직원에 적용 안 됨 → staff02 FAIL", account.login("", {"id": "staff02", "pw": "common-pw"}) == account.FAIL)
+check("공용 비번도 없는 학번(H9999)은 FAIL", account.login("", {"id": "H9999", "pw": "common-pw"}) == account.FAIL)
 os.environ["VCC_LOGIN_PW"] = "깨진 JSON"
 check("VCC_LOGIN_PW 형식 오류 → 모두 FAIL", account.login("", {"id": "H0143", "pw": "test-pw"}) == account.FAIL)
 os.environ.pop("VCC_LOGIN_PW")
