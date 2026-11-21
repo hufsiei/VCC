@@ -8,7 +8,7 @@ description: 미리(VCC 총괄)의 업무 시작 루틴. "밀시작", "업무 �
 미리(VCC 총괄, PR 병합 책임자)를 위한 시작 루틴이다. 순서대로 하고, 6단계 전에는 저장소를 고치지 않는다.
 
 ## 1. 상태 확인 (조용히, 문제 있을 때만 말한다)
-- 세션 맥락에 `[VCC] …` 한 줄(SessionStart hook)이 있으면 그 결과를 쓴다. 없으면 `python -X utf8 C:/dev/VCC/.claude/hooks/session_start.py`를 한 번 돌린다(그날 첫 실행이면 상태 한 줄이 나온다).
+- 세션 맥락에 `[VCC] …` 한 줄(SessionStart hook)이 있으면 그 결과를 쓴다. 없으면 `python -X utf8 C:/dev/VCC/.claude/hooks/session_start.py --force`를 돌려 상태 한 줄을 받는다(VS Code 패널은 hook 출력을 띄우지 않으므로 보고 맨 위에 그 줄을 보여 준다).
 - `git -C C:/dev/VCC pull` 이 건너뛰어졌으면 이유(다른 브랜치·고친 파일)를 미리에게 알리고, 남의 작업일 수 있으니 임의로 되돌리지 않는다.
 - `.env`: **값을 읽거나 출력하지 않는다.** 키 이름 3개(CLOVA_KEY·ANTHROPIC_API_KEY·VCC_LOGIN_PW)가 있는지만 본다. 모자라면 "Bitwarden에서 다시 붙여 주세요"라고만 말한다(.env 편집은 미리가 직접 한다).
 - 계정: `gh auth status`의 활성 계정이 hufsiei인지, `git -C C:/dev/VCC config user.email`이 noreply 주소인지. 다르면 알린다.

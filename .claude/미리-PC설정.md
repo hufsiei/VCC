@@ -15,6 +15,8 @@
 ```
 - 세션을 열 때마다 `C:\dev\VCC`가 main이고 고친 파일이 없을 때만 pull한다.
 - 그날 첫 세션에만 `[VCC] main 최신 · 남은 작업 폴더 0 · 열린 PR 2 · .env 키 3/3`을 보여 준다(`~\.claude\vcc-status-day.txt`에 날짜 기록).
+- VS Code 패널은 hook 출력을 화면에 띄우지 않는다(11/21 확인). 그래서 **Windows 알림(오른쪽 아래 풍선)**으로 띄우고, Claude가 첫 답변 맨 위에 같은 줄을 보여 준다. 알림이 안 보이면 Windows 「방해 금지/집중 지원」이 켜져 있는지 본다.
+- 그날 이미 봤어도 다시 보려면: Claude에게 "상태 한 줄" 또는 `python -X utf8 C:/dev/VCC/.claude/hooks/session_start.py --force`.
 - 끄려면 `/hooks`에서 끄거나 위 블록을 지운다.
 
 ## 2. 스킬 milstart · milend 연결
