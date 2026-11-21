@@ -61,6 +61,8 @@ function pickMock(m, name, p) {
       return m.getNote[p.id] || m.getNote["N-marburg"];
     case "checkMessage":
       return /\d{8,}/.test(p.text || "") ? m.checkMessage.blocked : m.checkMessage.ok;
+    case "respondRequest":
+      return p.cancel ? m.cancelRequest : m.respondRequest; // 요청 취소(cancelRequest)도 같은 서버 함수
     default:
       return m[name];
   }
@@ -123,11 +125,14 @@ export const saveConsent = (draftId, edits) => call("saveConsent", { draftId, ed
 export const listNotes = (filter) => call("listNotes", { filter });
 export const getNote = (id) => call("getNote", { id });
 export const reportStatement = (lineId, reason) => call("reportStatement", { lineId, reason });
-export const recommendSeniors = (noteId) => call("recommendSeniors", { noteId });
+// more=true면 3명씩 더해 최대 9명. 응답의 hasMore가 false면 「비슷한 선배를 모두 보여드렸어요」(spec 4장)
+export const recommendSeniors = (noteId, more) => call("recommendSeniors", more ? { noteId, more: true } : { noteId });
 export const checkMessage = (text) => call("checkMessage", { text });
 export const previewNickname = (to) => call("previewNickname", { to });
 export const sendMessage = (to, text) => call("sendMessage", { to, text });
 export const getMessages = () => call("getMessages");
 export const respondRequest = (threadId, accept) => call("respondRequest", { threadId, accept });
+// 보낸 사람이 수락 대기(waiting) 요청을 거둔다 → status "cancelled". 서버 함수는 respondRequest 하나(spec 4장)
+export const cancelRequest = (threadId) => call("respondRequest", { threadId, cancel: true });
 export const getInbox = () => call("getInbox");
 export const getDeptReport = (dept) => call("getDeptReport", { dept });

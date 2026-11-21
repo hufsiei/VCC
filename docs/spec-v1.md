@@ -55,7 +55,7 @@
 
 - **지금(로컬):** `functions/local_fn.py`가 시작할 때 `data/runtime/*.json`을 읽어 메모리에 두고, 기록이 바뀔 때마다 그 파일을 다시 쓴다(임시 파일에 쓴 뒤 바꿔 끼워 반쯤 쓰인 파일이 남지 않게). 서버를 껐다 켜도 남는다.
 - **Cloud Functions 이사 후:** 같은 파일 이름을 NCP **Object Storage**의 객체로 둔다. 바꾸는 곳은 `functions/store.py`의 저장 방식 한 곳뿐이다(`STORE_BACKEND=file|ncp`). 다른 코드는 `store.load(이름)`·`store.save(이름)`만 쓰고 파일을 직접 열지 않는다.
-- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별 지금 추천 목록 최대 9명과 노트 버전) · `counters.json`(번호 매기기) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(인터뷰 중간 저장, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 8개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). 관리자 콘솔용 `reportSettings.json`·`issuedReports.json`·`suggestionStatus.json`은 작업 66에서 같은 방식으로 더한다.
+- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별 지금 추천 목록 최대 9명과 노트 버전) · `counters.json`(번호 매기기) · **[작업 85]** `noteVersions.json`(노트별 버전 — saveConsent가 +1, recommendSeniors가 비교) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(인터뷰 중간 저장, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 9개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·recommendSeniors·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). 관리자 콘솔용 `reportSettings.json`·`issuedReports.json`·`suggestionStatus.json`은 작업 66에서 같은 방식으로 더한다.
 - **누가 부르는지:** 서버는 헤더 `X-Token`을 `sessions.json`(`functions/sessions.py`, 토큰 24시간, 같은 계정 동시 로그인 허용)으로 풀어 사용자를 안다. 토큰이 없거나 만료·폐기면 `{ "error": "로그인이 필요해요" }`(`checkMessage`·`login`만 예외). `login`이 난수 토큰을 발급해 `user.token`으로 주고, `logout`이 폐기한다. 로그인 비번은 `data/`가 아니라 환경변수 `VCC_LOGIN_PW`(.env·NCP 기본 파라미터)에만 둔다. 표의 `"*"`는 가상학생 전원의 공용 비번(청중 체험용, 개별 항목이 우선, 직원에는 적용 안 됨). 순서: 토큰 확인 → 전역 상한 → 사용자별 한도 → 함수. **[11/19] 남의 기록은 서버가 막는다**: `getMessages`·`respondRequest`는 `me`가 그 대화의 asker·senior일 때만, 내 경험노트·`saveConsent`는 `owner == me`일 때만, 관리자 함수는 `권한`이 있을 때만 응답하고 그 외는 `{ "error": "볼 수 없는 기록이에요" }`. (작업 73)
 - **초기화:** 리허설 전 `python functions/reset_runtime.py` → runtime 파일을 비우고 시연 시작 상태로 돌린다.
 - `data/runtime/`은 커밋하지 않는다(`.gitignore`). 시연 중 쌓인 기록이 저장소에 섞이지 않게.
@@ -283,6 +283,7 @@ payload `{threadId, accept: true|false}` 또는 `{threadId, cancel: true}`.
 { "ok": true, "status": "accepted" }
 { "ok": true, "status": "cancelled" }
 ```
+**[작업 85]** 서버는 화면 호환을 위해 옛 필드 `accepted: true|false`도 함께 보낸다(`respondRequest` 수락·거절 응답, `getMessages`의 각 대화). 새 화면은 `status`만 쓴다. 11/20 이전 기록의 `status: "requested"`는 `waiting`으로 읽는다.
 
 ### getInbox()
 ```json
@@ -316,7 +317,7 @@ payload `{lineId, reason?}`. 신고된 문장은 즉시 숨김, 부서 리포트
 login(id, pw) · getMe() · askBoo(question)
 interviewNext(program, answers) · summarizeInterview(program, transcript) · saveConsent(draftId, edits)
 listNotes(filter) · getNote(id) · reportStatement(lineId, reason)
-recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept)
+recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept) · cancelRequest(threadId)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85)
 getInbox() · getDeptReport(dept)
 currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이 성공 시 저장)
 ```
