@@ -30,7 +30,8 @@ sys.path.insert(0, str(ROOT / "functions"))
 from ai import PROVIDER, callAI, load_prompt  # noqa: E402
 
 DATA = ROOT / "data"
-CACHE = ROOT / "functions" / "logs" / "classify-cache.json"   # .gitignore 대상
+import paths  # noqa: E402
+CACHE = paths.LOGS / "classify-cache.json"   # .gitignore 대상. worktree에서 돌려도 본 저장소에 쌓인다(paths.py)
 KIND = "문단분류"
 # 11/20 Sonnet 측정 기준 1건 평균 입력 ~510·출력 ~60토큰. 단가(100만 토큰당 입력/출력): sonnet $2/$10, opus $4/$20
 PRICE = {"sonnet": (2, 10), "opus": (4, 20), "hcx": (0, 0)}
@@ -95,7 +96,7 @@ def main():
             if v is None:
                 print(f"  폐기 {e['id']}: {memo}")
             if done % 50 == 0:
-                CACHE.parent.mkdir(exist_ok=True)
+                CACHE.parent.mkdir(parents=True, exist_ok=True)
                 CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
                 print(f"  … {done}/{len(todo)}")
     CACHE.parent.mkdir(exist_ok=True)

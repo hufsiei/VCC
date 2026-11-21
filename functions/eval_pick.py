@@ -86,7 +86,8 @@ def probe(count=15):
 if __name__ == "__main__":
     out, n, total = score()
     lim = None if "--no-probe" in sys.argv else probe()
-    path = Path(__file__).parent / "logs" / "eval-pick.json"
+    import paths
+    path = paths.LOGS / "eval-pick.json"   # 본 저장소 logs(paths.py)
     path.parent.mkdir(exist_ok=True)
     path.write_text(json.dumps({"결과": out, "합계": n, "전체": total, "한도": lim}, ensure_ascii=False, indent=2),
                     encoding="utf-8")
