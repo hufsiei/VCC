@@ -36,3 +36,11 @@ python -m http.server 8000
 기본은 mock 데이터(`common/mock-data.json`)로 동작합니다(`common/data.js`의 `USE_MOCK`).
 함수마다 따로 서버로 보내려면 `data.js`의 `SERVER_FNS`(또는 되돌릴 때 `MOCK_FNS`)에 함수 이름을 적습니다.
 코드를 고치지 않고 확인할 때는 localhost에서 주소 끝에 `?server=all` 또는 `?server=sendMessage,getMessages`를 붙입니다. 그 탭에서만 기억하고(두 창 시연), `?server=`로 해제합니다. 서버로 가는 함수가 하나라도 있으면 로그인도 서버로 가므로 다시 로그인합니다. 서버(`functions/local_fn.py`)는 미리 PC에서만 켭니다.
+
+## push 전 검사
+
+push할 때 `.githooks/pre-push`가 `.py` 문법 검사와 `functions/test_*.py` 시험(약 5초)을 돌리고, 하나라도 실패하면 push를 막습니다. 오류를 고치지는 않고 어디가 실패했는지만 보여 줍니다.
+
+- 켜기(PC마다 한 번, 저장소 폴더에서): `git config core.hooksPath .githooks`
+- 검사만 따로 돌려 보기: `python -X utf8 .githooks/pre_push_check.py`
+- 급할 때만 건너뛰기: `git push --no-verify`

@@ -6,6 +6,7 @@
 #
 # 하는 일
 #   1) 세션을 열 때마다 C:\dev\VCC를 pull — main이고 고친 파일이 없을 때만(--ff-only). 아니면 건너뛰고 이유만 알린다.
+#   1-1) push 전 검사 켜기: git config core.hooksPath .githooks (없을 때만. .githooks/pre-push 참고)
 #   2) 그날 첫 세션에만 상태 한 줄: main 최신 여부 · 남은 작업 폴더(VCC-*) · 열린 PR · .env 키 개수(값은 읽어도 출력 안 함)
 # 출력: {"systemMessage": 사람에게 보일 한 줄, "hookSpecificOutput": {"additionalContext": Claude에게 줄 같은 내용}}
 #   VS Code 패널은 systemMessage를 화면에 띄우지 않으므로(11/21 확인) Windows 알림(풍선)으로도 띄우고,
@@ -49,6 +50,13 @@ def pull():
     _, n, _ = git("rev-list", "--count", f"{before}..{after}")
     _, last, _ = git("log", "-1", "--format=%s")
     return f"pull: 새 커밋 {n}개 (최신: {last[:40]})", True
+
+
+def ensure_hooks_path():
+    """push 전 검사(.githooks/pre-push)를 이 PC에서 켠다. 이미 켜져 있으면 아무것도 안 함."""
+    _, cur, _ = git("config", "--local", "core.hooksPath")
+    if cur != ".githooks":
+        git("config", "--local", "core.hooksPath", ".githooks")
 
 
 def status_bits():
@@ -97,6 +105,10 @@ def main():
         msg, changed = pull()
     except (OSError, subprocess.TimeoutExpired) as e:
         msg, changed = f"pull 건너뜀({type(e).__name__})", False
+    try:
+        ensure_hooks_path()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
 
     today = date.today().isoformat()
     force = "--force" in _sys.argv
