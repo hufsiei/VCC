@@ -606,7 +606,10 @@
           "이중전공 경영학 같음"
         ]
       }
-    ]
+    ],
+    "shown": 2,
+    "hasMore": false,
+    "newCount": 0
   },
   "checkMessage": {
     "ok": {
@@ -629,7 +632,12 @@
   },
   "respondRequest": {
     "ok": true,
+    "status": "accepted",
     "accepted": true
+  },
+  "cancelRequest": {
+    "ok": true,
+    "status": "cancelled"
   },
   "getMessages": {
     "threads": [
@@ -644,6 +652,8 @@
             "교환학생·독일"
           ]
         },
+        "status": "waiting",
+        "requestedAt": "2026-11-21T09:10:00+09:00",
         "accepted": false,
         "unread": 1,
         "messages": [
@@ -660,6 +670,8 @@
         "withId": "H0469",
         "nickname": "독일어과 선배 A",
         "myNickname": "용감한 수달",
+        "status": "accepted",
+        "requestedAt": "2026-11-20T10:00:00+09:00",
         "accepted": true,
         "unread": 1,
         "messages": [
@@ -675,7 +687,9 @@
           }
         ]
       }
-    ]
+    ],
+    "waitingCount": 0,
+    "waitingLimit": 3
   },
   "getInbox": {
     "myNotes": [

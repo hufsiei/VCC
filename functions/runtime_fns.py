@@ -10,17 +10,29 @@
 #   senior_label(viewer, senior)   — recommendSeniors 카드 이름(작업 22). 쪽지창과 같은 값
 # saveConsent → publish_lines: 동의 통과 문장을 noteLines에 쌓고, 후배 질문 답이면 질문 answered + 질문자 알림(작업 74).
 # 노트 읽기(getNote·listNotes)와 askBoo 근거 풀은 notes.py.
+# 쪽지 규칙(11/18·11/20, spec 4장 sendMessage, 작업 85): 선배당 요청 1건 · 보낸 사람 수락 대기 3건 · 받는 선배 5건 ·
+#   요청 취소(7일 재요청 금지) · 7일 자동 만료. status = waiting | accepted | declined | cancelled | expired
+# recommendSeniors(작업 85): 점수는 score.py(원우), 목록 보관·더 보기·재계산은 여기(spec 4장 인원 규칙).
 import json
 import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import notes
+import score
 import store
 from msg_check import check_message, check_public_text
 
 KST = timezone(timedelta(hours=9))
 DATA = Path(__file__).resolve().parent.parent / "data"
+
+WAIT_LIMIT = 3               # 보낸 사람의 수락 대기 요청 한도
+RECEIVE_LIMIT = score.REQUEST_LIMIT   # 받는 선배의 수락 대기 요청 한도(5) — score.py의 requestsFull과 같은 값
+EXPIRE_DAYS = 7              # 보낸 뒤 이 기간 안에 답이 없으면 expired
+COOLDOWN_DAYS = 7            # 취소한 선배에게 다시 요청하지 못하는 기간
+PAGE, MAX_SHOWN = 3, 9       # 닮은선배: 처음 3명, 더 보기마다 3명, 한 번에 보이는 목록 최대 9명
+EXPIRED_ALERT = "선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?"
+REQUEST_ALERT = "쪽지 요청이 왔어요"
 
 ADJECTIVES = ["용감한", "조용한", "느긋한", "다정한", "씩씩한", "궁금한", "반짝이는", "부지런한",
               "차분한", "명랑한", "수줍은", "든든한", "포근한", "재빠른", "꼼꼼한", "따뜻한"]
@@ -83,10 +95,65 @@ def _pending_names():
 
 
 def _find_thread(asker, senior):
-    for tid, t in store.load("messages", {}).items():
+    for tid, t in _threads().items():
         if t["asker"] == asker and t["senior"] == senior:
             return tid, t
     return None, None
+
+
+def _threads():
+    """messages.json. 11/20 이전 기록의 status "requested"는 "waiting"으로 읽는다."""
+    threads = store.load("messages", {})
+    for t in threads.values():
+        if t.get("status") == "requested":
+            t["status"] = "waiting"
+        t.setdefault("requestedAt", t.get("createdAt"))
+    return threads
+
+
+def _days_since(iso):
+    try:
+        return (datetime.fromisoformat(now()) - datetime.fromisoformat(iso)).total_seconds() / 86400
+    except (TypeError, ValueError):
+        return 0
+
+
+def _expire_old():
+    """보낸 뒤 7일 동안 답이 없는 요청을 expired로(스케줄러 없이 호출할 때 판정, spec 4장)."""
+    changed = False
+    for tid, t in _threads().items():
+        if t["status"] == "waiting" and _days_since(t["requestedAt"]) >= EXPIRE_DAYS:
+            t.update(status="expired", expiredAt=now())
+            _drop_request_alert(t["senior"], tid)
+            _alert(t["asker"], EXPIRED_ALERT, threadId=tid)
+            changed = True
+    if changed:
+        store.save("messages")
+
+
+def _waiting(asker=None, senior=None):
+    return sum(1 for t in _threads().values() if t["status"] == "waiting"
+               and (asker is None or t["asker"] == asker) and (senior is None or t["senior"] == senior))
+
+
+def _limit_error(me, to):
+    if _waiting(asker=me) >= WAIT_LIMIT:
+        return {"ok": False, "reason": "한도",
+                "message": "답을 기다리는 쪽지가 3건이에요. 기다리는 요청을 취소하거나 선배가 답하면 더 보낼 수 있어요."}
+    if _waiting(senior=to) >= RECEIVE_LIMIT:
+        return {"ok": False, "reason": "선배한도",
+                "message": "지금은 이 선배에게 요청이 많아요. 질문함에 남기면 선배 인터뷰 때 함께 물어볼게요."}
+    return None
+
+
+def _drop_request_alert(senior, tid):
+    """취소·만료된 요청은 선배 화면에서 조용히 사라진다(알림도 지운다)."""
+    alerts = store.load("alerts", {})
+    mine = alerts.get(senior, [])
+    kept = [a for a in mine if not (a.get("threadId") == tid and a.get("text") == REQUEST_ALERT)]
+    if len(kept) != len(mine):
+        alerts[senior] = kept
+        store.save("alerts")
 
 
 def _alert(to, text, **extra):
@@ -129,23 +196,43 @@ def sendMessage(me, p):
         return {"ok": False, **check}
 
     with store.lock():
-        threads = store.load("messages", {})
-        # 받은 선배가 답하는 경우가 먼저, 아니면 내가 보낸 대화
+        threads = _threads()
+        _expire_old()
+        # 받은 선배가 답하는 경우가 먼저(취소·만료된 요청은 선배 쪽에서 없는 대화), 아니면 내가 보낸 대화
         tid, t = _find_thread(to, me)
-        if not t:
+        if t and t["status"] in ("cancelled", "expired"):
+            tid, t = None, None
+        if t:
+            if t["status"] == "waiting":
+                return {"ok": False, "reason": "상태", "message": "쪽지 요청을 먼저 수락해 주세요"}
+            if t["status"] == "declined":
+                return {"ok": False, "reason": "상태", "message": "받지 않은 요청이에요"}
+        else:
             tid, t = _find_thread(me, to)
+
         if t is None:                                   # 첫 메시지 = 쪽지 요청
+            err = _limit_error(me, to)
+            if err:
+                return err
             nickname = previewNickname(me, {"to": to})["myNickname"]
             store.load("pendingNicknames", {}).pop(f"{to}|{me}", None)
             store.save("pendingNicknames")
             tid = store.next_id("T")
-            t = threads[tid] = {"asker": me, "senior": to, "askerNickname": nickname,
-                                "status": "requested", "createdAt": now(), "messages": [], "lastRead": {}}
-            _alert(to, "쪽지 요청이 왔어요", threadId=tid)
+            t = threads[tid] = {"asker": me, "senior": to, "askerNickname": nickname, "status": "waiting",
+                                "createdAt": now(), "requestedAt": now(), "messages": [], "lastRead": {}}
+            _alert(to, REQUEST_ALERT, threadId=tid)
         elif t["status"] == "declined":
-            return {"ok": False, "message": "선배가 이 요청을 받지 않았어요"}
-        elif t["status"] == "requested":
-            return {"ok": False, "message": "선배가 수락하면 대화를 이어갈 수 있어요"}
+            return {"ok": False, "reason": "상태", "message": "선배가 이 요청을 받지 않았어요"}
+        elif t["status"] in ("cancelled", "expired"):    # 같은 선배에게 다시 요청 = 같은 대화를 다시 연다
+            if t["status"] == "cancelled" and _days_since(t.get("cancelledAt")) < COOLDOWN_DAYS:
+                return {"ok": False, "reason": "취소",
+                        "message": "요청을 취소한 선배에게는 7일 뒤에 다시 보낼 수 있어요."}
+            err = _limit_error(me, to)
+            if err:
+                return err
+            t.update(status="waiting", requestedAt=now())
+            _alert(to, REQUEST_ALERT, threadId=tid)
+        # waiting(내가 보낸 요청에 덧붙이기)·accepted는 그대로 이어 쓴다 — 선배 한 명당 요청 1건
 
         at = now()
         t["messages"].append({"from": me, "text": text, "at": at})
@@ -161,17 +248,21 @@ def getMessages(me, p):
     """내 대화 목록. 부르면 안 읽은 메시지를 읽음으로 바꾼다(unread는 이번 응답에만 보임)."""
     with store.lock():
         out = []
-        threads = store.load("messages", {})
-        for tid, t in sorted(threads.items(), key=lambda kv: kv[1]["createdAt"], reverse=True):
+        threads = _threads()
+        _expire_old()
+        for tid, t in sorted(threads.items(), key=lambda kv: kv[1]["requestedAt"], reverse=True):
             if me not in (t["asker"], t["senior"]):
                 continue
             role = "asker" if t["asker"] == me else "senior"
+            if role == "senior" and t["status"] in ("cancelled", "expired"):
+                continue                                 # 선배 목록에서는 조용히 사라진다
             other = t["senior"] if role == "asker" else t["asker"]
             last = t["lastRead"].get(me, "")
             item = {
                 "threadId": tid, "role": role, "withId": other,
                 "nickname": senior_label(me, other) if role == "asker" else t["askerNickname"],
-                "accepted": t["status"] == "accepted",
+                "status": t["status"], "requestedAt": t["requestedAt"],
+                "accepted": t["status"] == "accepted",   # 옛 필드(화면 호환). 새 화면은 status를 쓴다
                 "unread": sum(1 for m in t["messages"] if m["from"] != me and m["at"] > last),
                 "messages": [{"from": "me" if m["from"] == me else "them", "text": m["text"], "at": m["at"]}
                              for m in t["messages"]],
@@ -185,7 +276,7 @@ def getMessages(me, p):
             t["lastRead"][me] = now()
             out.append(item)
         store.save("messages")
-        return {"threads": out}
+        return {"threads": out, "waitingCount": _waiting(asker=me), "waitingLimit": WAIT_LIMIT}
 
 
 def _asker_info(asker):
@@ -200,20 +291,89 @@ def _asker_info(asker):
 
 
 def respondRequest(me, p):
+    """선배의 수락·거절 {threadId, accept} 또는 보낸 사람의 요청 취소 {threadId, cancel: true}."""
     tid = p.get("threadId")
     with store.lock():
-        t = store.load("messages", {}).get(tid)
-        if not t or t["senior"] != me:
+        _expire_old()
+        t = _threads().get(tid)
+        if p.get("cancel"):
+            if not t or t["asker"] != me:
+                return {"error": "볼 수 없는 기록이에요"}
+            if t["status"] != "waiting":
+                return {"ok": False, "reason": "상태", "status": t["status"]}
+            t.update(status="cancelled", cancelledAt=now())
+            store.save("messages")
+            _drop_request_alert(t["senior"], tid)        # 선배에게 알리지 않는다
+            return {"ok": True, "status": "cancelled"}
+        if not t or t["senior"] != me or t["status"] in ("cancelled", "expired"):
             return {"error": "볼 수 없는 기록이에요"}
-        if t["status"] != "requested":
-            return {"ok": True, "accepted": t["status"] == "accepted"}
+        if t["status"] != "waiting":
+            return {"ok": False, "reason": "상태", "status": t["status"]}
         accept = bool(p.get("accept"))
         t["status"] = "accepted" if accept else "declined"
         store.save("messages")
         label = senior_label(t["asker"], me)
         _alert(t["asker"], f"쪽지 요청이 수락됐어요 · {label}" if accept else f"이번 쪽지 요청은 연결되지 않았어요 · {label}",
                threadId=tid)
-        return {"ok": True, "accepted": accept}
+        return {"ok": True, "status": t["status"], "accepted": accept}
+
+
+# ---------- 닮은선배 (spec 4장 recommendSeniors, 작업 85) ----------
+def _program_of(note_id):
+    """noteId → 프로그램 이름. notes.json이 생기기 전 방식(noteId = 프로그램 이름)도 받는다."""
+    n = notes.NOTES.get(note_id)
+    if n and n.get("program"):
+        return n["program"]
+    for program, nid in notes.FIXED_IDS.items():
+        if nid == note_id:
+            return program
+    return note_id
+
+
+def note_version(nid):
+    return store.load("noteVersions", {}).get(nid, 0)
+
+
+def recommendSeniors(me, p):
+    """처음 3명, more면 3명씩 더해 최대 9명. 목록은 shownSeniors.json에 노트 버전과 함께 보관하고
+    노트 버전이 바뀌었을 때(saveConsent)만 다시 계산한다. 학기·프로필 변경 재계산은 P1(아직 없음)."""
+    note_id = p.get("noteId")
+    if not note_id:
+        return {"error": "노트를 골라 주세요"}
+    program = _program_of(note_id)
+    nid = notes.note_id(program)
+    with store.lock():
+        _expire_old()
+        waiting = {}
+        for t in _threads().values():
+            if t["status"] == "waiting":
+                waiting[t["senior"]] = waiting.get(t["senior"], 0) + 1
+        ranked = score.rank_seniors(me, program, waiting=waiting)
+        by_id = {r["studentId"]: r for r in ranked}
+        cap = min(MAX_SHOWN, len(ranked))
+
+        shown = store.load("shownSeniors", {})
+        saved = shown.setdefault(me, {}).get(nid)
+        version = note_version(nid)
+        new_count = 0
+        if saved is None:
+            ids = [r["studentId"] for r in ranked[:PAGE]]
+        elif saved.get("version") != version:            # 새 경험이 공유됨 → 같은 크기로 다시 계산
+            size = max(PAGE, len(saved["ids"]))
+            ids = [r["studentId"] for r in ranked[:size]]
+            new_count = len(set(ids) - set(saved["ids"]))
+        else:                                            # 저장된 목록 그대로(사라진 후보만 뺀다)
+            ids = [h for h in saved["ids"] if h in by_id]
+        if p.get("more"):
+            rest = [r["studentId"] for r in ranked if r["studentId"] not in ids]
+            ids += rest[:max(0, min(PAGE, cap - len(ids)))]
+        ids = ids[:MAX_SHOWN]
+        shown[me][nid] = {"ids": ids, "version": version, "at": now()}
+        store.save("shownSeniors")
+
+        seniors = [{"studentId": h, "nickname": senior_label(me, h), "score": by_id[h]["score"],
+                    "requestsFull": by_id[h]["requestsFull"], "reasons": by_id[h]["reasons"]} for h in ids]
+        return {"seniors": seniors, "shown": len(seniors), "hasMore": len(ids) < cap, "newCount": new_count}
 
 
 # ---------- 질문함·내 경험노트·동의·신고 ----------
@@ -325,6 +485,9 @@ def publish_lines(me, program, my_note_id, passing):
             fresh.append(row)
         rows[:] = [r for r in rows if r.get("myNoteId") != my_note_id] + fresh
         store.save("noteLines")
+        versions = store.load("noteVersions", {})       # 노트 버전 +1 → recommendSeniors가 목록을 다시 계산
+        versions[nid] = versions.get(nid, 0) + 1
+        store.save("noteVersions")
 
         answered = []
         for qid in dict.fromkeys(r["answersQuestionId"] for r in fresh if r.get("answersQuestionId")):
@@ -369,6 +532,7 @@ ROUTES = {
     "sendMessage": sendMessage,
     "getMessages": getMessages,
     "respondRequest": respondRequest,
+    "recommendSeniors": recommendSeniors,   # AI 없음 → 호출 한도와 무관(작업 85)
     "saveConsent": saveConsent,
     "reportStatement": reportStatement,
     "getInbox": getInbox,
