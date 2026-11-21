@@ -7,6 +7,8 @@
 #        python -X utf8 tools/classify_intern.py --dry-run     # 대상 수·예상 비용만 (AI 호출 없음)
 #        python -X utf8 tools/classify_intern.py --limit 20    # 앞 20건만 시험
 #        python -X utf8 tools/classify_intern.py               # 전체
+#        python -X utf8 tools/classify_intern.py --redo-ids ids.txt   # 이미 칸이 있어도 이 id들만 다시 분류(캐시 무시)
+#              (11/21: 기준 변경 「후배에게 지원을 권하는 문장 = 지원동기」 뒤 그 유형 109문장만 다시 분류할 때 씀)
 #
 # 규칙
 #   - 고를 수 있는 칸 = frames.json 인턴 칸 중 '인터뷰로만'이 아닌 것(지원동기·업무내용·배운점)
@@ -14,7 +16,8 @@
 #   - 채운 행에는 "autoClassified": true (노트 화면 「자동 분류」 라벨, spec 9장)
 #   - 결과는 functions/logs/classify-cache.json에 id+문장으로 저장한다. sheet_to_json.py를 다시 돌려
 #     evidence.json이 새로 만들어지면 이 스크립트를 다시 돌리면 되고, 문장이 같으면 AI를 다시 부르지 않는다.
-#   - 채점은 원우의 data/intern-gold.csv와 비교(작업 50, 합격선 85%)
+#   - 결과는 evidence.json과 data/intern-sections.json({id: 칸}, sheet_to_json.py가 변환 때 다시 입힘)에 함께 쓴다.
+#   - 채점은 tools/score_intern.py(원우)가 한다: 정답 data/intern-gold.csv 128문장, 칸별 정확도, 합격선 85%(작업 50)
 import argparse
 import hashlib
 import json
@@ -48,14 +51,23 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--redo-ids", help="다시 분류할 id 목록 파일(한 줄에 하나). 칸·캐시가 있어도 다시 부른다")
     args = ap.parse_args()
 
     path = DATA / "evidence.json"
     ev = json.loads(path.read_text(encoding="utf-8"))
     cols = sections()
-    targets = [e for e in ev if e.get("docType") == "현장실습후기" and not e.get("칸")]
     cache = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
-    todo = [e for e in targets if key(e) not in cache]
+    if args.redo_ids:
+        redo = {x.strip() for x in Path(args.redo_ids).read_text(encoding="utf-8").splitlines() if x.strip()}
+        targets = [e for e in ev if e.get("docType") == "현장실습후기" and e["id"] in redo]
+        missing = redo - {e["id"] for e in targets}
+        if missing:
+            sys.exit(f"evidence.json 현장실습후기에 없는 id {len(missing)}개: {sorted(missing)[:5]}")
+        todo = list(targets)
+    else:
+        targets = [e for e in ev if e.get("docType") == "현장실습후기" and not e.get("칸")]
+        todo = [e for e in targets if key(e) not in cache]
     if args.limit:
         todo = todo[: args.limit]
 
@@ -89,16 +101,27 @@ def main():
     CACHE.parent.mkdir(exist_ok=True)
     CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
 
-    filled, dropped, count = 0, [], {c: 0 for c in cols}
+    sec_path = DATA / "intern-sections.json"
+    sections_map = json.loads(sec_path.read_text(encoding="utf-8")) if sec_path.exists() else {}
+    filled, dropped, changed, count = 0, [], [], {c: 0 for c in cols}
     for e in targets:
         v = cache.get(key(e))
         if v:
+            if e.get("칸") and e["칸"] != v:
+                changed.append((e["id"], e["칸"], v))
             e["칸"], e["autoClassified"] = v, True
+            sections_map[e["id"]] = v
             filled += 1
             count[v] += 1
         elif key(e) in cache:
-            dropped.append(e["id"])
+            dropped.append(e["id"])   # 폐기: 칸이 있던 행은 그대로 둔다(redo에서 폐기돼도 이전 분류 유지)
     path.write_text(json.dumps(ev, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    sec_path.write_text(json.dumps(sections_map, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    if changed:
+        moved = {}
+        for _, a, b in changed:
+            moved[f"{a}→{b}"] = moved.get(f"{a}→{b}", 0) + 1
+        print(f"칸이 바뀐 문장 {len(changed)}건: {moved}")
     print(f"채움 {filled}/{len(targets)} · 칸별 {count} · 폐기 {len(dropped)}건 {dropped[:10]}")
 
 

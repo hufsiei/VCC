@@ -41488,7 +41488,36 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "공공 행정 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
+      "sourceId": "I085-3",
+      "lineId": "L-I085-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "지금 생각해도 이 직무를 눈여겨봤던 분이라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I086-4",
+      "lineId": "L-I086-4",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "덧붙이자면 공공 행정 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I254-3",
+      "lineId": "L-I254-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "지금 생각해도 공공 행정 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I257-7",
+      "lineId": "L-I257-7",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -41683,23 +41712,9 @@
     "interviewOnly": false,
     "lines": [
      {
-      "text": "공공 행정 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
-      "sourceId": "I085-3",
-      "lineId": "L-I085-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "사실 예산 항목이 왜 그렇게 촘촘한지 보고서를 만들며 깨달았습니다.",
       "sourceId": "I086-3",
       "lineId": "L-I086-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "지금 생각해도 이 직무를 눈여겨봤던 분이라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I086-4",
-      "lineId": "L-I086-4",
       "official": false,
       "autoClassified": true
      },
@@ -41830,13 +41845,6 @@
       "autoClassified": true
      },
      {
-      "text": "덧붙이자면 공공 행정 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I254-3",
-      "lineId": "L-I254-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "사실 문서 하나에도 근거 규정이 따라붙는 문화를 배웠습니다.",
       "sourceId": "I257-3",
       "lineId": "L-I257-3",
@@ -41854,13 +41862,6 @@
       "text": "덧붙이자면 담당 사업의 근거 규정을 먼저 읽어 두면 회의가 들립니다.",
       "sourceId": "I257-6",
       "lineId": "L-I257-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "지금 생각해도 공공 행정 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I257-7",
-      "lineId": "L-I257-7",
       "official": false,
       "autoClassified": true
      }
@@ -42159,7 +42160,15 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "무역 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I247-3",
+      "lineId": "L-I247-3",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -42294,13 +42303,6 @@
       "text": "무역 실무가 서류 한 장 한 장으로 굴러간다는 걸 배웠습니다.",
       "sourceId": "I011-4",
       "lineId": "L-I011-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "무역 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I247-3",
-      "lineId": "L-I247-3",
       "official": false,
       "autoClassified": true
      },
@@ -42793,7 +42795,22 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "이 직무를 눈여겨봤던 분이라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I122-7",
+      "lineId": "L-I122-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "사실 국제협력 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I066-3",
+      "lineId": "L-I066-3",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -42921,20 +42938,6 @@
       "text": "지금 생각해도 명함 정리 요령을 미리 익혀 가면 행사 뒤처리가 빨라집니다.",
       "sourceId": "I122-6",
       "lineId": "L-I122-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "이 직무를 눈여겨봤던 분이라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I122-7",
-      "lineId": "L-I122-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "사실 국제협력 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I066-3",
-      "lineId": "L-I066-3",
       "official": false,
       "autoClassified": true
      },
@@ -43149,9 +43152,86 @@
       "autoClassified": true
      },
      {
+      "text": "지금 생각해도 짧아도 실무가 궁금하다면 지원해 볼 만합니다.",
+      "sourceId": "I145-3",
+      "lineId": "L-I145-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "사실 진로가 막막한 분이라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I237-6",
+      "lineId": "L-I237-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "해외 시장 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I244-7",
+      "lineId": "L-I244-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "돌이켜 보면 짧아도 실무가 궁금하다면 이만한 기회가 드뭅니다.",
+      "sourceId": "I264-7",
+      "lineId": "L-I264-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "솔직히 말하면 해외 시장 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I043-7",
+      "lineId": "L-I043-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "이 직무를 눈여겨봤던 분이라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I118-3",
+      "lineId": "L-I118-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "해외 시장 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I197-3",
+      "lineId": "L-I197-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "사실 전공을 살릴 곳을 찾다가 공고를 보고 바로 넣었습니다.",
       "sourceId": "I239-1",
       "lineId": "L-I239-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "사실 해외 시장 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I239-10",
+      "lineId": "L-I239-10",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "솔직히 말하면 이 직무를 눈여겨봤던 분이라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I134-3",
+      "lineId": "L-I134-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "짧아도 실무가 궁금하다면 지원해 볼 만합니다.",
+      "sourceId": "I012-6",
+      "lineId": "L-I012-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "해외 시장 분야가 궁금한 후배라면 지원해 볼 만합니다.",
+      "sourceId": "I129-3",
+      "lineId": "L-I129-3",
       "official": false,
       "autoClassified": true
      }
@@ -43616,13 +43696,6 @@
       "autoClassified": true
      },
      {
-      "text": "지금 생각해도 짧아도 실무가 궁금하다면 지원해 볼 만합니다.",
-      "sourceId": "I145-3",
-      "lineId": "L-I145-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "덧붙이자면 한 번쯤 조직 생활을 미리 보고 싶다면 시간이 아깝지 않을 겁니다.",
       "sourceId": "I164-3",
       "lineId": "L-I164-3",
@@ -43654,13 +43727,6 @@
       "text": "사실 현지 생활 초반에는 무조건 많이 물어보는 게 답입니다.",
       "sourceId": "I237-5",
       "lineId": "L-I237-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "사실 진로가 막막한 분이라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I237-6",
-      "lineId": "L-I237-6",
       "official": false,
       "autoClassified": true
      },
@@ -43700,13 +43766,6 @@
       "autoClassified": true
      },
      {
-      "text": "해외 시장 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I244-7",
-      "lineId": "L-I244-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "돌이켜 보면 프랑스어 전공을 실제 업무에 바로 적용할 수 있다는 게 가장 좋았습니다.",
       "sourceId": "I258-3",
       "lineId": "L-I258-3",
@@ -43738,13 +43797,6 @@
       "text": "지금 생각해도 현지 생활 초반에는 무조건 많이 물어보는 게 답입니다.",
       "sourceId": "I264-6",
       "lineId": "L-I264-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "돌이켜 보면 짧아도 실무가 궁금하다면 이만한 기회가 드뭅니다.",
-      "sourceId": "I264-7",
-      "lineId": "L-I264-7",
       "official": false,
       "autoClassified": true
      },
@@ -43784,37 +43836,9 @@
       "autoClassified": true
      },
      {
-      "text": "솔직히 말하면 해외 시장 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I043-7",
-      "lineId": "L-I043-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "이 직무를 눈여겨봤던 분이라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I118-3",
-      "lineId": "L-I118-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "업무 중에 프랑스어를 쓸 일이 꾸준히 있어 전공 공부의 동기가 됐습니다.",
       "sourceId": "I118-4",
       "lineId": "L-I118-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "해외 시장 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I197-3",
-      "lineId": "L-I197-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "사실 해외 시장 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I239-10",
-      "lineId": "L-I239-10",
       "official": false,
       "autoClassified": true
      },
@@ -43889,13 +43913,6 @@
       "autoClassified": true
      },
      {
-      "text": "솔직히 말하면 이 직무를 눈여겨봤던 분이라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I134-3",
-      "lineId": "L-I134-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "맡은 몫이 분명해서 책임감이 저절로 생겼습니다.",
       "sourceId": "I134-4",
       "lineId": "L-I134-4",
@@ -43924,13 +43941,6 @@
       "autoClassified": true
      },
      {
-      "text": "짧아도 실무가 궁금하다면 지원해 볼 만합니다.",
-      "sourceId": "I012-6",
-      "lineId": "L-I012-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "돌이켜 보면 업무 중에 네덜란드어를 쓸 일이 꾸준히 있어 전공 공부의 동기가 됐습니다.",
       "sourceId": "I007-3",
       "lineId": "L-I007-3",
@@ -43941,13 +43951,6 @@
       "text": "솔직히 말하면 맡은 몫이 분명해서 책임감이 저절로 생겼습니다.",
       "sourceId": "I123-3",
       "lineId": "L-I123-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "해외 시장 분야가 궁금한 후배라면 지원해 볼 만합니다.",
-      "sourceId": "I129-3",
-      "lineId": "L-I129-3",
       "official": false,
       "autoClassified": true
      },
@@ -44575,6 +44578,13 @@
       "lineId": "L-I101-1",
       "official": false,
       "autoClassified": true
+     },
+     {
+      "text": "미디어 분야가 궁금한 후배라면 지원해 볼 만합니다.",
+      "sourceId": "I082-3",
+      "lineId": "L-I082-3",
+      "official": false,
+      "autoClassified": true
      }
     ]
    },
@@ -44809,13 +44819,6 @@
       "text": "사실 진로의 방향을 잡는 데 필요한 경험이었다고 생각합니다.",
       "sourceId": "I008-6",
       "lineId": "L-I008-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "미디어 분야가 궁금한 후배라면 지원해 볼 만합니다.",
-      "sourceId": "I082-3",
-      "lineId": "L-I082-3",
       "official": false,
       "autoClassified": true
      },
@@ -45403,6 +45406,13 @@
       "lineId": "L-I103-1",
       "official": false,
       "autoClassified": true
+     },
+     {
+      "text": "전공 활용처를 고민 중이라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I103-11",
+      "lineId": "L-I103-11",
+      "official": false,
+      "autoClassified": true
      }
     ]
    },
@@ -45490,13 +45500,6 @@
       "text": "지금 생각해도 모르는 서류는 그날그날 질문하는 편이 낫습니다.",
       "sourceId": "I103-10",
       "lineId": "L-I103-10",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "전공 활용처를 고민 중이라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I103-11",
-      "lineId": "L-I103-11",
       "official": false,
       "autoClassified": true
      },
@@ -45696,7 +45699,15 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "돌이켜 보면 이 직무를 눈여겨봤던 분이라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I236-6",
+      "lineId": "L-I236-6",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -45796,13 +45807,6 @@
       "text": "사실 엑셀 단축키 몇 개만 익혀 가도 반나절이 절약됩니다.",
       "sourceId": "I236-5",
       "lineId": "L-I236-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "돌이켜 보면 이 직무를 눈여겨봤던 분이라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I236-6",
-      "lineId": "L-I236-6",
       "official": false,
       "autoClassified": true
      },
@@ -45959,7 +45963,22 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "전공 활용처를 고민 중이라면 지원해 볼 만합니다.",
+      "sourceId": "I151-6",
+      "lineId": "L-I151-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "외국계 기업 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
+      "sourceId": "I231-7",
+      "lineId": "L-I231-7",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -46084,13 +46103,6 @@
       "autoClassified": true
      },
      {
-      "text": "전공 활용처를 고민 중이라면 지원해 볼 만합니다.",
-      "sourceId": "I151-6",
-      "lineId": "L-I151-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "포르투갈어 전공을 실제 업무에 써 볼 수 있다는 점이 가장 좋았습니다.",
       "sourceId": "I154-4",
       "lineId": "L-I154-4",
@@ -46122,13 +46134,6 @@
       "text": "솔직히 말하면 타임존이 적힌 회의 초대는 캘린더에 바로 옮겨야 안전합니다.",
       "sourceId": "I231-6",
       "lineId": "L-I231-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "외국계 기업 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
-      "sourceId": "I231-7",
-      "lineId": "L-I231-7",
       "official": false,
       "autoClassified": true
      },
@@ -46339,6 +46344,34 @@
       "autoClassified": true
      },
      {
+      "text": "사실 짧아도 실무가 궁금하다면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I153-12",
+      "lineId": "L-I153-12",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "사실 한 번쯤 조직 생활을 미리 보고 싶다면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I261-7",
+      "lineId": "L-I261-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "지금 생각해도 국제협력 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
+      "sourceId": "I277-3",
+      "lineId": "L-I277-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "이 직무를 눈여겨봤던 분이라면 지원해 볼 만합니다.",
+      "sourceId": "I162-7",
+      "lineId": "L-I162-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "채용 공고로만 보던 분야를 안에서 확인하고 싶었습니다.",
       "sourceId": "I149-1",
       "lineId": "L-I149-1",
@@ -46533,13 +46566,6 @@
       "autoClassified": true
      },
      {
-      "text": "사실 짧아도 실무가 궁금하다면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I153-12",
-      "lineId": "L-I153-12",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "처음에는 해외 자료 조사·번역조차 손에 익지 않아 시간이 걸렸지만, 몇 주 지나니 제 방식대로 정리하는 요령이 생겼습니다.",
       "sourceId": "I153-4",
       "lineId": "L-I153-4",
@@ -46603,20 +46629,6 @@
       "autoClassified": true
      },
      {
-      "text": "사실 한 번쯤 조직 생활을 미리 보고 싶다면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I261-7",
-      "lineId": "L-I261-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "지금 생각해도 국제협력 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
-      "sourceId": "I277-3",
-      "lineId": "L-I277-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "사실 명함 정리 요령을 미리 익혀 가면 쓸모가 많습니다.",
       "sourceId": "I277-4",
       "lineId": "L-I277-4",
@@ -46641,13 +46653,6 @@
       "text": "솔직히 말하면 관심 지역 이슈를 평소에 챙겨 두면 회의 내용이 잘 들립니다.",
       "sourceId": "I162-6",
       "lineId": "L-I162-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "이 직무를 눈여겨봤던 분이라면 지원해 볼 만합니다.",
-      "sourceId": "I162-7",
-      "lineId": "L-I162-7",
       "official": false,
       "autoClassified": true
      },
@@ -46990,7 +46995,15 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "번역 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I171-7",
+      "lineId": "L-I171-7",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -47132,13 +47145,6 @@
       "text": "돌이켜 보면 맞춤법과 외래어 표기법을 다시 정리해 두면 좋습니다.",
       "sourceId": "I171-6",
       "lineId": "L-I171-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "번역 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I171-7",
-      "lineId": "L-I171-7",
       "official": false,
       "autoClassified": true
      },
@@ -47315,7 +47321,7 @@
   "id": "N-ff024a",
   "program": "㈜한백인터내셔널 해외영업팀",
   "type": "인턴",
-  "oneLine": "일을 배우는 것 이상으로 일하는 저를 시험해 본 기간이었습니다.",
+  "oneLine": "두 달간 ㈜한백인터내셔널 해외영업팀에 다니며 사무 일을 가까이서 봤습니다.",
   "forWhom": "해외영업 지원 분야 현장실습을 생각하는 2~3학년",
   "evidenceCount": 44,
   "lastSemester": "2026-여름",
@@ -47327,9 +47333,37 @@
     "interviewOnly": false,
     "lines": [
      {
+      "text": "덧붙이자면 짧아도 실무가 궁금하다면 이만한 기회가 드뭅니다.",
+      "sourceId": "I117-3",
+      "lineId": "L-I117-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "사실 한 번쯤 조직 생활을 미리 보고 싶다면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I194-6",
+      "lineId": "L-I194-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "지금 생각해도 선배 추천으로 알게 된 자리였습니다.",
       "sourceId": "I191-1",
       "lineId": "L-I191-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "해외영업 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
+      "sourceId": "I191-11",
+      "lineId": "L-I191-11",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "덧붙이자면 짧아도 실무가 궁금하다면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I241-4",
+      "lineId": "L-I241-4",
       "official": false,
       "autoClassified": true
      }
@@ -47493,13 +47527,6 @@
       "autoClassified": true
      },
      {
-      "text": "덧붙이자면 짧아도 실무가 궁금하다면 이만한 기회가 드뭅니다.",
-      "sourceId": "I117-3",
-      "lineId": "L-I117-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "솔직히 말하면 단가 협상 메일이 오가는 걸 보며 밀고 당기는 호흡을 읽게 됐습니다.",
       "sourceId": "I194-3",
       "lineId": "L-I194-3",
@@ -47517,13 +47544,6 @@
       "text": "사실 회의록을 잘 쓰면 다음 일이 먼저 들어옵니다.",
       "sourceId": "I194-5",
       "lineId": "L-I194-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "사실 한 번쯤 조직 생활을 미리 보고 싶다면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I194-6",
-      "lineId": "L-I194-6",
       "official": false,
       "autoClassified": true
      },
@@ -47559,13 +47579,6 @@
       "text": "솔직히 말하면 회의록을 잘 쓰면 금방 신뢰를 얻습니다.",
       "sourceId": "I191-10",
       "lineId": "L-I191-10",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "해외영업 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
-      "sourceId": "I191-11",
-      "lineId": "L-I191-11",
       "official": false,
       "autoClassified": true
      },
@@ -47608,13 +47621,6 @@
       "text": "지금 생각해도 환율과 인코텀즈 기본 개념은 하루만 공부해 가도 다릅니다.",
       "sourceId": "I241-3",
       "lineId": "L-I241-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "덧붙이자면 짧아도 실무가 궁금하다면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I241-4",
-      "lineId": "L-I241-4",
       "official": false,
       "autoClassified": true
      },
@@ -48104,7 +48110,36 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "지금 생각해도 짧아도 실무가 궁금하다면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I183-4",
+      "lineId": "L-I183-4",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "덧붙이자면 스타트업 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I069-7",
+      "lineId": "L-I069-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "스타트업 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I213-3",
+      "lineId": "L-I213-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "솔직히 말하면 스타트업 분야가 궁금한 후배라면 지원해 볼 만합니다.",
+      "sourceId": "I022-5",
+      "lineId": "L-I022-5",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -48264,13 +48299,6 @@
       "autoClassified": true
      },
      {
-      "text": "지금 생각해도 짧아도 실무가 궁금하다면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I183-4",
-      "lineId": "L-I183-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "덧붙이자면 일을 배우는 것 이상으로 일하는 저를 시험해 본 기간이었습니다.",
       "sourceId": "I068-3",
       "lineId": "L-I068-3",
@@ -48288,20 +48316,6 @@
       "text": "덧붙이자면 업무 범위가 넓어 저녁엔 녹초가 되기도 했습니다.",
       "sourceId": "I069-5",
       "lineId": "L-I069-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "덧붙이자면 스타트업 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I069-7",
-      "lineId": "L-I069-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "스타트업 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I213-3",
-      "lineId": "L-I213-3",
       "official": false,
       "autoClassified": true
      },
@@ -48351,13 +48365,6 @@
       "text": "모르는 툴은 튜토리얼 한 시간이면 따라갑니다.",
       "sourceId": "I022-4",
       "lineId": "L-I022-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "솔직히 말하면 스타트업 분야가 궁금한 후배라면 지원해 볼 만합니다.",
-      "sourceId": "I022-5",
-      "lineId": "L-I022-5",
       "official": false,
       "autoClassified": true
      }
@@ -48571,7 +48578,15 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "한 번쯤 조직 생활을 미리 보고 싶다면 이만한 기회가 드뭅니다.",
+      "sourceId": "I023-7",
+      "lineId": "L-I023-7",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -48664,13 +48679,6 @@
       "text": "주간 보고 양식을 스스로 만들어 쓰면 평가가 달라집니다.",
       "sourceId": "I023-6",
       "lineId": "L-I023-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "한 번쯤 조직 생활을 미리 보고 싶다면 이만한 기회가 드뭅니다.",
-      "sourceId": "I023-7",
-      "lineId": "L-I023-7",
       "official": false,
       "autoClassified": true
      },
@@ -49063,7 +49071,7 @@
   "id": "N-a87d15",
   "program": "세계언어문화협력기구 한국사무소",
   "type": "인턴",
-  "oneLine": "외교적인 문장과 일반 문장의 차이를 교정을 받으며 배웠습니다.",
+  "oneLine": "행사 운영 지원 직무로 세계언어문화협력기구 한국사무소에서 두 달간 일해 봤습니다.",
   "forWhom": "사업지원 분야 현장실습을 생각하는 2~3학년",
   "evidenceCount": 42,
   "lastSemester": "2026-여름",
@@ -49075,9 +49083,30 @@
     "interviewOnly": false,
     "lines": [
      {
+      "text": "돌이켜 보면 진로가 막막한 분이라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I166-4",
+      "lineId": "L-I166-4",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "졸업 전에 사무실이라는 공간을 한 번은 경험해야 한다고 생각했습니다.",
       "sourceId": "I255-1",
       "lineId": "L-I255-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "사실 전공 활용처를 고민 중이라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I255-10",
+      "lineId": "L-I255-10",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "국제협력 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I196-7",
+      "lineId": "L-I196-7",
       "official": false,
       "autoClassified": true
      }
@@ -49248,13 +49277,6 @@
       "autoClassified": true
      },
      {
-      "text": "돌이켜 보면 진로가 막막한 분이라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I166-4",
-      "lineId": "L-I166-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "사실 행사 하나에 들어가는 준비의 양을 실감했습니다.",
       "sourceId": "I169-3",
       "lineId": "L-I169-3",
@@ -49279,13 +49301,6 @@
       "text": "돌이켜 보면 끝나고 나니 남은 학기를 어떻게 보낼지 정해졌습니다.",
       "sourceId": "I169-6",
       "lineId": "L-I169-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "사실 전공 활용처를 고민 중이라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I255-10",
-      "lineId": "L-I255-10",
       "official": false,
       "autoClassified": true
      },
@@ -49370,13 +49385,6 @@
       "text": "사실 관심 지역 이슈를 평소에 챙겨 두면 업무 맥락이 잡힙니다.",
       "sourceId": "I196-6",
       "lineId": "L-I196-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "국제협력 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I196-7",
-      "lineId": "L-I196-7",
       "official": false,
       "autoClassified": true
      }
@@ -49625,7 +49633,29 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "미디어 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I185-7",
+      "lineId": "L-I185-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "돌이켜 보면 이 직무를 눈여겨봤던 분이라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I245-3",
+      "lineId": "L-I245-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "미디어 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I272-4",
+      "lineId": "L-I272-4",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -49834,20 +49864,6 @@
       "autoClassified": true
      },
      {
-      "text": "미디어 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I185-7",
-      "lineId": "L-I185-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "돌이켜 보면 이 직무를 눈여겨봤던 분이라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I245-3",
-      "lineId": "L-I245-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "덧붙이자면 맞춤법 검사기는 끝까지 의심하는 게 좋습니다.",
       "sourceId": "I245-4",
       "lineId": "L-I245-4",
@@ -49956,13 +49972,6 @@
       "text": "솔직히 말하면 자막 오탈자를 잡는 눈은 많이 읽을수록 좋아집니다.",
       "sourceId": "I272-3",
       "lineId": "L-I272-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "미디어 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I272-4",
-      "lineId": "L-I272-4",
       "official": false,
       "autoClassified": true
      }
@@ -50226,7 +50235,7 @@
   "id": "N-ed35dc",
   "program": "토키토키㈜",
   "type": "인턴",
-  "oneLine": "사수분이 제 눈높이에 맞춰 설명해 주셔서 혼자 끙끙대는 시간이 줄었습니다.",
+  "oneLine": "첫 실습지는 토키토키㈜였고, 맡은 역할은 서비스 운영 지원이었습니다.",
   "forWhom": "서비스 운영 지원 분야 현장실습을 생각하는 2~3학년",
   "evidenceCount": 25,
   "lastSemester": "2026-여름",
@@ -50236,7 +50245,36 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "한 번쯤 조직 생활을 미리 보고 싶다면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I027-6",
+      "lineId": "L-I027-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "스타트업 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I271-3",
+      "lineId": "L-I271-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "스타트업 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I219-4",
+      "lineId": "L-I219-4",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "솔직히 말하면 이 직무를 눈여겨봤던 분이라면 지원해 볼 만합니다.",
+      "sourceId": "I167-3",
+      "lineId": "L-I167-3",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -50340,13 +50378,6 @@
       "autoClassified": true
      },
      {
-      "text": "한 번쯤 조직 생활을 미리 보고 싶다면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I027-6",
-      "lineId": "L-I027-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "돌이켜 보면 토키토키㈜에서 서비스 운영 지원 업무를 배웠습니다.",
       "sourceId": "I112-1",
       "lineId": "L-I112-1",
@@ -50382,13 +50413,6 @@
       "autoClassified": true
      },
      {
-      "text": "스타트업 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I271-3",
-      "lineId": "L-I271-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "솔직히 말하면 지표가 나빠지면 그 주의 할 일이 통째로 바뀌는 속도를 경험했습니다.",
       "sourceId": "I271-4",
       "lineId": "L-I271-4",
@@ -50399,20 +50423,6 @@
       "text": "돌이켜 보면 스스로 일을 찾아서 하는 사람이 환영받습니다.",
       "sourceId": "I219-3",
       "lineId": "L-I219-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "스타트업 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I219-4",
-      "lineId": "L-I219-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "솔직히 말하면 이 직무를 눈여겨봤던 분이라면 지원해 볼 만합니다.",
-      "sourceId": "I167-3",
-      "lineId": "L-I167-3",
       "official": false,
       "autoClassified": true
      },
@@ -50585,6 +50595,13 @@
     "interviewOnly": false,
     "lines": [
      {
+      "text": "덧붙이자면 한 번쯤 조직 생활을 미리 보고 싶다면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I243-6",
+      "lineId": "L-I243-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "지금 생각해도 졸업 전에 사무실이라는 공간을 겪어 보고 싶었습니다.",
       "sourceId": "I089-1",
       "lineId": "L-I089-1",
@@ -50754,13 +50771,6 @@
       "text": "덧붙이자면 회의록을 잘 쓰면 금방 신뢰를 얻습니다.",
       "sourceId": "I243-5",
       "lineId": "L-I243-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "덧붙이자면 한 번쯤 조직 생활을 미리 보고 싶다면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I243-6",
-      "lineId": "L-I243-6",
       "official": false,
       "autoClassified": true
      },
@@ -51232,9 +51242,44 @@
     "interviewOnly": false,
     "lines": [
      {
+      "text": "공공 행정 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I060-4",
+      "lineId": "L-I060-4",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "교수님 소개로 알게 된 자리였습니다.",
       "sourceId": "I186-1",
       "lineId": "L-I186-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "짧아도 실무가 궁금하다면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I186-12",
+      "lineId": "L-I186-12",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "솔직히 말하면 공공 행정 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I204-6",
+      "lineId": "L-I204-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "지금 생각해도 전공 활용처를 고민 중이라면 지원해 볼 만합니다.",
+      "sourceId": "I273-3",
+      "lineId": "L-I273-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "한 번쯤 조직 생활을 미리 보고 싶다면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I109-7",
+      "lineId": "L-I109-7",
       "official": false,
       "autoClassified": true
      }
@@ -51426,13 +51471,6 @@
       "autoClassified": true
      },
      {
-      "text": "공공 행정 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I060-4",
-      "lineId": "L-I060-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "기관이 왜 절차를 중시하는지 이해하게 됐습니다.",
       "sourceId": "I070-3",
       "lineId": "L-I070-3",
@@ -51489,13 +51527,6 @@
       "autoClassified": true
      },
      {
-      "text": "짧아도 실무가 궁금하다면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I186-12",
-      "lineId": "L-I186-12",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "돌이켜 보면 문서 하나에도 근거 규정이 따라붙는 문화를 배웠습니다.",
       "sourceId": "I186-5",
       "lineId": "L-I186-5",
@@ -51541,20 +51572,6 @@
       "text": "돌이켜 보면 문서를 기관 양식에 맞추는 것부터가 기본기입니다.",
       "sourceId": "I204-5",
       "lineId": "L-I204-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "솔직히 말하면 공공 행정 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I204-6",
-      "lineId": "L-I204-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "지금 생각해도 전공 활용처를 고민 중이라면 지원해 볼 만합니다.",
-      "sourceId": "I273-3",
-      "lineId": "L-I273-3",
       "official": false,
       "autoClassified": true
      },
@@ -51625,13 +51642,6 @@
       "text": "돌이켜 보면 보고 전에 숫자 단위를 맞추는 것만으로도 신뢰를 얻습니다.",
       "sourceId": "I109-6",
       "lineId": "L-I109-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "한 번쯤 조직 생활을 미리 보고 싶다면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I109-7",
-      "lineId": "L-I109-7",
       "official": false,
       "autoClassified": true
      }
@@ -51940,7 +51950,7 @@
   "id": "N-3f3529",
   "program": "국제언어교류진흥원",
   "type": "인턴",
-  "oneLine": "담당 사업의 근거 규정을 먼저 읽어 두면 질문이 줄어듭니다.",
+  "oneLine": "저는 국제언어교류진흥원에서 두 달간 현장실습을 했습니다.",
   "forWhom": "사업 운영 지원 분야 현장실습을 생각하는 2~3학년",
   "evidenceCount": 52,
   "lastSemester": "2026-여름",
@@ -51955,6 +51965,41 @@
       "text": "덧붙이자면 전공을 살릴 곳을 찾다가 공고를 보고 바로 넣었습니다.",
       "sourceId": "I224-1",
       "lineId": "L-I224-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "사실 이 직무를 눈여겨봤던 분이라면 지원해 볼 만합니다.",
+      "sourceId": "I224-10",
+      "lineId": "L-I224-10",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "짧아도 실무가 궁금하다면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I083-6",
+      "lineId": "L-I083-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "덧붙이자면 이 직무를 눈여겨봤던 분이라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I137-6",
+      "lineId": "L-I137-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "전공 활용처를 고민 중이라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I090-3",
+      "lineId": "L-I090-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "공공 행정 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I121-7",
+      "lineId": "L-I121-7",
       "official": false,
       "autoClassified": true
      }
@@ -52195,13 +52240,6 @@
       "autoClassified": true
      },
      {
-      "text": "사실 이 직무를 눈여겨봤던 분이라면 지원해 볼 만합니다.",
-      "sourceId": "I224-10",
-      "lineId": "L-I224-10",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "덧붙이자면 예산 항목이 왜 그렇게 촘촘한지 보고서를 만들며 깨달았습니다.",
       "sourceId": "I224-5",
       "lineId": "L-I224-5",
@@ -52258,13 +52296,6 @@
       "autoClassified": true
      },
      {
-      "text": "짧아도 실무가 궁금하다면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I083-6",
-      "lineId": "L-I083-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "덧붙이자면 문서 하나에도 근거 규정이 따라붙는 문화를 배웠습니다.",
       "sourceId": "I137-3",
       "lineId": "L-I137-3",
@@ -52286,20 +52317,6 @@
       "autoClassified": true
      },
      {
-      "text": "덧붙이자면 이 직무를 눈여겨봤던 분이라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I137-6",
-      "lineId": "L-I137-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "전공 활용처를 고민 중이라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I090-3",
-      "lineId": "L-I090-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "솔직히 말하면 문서 하나에도 근거 규정이 따라붙는 꼼꼼함을 배웠습니다.",
       "sourceId": "I121-3",
       "lineId": "L-I121-3",
@@ -52317,13 +52334,6 @@
       "text": "문서를 기관 양식에 맞추는 것부터가 절반입니다.",
       "sourceId": "I121-6",
       "lineId": "L-I121-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "공공 행정 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I121-7",
-      "lineId": "L-I121-7",
       "official": false,
       "autoClassified": true
      }
@@ -52624,9 +52634,30 @@
     "interviewOnly": false,
     "lines": [
      {
+      "text": "덧붙이자면 짧아도 실무가 궁금하다면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I192-3",
+      "lineId": "L-I192-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "진로가 막막한 분이라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I163-7",
+      "lineId": "L-I163-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "지금 생각해도 채용 공고로만 보던 분야를 안에서 확인하고 싶었습니다.",
       "sourceId": "I242-1",
       "lineId": "L-I242-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "돌이켜 보면 짧아도 실무가 궁금하다면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I242-10",
+      "lineId": "L-I242-10",
       "official": false,
       "autoClassified": true
      }
@@ -52755,13 +52786,6 @@
       "autoClassified": true
      },
      {
-      "text": "덧붙이자면 짧아도 실무가 궁금하다면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I192-3",
-      "lineId": "L-I192-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "덧붙이자면 모르는 서류는 그날그날 질문하는 편이 낫습니다.",
       "sourceId": "I192-4",
       "lineId": "L-I192-4",
@@ -52786,20 +52810,6 @@
       "text": "사실 환율 창을 켜 두는 습관이 들면 업무 감이 빨리 잡힙니다.",
       "sourceId": "I163-6",
       "lineId": "L-I163-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "진로가 막막한 분이라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I163-7",
-      "lineId": "L-I163-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "돌이켜 보면 짧아도 실무가 궁금하다면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I242-10",
-      "lineId": "L-I242-10",
       "official": false,
       "autoClassified": true
      },
@@ -53032,7 +53042,7 @@
   "id": "N-d23cf8",
   "program": "두레텍스㈜ 해외영업팀",
   "type": "인턴",
-  "oneLine": "시차를 계산해 메일 보낼 시간을 고르는 것도 일의 일부라는 걸 알았습니다.",
+  "oneLine": "두레텍스㈜ 해외영업팀에서 8주간 해외영업 지원 업무를 경험했습니다.",
   "forWhom": "해외마케팅 지원 분야 현장실습을 생각하는 2~3학년",
   "evidenceCount": 32,
   "lastSemester": "2026-여름",
@@ -53042,7 +53052,36 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "덧붙이자면 이 직무를 눈여겨봤던 분이라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I203-6",
+      "lineId": "L-I203-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "해외영업 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I205-7",
+      "lineId": "L-I205-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "솔직히 말하면 해외영업 분야가 궁금한 후배라면 지원해 볼 만합니다.",
+      "sourceId": "I229-3",
+      "lineId": "L-I229-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "솔직히 말하면 한 번쯤 조직 생활을 미리 보고 싶다면 지원해 볼 만합니다.",
+      "sourceId": "I246-6",
+      "lineId": "L-I246-6",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -53195,13 +53234,6 @@
       "autoClassified": true
      },
      {
-      "text": "덧붙이자면 이 직무를 눈여겨봤던 분이라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I203-6",
-      "lineId": "L-I203-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "돌이켜 보면 보고서를 핵심만 남기고 줄이는 연습이 많이 됐습니다.",
       "sourceId": "I205-3",
       "lineId": "L-I205-3",
@@ -53219,20 +53251,6 @@
       "text": "지금 생각해도 환율과 인코텀즈 기본 개념은 미리 보고 가면 좋습니다.",
       "sourceId": "I205-6",
       "lineId": "L-I205-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "해외영업 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I205-7",
-      "lineId": "L-I205-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "솔직히 말하면 해외영업 분야가 궁금한 후배라면 지원해 볼 만합니다.",
-      "sourceId": "I229-3",
-      "lineId": "L-I229-3",
       "official": false,
       "autoClassified": true
      },
@@ -53268,13 +53286,6 @@
       "text": "돌이켜 보면 회의록을 잘 쓰면 금방 신뢰를 얻습니다.",
       "sourceId": "I246-5",
       "lineId": "L-I246-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "솔직히 말하면 한 번쯤 조직 생활을 미리 보고 싶다면 지원해 볼 만합니다.",
-      "sourceId": "I246-6",
-      "lineId": "L-I246-6",
       "official": false,
       "autoClassified": true
      }
@@ -53473,7 +53484,22 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "솔직히 말하면 짧아도 실무가 궁금하다면 지원해 볼 만합니다.",
+      "sourceId": "I209-4",
+      "lineId": "L-I209-4",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "기업 실무 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I201-7",
+      "lineId": "L-I201-7",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -53598,13 +53624,6 @@
       "autoClassified": true
      },
      {
-      "text": "솔직히 말하면 짧아도 실무가 궁금하다면 지원해 볼 만합니다.",
-      "sourceId": "I209-4",
-      "lineId": "L-I209-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "사실 결재 문서가 올라가는 경로를 보며 조직이 책임을 나누는 방식을 배웠습니다.",
       "sourceId": "I269-3",
       "lineId": "L-I269-3",
@@ -53671,13 +53690,6 @@
       "text": "솔직히 말하면 엑셀 단축키 몇 개만 익혀 가도 일이 눈에 띄게 빨라집니다.",
       "sourceId": "I201-6",
       "lineId": "L-I201-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "기업 실무 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I201-7",
-      "lineId": "L-I201-7",
       "official": false,
       "autoClassified": true
      }
@@ -54071,7 +54083,15 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "현지 온라인 실습 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I210-3",
+      "lineId": "L-I210-3",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -54143,13 +54163,6 @@
       "text": "제출 전에 원어민 친구에게 검토를 받으면 배우는 게 많습니다.",
       "sourceId": "I250-3",
       "lineId": "L-I250-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "현지 온라인 실습 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I210-3",
-      "lineId": "L-I210-3",
       "official": false,
       "autoClassified": true
      }
@@ -54243,6 +54256,13 @@
       "text": "덧붙이자면 자기소개서에 쓸 경험이 필요하다는 현실적인 계산으로 지원했습니다.",
       "sourceId": "I047-1",
       "lineId": "L-I047-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "공공 행정 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I146-6",
+      "lineId": "L-I146-6",
       "official": false,
       "autoClassified": true
      }
@@ -54423,13 +54443,6 @@
       "text": "돌이켜 보면 전화 응대 멘트를 미리 적어 두면 응대가 한결 수월합니다.",
       "sourceId": "I146-5",
       "lineId": "L-I146-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "공공 행정 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I146-6",
-      "lineId": "L-I146-6",
       "official": false,
       "autoClassified": true
      },
@@ -54720,7 +54733,7 @@
   "id": "N-e800dc",
   "program": "유럽경제협력포럼 한국사무소",
   "type": "인턴",
-  "oneLine": "관심 지역 이슈를 평소에 챙겨 두면 회의 내용이 잘 들립니다.",
+  "oneLine": "방학 동안 유럽경제협력포럼 한국사무소에 다니며 사무 일을 가까이서 봤습니다.",
   "forWhom": "사업지원 분야 현장실습을 생각하는 2~3학년",
   "evidenceCount": 50,
   "lastSemester": "2026-여름",
@@ -54732,9 +54745,51 @@
     "interviewOnly": false,
     "lines": [
      {
+      "text": "국제협력 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I077-7",
+      "lineId": "L-I077-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "덧붙이자면 한 번쯤 조직 생활을 미리 보고 싶다면 지원해 볼 만합니다.",
+      "sourceId": "I178-7",
+      "lineId": "L-I178-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "솔직히 말하면 진로가 막막한 분이라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I181-3",
+      "lineId": "L-I181-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "전공을 살릴 곳을 찾다가 지원하게 됐습니다.",
       "sourceId": "I073-1",
       "lineId": "L-I073-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "짧아도 실무가 궁금하다면 한 학기 투자할 가치가 있습니다.",
+      "sourceId": "I150-6",
+      "lineId": "L-I150-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "사실 이 직무를 눈여겨봤던 분이라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I168-4",
+      "lineId": "L-I168-4",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "지금 생각해도 국제협력 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I260-4",
+      "lineId": "L-I260-4",
       "official": false,
       "autoClassified": true
      }
@@ -54940,13 +54995,6 @@
       "autoClassified": true
      },
      {
-      "text": "국제협력 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I077-7",
-      "lineId": "L-I077-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "솔직히 말하면 국제협력 분야가 실제로 무엇을 하는 곳인지 감을 잡았습니다.",
       "sourceId": "I178-3",
       "lineId": "L-I178-3",
@@ -54964,20 +55012,6 @@
       "text": "돌이켜 보면 행사 전날 체크리스트를 한 번 더 점검하면 티가 납니다.",
       "sourceId": "I178-6",
       "lineId": "L-I178-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "덧붙이자면 한 번쯤 조직 생활을 미리 보고 싶다면 지원해 볼 만합니다.",
-      "sourceId": "I178-7",
-      "lineId": "L-I178-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "솔직히 말하면 진로가 막막한 분이라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I181-3",
-      "lineId": "L-I181-3",
       "official": false,
       "autoClassified": true
      },
@@ -55059,13 +55093,6 @@
       "autoClassified": true
      },
      {
-      "text": "짧아도 실무가 궁금하다면 한 학기 투자할 가치가 있습니다.",
-      "sourceId": "I150-6",
-      "lineId": "L-I150-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "지금 생각해도 러시아어 메일을 실전에서 매일 쓰다 보니 교과서 표현과 현장 표현이 꽤 다르다는 걸 알았습니다.",
       "sourceId": "I274-3",
       "lineId": "L-I274-3",
@@ -55073,23 +55100,9 @@
       "autoClassified": true
      },
      {
-      "text": "사실 이 직무를 눈여겨봤던 분이라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I168-4",
-      "lineId": "L-I168-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "덧붙이자면 국제협력 분야가 어떤 일로 이루어지는지 감을 잡았습니다.",
       "sourceId": "I260-3",
       "lineId": "L-I260-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "지금 생각해도 국제협력 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I260-4",
-      "lineId": "L-I260-4",
       "official": false,
       "autoClassified": true
      }
@@ -55378,7 +55391,36 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "돌이켜 보면 진로가 막막한 분이라면 지원해 볼 만합니다.",
+      "sourceId": "I226-6",
+      "lineId": "L-I226-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "지금 생각해도 기업 실무 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I252-7",
+      "lineId": "L-I252-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "지금 생각해도 진로가 막막한 분이라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I158-4",
+      "lineId": "L-I158-4",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "기업 실무 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I238-3",
+      "lineId": "L-I238-3",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -55552,13 +55594,6 @@
       "autoClassified": true
      },
      {
-      "text": "돌이켜 보면 진로가 막막한 분이라면 지원해 볼 만합니다.",
-      "sourceId": "I226-6",
-      "lineId": "L-I226-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "회사가 부서 간 협업으로 움직이는 과정을 매일 체감했습니다.",
       "sourceId": "I094-3",
       "lineId": "L-I094-3",
@@ -55594,13 +55629,6 @@
       "autoClassified": true
      },
      {
-      "text": "지금 생각해도 기업 실무 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I252-7",
-      "lineId": "L-I252-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "돌이켜 보면 전공 활용처를 고민 중이라면 한 학기 투자할 가치가 있습니다.",
       "sourceId": "I256-3",
       "lineId": "L-I256-3",
@@ -55618,20 +55646,6 @@
       "text": "사소한 일도 기한을 지키는 게 가장 큰 인상을 남깁니다.",
       "sourceId": "I158-3",
       "lineId": "L-I158-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "지금 생각해도 진로가 막막한 분이라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I158-4",
-      "lineId": "L-I158-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "기업 실무 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I238-3",
-      "lineId": "L-I238-3",
       "official": false,
       "autoClassified": true
      },
@@ -55883,9 +55897,23 @@
     "interviewOnly": false,
     "lines": [
      {
+      "text": "진로가 막막한 분이라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I056-6",
+      "lineId": "L-I056-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "자기소개서에 쓸 경험이 필요하다는 현실적인 계산으로 지원했습니다.",
       "sourceId": "I096-1",
       "lineId": "L-I096-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "돌이켜 보면 이 직무를 눈여겨봤던 분이라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I182-7",
+      "lineId": "L-I182-7",
       "official": false,
       "autoClassified": true
      }
@@ -56000,13 +56028,6 @@
       "autoClassified": true
      },
      {
-      "text": "진로가 막막한 분이라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I056-6",
-      "lineId": "L-I056-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "그렇지만 덕분에 맷집이 생겼습니다.",
       "sourceId": "I096-10",
       "lineId": "L-I096-10",
@@ -56094,13 +56115,6 @@
       "text": "솔직히 말하면 맞춤법 검사기는 보조 도구일 뿐입니다.",
       "sourceId": "I182-6",
       "lineId": "L-I182-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "돌이켜 보면 이 직무를 눈여겨봤던 분이라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I182-7",
-      "lineId": "L-I182-7",
       "official": false,
       "autoClassified": true
      }
@@ -56296,6 +56310,13 @@
       "lineId": "L-I063-1",
       "official": false,
       "autoClassified": true
+     },
+     {
+      "text": "진로가 막막한 분이라면 지원해 볼 만합니다.",
+      "sourceId": "I141-3",
+      "lineId": "L-I141-3",
+      "official": false,
+      "autoClassified": true
      }
     ]
    },
@@ -56390,13 +56411,6 @@
       "text": "그렇지만 버틴 만큼 남는 게 있었습니다.",
       "sourceId": "I063-9",
       "lineId": "L-I063-9",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "진로가 막막한 분이라면 지원해 볼 만합니다.",
-      "sourceId": "I141-3",
-      "lineId": "L-I141-3",
       "official": false,
       "autoClassified": true
      },
@@ -56517,7 +56531,15 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "지금 생각해도 현지 온라인 실습 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I268-3",
+      "lineId": "L-I268-3",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -56557,13 +56579,6 @@
     "name": "배운점",
     "interviewOnly": false,
     "lines": [
-     {
-      "text": "지금 생각해도 현지 온라인 실습 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I268-3",
-      "lineId": "L-I268-3",
-      "official": false,
-      "autoClassified": true
-     },
      {
       "text": "돌이켜 보면 현지 담당자와 소통하며 표현력이 늘었습니다.",
       "sourceId": "I268-4",
@@ -56638,7 +56653,7 @@
   "id": "N-a16b19",
   "program": "데일리온미디어",
   "type": "인턴",
-  "oneLine": "독자의 눈으로 제목을 다시 보는 습관이 생겼습니다.",
+  "oneLine": "저는 데일리온미디어에서 8주간 현장실습을 했습니다.",
   "forWhom": "콘텐츠 제작 지원 분야 현장실습을 생각하는 2~3학년",
   "evidenceCount": 40,
   "lastSemester": "2026-여름",
@@ -56653,6 +56668,27 @@
       "text": "사실 채용 공고로만 보던 분야를 직접 들여다보고 싶었습니다.",
       "sourceId": "I267-1",
       "lineId": "L-I267-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "돌이켜 보면 짧아도 실무가 궁금하다면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I267-11",
+      "lineId": "L-I267-11",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "지금 생각해도 이 직무를 눈여겨봤던 분이라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I193-3",
+      "lineId": "L-I193-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "짧아도 실무가 궁금하다면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I140-6",
+      "lineId": "L-I140-6",
       "official": false,
       "autoClassified": true
      }
@@ -56865,13 +56901,6 @@
       "autoClassified": true
      },
      {
-      "text": "돌이켜 보면 짧아도 실무가 궁금하다면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I267-11",
-      "lineId": "L-I267-11",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "돌이켜 보면 정정 요청 하나에 모두가 긴장하는 걸 봤습니다.",
       "sourceId": "I267-5",
       "lineId": "L-I267-5",
@@ -56900,13 +56929,6 @@
       "autoClassified": true
      },
      {
-      "text": "지금 생각해도 이 직무를 눈여겨봤던 분이라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I193-3",
-      "lineId": "L-I193-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "돌이켜 보면 자막 오탈자를 잡는 눈은 연습으로 길러집니다.",
       "sourceId": "I221-3",
       "lineId": "L-I221-3",
@@ -56931,13 +56953,6 @@
       "text": "사실 자막 오탈자를 잡는 눈은 많이 읽을수록 좋아집니다.",
       "sourceId": "I140-5",
       "lineId": "L-I140-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "짧아도 실무가 궁금하다면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I140-6",
-      "lineId": "L-I140-6",
       "official": false,
       "autoClassified": true
      }
@@ -57176,7 +57191,15 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "지금 생각해도 온라인 실습 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I078-4",
+      "lineId": "L-I078-4",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -57248,13 +57271,6 @@
       "text": "지금 생각해도 진로의 방향을 잡는 데 도움이 된 시간이었습니다.",
       "sourceId": "I071-6",
       "lineId": "L-I071-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "지금 생각해도 온라인 실습 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I078-4",
-      "lineId": "L-I078-4",
       "official": false,
       "autoClassified": true
      }
@@ -57345,9 +57361,23 @@
     "interviewOnly": false,
     "lines": [
      {
+      "text": "짧아도 실무가 궁금하다면 이만한 기회가 드뭅니다.",
+      "sourceId": "I072-6",
+      "lineId": "L-I072-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "돌이켜 보면 전공을 살릴 곳을 찾다가 공고를 보고 바로 넣었습니다.",
       "sourceId": "I223-1",
       "lineId": "L-I223-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "덧붙이자면 전공 활용처를 고민 중이라면 지원해 볼 만합니다.",
+      "sourceId": "I223-11",
+      "lineId": "L-I223-11",
       "official": false,
       "autoClassified": true
      }
@@ -57469,13 +57499,6 @@
       "autoClassified": true
      },
      {
-      "text": "짧아도 실무가 궁금하다면 이만한 기회가 드뭅니다.",
-      "sourceId": "I072-6",
-      "lineId": "L-I072-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "돌이켜 보면 번역이 언어 실력만이 아니라 프로세스로 완성된다는 걸 배웠습니다.",
       "sourceId": "I126-3",
       "lineId": "L-I126-3",
@@ -57493,13 +57516,6 @@
       "text": "지금 생각해도 모호한 원문은 임의로 옮기지 말고 주석을 남겨야 합니다.",
       "sourceId": "I223-10",
       "lineId": "L-I223-10",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "덧붙이자면 전공 활용처를 고민 중이라면 지원해 볼 만합니다.",
-      "sourceId": "I223-11",
-      "lineId": "L-I223-11",
       "official": false,
       "autoClassified": true
      },
@@ -57703,7 +57719,15 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "솔직히 말하면 진로가 막막한 분이라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I173-4",
+      "lineId": "L-I173-4",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -57747,13 +57771,6 @@
       "text": "덧붙이자면 거래처 메일 한 통에도 회사의 신뢰가 걸려 있다는 걸 배웠습니다.",
       "sourceId": "I173-3",
       "lineId": "L-I173-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "솔직히 말하면 진로가 막막한 분이라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I173-4",
-      "lineId": "L-I173-4",
       "official": false,
       "autoClassified": true
      },
@@ -57848,9 +57865,37 @@
     "interviewOnly": false,
     "lines": [
      {
+      "text": "덧붙이자면 진로가 막막한 분이라면 지원해 볼 만합니다.",
+      "sourceId": "I138-7",
+      "lineId": "L-I138-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "솔직히 말하면 전공을 살릴 곳을 찾다가 공고를 보고 바로 넣었습니다.",
       "sourceId": "I227-1",
       "lineId": "L-I227-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "지금 생각해도 짧아도 실무가 궁금하다면 한 학기 투자할 가치가 있습니다.",
+      "sourceId": "I227-11",
+      "lineId": "L-I227-11",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "덧붙이자면 해외 시장 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I270-6",
+      "lineId": "L-I270-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "덧붙이자면 해외 시장 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
+      "sourceId": "I218-6",
+      "lineId": "L-I218-6",
       "official": false,
       "autoClassified": true
      }
@@ -58028,23 +58073,9 @@
       "autoClassified": true
      },
      {
-      "text": "덧붙이자면 진로가 막막한 분이라면 지원해 볼 만합니다.",
-      "sourceId": "I138-7",
-      "lineId": "L-I138-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "덧붙이자면 출국 전에 주재국의 기본 경제 지표를 훑어 두면 회의 내용이 들립니다.",
       "sourceId": "I227-10",
       "lineId": "L-I227-10",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "지금 생각해도 짧아도 실무가 궁금하다면 한 학기 투자할 가치가 있습니다.",
-      "sourceId": "I227-11",
-      "lineId": "L-I227-11",
       "official": false,
       "autoClassified": true
      },
@@ -58094,13 +58125,6 @@
       "text": "사실 혼자 보내는 저녁을 위한 루틴이 있으면 외로움이 덜합니다.",
       "sourceId": "I270-5",
       "lineId": "L-I270-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "덧붙이자면 해외 시장 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I270-6",
-      "lineId": "L-I270-6",
       "official": false,
       "autoClassified": true
      },
@@ -58157,13 +58181,6 @@
       "text": "솔직히 말하면 출국 전에 주재국의 기본 경제 지표를 훑어 두면 리포트 쓸 때 덜 막힙니다.",
       "sourceId": "I218-5",
       "lineId": "L-I218-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "덧붙이자면 해외 시장 분야가 궁금한 후배라면 좋은 출발점이 될 겁니다.",
-      "sourceId": "I218-6",
-      "lineId": "L-I218-6",
       "official": false,
       "autoClassified": true
      },
@@ -58681,6 +58698,13 @@
       "lineId": "L-I106-1",
       "official": false,
       "autoClassified": true
+     },
+     {
+      "text": "사실 진로가 막막한 분이라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I156-7",
+      "lineId": "L-I156-7",
+      "official": false,
+      "autoClassified": true
      }
     ]
    },
@@ -58861,13 +58885,6 @@
       "lineId": "L-I156-6",
       "official": false,
       "autoClassified": true
-     },
-     {
-      "text": "사실 진로가 막막한 분이라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I156-7",
-      "lineId": "L-I156-7",
-      "official": false,
-      "autoClassified": true
      }
     ]
    },
@@ -59034,7 +59051,15 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "관광 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
+      "sourceId": "I148-3",
+      "lineId": "L-I148-3",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -59085,13 +59110,6 @@
       "text": "솔직히 말하면 클레임 응대를 보며 사과와 설명의 순서가 얼마나 중요한지 알았습니다.",
       "sourceId": "I107-4",
       "lineId": "L-I107-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "관광 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
-      "sourceId": "I148-3",
-      "lineId": "L-I148-3",
       "official": false,
       "autoClassified": true
      }
@@ -59165,7 +59183,22 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "사실 번역 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I195-7",
+      "lineId": "L-I195-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "번역 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I125-8",
+      "lineId": "L-I125-8",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -59241,13 +59274,6 @@
       "autoClassified": true
      },
      {
-      "text": "사실 번역 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I195-7",
-      "lineId": "L-I195-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "지금 생각해도 같은 문장도 분야가 다르면 용어부터 달라진다는 걸 배웠습니다.",
       "sourceId": "I125-4",
       "lineId": "L-I125-4",
@@ -59272,13 +59298,6 @@
       "text": "덧붙이자면 모호한 원문은 임의로 옮기지 말고 주석을 남겨야 합니다.",
       "sourceId": "I125-7",
       "lineId": "L-I125-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "번역 분야가 궁금한 후배라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I125-8",
-      "lineId": "L-I125-8",
       "official": false,
       "autoClassified": true
      }
@@ -59382,7 +59401,7 @@
   "id": "N-0abf7d",
   "program": "KOTRA 해외무역관(CIS 권역)",
   "type": "인턴",
-  "oneLine": "전공 활용처를 고민 중이라면 다음 공고를 노려 보길 바랍니다.",
+  "oneLine": "KOTRA 해외무역관(CIS 권역)에서 두 달간 전시·행사 지원 업무를 배웠습니다.",
   "forWhom": "시장조사 지원 분야 현장실습을 생각하는 2~3학년",
   "evidenceCount": 15,
   "lastSemester": "2026-여름",
@@ -59392,7 +59411,29 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "사실 전공 활용처를 고민 중이라면 다음 공고를 노려 보길 바랍니다.",
+      "sourceId": "I127-4",
+      "lineId": "L-I127-4",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "한 번쯤 조직 생활을 미리 보고 싶다면 지원해 볼 만합니다.",
+      "sourceId": "I159-7",
+      "lineId": "L-I159-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "해외 시장 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I208-3",
+      "lineId": "L-I208-3",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -59454,13 +59495,6 @@
     "interviewOnly": false,
     "lines": [
      {
-      "text": "사실 전공 활용처를 고민 중이라면 다음 공고를 노려 보길 바랍니다.",
-      "sourceId": "I127-4",
-      "lineId": "L-I127-4",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "지금 생각해도 러시아어 전공을 실제 업무에 써 볼 수 있다는 점이 가장 좋았습니다.",
       "sourceId": "I127-5",
       "lineId": "L-I127-5",
@@ -59492,20 +59526,6 @@
       "text": "솔직히 말하면 출국 전에 주재국의 기본 경제 지표를 훑어 두면 업무 이해가 빠릅니다.",
       "sourceId": "I159-6",
       "lineId": "L-I159-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "한 번쯤 조직 생활을 미리 보고 싶다면 지원해 볼 만합니다.",
-      "sourceId": "I159-7",
-      "lineId": "L-I159-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "해외 시장 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I208-3",
-      "lineId": "L-I208-3",
       "official": false,
       "autoClassified": true
      }
@@ -59619,7 +59639,29 @@
    {
     "name": "지원동기",
     "interviewOnly": false,
-    "lines": []
+    "lines": [
+     {
+      "text": "솔직히 말하면 관광 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
+      "sourceId": "I265-3",
+      "lineId": "L-I265-3",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "지금 생각해도 짧아도 실무가 궁금하다면 이만한 기회가 드뭅니다.",
+      "sourceId": "I235-6",
+      "lineId": "L-I235-6",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "사실 짧아도 실무가 궁금하다면 한 학기 투자할 가치가 있습니다.",
+      "sourceId": "I248-6",
+      "lineId": "L-I248-6",
+      "official": false,
+      "autoClassified": true
+     }
+    ]
    },
    {
     "name": "업무내용",
@@ -59716,13 +59758,6 @@
     "interviewOnly": false,
     "lines": [
      {
-      "text": "솔직히 말하면 관광 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
-      "sourceId": "I265-3",
-      "lineId": "L-I265-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "지금 생각해도 점심시간마다 직원분들이 번갈아 밥을 사 주셔서 회사 이야기를 많이 들었습니다.",
       "sourceId": "I179-4",
       "lineId": "L-I179-4",
@@ -59765,13 +59800,6 @@
       "autoClassified": true
      },
      {
-      "text": "지금 생각해도 짧아도 실무가 궁금하다면 이만한 기회가 드뭅니다.",
-      "sourceId": "I235-6",
-      "lineId": "L-I235-6",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "솔직히 말하면 고객 응대에서 단어 선택의 무게를 배웠습니다.",
       "sourceId": "I248-3",
       "lineId": "L-I248-3",
@@ -59789,13 +59817,6 @@
       "text": "돌이켜 보면 지도 앱에 즐겨찾기를 쌓는 습관이 업무에 그대로 쓰였습니다.",
       "sourceId": "I248-5",
       "lineId": "L-I248-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "사실 짧아도 실무가 궁금하다면 한 학기 투자할 가치가 있습니다.",
-      "sourceId": "I248-6",
-      "lineId": "L-I248-6",
       "official": false,
       "autoClassified": true
      }
@@ -59961,6 +59982,20 @@
       "lineId": "L-I249-1",
       "official": false,
       "autoClassified": true
+     },
+     {
+      "text": "솔직히 말하면 진로가 막막한 분이라면 지원해 볼 만합니다.",
+      "sourceId": "I249-11",
+      "lineId": "L-I249-11",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "사실 스타트업 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
+      "sourceId": "I172-4",
+      "lineId": "L-I172-4",
+      "official": false,
+      "autoClassified": true
      }
     ]
    },
@@ -60024,13 +60059,6 @@
     "interviewOnly": false,
     "lines": [
      {
-      "text": "솔직히 말하면 진로가 막막한 분이라면 지원해 볼 만합니다.",
-      "sourceId": "I249-11",
-      "lineId": "L-I249-11",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "돌이켜 보면 사수분이 제 눈높이에 맞춰 설명해 주셔서 일이 금방 손에 익었습니다.",
       "sourceId": "I249-6",
       "lineId": "L-I249-6",
@@ -60062,13 +60090,6 @@
       "text": "지금 생각해도 지표가 나빠지면 그 주의 할 일이 즉시 재편되는 걸 경험했습니다.",
       "sourceId": "I172-3",
       "lineId": "L-I172-3",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "사실 스타트업 분야가 궁금한 후배라면 한 학기 투자할 가치가 있습니다.",
-      "sourceId": "I172-4",
-      "lineId": "L-I172-4",
       "official": false,
       "autoClassified": true
      }
@@ -60184,9 +60205,30 @@
     "interviewOnly": false,
     "lines": [
      {
+      "text": "해외영업 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I180-7",
+      "lineId": "L-I180-7",
+      "official": false,
+      "autoClassified": true
+     },
+     {
       "text": "사실 방학을 그냥 보내기 아쉬워 지원했는데 생각보다 얻은 게 많았습니다.",
       "sourceId": "I232-1",
       "lineId": "L-I232-1",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "솔직히 말하면 해외영업 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
+      "sourceId": "I232-10",
+      "lineId": "L-I232-10",
+      "official": false,
+      "autoClassified": true
+     },
+     {
+      "text": "지금 생각해도 해외영업 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
+      "sourceId": "I275-6",
+      "lineId": "L-I275-6",
       "official": false,
       "autoClassified": true
      }
@@ -60280,20 +60322,6 @@
       "autoClassified": true
      },
      {
-      "text": "해외영업 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I180-7",
-      "lineId": "L-I180-7",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "솔직히 말하면 해외영업 분야가 궁금한 후배라면 이만한 기회가 드뭅니다.",
-      "sourceId": "I232-10",
-      "lineId": "L-I232-10",
-      "official": false,
-      "autoClassified": true
-     },
-     {
       "text": "네덜란드어 메일을 실전에서 처음 써 봤는데 교과서 표현과 현장 표현이 꽤 다르다는 걸 알았습니다.",
       "sourceId": "I232-5",
       "lineId": "L-I232-5",
@@ -60346,13 +60374,6 @@
       "text": "솔직히 말하면 제품 스펙 시트를 먼저 외우면 어떤 회의든 따라갈 수 있습니다.",
       "sourceId": "I275-5",
       "lineId": "L-I275-5",
-      "official": false,
-      "autoClassified": true
-     },
-     {
-      "text": "지금 생각해도 해외영업 분야가 궁금한 후배라면 시간이 아깝지 않을 겁니다.",
-      "sourceId": "I275-6",
-      "lineId": "L-I275-6",
       "official": false,
       "autoClassified": true
      }
