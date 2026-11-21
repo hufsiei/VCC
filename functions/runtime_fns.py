@@ -516,8 +516,8 @@ def getInbox(me, p):
         my_notes = [{"id": k, "program": v["program"], "share": v["share"]}
                     for k, v in store.load("myNotes", {}).items() if v["owner"] == me]
         questions = [{"questionId": q["id"], "text": q["질문"], "askedAt": q["at"],
-                      "status": "answered" if q["status"] == "answered" else
-                                ("official" if q["status"] == "official" else "waiting"),
+                      # spec 4장 getInbox [11/19]: hold(미답변) | answered. 규정 질문은 official 그대로
+                      "status": q["status"] if q["status"] in ("answered", "official") else "hold",
                       **({"noteId": q["noteId"]} if q.get("noteId") else {}),
                       **({"answeredAt": q["answeredAt"]} if q.get("answeredAt") else {})}
                      for q in store.load("questions", []) if q["colreg_no"] == me]

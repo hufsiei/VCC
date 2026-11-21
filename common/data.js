@@ -61,6 +61,10 @@ function pickMock(m, name, p) {
       return m.getNote[p.id] || m.getNote["N-marburg"];
     case "checkMessage":
       return /\d{8,}/.test(p.text || "") ? m.checkMessage.blocked : m.checkMessage.ok;
+    case "getAdminOverview":
+    case "getAdminSuggestions":
+    case "getReportSettings":
+      return m[name][!p.dept || p.dept === "ALL" ? "ALL" : "D01"]; // mock은 전체·국제교류팀 두 벌(PRD 7장)
     case "respondRequest":
       return p.cancel ? m.cancelRequest : m.respondRequest; // 요청 취소(cancelRequest)도 같은 서버 함수
     default:
@@ -136,3 +140,17 @@ export const respondRequest = (threadId, accept) => call("respondRequest", { thr
 export const cancelRequest = (threadId) => call("respondRequest", { threadId, cancel: true });
 export const getInbox = () => call("getInbox");
 export const getDeptReport = (dept) => call("getDeptReport", { dept });
+
+// ── 관리자 콘솔(직원 계정 전용, PRD 7장·작업 66) ──
+// dept: "ALL" | 부서코드("D01"…). 부서 담당자(staff02)는 서버가 자기 부서로 고정한다.
+// period: { type: "semester" | "month", value: "2026-2" | "2026-11" } — 비우면 지금 학기
+export const getDepartments = () => call("getDepartments");
+export const getAdminOverview = (dept, period) => call("getAdminOverview", { dept, period });
+export const getAdminSuggestions = (dept, period) => call("getAdminSuggestions", { dept, period });
+export const setSuggestionStatus = (id, status) => call("setSuggestionStatus", { id, status }); // 새로 옴|검토 중|반영됨|보류
+export const getReportSettings = (dept) => call("getReportSettings", { dept });
+export const saveReportSettings = (dept, settings) => call("saveReportSettings", { dept, settings });
+export const issueReport = (dept, period) => call("issueReport", { dept, period });
+export const listIssuedReports = (dept) => call("listIssuedReports", { dept });
+// 이력 「열기」. html은 iframe srcdoc(sandbox)로만 보여 준다 — innerHTML 금지
+export const getIssuedReport = (reportId) => call("getIssuedReport", { reportId });
