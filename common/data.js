@@ -96,8 +96,16 @@ export function currentUser() {
   }
 }
 
+// 학번은 대소문자를 가리지 않는다: h0143 → H0143, STAFF01 → staff01 (mock·서버 공통)
+export function normalizeId(id) {
+  const s = String(id || "").trim();
+  if (/^h\d{4}$/i.test(s)) return s.toUpperCase();
+  if (/^staff\d+$/i.test(s)) return s.toLowerCase();
+  return s;
+}
+
 export const login = async (id, pw) => {
-  const res = await call("login", { id, pw });
+  const res = await call("login", { id: normalizeId(id), pw });
   if (res && res.ok && res.user) sessionStorage.setItem("me", JSON.stringify(res.user));
   return res;
 };

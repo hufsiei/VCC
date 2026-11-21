@@ -6,6 +6,7 @@
 #   logout(me, {token})  — 토큰을 폐기한다.
 #   getMe(me, {})        — 내 학생 행(번호·비번 제외) + 이수 기록 3종(시트 헤더 그대로, 본문 칸 제외)
 import json
+import re
 import os
 from pathlib import Path
 
@@ -62,8 +63,18 @@ def _pick(rows, id_key, me, keys):
     return [{k: r.get(k) for k in keys} for r in rows if r.get(id_key) == me]
 
 
+def _normalize_id(s):
+    """학번은 대소문자를 가리지 않는다: h0143 → H0143, STAFF01 → staff01 (data.js normalizeId와 같은 규칙)."""
+    s = str(s or "").strip()
+    if re.fullmatch(r"h\d{4}", s, re.I):
+        return s.upper()
+    if re.fullmatch(r"staff\d+", s, re.I):
+        return s.lower()
+    return s
+
+
 def login(me, p):
-    uid = str(p.get("id") or "").strip()
+    uid = _normalize_id(p.get("id"))
     row = student(uid)
     expected = _passwords().get(uid)
     if not row or expected is None or str(p.get("pw") or "") != str(expected):
