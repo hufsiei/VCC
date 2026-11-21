@@ -1,0 +1,22 @@
+#!/bin/sh
+# pre-push — push 전에 .githooks/pre_push_check.py(문법 검사 + functions/test_*.py)를 돌린다. 실패하면 push를 막는다.
+# 켜기(PC마다 한 번): git config core.hooksPath .githooks
+# 급할 때 건너뛰기: git push --no-verify
+
+# 브랜치 지우기만 하는 push(로컬 sha가 0)는 검사하지 않는다.
+only_delete=1
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$local_sha" in
+        *[!0]*) only_delete=0 ;;
+    esac
+done
+[ "$only_delete" = 1 ] && exit 0
+
+root=$(git rev-parse --show-toplevel)
+for py in python python3 py; do
+    if command -v "$py" >/dev/null 2>&1; then
+        exec "$py" -X utf8 "$root/.githooks/pre_push_check.py"
+    fi
+done
+echo "[pre-push] python을 찾지 못해 검사를 건너뜁니다." >&2
+exit 0
