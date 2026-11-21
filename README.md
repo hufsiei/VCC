@@ -34,3 +34,5 @@ python -m http.server 8000
 
 파일을 더블클릭해 열면 동작하지 않습니다. 반드시 위 서버로 `localhost:8000`에서 엽니다.
 기본은 mock 데이터(`common/mock-data.json`)로 동작합니다(`common/data.js`의 `USE_MOCK`).
+함수마다 따로 서버로 보내려면 `data.js`의 `SERVER_FNS`(또는 되돌릴 때 `MOCK_FNS`)에 함수 이름을 적습니다.
+코드를 고치지 않고 확인할 때는 localhost에서 주소 끝에 `?server=all` 또는 `?server=sendMessage,getMessages`를 붙입니다. 그 탭에서만 기억하고(두 창 시연), `?server=`로 해제합니다. 서버로 가는 함수가 하나라도 있으면 로그인도 서버로 가므로 다시 로그인합니다. 서버(`functions/local_fn.py`)는 미리 PC에서만 켭니다.

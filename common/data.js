@@ -2,8 +2,42 @@
 // 화면은 이 파일의 함수만 부릅니다. 응답 모양은 명세 4장을 따릅니다.
 // 사용: <script type="module"> import { askBoo } from "../../common/data.js"; </script>
 
-export const USE_MOCK = true; // true: common/mock-data.json, false: 서버 함수
+export const USE_MOCK = true; // 기본값. true: common/mock-data.json, false: 서버 함수
 const FN_BASE = "http://localhost:8787";
+
+// [작업 29] 함수별 스위치 — USE_MOCK과 반대로 보낼 함수만 적는다.
+// 전환 순서(작업 29): login·getMe → askBoo → 들려주기 → 노트 → 닮은선배·쪽지 → 콘솔. 실패한 함수만 MOCK_FNS로 되돌린다.
+const SERVER_FNS = []; // USE_MOCK = true여도 서버로 보낼 함수. 예: ["recommendSeniors", "sendMessage", "getMessages"]
+const MOCK_FNS = []; //   USE_MOCK = false여도 mock으로 되돌릴 함수
+// 서버 함수는 로그인 토큰(X-Token)이 있어야 하므로, 서버로 가는 함수가 하나라도 있으면 로그인도 서버로 간다.
+const AUTH_FNS = ["login", "logout", "getMe"];
+
+// 로컬 확인용(미리 PC, localhost에서만): 주소 끝에 ?server=all 또는 ?server=sendMessage,getMessages
+// → 그 탭에서만 기억(sessionStorage, 두 창 시연). ?server= (빈 값)으로 해제. 공개 주소(GitHub Pages)에서는 무시한다.
+function localServerFns() {
+  try {
+    if (!["localhost", "127.0.0.1"].includes(location.hostname)) return [];
+    const q = new URLSearchParams(location.search);
+    if (q.has("server")) {
+      const v = q.get("server").trim();
+      if (v) sessionStorage.setItem("vccServer", v);
+      else sessionStorage.removeItem("vccServer");
+    }
+    const saved = sessionStorage.getItem("vccServer") || "";
+    return saved ? saved.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+// 이 함수를 mock으로 부를지
+export function isMock(name) {
+  const server = [...SERVER_FNS, ...localServerFns()];
+  if (server.includes("all")) return false;
+  if (!USE_MOCK) return MOCK_FNS.includes(name) && !AUTH_FNS.includes(name);
+  if (server.includes(name)) return false;
+  return !(server.length && AUTH_FNS.includes(name));
+}
 
 let mockPromise = null;
 function loadMock() {
@@ -74,7 +108,7 @@ function pickMock(m, name, p) {
 
 async function call(name, payload = {}) {
   try {
-    if (USE_MOCK) {
+    if (isMock(name)) {
       const m = await loadMock();
       return structuredClone(pickMock(m, name, payload));
     }
@@ -117,7 +151,7 @@ export const login = async (id, pw) => {
 };
 export const logout = () => {
   // 서버에서 토큰 폐기. call()이 헤더를 먼저 만든 뒤 지우므로 기다리지 않아도 토큰이 실려 간다(화면은 바로 이동).
-  const done = USE_MOCK ? Promise.resolve() : call("logout");
+  const done = isMock("logout") ? Promise.resolve() : call("logout");
   sessionStorage.removeItem("me");
   return done;
 };
