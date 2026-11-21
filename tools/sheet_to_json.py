@@ -42,7 +42,19 @@ ALIASES = {
     "KOTRA 해외무역관(중남미 권역)": ["KOTRA 중남미 무역관", "KOTRA 중남미", "코트라 중남미"],
     "㈜한백인터내셔널 해외영업팀": ["한백인터내셔널"],   # 11/20 개발 질문 57
     "그렌버그코리아㈜": ["그렌버그코리아"],               # 11/20 개발 질문 70
+    # 11/22 작업 81: 나머지 KOTRA 권역도 중남미와 같은 모양으로
+    "KOTRA 해외무역관(유럽 권역)": ["KOTRA 유럽 무역관", "KOTRA 유럽", "코트라 유럽"],
+    "KOTRA 해외무역관(CIS 권역)": ["KOTRA CIS 무역관", "KOTRA CIS", "코트라 CIS"],
 }
+# 11/22 작업 81: 현장실습 업체는 ㈜·(유)·(온라인)·'해외영업팀'·'한국/서울사무소'를 뗀 이름도 별칭으로 자동 추가
+#   예) ㈜글로벌랭스 → 글로벌랭스, 두레텍스㈜ 해외영업팀 → 두레텍스, 국제청년교류기구 한국사무소 → 국제청년교류기구
+SHORT_DROP = re.compile(r"㈜|\(유\)|\(온라인\)")
+SHORT_TAIL = re.compile(r"\s*(?:해외영업팀|한국사무소|서울사무소)$")
+
+
+def short_name(name):
+    s = SHORT_TAIL.sub("", SHORT_DROP.sub("", name)).strip()
+    return s if s != name and len(s.replace(" ", "")) >= 3 else None
 # 긴 이름 우선으로 풀리는 겹침(의도한 것만). (별칭, 겹치는 다른 프로그램명)
 ALIAS_OVERLAP_OK = {
     ("밀라노", "밀라노 협력기관(온라인)"),  # "밀라노 협력기관"이 있으면 긴 이름이 이김. "밀라노"만 쓰면 교환(대학교)
@@ -175,6 +187,10 @@ def main():
             errors.append(f"비교과 부서 미배정: {r['프로그램명']}")
         programs.append({"프로그램명": r["프로그램명"], "분야": "비교과", "세부": r.get("비교과 유형"),
                          "만족도(5점)": r.get("만족도(5점)"), "운영부서코드": code})
+    for p in programs:
+        short = short_name(p["프로그램명"]) if p["분야"] == "현장실습" else None
+        if short and short not in ALIASES.get(p["프로그램명"], []):
+            ALIASES.setdefault(p["프로그램명"], []).append(short)
     for p in programs:
         if p["프로그램명"] in ALIASES:
             p["별칭"] = ALIASES[p["프로그램명"]]
