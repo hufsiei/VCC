@@ -12,6 +12,10 @@ store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"
 
 import admin
 import runtime_fns as rf
+import suggest
+
+# 리포트 요약 AI는 부르지 않는다(실패 응답 → 템플릿 요약). AI 요약 검증은 test_suggest.py
+suggest.callAI = lambda *a, **k: {"ok": False, "text": "", "json": None, "model": "fake", "error": "시험"}
 from runtime_fns import add_question
 
 clock = [datetime(2026, 11, 21, 10, 0, tzinfo=rf.KST)]

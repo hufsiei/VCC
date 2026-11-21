@@ -11,6 +11,7 @@
 #   saveReportSettings·issueReport를 거절한다. 학생이 부르면 {"error": "볼 수 없는 기록이에요"}.
 # 개선 제안 묶음은 시드 로그로만 만든다(제안 문장은 작업 67이 data/suggestions.json에 미리 만들어 둔다 — 없으면 제목만).
 #   시연 중 새로 생긴 보류·규정 질문은 pendingNew로만 센다(「새 질문 N건 — 다음 집계 때 제안 생성」).
+# 리포트 요약은 issueReport 때 AI 1회(suggest.ai_summary, 실패하면 템플릿). 그래서 issueReport는 local_fn의 AI_ROUTES에 든다.
 # 리포트는 서버 함수가 불릴 때 예정일이 지났으면 그 자리에서 자동 발행한다(스케줄러 없음, PRD 5-4).
 import calendar
 import hashlib
@@ -23,6 +24,7 @@ from pathlib import Path
 
 import notes
 import store
+import suggest
 from runtime_fns import now, student
 
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -507,15 +509,20 @@ def _issue(dept, period, mode):
     ov = _overview(dept, period)
     sugg = {"suggestions": _suggestions(dept, start, end), "reported": _reported(dept, start, end)}
     settings = _settings(dept)
-    summary = _summary(ov)
+    # AI 요약 한 단락(작업 67). 입력에 없는 숫자·고유명사·URL이 있거나 실패하면 템플릿 문장
+    ov["deptName"] = "전체" if dept == "ALL" else (DEPT_BY_CODE.get(dept) or {}).get("부서명", dept)
+    text, source = suggest.ai_summary(ov, sugg)
+    summary = text or _summary(ov)
     rid = store.next_id("R")
     at = now()
     store.load("reportHtml", {})[rid] = _render(dept, ov, sugg, settings, summary)
     store.save("reportHtml")
     store.load("issuedReports", []).append({"reportId": rid, "issuedAt": at, "dept": dept, "period": period,
-                                            "mode": mode, "recipients": len(settings["recipients"]), "summary": summary})
+                                            "mode": mode, "recipients": len(settings["recipients"]), "summary": summary,
+                                            "summarySource": source or "template"})
     store.save("issuedReports")
-    return {"reportId": rid, "issuedAt": at, "html": store.load("reportHtml", {})[rid], "summary": summary}
+    return {"reportId": rid, "issuedAt": at, "html": store.load("reportHtml", {})[rid], "summary": summary,
+            "summarySource": source or "template"}
 
 
 def issueReport(me, p):

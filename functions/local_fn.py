@@ -27,7 +27,7 @@ ROUTES = {**ROUTES, **account.ROUTES, **admin.ROUTES, "askBoo": askBoo, "intervi
 NEEDS_NO_LOGIN = {"checkMessage", "login"}
 # 사용자별 호출 한도(limits.py, 분당 10·일 100)를 세는 함수. AI를 부르는 함수를 새로 연결하면 여기에 더한다
 # (checkMessage의 비방 판정은 작업 27).
-AI_ROUTES = {"askBoo", "interviewNext", "summarizeInterview"}
+AI_ROUTES = {"askBoo", "interviewNext", "summarizeInterview", "issueReport"}   # issueReport: 리포트 요약(작업 67)
 
 
 def practice(question):
