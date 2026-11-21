@@ -12,6 +12,7 @@
 #   봉인 세트는 1차(30)·최종(36) 측정 때만 돌리고, 결과를 보고 프롬프트를 고치지 않는다.
 # - 지표(PRD 1-2): 근거 없는 답변 0건 · 범위밖·함정 100% 보류 · 동의어 80% 이상 답변 · 규정오해 100% 공식 안내.
 #   근거 없는 답변 = 답한 줄 중 askboo.verify에 걸린 줄(숫자·고유명사·새 낱말)이 하나라도 있는 답, 또는 보류·공식안내여야 하는데 답한 것.
+#   보류·답변·공식안내 비율은 '유형'이 아니라 '기대결과'로 센다(함정 중에도 답해야 하는 질문이 있음).
 #   근거 적중 = 답변 기대 질문에서 답한 줄의 출처 중 하나라도 '기대 근거ID'에 들어 있음(참고 지표).
 # 결과: <out>/eval_<질문파일>_<모델>_<시각>.csv (질문별) + eval_요약_<시각>.csv (모델별)
 import argparse, csv, json, sys, time
@@ -84,7 +85,7 @@ def run(rows, model, askboo):
                 "줄수": len(lines), "폴백줄": sum(bool(ln.get("fallback")) for ln in lines),
                 "근거밖줄": " / ".join(bad), "초": sec,
                 "질문": r["질문"], "답": " / ".join(ln["text"] for ln in lines),
-                "출처": ", ".join(sorted(used)), "보류이유": res.get("why", "") or res.get("reason", ""),
+                "출처": ", ".join(sorted(used)), "보류이유": res.get("_why", ""),
             })
             print(f"  {out[-1]['일치']} {r['번호']:>3} [{r['기대결과']}/{r.get('유형','')}] → {got} ({sec}초)"
                   + (f"  근거밖 {len(bad)}줄" if bad else ""))
@@ -106,9 +107,10 @@ def summary(model, out):
         "정답률": f(rate(out, lambda r: True, lambda r: r["일치"] == "O")),
         "보류율": f(rate(out, lambda r: True, lambda r: r["결과"] == "hold")),
         "근거없는답(0건)": sum(r["근거없는답"] == "O" for r in out),
-        "범위밖·함정 보류(100%)": f(rate(out, lambda r: r["유형"] in ("범위밖", "함정"), lambda r: r["결과"] == "hold")),
-        "동의어 답변(80%)": f(rate(out, lambda r: r["유형"] == "동의어", lambda r: r["결과"] == "ok")),
-        "규정오해 공식안내(100%)": f(rate(out, lambda r: r["유형"] == "규정오해", lambda r: r["결과"] == "official")),
+        # 유형이 아니라 기대결과로 센다 — 함정 중에도 답해야 하는 별칭 질문이 있다(개발 35 '파리 제7대학교')
+        "범위밖·함정 보류(100%)": f(rate(out, lambda r: r["기대결과"] == "보류", lambda r: r["결과"] == "hold")),
+        "동의어 답변(80%)": f(rate(out, lambda r: r["기대결과"] == "답변", lambda r: r["결과"] == "ok")),
+        "규정오해 공식안내(100%)": f(rate(out, lambda r: r["기대결과"] == "공식안내", lambda r: r["결과"] == "official")),
         "근거적중(참고)": f(rate(out, lambda r: r["근거적중"], lambda r: r["근거적중"] == "O")),
         "폴백줄/전체줄": f"{sum(r['폴백줄'] for r in out)}/{sum(r['줄수'] for r in out)}",
         "평균초": round(sum(r["초"] for r in out) / max(len(out), 1), 1),
@@ -117,6 +119,8 @@ def summary(model, out):
 
 
 def write_csv(path, rows):
+    if not rows:
+        return
     with open(path, "w", encoding="utf-8-sig", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))
         w.writeheader()
@@ -131,6 +135,8 @@ def main():
     ap.add_argument("--only", default="", help="번호만 골라 실행(쉼표 구분)")
     ap.add_argument("--dry", action="store_true")
     a = ap.parse_args()
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")   # 한글 콘솔(cp949)에서도 출력이 깨지지 않게
 
     qpath, out_dir = Path(a.questions), Path(a.out)
     rows = read_questions(qpath)
@@ -145,6 +151,9 @@ def main():
     if a.dry:
         askboo.callAI = dry_call
     models = ["dry"] if a.dry else [m.strip() for m in a.model.split(",") if m.strip()]
+    wrong = [m for m in models if m not in ("표", "dry", "hcx", "sonnet", "opus", "claude")]
+    if wrong or not rows:
+        sys.exit(f"모델 이름 확인: {wrong}" if wrong else "측정할 질문이 없습니다(질문·기대결과 열 확인).")
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M")
     sums = []
