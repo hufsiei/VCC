@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-11-20T22:55+09:00",
+ "generatedAt": "2026-11-21T13:33+09:00",
  "source": "@VCC작업내역 v6.xlsx",
  "tasks": [
   {
@@ -2250,7 +2250,7 @@
   {
    "일자": "11/20(목)",
    "작성": "미리",
-   "내용": "[보안 보완 완료 — 작업 73·86, PR #70·#71 병합]\n1. 로그인하면 서버가 토큰을 발급하고 화면은 X-Token 헤더로 보냅니다. X-User 헤더는 더 이상 안 씁니다(토큰 없으면 \"로그인이 필요해요\").\n2. 로그인 비번은 data/에서 빼고 서버 환경변수 VCC_LOGIN_PW(.env·NCP 기본 파라미터)에만 둡니다. 시연 계정 비번은 새 값으로 바꿨고(값은 미리에게), students.json의 비번 열은 삭제했습니다.\n3. AI 함수 하루 전체 2,000건 상한(시연 계정 포함, 사용자별 한도만 면제).\n4. mock 모드(USE_MOCK=true)는 비번 대조 없이 staff01·staff02, H+숫자 4자리만 로그인됩니다.\n▶ 원우: sheet_to_json.py DROP_STUDENT에 \"비번\"을 넣었어요. 다음 변환 전에 최신 main을 받아 주세요(옛 스크립트로 돌리면 비번 열이 다시 생깁니다).\n▶ 모두: 화면 코드는 바꿀 것 없음. 서버 로그인 테스트는 .env에 VCC_LOGIN_PW가 있어야 합니다(.env.example 참고).",
+   "내용": "[보안 보완 완료 — 작업 73·86, PR #70·#71 병합]\n1. 로그인하면 서버가 토큰을 발급하고 화면은 X-Token 헤더로 보냅니다. X-User 헤더는 더 이상 안 씁니다(토큰 없으면 \"로그인이 필요해요\").\n2. 로그인 비번은 data/에서 빼고 서버 환경변수 VCC_LOGIN_PW(.env·NCP 기본 파라미터)에만 둡니다. students.json의 비번 열은 삭제했습니다. [11/21 수정] 표에 \"*\" 항목 = 가상학생 전원 공용 비번(청중 체험용, PR #79). 시연 계정 4개(H0143·H0469·H0241·H0745)와 직원 2개(staff01·02)는 개별 비번이 우선. 비번 값은 이 시트가 아니라 「주요링크」 시트 맨 아래 행에 있습니다(전달사항은 tasks.json으로 공개 저장소에 올라가므로 여기엔 적지 않음). 아이디는 대소문자 무관(PR #78).\n3. AI 함수 하루 전체 2,000건 상한(시연 계정 포함, 사용자별 한도만 면제).\n4. mock 모드(USE_MOCK=true)는 비번 대조 없이 staff01·staff02, H+숫자 4자리만 로그인됩니다.\n▶ 원우: sheet_to_json.py DROP_STUDENT에 \"비번\"을 넣었어요. 다음 변환 전에 최신 main을 받아 주세요(옛 스크립트로 돌리면 비번 열이 다시 생깁니다).\n▶ 모두: 화면 코드는 바꿀 것 없음. 서버 로그인 테스트는 .env에 VCC_LOGIN_PW가 있어야 합니다(.env.example 참고).",
    "대상": "all",
    "처리상태": "확인요청",
    "피드백1": "",
@@ -2259,7 +2259,7 @@
   {
    "일자": "11/20(목)",
    "작성": "미리",
-   "내용": "[설정 부탁 — 커밋 메일 숨기기, 1인 3분] 공개 저장소라 커밋 작성자 메일이 그대로 보입니다(개인 Gmail이 기록에 남아 있어요). 앞으로의 커밋만 막습니다.\n① GitHub → Settings → Emails에서 \"Keep my email addresses private\"와 \"Block command line pushes that expose my email\" 두 개 켜기.\n② PowerShell에서 git config --global user.email <GitHub아이디>@users.noreply.github.com (아이디는 Emails 화면에 나온 주소 그대로).\n③ 다음 커밋이 noreply 주소로 올라가는지 PR에서 확인. 과거 기록은 고치지 않습니다(PRD 9-4 점검표 7번).",
+   "내용": "[설정 부탁 — 커밋 메일 숨기기, 1인 3분] 공개 저장소라 커밋 작성자 메일이 그대로 보입니다(개인 Gmail이 기록에 남아 있어요). 앞으로의 커밋만 막습니다.\n① GitHub → Settings → Emails에서 \"Keep my email addresses private\"와 \"Block command line pushes that expose my email\" 두 개 켜기.\n② PowerShell에서 git config --global user.email <GitHub아이디>@users.noreply.github.com (아이디는 Emails 화면에 나온 주소 그대로).\n③ 확인: git config user.email을 실행해서 noreply 주소가 나오면 끝이에요.",
    "대상": "all",
    "처리상태": "확인요청",
    "피드백1": "",
@@ -2387,6 +2387,11 @@
   },
   {
    "path": "docs/작업일지/외대인사이드_주간작업일지_1119_민지.md",
+   "author": "민지",
+   "updated": "2026-11-20"
+  },
+  {
+   "path": "docs/작업일지/외대인사이드_주간작업일지_1120(추가)_민지.md",
    "author": "민지",
    "updated": "2026-11-20"
   },
