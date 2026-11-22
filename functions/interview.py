@@ -5,7 +5,8 @@
 # interviewNext(program, answers) — 다음 질문 하나
 #   ① 코드: 질문함(questions.json)에서 같은 프로그램의 hold 질문을 최근순 최대 3개 먼저 묻는다(작업 74).
 #        본인이 한 질문·이미 answered·이번 인터뷰에서 답했거나 건너뛴 질문은 뺀다.
-#   ② 코드: 그 뒤 근거(evidence.json)가 적은 칸 순, 「배운점」은 마지막.
+#   ② 코드: [11/22] 그 뒤 근거가 0건이거나 모두 2년 넘은 칸만 기본 질문(근거 적은 칸 순). 근거가 충분한 칸은
+#        묻지 않고 covered로 알린다 → 깊이 질문(교환·파견 3, 인턴·비교과 2 — DEPTH_QUESTIONS, 판단·비교·후회·오해) → 「배운점」 마지막.
 #   ③ AI(충분판정, HCX): 칸의 첫 답이 들어오면 충분한지 본다. 부족하면
 #      AI(꼬리질문, HCX): 꼬리 질문 하나 — 칸당 1회. 형식이 틀리거나 답에 없는 숫자·고유명사가 있으면 버리고 다음 칸.
 #
@@ -21,6 +22,7 @@
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date
 
 import askboo
 import identify
@@ -53,6 +55,31 @@ BASE_QUESTIONS = {
     "배운점": "이 경험에서 배운 점을 한 문장으로 들려주세요.",
 }
 GENERIC = "{s}에 대해 기억나는 경험을 들려주세요."
+
+# [11/22] 깊이 질문 — 보고서가 이미 답한 사실(서류·학점·금액)은 다시 묻지 않고, 보고서에 잘 안 쓰는
+# 판단·비교·후회·오해를 묻는다(PRD 1:10 「보고서가 답하지 못한 질문만 묻는다」). (칸, 질문) — 답은 그 칸에 담긴다.
+# 유도 질문·본인 식별 답(성적·사람 이름·날짜)을 부르는 질문은 넣지 않는다. 문장은 미리가 정했다(AI가 만들지 않음).
+DEPTH_QUESTIONS = {
+    "교환": [
+        ("생활", "출국 전에 걱정했던 것과 실제로 달랐던 게 있었나요?"),
+        ("지원", "다시 준비 과정을 거친다면 무엇부터 하실 것 같아요?"),
+        ("팁", "후배들이 {p}에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?"),
+    ],
+    "인턴": [
+        ("업무내용", "시작 전에 상상했던 일과 실제 업무가 어떻게 달랐나요?"),
+        ("배운점", "이 인턴이 맞는 사람과 안 맞는 사람은 어떤 사람일까요?"),
+    ],
+    "비교과": [
+        ("배운점", "신청할 때 기대한 것과 실제로 얻은 게 같았나요?"),
+        ("활동내용", "이 프로그램을 몇 학년 때 듣는 게 가장 좋을까요? 왜요?"),
+        ("활동내용", "끝까지 하려면 어떤 점을 각오해야 하나요?"),
+    ],
+}
+# 한 인터뷰에 묻는 깊이 질문 수(종류별, 없으면 기본). 근거가 적은 칸에 담기는 질문부터(시연 순서가 매번 같게).
+# 교환·파견은 보고서 근거가 많아 기본 질문이 거의 안 남으므로 3개 모두 묻는다(11/22 미리).
+DEPTH_PER_INTERVIEW = {"교환": 3, "*": 2}
+OLD_YEARS = 2             # 칸의 근거가 모두 이보다 오래되면 '오래된 칸'(디자인 규칙 6-2 「최근 경험이 없어요」와 같은 기준)
+STALE_PREFIX = "{s} 칸은 최근 경험이 없어요. "
 
 
 # ── 공통 ──────────────────────────────────────────────────────────────
@@ -127,16 +154,32 @@ def interviewNext(me, payload):
                 return {"done": False, "section": last["section"], "question": follow,
                         "followUp": True, "progress": progress, "pendingQuestions": 0}
 
-    # ② 근거가 적은 칸 순, 배운점은 마지막
-    for s in section_order(program, sections):
+    # ② [11/22] 비었거나(0건) 오래된 칸만 기본 질문 — 근거가 충분한 칸은 묻지 않는다(covered)
+    stats = evidence_stats(program)
+    gaps = [s for s in section_order(program, sections, stats) if s != LAST_SECTION and is_gap(stats.get(s))]
+    covered = [s for s in sections if s != LAST_SECTION and s not in gaps]
+    base = {"done": False, "progress": progress, "pendingQuestions": 0, "covered": covered}
+    for s in gaps:
         if s not in answered:
-            step = {"done": False, "section": s, "question": base_question(program, s),
-                    "progress": progress, "pendingQuestions": 0}
+            q = base_question(program, s)
+            if stats.get(s):   # 근거가 있는데 오래된 칸
+                q = STALE_PREFIX.format(s=s) + q
+            step = {**base, "section": s, "question": q}
             examples = (frame.get("예시") or {}).get(s)   # P1-여건(작업 84): frames.json에 있으면
             if isinstance(examples, list) and examples:
                 step["examples"] = [str(x) for x in examples[:3]]
             return step
-    return {"done": True, "progress": progress}
+
+    # ③′ 깊이 질문(보고서에 잘 안 쓰는 판단·비교) — 이번 인터뷰에서 아직 안 한 것
+    asked = {askboo._norm(a.get("question")) for a in answers}
+    for s, q in depth_questions(program, sections, stats):
+        if askboo._norm(q) not in asked:
+            return {**base, "section": s, "question": q, "depth": True}
+
+    # ④ 배운점은 마지막(교환·파견은 인터뷰로만 받는 칸)
+    if LAST_SECTION in sections and LAST_SECTION not in answered:
+        return {**base, "section": LAST_SECTION, "question": base_question(program, LAST_SECTION)}
+    return {"done": True, "progress": progress, "covered": covered}
 
 
 def junior_questions(me, program):
@@ -149,13 +192,44 @@ def junior_questions(me, program):
     return rows[:MAX_JUNIOR]
 
 
-def section_order(program, sections):
-    count = {}
-    for e in askboo.EVIDENCE.get(program, []):
-        count[e.get("칸")] = count.get(e.get("칸"), 0) + 1
+def _year(semester):
+    m = re.match(r"(\d{4})", str(semester or ""))
+    return int(m.group(1)) if m else None
+
+
+def evidence_stats(program):
+    """칸별 근거 연도 목록. 보고서 근거(evidence.json) + 동의를 통과한 인터뷰 문장(noteLines)."""
+    import notes   # notes가 runtime_fns를 거쳐 돌아오지 않게 여기서 부른다
+    stats = {}
+    for e in list(askboo.EVIDENCE.get(program, [])) + notes.interview_lines(program):
+        stats.setdefault(e.get("칸"), []).append(_year(e.get("semester")))
+    return stats
+
+
+def is_gap(years, this_year=None):
+    """근거 0건이거나, 연도가 있는 근거가 모두 OLD_YEARS보다 오래됐으면 물어야 할 칸."""
+    if not years:
+        return True
+    this_year = this_year or date.today().year
+    known = [y for y in years if y]
+    return bool(known) and len(known) == len(years) and all(this_year - y > OLD_YEARS for y in known)
+
+
+def section_order(program, sections, stats=None):
+    stats = evidence_stats(program) if stats is None else stats
     body = [s for s in sections if s != LAST_SECTION]
-    body.sort(key=lambda s: count.get(s, 0))   # 안정 정렬: 같은 수면 frames.json 순서
+    body.sort(key=lambda s: len(stats.get(s) or []))   # 안정 정렬: 같은 수면 frames.json 순서
     return body + ([LAST_SECTION] if LAST_SECTION in sections else [])
+
+
+def depth_questions(program, sections, stats=None):
+    """이번 인터뷰의 깊이 질문(종류별 DEPTH_PER_INTERVIEW개). 근거가 적은 칸에 담기는 것부터(같으면 목록 순서)."""
+    stats = evidence_stats(program) if stats is None else stats
+    kind = kind_of(program)
+    pool = [(s, q) for s, q in DEPTH_QUESTIONS.get(kind, []) if s in sections]
+    pool.sort(key=lambda sq: len(stats.get(sq[0]) or []))
+    n = DEPTH_PER_INTERVIEW.get(kind, DEPTH_PER_INTERVIEW["*"])
+    return [(s, q.format(p=short_name(program))) for s, q in pool[:n]]
 
 
 def base_question(program, section):
