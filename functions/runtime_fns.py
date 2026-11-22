@@ -523,7 +523,7 @@ def getInbox(me, p):
                      for q in store.load("questions", []) if q["colreg_no"] == me]
         questions.sort(key=lambda q: (q["status"] != "answered", q["askedAt"]))   # 답변 도착이 맨 위
         alerts = sorted(store.load("alerts", {}).get(me, []), key=lambda a: a["at"], reverse=True)
-        return {"myNotes": my_notes, "questions": questions, "scraps": [], "alerts": alerts}
+    return {"myNotes": my_notes, "questions": questions, "scraps": notes.inbox_scraps(me), "alerts": alerts}
 
 
 ROUTES = {
