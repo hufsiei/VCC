@@ -10,6 +10,7 @@
 > 11/16 개정(PRD 4-1): 교환·파견 노트 틀에 `배운점`(인터뷰로만) 추가 → 6칸. `summarizeInterview`가 끝나면 myNote를 서버가 바로 저장(저장은 기본, 공유는 선택). `saveConsent`의 `edits.removed`가 문장 단위 비공개를 뜻함. 공개 초안 문장에 `identifying` 표시 추가. 사람 이름: 추천 선배는 `독일어과 선배 A`, 쪽지 보낸 사람은 `형용사 + 동물`(대화마다 새로) — `previewNickname`·`respondRequest` 신설, `sendMessage`·`getMessages`에 `myNickname`·`role`·`askerInfo` 추가.
 > **11/19 개정 ②(작업 18·22)**: askBoo 응답에 **`status: "official"`**(규정 질문 → 공식 안내 연결) 추가(3·4·6·8장). 닮은 선배 점수는 서버가 Python이므로 `common/score.js`를 없애고 **`functions/score.py`(원우)** 한 벌로 계산한다.
 > **11/19 개정 ③(작업 18)**: askBoo `lines[]`에 **`fallback`**(사후 검증에 걸려 근거 원문을 보여 준 줄) 추가(4장). `noteId`는 `data/notes.json`이 생기기 전까지 프로그램 이름으로 나간다.
+> **11/22 개정(작업 23, 민지 요청)**: `listNotes`·`getNote`에 **`country`**(국제교류 = `programs.json` `세부` 국가, 인턴·비교과 `null`, 카드 띠 「교환학생 · 독일」)와 **`scrapped`**(내가 스크랩했는지) 추가. 새 함수 **`scrapNote(noteId, scrap)`**(켜기·끄기, 멱등) → `getInbox.scraps`가 실제로 채워진다(최근이 위). 바뀐 곳은 **[11/22]** 표시.
 > **11/20 개정(닮은 선배 실제 데이터 기준)**: 시연 인물을 `가상데이터_1000명.xlsx` 실제 값에 맞췄다. 선배2를 H0745 → **H0241**(독일어과 3학년·경영학, 마르부르크 2026-1, 12점 2위)로 바꾸고, 선배1과 후배1의 공통 비교과를 `합격 면접 취업특강(커리어랩)` → **`한국외국어대학교 직무탐색 집중교육`**으로 바꿨다. H0241은 공통 비교과가 없다(12점 = 학과 5 + 이중전공 4 + 단과대 3). 후배1은 현장실습 이수가 없다. 선배1 보고서 학기 2024-1 → 2025-1(1·4·6장 예시 포함).
 
 ## 0. 공통 규칙
@@ -176,10 +177,19 @@ payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"
 ```json
 { "notes": [ { "id": "N-marburg", "program": "마르부르크필립스대학교", "type": "교환",
   "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청", "forWhom": "독일어권 교환을 생각하는 1~2학년",
-  "evidenceCount": 7, "lastSemester": "2026-1", "satisfaction": null, "completedCount": null },
+  "evidenceCount": 7, "lastSemester": "2026-1", "satisfaction": null, "completedCount": null, "country": "독일", "scrapped": true },
   { "id": "N-3ca17d", "program": "HUFS 동문멘토링 데이", "type": "비교과",
-  "oneLine": "...", "forWhom": "...", "evidenceCount": 0, "lastSemester": "2026-1", "satisfaction": 4.2, "completedCount": 150 } ] }
+  "oneLine": "", "forWhom": "2학년이 많이 이수한 비교과", "evidenceCount": 0, "lastSemester": "2026-1", "satisfaction": 4.2, "completedCount": 150, "country": null, "scrapped": false } ] }
 ```
+**[11/22]** `country`는 국제교류(교환·파견) 노트만 `programs.json`의 `세부`(국가) 글자 그대로, 인턴·비교과는 `null` → 카드 띠는 「교환학생 · 독일」, `null`이면 종류만. `scrapped`는 부른 사람(토큰) 기준 스크랩 여부. `oneLine`이 `""`이면 화면은 「–」(6-2).
+
+### scrapNote(noteId, scrap) [11/22]
+payload `{noteId, scrap?: true|false}`(생략 = 켜기). 같은 상태로 다시 불러도 `ok`(멱등). 기록은 `runtime/scraps.json`(사람별 노트 id 목록). AI 없음.
+```json
+{ "ok": true, "noteId": "N-marburg", "scrapped": true }
+{ "error": "노트를 찾지 못했어요" }
+```
+mock은 기억하지 않는다(받은 값을 그대로 돌려주고, 목록·노트의 `scrapped`는 mock-data.json 고정값). 화면은 응답의 `scrapped`로 버튼 상태를 바꾼다.
 
 ### getNote(id)
 칸 순서와 이름은 `data/frames.json`을 따른다. 빈 칸도 `lines: []`로 보낸다. `interviewOnly`가 true인 칸은 선배 인터뷰로만 채워진다.
@@ -190,6 +200,7 @@ payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"
 ```json
 { "id": "N-marburg", "program": "마르부르크필립스대학교", "type": "교환",
   "oneLine": "...", "forWhom": "...", "evidenceCount": 7, "lastSemester": "2026-1", "satisfaction": null, "completedCount": null,
+  "country": "독일", "scrapped": true,   // [11/22] listNotes와 같음
   "officialUrl": "https://...",
   "sections": [ { "name": "지원", "interviewOnly": false,
                   "lines": [ { "text": "...", "sourceId": "R03-1-1", "lineId": "L-R03-1-1", "official": false } ] },
@@ -290,7 +301,7 @@ payload `{threadId, accept: true|false}` 또는 `{threadId, cancel: true}`.
 { "myNotes": [ { "id": "N-marburg", "program": "마르부르크필립스대학교" } ],
   "questions": [ { "questionId": "Q-0001", "text": "...", "status": "hold", "askedAt": "..." },
                  { "questionId": "Q-0002", "text": "...", "status": "answered", "noteId": "N-marburg", "answeredAt": "..." } ],
-  "scraps": [ { "noteId": "N-marburg", "program": "마르부르크필립스대학교" } ],
+  "scraps": [ { "noteId": "N-marburg", "program": "마르부르크필립스대학교" } ],   // [11/22] scrapNote로 켠 노트, 최근이 위
   "alerts": [ { "text": "내 질문에 선배가 답했어요 · 마르부르크필립스대학교 해봤노트", "questionId": "Q-0002", "noteId": "N-marburg", "at": "..." } ] }
 ```
 **[11/19]** 질문 `status`는 `hold`(미답변) | `answered`. 화면은 `answered`에 「선배가 답했어요」 라벨 + 노트 「후배 질문」 칸 링크. (이전 예시의 `waiting`은 쓰지 않는다.)
@@ -318,7 +329,7 @@ payload `{lineId, reason?}`. 신고된 문장은 즉시 숨김, 부서 리포트
 ```js
 login(id, pw) · getMe() · askBoo(question)
 interviewNext(program, answers) · summarizeInterview(program, transcript) · saveConsent(draftId, edits)
-listNotes(filter) · getNote(id) · reportStatement(lineId, reason)
+listNotes(filter) · getNote(id) · scrapNote(noteId, scrap = true) · reportStatement(lineId, reason)   // scrapNote [11/22]
 recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept) · cancelRequest(threadId)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85)
 getInbox() · getDeptReport(dept)
 getDepartments() · getAdminOverview(dept, period) · getAdminSuggestions(dept, period) · setSuggestionStatus(id, status)

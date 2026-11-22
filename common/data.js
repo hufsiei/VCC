@@ -93,6 +93,8 @@ function pickMock(m, name, p) {
       return mockInterview(m, p); // 고른 경험(program)에 맞는 노트 틀로 묻는다
     case "getNote":
       return m.getNote[p.id] || m.getNote["N-marburg"];
+    case "scrapNote":
+      return { ok: true, noteId: p.noteId, scrapped: p.scrap !== false }; // mock은 기억하지 않는다(목록·노트의 scrapped는 고정값)
     case "checkMessage":
       return /\d{8,}/.test(p.text || "") ? m.checkMessage.blocked : m.checkMessage.ok;
     case "getAdminOverview":
@@ -162,6 +164,8 @@ export const summarizeInterview = (program, transcript) => call("summarizeInterv
 export const saveConsent = (draftId, edits) => call("saveConsent", { draftId, edits, consent: true });
 export const listNotes = (filter) => call("listNotes", { filter });
 export const getNote = (id) => call("getNote", { id });
+// 스크랩 켜기(scrap=true, 기본)·끄기(false) → { ok, noteId, scrapped }. 카드·노트의 scrapped, 내 보관함 scraps에 반영(spec 4장)
+export const scrapNote = (noteId, scrap = true) => call("scrapNote", { noteId, scrap });
 export const reportStatement = (lineId, reason) => call("reportStatement", { lineId, reason });
 // more=true면 3명씩 더해 최대 9명. 응답의 hasMore가 false면 「비슷한 선배를 모두 보여드렸어요」(spec 4장)
 export const recommendSeniors = (noteId, more) => call("recommendSeniors", more ? { noteId, more: true } : { noteId });

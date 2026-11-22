@@ -7,6 +7,8 @@
 #   getNote(me, {id})          — 칸 뒤에 인터뷰 문장을 붙인다. 「후배 질문」 칸은 Q(asked)·A(text) 쌍, 질문별로 모아 원문 인용
 #   listNotes(me, {filter})    — 카드 목록. evidenceCount·lastSemester에 인터뷰 문장을 더한다
 #   interview_lines(program)   — askBoo 근거 풀에 더할 인터뷰 문장(후배 질문 A 포함)
+#   scrapNote(me, {noteId, scrap}) — 스크랩 켜기·끄기(runtime/scraps.json). 카드·노트의 scrapped, getInbox.scraps
+#   카드·노트의 country = 국제교류 프로그램의 programs.json 「세부」(국가). 인턴·비교과는 null
 #
 # 원문 인용만 한다: 선배가 동의한 문장 그대로 붙이고, 여러 선배의 답을 합치거나 요약하지 않는다(HCX 원칙 v2). AI 없음.
 # 응답에 선배 학번(owner)·내 경험노트 id는 넣지 않는다.
@@ -109,6 +111,18 @@ def _empty_note(nid, program):
             "sources": {}}
 
 
+def _country(program):
+    """국제교류 프로그램의 국가(programs.json 「세부」). 카드 띠 「교환학생 · 독일」용. 인턴·비교과는 None."""
+    info = PROGRAMS.get(program, {})
+    return info.get("세부") if info.get("분야") == "국제교류" else None
+
+
+def _my_scraps(me):
+    """내가 스크랩한 노트 id 목록(스크랩한 순서)."""
+    with store.lock():
+        return list(store.load("scraps", {}).get(me, []))
+
+
 def _official_url(program):
     code = PROGRAMS.get(program, {}).get("운영부서코드")
     return DEPTS.get(code, {}).get("공식안내URL", "")
@@ -152,7 +166,11 @@ def _merge(nid, rows):
 def getNote(me, p):
     nid = (p.get("id") or "").strip()
     note = _merge(nid, _visible_lines(nid=nid)) if nid else None
-    return note or {"error": "노트를 찾지 못했어요"}
+    if not note:
+        return {"error": "노트를 찾지 못했어요"}
+    note["country"] = _country(note["program"])
+    note["scrapped"] = nid in _my_scraps(me)
+    return note
 
 
 def _norm(s):
@@ -171,6 +189,7 @@ def listNotes(me, p):
         if r.get("semester"):
             last[nid] = max(last.get(nid, ""), r["semester"])
     ids = list(NOTES) + [nid for nid in program_of if nid not in NOTES]
+    scrapped = set(_my_scraps(me))
     out = []
     for nid in ids:
         n = NOTES.get(nid) or _empty_note(nid, program_of[nid])
@@ -184,8 +203,43 @@ def listNotes(me, p):
             words = [card["program"], *PROGRAMS.get(card["program"], {}).get("별칭", []), card["oneLine"], card["forWhom"]]
             if not any(q in _norm(w) for w in words if w):
                 continue
+        card["country"] = _country(card["program"])
+        card["scrapped"] = nid in scrapped
         out.append(card)
     return {"notes": out}
+
+
+def _note_exists(nid):
+    return nid in NOTES or bool(_visible_lines(nid=nid))
+
+
+def scrapNote(me, p):
+    """스크랩 켜기(scrap 생략·true)·끄기(false). 같은 상태로 다시 불러도 ok(멱등)."""
+    nid = (p.get("noteId") or "").strip()
+    if not nid or not _note_exists(nid):
+        return {"error": "노트를 찾지 못했어요"}
+    on = p.get("scrap", True) is not False
+    with store.lock():
+        mine = store.load("scraps", {}).setdefault(me, [])
+        if on and nid not in mine:
+            mine.append(nid)
+        elif not on and nid in mine:
+            mine.remove(nid)
+        store.save("scraps")
+    return {"ok": True, "noteId": nid, "scrapped": on}
+
+
+def inbox_scraps(me):
+    """getInbox.scraps — 최근 스크랩이 위. 지금 없는 노트는 뺀다."""
+    out = []
+    for nid in reversed(_my_scraps(me)):
+        program = (NOTES.get(nid) or {}).get("program")
+        if program is None:
+            rows = _visible_lines(nid=nid)
+            program = rows[0].get("program") if rows else None
+        if program:
+            out.append({"noteId": nid, "program": program})
+    return out
 
 
 def interview_lines(program):
@@ -195,4 +249,4 @@ def interview_lines(program):
             for r in sorted(_visible_lines(program=program), key=lambda r: r.get("at", ""), reverse=True)]
 
 
-ROUTES = {"getNote": getNote, "listNotes": listNotes}
+ROUTES = {"getNote": getNote, "listNotes": listNotes, "scrapNote": scrapNote}
