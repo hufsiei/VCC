@@ -282,7 +282,17 @@ def summarize_group(g):
     if lines:
         return lines
     src = [askboo.clean_source(s) for s in askboo.split_sentences(g["source"])]
-    return [{"text": s, "fallback": True} for s in src if s][:3]
+    return [{"text": s, "fallback": True} for s in src if s and not too_thin(s)][:3]
+
+
+# 요약이 실패해 원문을 그대로 쓸 때, 정보가 없는 짧은 답(「생각보다 많이 들었어요.」)은 해봤노트에 올리지 않는다
+# (원우 11/22 제보 → 미리 결정: 빼기). 숫자가 있으면 짧아도 정보로 본다(「비자는 2주 걸렸어요.」).
+MIN_FALLBACK_CHARS = 12
+
+
+def too_thin(s):
+    body = re.sub(r"[\s\W_]+", "", s or "")
+    return len(body) < MIN_FALLBACK_CHARS and not re.search(r"\d", body)
 
 
 PLAIN_END = re.compile(r"다[.!?~]*$")   # 해라체로 끝나야 한다
