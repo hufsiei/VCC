@@ -10,6 +10,7 @@
 #   senior_label(viewer, senior)   — recommendSeniors 카드 이름(작업 22). 쪽지창과 같은 값
 # saveConsent → publish_lines: 동의 통과 문장을 noteLines에 쌓고, 후배 질문 답이면 질문 answered + 질문자 알림(작업 74).
 # 노트 읽기(getNote·listNotes)와 askBoo 근거 풀은 notes.py.
+# 내 경험노트(11/22): getInbox.myNotes 카드(share·filled/total·sharedLines)와 getMyNote(id) 상세는 _my_note_view 하나로 계산.
 # 쪽지 규칙(11/18·11/20, spec 4장 sendMessage, 작업 85): 선배당 요청 1건 · 보낸 사람 수락 대기 3건 · 받는 선배 5건 ·
 #   요청 취소(7일 재요청 금지) · 7일 자동 만료. status = waiting | accepted | declined | cancelled | expired
 # recommendSeniors(작업 85): 점수는 score.py(원우), 목록 보관·더 보기·재계산은 여기(spec 4장 인원 규칙).
@@ -445,7 +446,7 @@ def saveConsent(me, p):
         note["share"] = "partial" if removed else "shared"
         note["noteId"] = nid
         store.save("myNotes")
-        _alert(me, "해봤노트에 반영하고 있어요")
+        _alert(me, "해봤노트에 내 이야기가 반영됐어요", noteId=nid)   # 바로 반영되므로 완료 알림(디자인 규칙 7-②, 11/22)
         out = {"ok": True, "noteId": nid, "added": added, "answered": answered}
         if rejected:
             out["rejected"] = rejected     # 화면은 걸린 문장마다 message를 보여 준다
@@ -511,10 +512,55 @@ def reportStatement(me, p):
     return {"ok": True, "hidden": True}
 
 
+# ---------- 내 경험노트 [11/22, 작업 23 민지 요청] ----------
+# 카드(getInbox.myNotes)와 상세(getMyNote)가 같은 계산을 쓴다.
+# 공유 상태는 share(private | partial | shared) 셋뿐 — saveConsent가 바로 반영하므로 「반영 중」은 없다(11/22 미리 결정).
+def _my_note_view(mid, v, detail=False):
+    program = v["program"]
+    kind = notes._kind(program)
+    frame = list((notes.FRAMES.get(kind) or {}).get("칸", []))
+    hidden = set(store.load("reported", {}))
+    shared_ids = {r.get("draftLineId") for r in store.load("noteLines", [])
+                  if r.get("myNoteId") == mid and "L-" + r.get("sourceId", "") not in hidden}
+    mine = {s["name"]: s.get("lines", []) for s in (v.get("myNote") or {}).get("sections", [])}
+    pub = {s["name"]: s.get("lines", []) for s in (v.get("publicDraft") or {}).get("sections", [])}
+    names = frame + [n for n in mine if n not in frame]          # 틀에 없는 칸(틀이 바뀐 경우)은 뒤에
+    view = {"id": mid, "program": program, "type": kind, "noteId": notes.note_id(program),
+            "share": v.get("share", "private"),
+            "filled": sum(1 for n in frame if mine.get(n)), "total": len(frame),
+            "sharedLines": len(shared_ids & {ln.get("lineId") for ls in pub.values() for ln in ls}),
+            "updatedAt": v.get("updatedAt")}
+    if not detail:
+        return view
+    sections = []
+    for name in names:
+        lines = []
+        for i, ln in enumerate(mine.get(name, [])):
+            p_ln = (pub.get(name) or [])[i] if i < len(pub.get(name) or []) else {}   # 요약 때 같은 순서로 만들어짐
+            row = {"text": ln.get("text", ""), "publicText": p_ln.get("text"), "lineId": p_ln.get("lineId"),
+                   "shared": p_ln.get("lineId") in shared_ids}
+            for k in ("asked", "answersQuestionId"):
+                if ln.get(k):
+                    row[k] = ln[k]
+            lines.append(row)
+        sections.append({"name": name, "lines": lines})
+    return {**view, "draftId": v.get("draftId"), "sections": sections, "publicDraft": v.get("publicDraft")}
+
+
+def getMyNote(me, p):
+    """내 경험노트 상세(디자인 규칙 8절). 본인 것만. publicDraft·draftId는 공개 동의 시트를 다시 열 때 쓴다."""
+    mid = (p.get("id") or "").strip()
+    with store.lock():
+        v = store.load("myNotes", {}).get(mid)
+        if not v or v.get("owner") != me:
+            return {"error": "볼 수 없는 기록이에요"}
+        return _my_note_view(mid, v, detail=True)
+
+
 def getInbox(me, p):
     with store.lock():
-        my_notes = [{"id": k, "program": v["program"], "share": v["share"]}
-                    for k, v in store.load("myNotes", {}).items() if v["owner"] == me]
+        my_notes = [_my_note_view(k, v) for k, v in store.load("myNotes", {}).items() if v["owner"] == me]
+        my_notes.sort(key=lambda n: n.get("updatedAt") or "", reverse=True)   # 최근에 요약한 것이 위
         questions = [{"questionId": q["id"], "text": q["질문"], "askedAt": q["at"],
                       # spec 4장 getInbox [11/19]: hold(미답변) | answered. 규정 질문은 official 그대로
                       "status": q["status"] if q["status"] in ("answered", "official") else "hold",
@@ -534,6 +580,7 @@ ROUTES = {
     "respondRequest": respondRequest,
     "recommendSeniors": recommendSeniors,   # AI 없음 → 호출 한도와 무관(작업 85)
     "saveConsent": saveConsent,
+    "getMyNote": getMyNote,   # [11/22] 내 경험노트 상세
     "reportStatement": reportStatement,
     "getInbox": getInbox,
     **notes.ROUTES,      # getNote·listNotes (AI 없음, 작업 26·74)

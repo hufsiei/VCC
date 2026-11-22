@@ -95,6 +95,8 @@ function pickMock(m, name, p) {
       return m.getNote[p.id] || m.getNote["N-marburg"];
     case "scrapNote":
       return { ok: true, noteId: p.noteId, scrapped: p.scrap !== false }; // mock은 기억하지 않는다(목록·노트의 scrapped는 고정값)
+    case "getMyNote":
+      return { ...m.getMyNote, id: p.id || m.getMyNote.id }; // mock 경험노트는 하나뿐(M-0001)
     case "saveQuestion":
       return m.saveQuestion; // mock은 기억하지 않는다(내 보관함 질문함 목록은 고정값)
     case "checkMessage":
@@ -181,6 +183,8 @@ export const respondRequest = (threadId, accept) => call("respondRequest", { thr
 // 보낸 사람이 수락 대기(waiting) 요청을 거둔다 → status "cancelled". 서버 함수는 respondRequest 하나(spec 4장)
 export const cancelRequest = (threadId) => call("respondRequest", { threadId, cancel: true });
 export const getInbox = () => call("getInbox");
+// 내 경험노트 상세(본인만) → { id, program, type, noteId, share, filled, total, sharedLines, draftId, sections[{name, lines[{text, publicText, lineId, shared}]}], publicDraft } (spec 4장)
+export const getMyNote = (id) => call("getMyNote", { id });
 export const getDeptReport = (dept) => call("getDeptReport", { dept });
 
 // ── 관리자 콘솔(직원 계정 전용, PRD 7장·작업 66) ──

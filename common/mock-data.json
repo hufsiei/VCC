@@ -753,8 +753,15 @@
   "getInbox": {
     "myNotes": [
       {
-        "id": "N-marburg",
-        "program": "마르부르크필립스대학교"
+        "id": "M-0001",
+        "program": "마르부르크필립스대학교",
+        "type": "교환",
+        "noteId": "N-marburg",
+        "share": "partial",
+        "filled": 4,
+        "total": 7,
+        "sharedLines": 3,
+        "updatedAt": "2026-11-19T14:00:00+09:00"
       }
     ],
     "questions": [
@@ -2117,5 +2124,130 @@
     "questionId": "Q-0101",
     "already": false,
     "message": "질문함에 담았어요. 다음 선배 인터뷰 때 먼저 물어볼게요."
+  },
+  "getMyNote": {
+    "id": "M-0001",
+    "program": "마르부르크필립스대학교",
+    "type": "교환",
+    "noteId": "N-marburg",
+    "share": "partial",
+    "filled": 4,
+    "total": 7,
+    "sharedLines": 3,
+    "updatedAt": "2026-11-19T14:00:00+09:00",
+    "draftId": "D-0001",
+    "sections": [
+      {
+        "name": "지원",
+        "lines": [
+          {
+            "text": "나는 출국 3학기 전부터 TestDaF를 준비했다.",
+            "publicText": "출국 3학기 전부터 TestDaF를 준비했어요.",
+            "lineId": "L-D1-1",
+            "shared": true
+          }
+        ]
+      },
+      {
+        "name": "학점",
+        "lines": [
+          {
+            "text": "나는 학점 4.3으로 성적우수 장학금을 받았다.",
+            "publicText": "학점 4.3으로 성적우수 장학금을 받았어요.",
+            "lineId": "L-D1-4",
+            "shared": false
+          }
+        ]
+      },
+      {
+        "name": "비용",
+        "lines": []
+      },
+      {
+        "name": "생활",
+        "lines": [
+          {
+            "text": "나는 합격 직후 기숙사를 신청했고, 첫 학기에는 생활에 적응하느라 바빴다.",
+            "publicText": "합격 직후 기숙사를 신청했어요.",
+            "lineId": "L-D1-2",
+            "shared": true
+          }
+        ]
+      },
+      {
+        "name": "팁",
+        "lines": []
+      },
+      {
+        "name": "배운점",
+        "lines": []
+      },
+      {
+        "name": "후배 질문",
+        "lines": [
+          {
+            "text": "나는 학기 중에는 수업이 많아 인턴을 못 했고, 방학에 단기 인턴을 했다.",
+            "publicText": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.",
+            "lineId": "L-D1-7",
+            "shared": true,
+            "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+            "answersQuestionId": "Q-0001"
+          }
+        ]
+      }
+    ],
+    "publicDraft": {
+      "sections": [
+        {
+          "name": "지원",
+          "lines": [
+            {
+              "lineId": "L-D1-1",
+              "text": "출국 3학기 전부터 TestDaF를 준비했어요.",
+              "match": true
+            }
+          ]
+        },
+        {
+          "name": "학점",
+          "lines": [
+            {
+              "lineId": "L-D1-4",
+              "text": "학점 4.3으로 성적우수 장학금을 받았어요.",
+              "match": true,
+              "identifying": true
+            }
+          ]
+        },
+        {
+          "name": "생활",
+          "lines": [
+            {
+              "lineId": "L-D1-2",
+              "text": "합격 직후 기숙사를 신청했어요.",
+              "match": true
+            },
+            {
+              "lineId": "L-D1-3",
+              "text": "첫 학기에는 생활에 적응하느라 바빴어요.",
+              "match": true
+            }
+          ]
+        },
+        {
+          "name": "후배 질문",
+          "lines": [
+            {
+              "lineId": "L-D1-7",
+              "answersQuestionId": "Q-0001",
+              "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+              "text": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.",
+              "match": true,
+              "identifying": false
+            }
+          ]
+        }
+      ]
+    }
   }
 }
