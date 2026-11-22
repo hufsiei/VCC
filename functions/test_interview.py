@@ -66,7 +66,7 @@ answers = [{"section": "후배 질문", "question": s["asked"], "questionId": qi
 s = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers})
 # [11/22] 마르부르크는 다섯 칸 모두 최근 근거가 있다(지원15·학점15·비용5·생활20·팁5) → 기본 질문 없이 깊이 질문
 depth = interview.depth_questions(PROGRAM, ["지원", "학점", "비용", "생활", "팁", "배운점"])
-expect("깊이 질문 2개, 근거 적은 칸 먼저(팁 → 지원)", [d[0] for d in depth] == ["팁", "지원"])
+expect("교환 깊이 질문 3개, 근거 적은 칸 먼저(팁 → 지원 → 생활)", [d[0] for d in depth] == ["팁", "지원", "생활"])
 expect("{p}는 프로그램 짧은 이름으로", "{p}" not in depth[0][1] and "마르부르크" in depth[0][1])
 first = depth[0][0]
 expect("다음은 깊이 질문(팁)", s.get("section") == first and s.get("depth") and s.get("question") == depth[0][1])
@@ -92,6 +92,8 @@ interview.evidence_stats = real_stats
 # 1-3) 인턴·비교과도 깊이 질문이 틀의 칸에 담긴다
 for kind, frame in (("인턴", interview.FRAMES["인턴"]["칸"]), ("비교과", interview.FRAMES["비교과"]["칸"])):
     expect(f"{kind} 깊이 질문 칸은 틀 안에", all(s in frame for s, _ in interview.DEPTH_QUESTIONS[kind]))
+intern = next(p for p in interview.askboo.PROGRAMS if interview.kind_of(p) == "인턴")
+expect("인턴 깊이 질문은 2개", len(interview.depth_questions(intern, interview.FRAMES["인턴"]["칸"])) == 2)
 
 # 2) 부족한 답 → 꼬리 질문 1회, 다시 부족해도 다음 칸
 answers.append({"section": s["section"], "question": s["question"], "answer": "그냥 그랬어요."})
@@ -108,8 +110,8 @@ while not s3.get("done"):
     order.append(s3["section"])
     answers.append({"section": s3["section"], "question": s3["question"], "answer": "합격 메일 받고 바로 기숙사 신청했어요."})
     s3 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers})
-expect("남은 순서 = 지원 → 배운점", order == ["지원", "배운점"])
-expect("done + filled 4/7 + covered", s3["done"] and s3["progress"] == {"filled": 4, "total": 7} and len(s3["covered"]) == 5)
+expect("남은 순서 = 지원 → 생활 → 배운점", order == ["지원", "생활", "배운점"])
+expect("done + filled 5/7 + covered", s3["done"] and s3["progress"] == {"filled": 5, "total": 7} and len(s3["covered"]) == 5)
 
 # 4) 요약: 화면처럼 questionId를 빼고 보내도 질문 원문으로 찾는다
 transcript = [{k: a[k] for k in ("section", "question", "answer")} for a in answers]

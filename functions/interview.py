@@ -6,7 +6,7 @@
 #   ① 코드: 질문함(questions.json)에서 같은 프로그램의 hold 질문을 최근순 최대 3개 먼저 묻는다(작업 74).
 #        본인이 한 질문·이미 answered·이번 인터뷰에서 답했거나 건너뛴 질문은 뺀다.
 #   ② 코드: [11/22] 그 뒤 근거가 0건이거나 모두 2년 넘은 칸만 기본 질문(근거 적은 칸 순). 근거가 충분한 칸은
-#        묻지 않고 covered로 알린다 → 깊이 질문 2개(DEPTH_QUESTIONS, 판단·비교·후회·오해) → 「배운점」 마지막.
+#        묻지 않고 covered로 알린다 → 깊이 질문(교환·파견 3, 인턴·비교과 2 — DEPTH_QUESTIONS, 판단·비교·후회·오해) → 「배운점」 마지막.
 #   ③ AI(충분판정, HCX): 칸의 첫 답이 들어오면 충분한지 본다. 부족하면
 #      AI(꼬리질문, HCX): 꼬리 질문 하나 — 칸당 1회. 형식이 틀리거나 답에 없는 숫자·고유명사가 있으면 버리고 다음 칸.
 #
@@ -75,7 +75,9 @@ DEPTH_QUESTIONS = {
         ("활동내용", "끝까지 하려면 어떤 점을 각오해야 하나요?"),
     ],
 }
-DEPTH_PER_INTERVIEW = 2   # 한 인터뷰에 묻는 깊이 질문 수. 근거가 적은 칸에 담기는 질문부터(시연 순서가 매번 같게)
+# 한 인터뷰에 묻는 깊이 질문 수(종류별, 없으면 기본). 근거가 적은 칸에 담기는 질문부터(시연 순서가 매번 같게).
+# 교환·파견은 보고서 근거가 많아 기본 질문이 거의 안 남으므로 3개 모두 묻는다(11/22 미리).
+DEPTH_PER_INTERVIEW = {"교환": 3, "*": 2}
 OLD_YEARS = 2             # 칸의 근거가 모두 이보다 오래되면 '오래된 칸'(디자인 규칙 6-2 「최근 경험이 없어요」와 같은 기준)
 STALE_PREFIX = "{s} 칸은 최근 경험이 없어요. "
 
@@ -221,11 +223,13 @@ def section_order(program, sections, stats=None):
 
 
 def depth_questions(program, sections, stats=None):
-    """이번 인터뷰의 깊이 질문 DEPTH_PER_INTERVIEW개. 근거가 적은 칸에 담기는 것부터(같으면 목록 순서)."""
+    """이번 인터뷰의 깊이 질문(종류별 DEPTH_PER_INTERVIEW개). 근거가 적은 칸에 담기는 것부터(같으면 목록 순서)."""
     stats = evidence_stats(program) if stats is None else stats
-    pool = [(s, q) for s, q in DEPTH_QUESTIONS.get(kind_of(program), []) if s in sections]
+    kind = kind_of(program)
+    pool = [(s, q) for s, q in DEPTH_QUESTIONS.get(kind, []) if s in sections]
     pool.sort(key=lambda sq: len(stats.get(sq[0]) or []))
-    return [(s, q.format(p=short_name(program))) for s, q in pool[:DEPTH_PER_INTERVIEW]]
+    n = DEPTH_PER_INTERVIEW.get(kind, DEPTH_PER_INTERVIEW["*"])
+    return [(s, q.format(p=short_name(program))) for s, q in pool[:n]]
 
 
 def base_question(program, section):

@@ -211,10 +211,28 @@
           },
           {
             "done": false,
+            "section": "생활",
+            "question": "출국 전에 걱정했던 것과 실제로 달랐던 게 있었나요?",
+            "progress": {
+              "filled": 3,
+              "total": 7
+            },
+            "pendingQuestions": 0,
+            "covered": [
+              "지원",
+              "학점",
+              "비용",
+              "생활",
+              "팁"
+            ],
+            "depth": true
+          },
+          {
+            "done": false,
             "section": "배운점",
             "question": "이 경험에서 배운 점을 한 문장으로 들려주세요.",
             "progress": {
-              "filled": 3,
+              "filled": 4,
               "total": 7
             },
             "pendingQuestions": 0,
@@ -230,7 +248,7 @@
         "done": {
           "done": true,
           "progress": {
-            "filled": 4,
+            "filled": 5,
             "total": 7
           },
           "covered": [
