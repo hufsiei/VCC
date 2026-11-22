@@ -107,6 +107,12 @@ expect("다시 요약하면 같은 myNoteId", r2["myNoteId"] == r["myNoteId"])
 interview.callAI = lambda *a, **k: {"ok": False, "text": "", "json": None, "model": "fake", "error": "x"}
 r3 = interview.summarizeInterview(SENIOR, {"program": PROGRAM, "transcript": transcript[:2]})
 expect("AI 실패 시 fallback", all(ln.get("fallback") for sec in r3["publicDraft"]["sections"] for ln in sec["lines"]))
+expect("fallback: 정보 없는 짧은 답은 뺀다", interview.too_thin("생각보다 많이 들었어요."))
+expect("fallback: 숫자 있으면 짧아도 남긴다", not interview.too_thin("비자는 2주 걸렸어요."))
+expect("fallback: 긴 답은 남긴다", not interview.too_thin("기숙사는 합격 메일 받자마자 신청해야 자리가 있어요."))
+g_short = {"section": "팁", "source": "생각보다 많이 들었어요. 월세는 450유로였어요."}
+expect("fallback 묶음에서 짧은 답만 빠짐",
+       [ln["text"] for ln in interview.summarize_group(g_short)] == ["월세는 450유로였어요."])
 s4 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers[:2]})
 expect("판정 실패면 다음 칸으로", not s4.get("followUp") and s4.get("section"))
 expect("빈 transcript는 오류", "error" in interview.summarizeInterview(SENIOR, {"program": PROGRAM, "transcript": []}))

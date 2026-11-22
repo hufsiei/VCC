@@ -12,6 +12,7 @@
 
 import json
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -227,6 +228,9 @@ def _모델ID(모델):
         return 모델
 
 
+_기록_잠금 = threading.Lock()  # 동시 호출 때 줄이 섞이거나 빠지지 않게(원우 11/22: 200건 중 187~193줄만 남음)
+
+
 def _기록(작업명, 모델, usage, 시작, ok, error=None):
     """호출 한 건마다 한 줄. 작업 55(질문 1건당 원가·운영비)와 작업 30(모델 비교)의 재료. 실패면 이유도(키는 담기지 않음)."""
     try:
@@ -239,7 +243,8 @@ def _기록(작업명, 모델, usage, 시작, ok, error=None):
         }
         if error:
             row["error"] = mask(error)[:200]  # 오류 문구에 요청 내용이 섞일 수 있어 가린 뒤 자른다
-        with LOG_FILE.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+        line = json.dumps(row, ensure_ascii=False) + "\n"
+        with _기록_잠금, LOG_FILE.open("a", encoding="utf-8") as f:
+            f.write(line)
     except OSError:
         pass  # 기록 실패가 응답을 막지 않게

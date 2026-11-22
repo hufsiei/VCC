@@ -8,7 +8,9 @@
 #   listNotes(me, {filter})    — 카드 목록. evidenceCount·lastSemester에 인터뷰 문장을 더한다
 #   interview_lines(program)   — askBoo 근거 풀에 더할 인터뷰 문장(후배 질문 A 포함)
 #   scrapNote(me, {noteId, scrap}) — 스크랩 켜기·끄기(runtime/scraps.json). 카드·노트의 scrapped, getInbox.scraps
+#   saveQuestion(me, {noteId, section}) — [11/22] 「질문함에 담기」: 그 칸을 질문함에 hold로(다음 인터뷰가 먼저 묻는다)
 #   카드·노트의 country = 국제교류 프로그램의 programs.json 「세부」(국가). 인턴·비교과는 null
+#   getNote 배운점 문장의 senior = 「선배 A」(노트 안에서만 쓰는 글자, 학과 없음 — PRD 9-1)
 #
 # 원문 인용만 한다: 선배가 동의한 문장 그대로 붙이고, 여러 선배의 답을 합치거나 요약하지 않는다(HCX 원칙 v2). AI 없음.
 # 응답에 선배 학번(owner)·내 경험노트 id는 넣지 않는다.
@@ -162,12 +164,45 @@ def _merge(nid, rows):
     return note
 
 
+# ── 배운점 선배 글자 [11/22] ──────────────────────────────────────────
+# 배운점은 선배별 원문 인용이라(디자인 규칙 8절) 문장마다 「선배 A」를 붙인다. 글자는 **이 노트 안에서만** 쓰는 것:
+# PRD 9-1에 따라 학과는 넣지 않고, 닮은선배의 nickname(학과 포함)과도 잇지 않는다(이으면 학과가 드러남).
+LESSON_SECTION = "배운점"
+_who_by_source = None
+
+
+def _source_owner(sid):
+    """보고서·후기 문장 id → 쓴 사람(evidence.json 학번). 화면으로는 내보내지 않는다."""
+    global _who_by_source
+    if _who_by_source is None:
+        _who_by_source = {e["id"]: e.get("학번") for e in _json("evidence.json", []) if e.get("id")}
+    return _who_by_source.get(sid)
+
+
+def _label_lesson_seniors(note, rows):
+    owner = {r["sourceId"]: r.get("owner") for r in rows}
+    letters = {}
+    for sec in note.get("sections", []):
+        if sec.get("name") != LESSON_SECTION:
+            continue
+        for ln in sec.get("lines", []):
+            who = owner.get(ln.get("sourceId")) or _source_owner(ln.get("sourceId"))
+            if not who:
+                continue
+            if who not in letters:
+                i = len(letters)
+                letters[who] = f"선배 {chr(ord('A') + i)}" if i < 26 else f"선배 {i + 1}"
+            ln["senior"] = letters[who]
+
+
 # ── 서버 함수 ─────────────────────────────────────────────────────────
 def getNote(me, p):
     nid = (p.get("id") or "").strip()
-    note = _merge(nid, _visible_lines(nid=nid)) if nid else None
+    rows = _visible_lines(nid=nid) if nid else []
+    note = _merge(nid, rows) if nid else None
     if not note:
         return {"error": "노트를 찾지 못했어요"}
+    _label_lesson_seniors(note, rows)
     note["country"] = _country(note["program"])
     note["scrapped"] = nid in _my_scraps(me)
     return note
@@ -229,6 +264,36 @@ def scrapNote(me, p):
     return {"ok": True, "noteId": nid, "scrapped": on}
 
 
+QUESTION_TEXT = "{section} 이야기를 최근 경험으로 듣고 싶어요."
+
+
+def saveQuestion(me, p):
+    """[11/22] 「질문함에 담기」(디자인 규칙 6-1·6-2, PRD ⑧): 노트의 한 칸을 질문함에 hold로 넣는다.
+    다음 선배 인터뷰(interviewNext)가 이 질문을 먼저 묻는다. 글은 서버가 정한다(자유 입력 없음 → 검사·AI 없음).
+    같은 사람·노트·칸의 hold 질문이 이미 있으면 새로 만들지 않는다(멱등)."""
+    import runtime_fns   # runtime_fns가 notes를 import하므로 여기서 부른다
+    nid = (p.get("noteId") or "").strip()
+    section = (p.get("section") or "").strip()
+    note = _merge(nid, _visible_lines(nid=nid)) if nid else None
+    if not note:
+        return {"error": "노트를 찾지 못했어요"}
+    names = [s["name"] for s in note.get("sections", [])]
+    if section not in names or section == QUESTION_SECTION:
+        return {"error": "담을 수 없는 칸이에요"}
+    with store.lock():
+        same = next((q for q in store.load("questions", [])
+                     if q.get("colreg_no") == me and q.get("noteId") == nid and q.get("칸") == section
+                     and q.get("status") == "hold"), None)
+    if same:
+        qid, already = same["id"], True
+    else:
+        qid = runtime_fns.add_question(me, QUESTION_TEXT.format(section=section), program=note["program"],
+                                       section=section, note_id=nid)
+        already = False
+    return {"ok": True, "questionId": qid, "already": already,
+            "message": "질문함에 담았어요. 다음 선배 인터뷰 때 먼저 물어볼게요."}
+
+
 def inbox_scraps(me):
     """getInbox.scraps — 최근 스크랩이 위. 지금 없는 노트는 뺀다."""
     out = []
@@ -249,4 +314,4 @@ def interview_lines(program):
             for r in sorted(_visible_lines(program=program), key=lambda r: r.get("at", ""), reverse=True)]
 
 
-ROUTES = {"getNote": getNote, "listNotes": listNotes, "scrapNote": scrapNote}
+ROUTES = {"getNote": getNote, "listNotes": listNotes, "scrapNote": scrapNote, "saveQuestion": saveQuestion}
