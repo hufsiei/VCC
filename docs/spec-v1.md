@@ -11,6 +11,7 @@
 > **11/19 개정 ②(작업 18·22)**: askBoo 응답에 **`status: "official"`**(규정 질문 → 공식 안내 연결) 추가(3·4·6·8장). 닮은 선배 점수는 서버가 Python이므로 `common/score.js`를 없애고 **`functions/score.py`(원우)** 한 벌로 계산한다.
 > **11/19 개정 ③(작업 18)**: askBoo `lines[]`에 **`fallback`**(사후 검증에 걸려 근거 원문을 보여 준 줄) 추가(4장). `noteId`는 `data/notes.json`이 생기기 전까지 프로그램 이름으로 나간다.
 > **11/22 개정(작업 23, 민지 요청)**: `listNotes`·`getNote`에 **`country`**(국제교류 = `programs.json` `세부` 국가, 인턴·비교과 `null`, 카드 띠 「교환학생 · 독일」)와 **`scrapped`**(내가 스크랩했는지) 추가. 새 함수 **`scrapNote(noteId, scrap)`**(켜기·끄기, 멱등) → `getInbox.scraps`가 실제로 채워진다(최근이 위). **[11/22 오후]** `getNote` 배운점 문장에 **`senior`**(「선배 A」, 노트 안에서만 쓰는 글자, 학과 없음 — PRD 9-1), 새 함수 **`saveQuestion(noteId, section)`**(「질문함에 담기」). **[11/22 저녁]** `getInbox.myNotes` 카드 값(`share`·`filled`/`total`·`sharedLines` 등), 새 함수 **`getMyNote(id)`**(내 경험노트 상세), 공유 상태는 셋뿐(「반영 중」 없음). 바뀐 곳은 **[11/22]** 표시.
+> **11/22 개정 ③(선배 추천 열림, 미리 결정)**: 닮은선배 추천은 **경험 나눔**(들려주기 유효 답변 3개 + 해봤노트 1문장 이상 공유) 또는 **수요 제공**(새 함수 **`demandNext`·`saveDemand`** — 「궁금한 것 정리하기」, 유효 답변 3개 + 전달 동의)을 한 뒤에 열린다. 한 번 열리면 모든 프로그램. `getMe.recommend`, 잠겼을 때 `recommendSeniors`·`previewNickname`의 `locked`와 `sendMessage`의 `reason: "잠김"`, `summarizeInterview`의 `answered`·`need`, `saveConsent`의 `recommend`·`unlocked`, `askerInfo.관심`을 「교환학생·독일」 형식으로 + `시기`. 서버 `functions/demand.py`. 바뀐 곳은 **[11/22 열림]** 표시.
 > **11/22 개정 ②(작업 21, 미리)**: `interviewNext`가 보고서가 이미 답한 칸은 묻지 않고(빈 칸·오래된 칸만), **깊이 질문**(`depth`, 교환·파견 3개·인턴·비교과 2개)을 묻는다. 묻지 않은 칸은 **`covered`**로 알린다(4장).
 > **11/20 개정(닮은 선배 실제 데이터 기준)**: 시연 인물을 `가상데이터_1000명.xlsx` 실제 값에 맞췄다. 선배2를 H0745 → **H0241**(독일어과 3학년·경영학, 마르부르크 2026-1, 12점 2위)로 바꾸고, 선배1과 후배1의 공통 비교과를 `합격 면접 취업특강(커리어랩)` → **`한국외국어대학교 직무탐색 집중교육`**으로 바꿨다. H0241은 공통 비교과가 없다(12점 = 학과 5 + 이중전공 4 + 단과대 3). 후배1은 현장실습 이수가 없다. 선배1 보고서 학기 2024-1 → 2025-1(1·4·6장 예시 포함).
 
@@ -57,7 +58,7 @@
 
 - **지금(로컬):** `functions/local_fn.py`가 시작할 때 `data/runtime/*.json`을 읽어 메모리에 두고, 기록이 바뀔 때마다 그 파일을 다시 쓴다(임시 파일에 쓴 뒤 바꿔 끼워 반쯤 쓰인 파일이 남지 않게). 서버를 껐다 켜도 남는다.
 - **Cloud Functions 이사 후:** 같은 파일 이름을 NCP **Object Storage**의 객체로 둔다. 바꾸는 곳은 `functions/store.py`의 저장 방식 한 곳뿐이다(`STORE_BACKEND=file|ncp`). 다른 코드는 `store.load(이름)`·`store.save(이름)`만 쓰고 파일을 직접 열지 않는다.
-- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별 지금 추천 목록 최대 9명과 노트 버전) · `counters.json`(번호 매기기) · **[작업 85]** `noteVersions.json`(노트별 버전 — saveConsent가 +1, recommendSeniors가 비교) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(인터뷰 중간 저장, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 9개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·recommendSeniors·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). **[작업 66]** 관리자 콘솔용 `reportSettings.json`(부서코드별 발행 설정) · `issuedReports.json`(발행 이력) · `reportHtml.json`(리포트 id → HTML, PRD 6-4의 `reports/{id}.html` 대신 한 파일) · `suggestionStatus.json`(제안 id → 상태). 코드: `functions/admin.py`.
+- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `demands.json`(**[11/22 열림]** 궁금한 것 정리하기 — 분야·세부·프로그램·칸·시기·상황·바라는 것, 선배 추천 열림 근거) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별 지금 추천 목록 최대 9명과 노트 버전) · `counters.json`(번호 매기기) · **[작업 85]** `noteVersions.json`(노트별 버전 — saveConsent가 +1, recommendSeniors가 비교) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(인터뷰 중간 저장, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 9개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·recommendSeniors·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). **[작업 66]** 관리자 콘솔용 `reportSettings.json`(부서코드별 발행 설정) · `issuedReports.json`(발행 이력) · `reportHtml.json`(리포트 id → HTML, PRD 6-4의 `reports/{id}.html` 대신 한 파일) · `suggestionStatus.json`(제안 id → 상태). 코드: `functions/admin.py`.
 - **누가 부르는지:** 서버는 헤더 `X-Token`을 `sessions.json`(`functions/sessions.py`, 토큰 24시간, 같은 계정 동시 로그인 허용)으로 풀어 사용자를 안다. 토큰이 없거나 만료·폐기면 `{ "error": "로그인이 필요해요" }`(`checkMessage`·`login`만 예외). `login`이 난수 토큰을 발급해 `user.token`으로 주고, `logout`이 폐기한다. 로그인 비번은 `data/`가 아니라 환경변수 `VCC_LOGIN_PW`(.env·NCP 기본 파라미터)에만 둔다. 표의 `"*"`는 가상학생 전원의 공용 비번(청중 체험용, 개별 항목이 우선, 직원에는 적용 안 됨). 순서: 토큰 확인 → 전역 상한 → 사용자별 한도 → 함수. **[11/19] 남의 기록은 서버가 막는다**: `getMessages`·`respondRequest`는 `me`가 그 대화의 asker·senior일 때만, 내 경험노트·`saveConsent`는 `owner == me`일 때만, 관리자 함수는 `권한`이 있을 때만 응답하고 그 외는 `{ "error": "볼 수 없는 기록이에요" }`. (작업 73)
 - **초기화:** 리허설 전 `python functions/reset_runtime.py` → runtime 파일을 비우고 시연 시작 상태로 돌린다.
 - `data/runtime/`은 커밋하지 않는다(`.gitignore`). 시연 중 쌓인 기록이 저장소에 섞이지 않게.
@@ -81,6 +82,9 @@ const FN_BASE = "http://localhost:8787";
 | interviewNext | **[11/20]** `program`이 `interviewNext.byProgram`에 있으면(마르부르크 시연 대본) `answers.length`번째 `steps`, 다 쓰면 `done`(steps[0]은 「후배 질문」). 그 밖의 프로그램은 서버(`interview.py`)처럼 `data/programs.json`의 `분야` → `data/frames.json` 노트 틀을 고르고, 아직 답하지 않은 칸을 틀 순서대로(「배운점」은 마지막) `interviewNext.questions[칸]` 문장으로 묻는다(`{p}` = 별칭 첫째 또는 프로그램명). 꼬리 질문·후배 질문은 없다(`pendingQuestions: 0`) |
 | getNote | `getNote[id]`가 있으면 그것, 없으면 `getNote["N-marburg"]` |
 | getMyNote [11/22] | `getMyNote` 하나(M-0001, 일부 공유 예시). 받은 `id`를 그대로 넣어 돌려준다 |
+| 선배 추천 열림 [11/22 열림] | mock 기본은 **열림**. 주소에 `?locked=1`이면 잠김: `getMe.recommend.ready: false`, `recommendSeniors`·`previewNickname` → `locked`, `sendMessage` → `reason: "잠김"`. mock `saveDemand`·`saveConsent`를 부르면 그 탭은 열린다(sessionStorage `mockUnlocked`) |
+| demandNext·saveDemand [11/22 열림] | `data.js`의 `mockDemand`가 서버(`demand.py`)와 같은 순서로 `programs.json`·`frames.json`에서 칩을 만든다. `fromQuestionId`는 마르부르크·생활 보류 질문으로 채운다 |
+| summarizeInterview [11/22 열림] | `summarizeInterview` + transcript로 센 `answered`, `need: 3` |
 | checkMessage | 숫자가 8자리 이상 연속(전화·학번)이면 `checkMessage.blocked`, 그 외 `checkMessage.ok` |
 | 나머지 | `m[name]` 그대로 |
 
@@ -108,6 +112,12 @@ payload `{id, pw}`
   "귀국보고서": [],
   "현장실습후기": [] }
 ```
+**[11/22 열림]** `recommend` = 선배 추천 열림 상태(`demand.recommend_status`). 닮은선배 화면은 `ready: false`면 잠김(디자인 규칙 6-6) + 두 길(경험 들려주기 / 궁금한 것 정리하기)을 보여 준다.
+```json
+"recommend": { "ready": false, "by": null, "need": 3, "talk": { "answered": 2, "shared": 0 }, "ask": false }
+```
+`by` = `"talk"`(경험 나눔으로 열림) | `"ask"`(수요 제공으로 열림) | `null`. `talk`는 내 경험노트 중 가장 많이 한 것(유효 답변 수·지금 공유된 문장 수).
+
 귀국보고서 항목 예: `{ "학년도": 2024, "학기": 1, "국가": "독일", "대학명": "마르부르크필립스대학교" }` · 현장실습후기 항목 예: `{ "학년도": 2025, "학기": 2, "업체명": "KOTRA 해외무역관(유럽 권역)", "직군": "전시·행사 지원" }`(학기 2 = 여름방학). 학기 숫자를 화면에 낼 때는 9장의 학기 코드표로 바꾼다.
 
 ### askBoo(question)
@@ -154,6 +164,7 @@ payload `{program, transcript:[{section, question, answer}]}`. 두 장을 돌려
 **서버는 응답과 함께 myNote를 내 경험노트로 저장한다**(`saved: true`, `myNoteId`). 화면은 "내 경험노트에 저장됨"을 표시하고, 공유는 이후 `saveConsent`로만 한다. 같은 프로그램으로 다시 요약하면 같은 `myNoteId`를 갱신한다.
 `match`는 AI 원문 일치 검사 결과. `false`면 화면이 "원문과 다를 수 있어요" 표시.
 `identifying`은 코드(정규식·사전)가 찾은 본인 식별 문장(성적 숫자·수상·실명·특정 인물). `true`면 동의 시트에서 기본 꺼짐 + 주의 라벨.
+**[11/22 열림]** 응답에 `answered`(이번 transcript의 유효 답변 수 — 서로 다른 질문, 10자 이상, 「몰라요」류·건너뛰기 제외)와 `need`(3)를 더한다. 서버는 내 경험노트에 큰 값을 남긴다. 화면은 `answered < need`면 공유 시트에 「세 가지 이상 이야기하면 선배 추천이 열려요」를 안내한다(요약·공유 자체는 막지 않음).
 **[11/19]** 후배 질문에 답한 문장은 `section: "후배 질문"`에 들어가고 `answersQuestionId`·`asked`(질문 원문)를 유지한다. myNote·publicDraft 모두 같다. 요약 전에 transcript는 0장 마스킹을 거친다.
 ```json
 { "draftId": "D-0001", "program": "마르부르크필립스대학교", "saved": true, "myNoteId": "M-0001",
@@ -168,8 +179,10 @@ payload `{program, transcript:[{section, question, answer}]}`. 두 장을 돌려
 payload `{draftId, edits:{removed:[lineId], changed:[{lineId, text}]}, consent:true}`. `removed` = 동의 시트에서 끈 문장(내 경험노트에는 남고 해봤노트에는 안 들어감). 이미 공유한 경험노트에서 다시 부르면 공유 범위를 바꾼다.
 **[11/19]** 통과한 문장은 `runtime/noteLines.json`에 `{noteId, section, text, sourceId: "I-…", semester, answersQuestionId?, asked?}`로 쌓인다(작업 26·74). `answersQuestionId`가 있으면 그 질문을 `status: "answered"`, `noteId`로 바꾸고 질문자에게 알림 `「내 질문에 선배가 답했어요 · {프로그램} 해봤노트」`(`alerts.json`, `questionId`·`noteId` 포함)를 보낸다. **칸 이름이 같다는 이유만으로 알림을 보내지 않는다.** 노트가 아직 없는 프로그램이면 새 노트 id를 만든다(`"N-" + slug`).
 ```json
-{ "ok": true, "noteId": "N-marburg", "added": 3, "answered": ["Q-0001"] }
+{ "ok": true, "noteId": "N-marburg", "added": 3, "answered": ["Q-0001"],
+  "recommend": { "ready": true, "by": "talk", "need": 3, "talk": { "answered": 4, "shared": 3 }, "ask": false }, "unlocked": true }
 ```
+**[11/22 열림]** `unlocked: true`면 이번 공유로 선배 추천이 처음 열린 것 → 화면 토스트 「선배 추천이 열렸어요」.
 **[11/20]** `changed`의 문장은 저장 전에 `functions/msg_check.py`의 `check_public_text`로 다시 검사한다(학번·연락처·메일·링크·주소·금지어). **걸린 문장만 공개에서 빼고**(내 경험노트에는 남음) 나머지는 저장하며, 응답에 `rejected`를 붙인다. 화면은 문장마다 `message`를 보여 준다.
 ```json
 { "ok": true, "noteId": "N-marburg", "added": 2,
@@ -245,6 +258,7 @@ payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명
   - 그 노트에 새 경험이 공유될 때(saveConsent → 노트 버전 +1) — P0
   - 학기가 바뀔 때(학기마다 1회 일괄) — P1
   - 보는 사람의 비교과·이중전공이 바뀔 때(`recomputed: true`) — P1
+- **[11/22 열림] 잠김**: 경험 나눔·수요 제공 전에는 목록 대신 `{ "locked": true, "message": "경험을 들려주거나 궁금한 것을 정리하면 선배 추천이 열려요", "recommend": {…getMe.recommend와 같음} }`. 화면만이 아니라 서버가 막는다.
 - 다시 계산해서 새로 들어온 선배 수는 `newCount`로 알린다(화면 배지 「새로 비슷한 선배 N명」).
 - 목록에서 밀려난 선배는 보관함에 남기지 않는다. 내 보관함에는 **쪽지를 주고받은 선배만** 남는다(「선배 저장」 최대 9명은 P1).
 - 글자는 `nicknames.json`에 만난 순서대로 따로 기억하므로, 목록에서 빠졌다가 다시 나타나도 같은 사람은 같은 글자다(I 다음은 J, K…).
@@ -273,6 +287,7 @@ payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청�
 막힘 방지(응답 없는 선배 3명에게 갇히지 않게) 두 가지:
 - **보낸 사람이 취소(P0)**: `respondRequest(threadId, cancel: true)`로 기다리는 요청을 거둔다 → `status: "cancelled"`, 한도에서 빠진다. 취소한 선배에게는 7일 동안 다시 요청하지 못한다(반복 요청 방지). 선배 화면에서는 그 요청이 조용히 사라진다(알림 없음).
 - **자동 만료(P1)**: 보낸 뒤 **7일** 안에 선배가 수락·거절하지 않으면 서버가 `status: "expired"`로 바꾸고 한도에서 뺀다. 보낸 사람에게 알림 「선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?」(`alerts.json`). 만료 판정은 `getMessages`·`sendMessage` 호출 때 `requestedAt` 기준으로 한다(별도 스케줄러 없음). 시연에서는 7일이 지나지 않으므로 문구로만 설명한다.
+**[11/22 열림] 잠김:** 선배 추천이 잠긴 사람의 **새 요청·다시 요청**은 `{ "ok": false, "reason": "잠김", "message": "경험을 들려주거나 궁금한 것을 정리하면 선배 추천이 열려요", "recommend": {…} }`. 이미 열린 대화에 이어 쓰기와 받은 선배의 답장은 막지 않는다.
 대화 상태 `status`: `waiting`(수락 대기) | `accepted` | `declined` | `cancelled` | `expired`. 한도에 세는 것은 `waiting`만이다. 기존 `accepted: true|false`는 `status`로 대신한다.
 첫 메시지일 때 서버가 이 대화에서 쓸 보낸 사람 닉네임(`myNickname`, 형용사 + 동물)을 만든다. 화면은 요청 시트를 열 때 `previewNickname(to)`로 같은 값을 미리 받아 「선배에게는 '용감한 수달'로 보여요」를 보여 준다.
 ```json
@@ -280,20 +295,20 @@ payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청�
 ```
 
 ### previewNickname(to)
-payload `{to}`. 이 선배에게 보낼 대화의 내 닉네임을 정해 돌려준다(아직 대화가 없으면 새로 만들고, 있으면 그 값). AI 없음, 목록(형용사 × 동물)에서 코드가 고른다.
+payload `{to}`. 이 선배에게 보낼 대화의 내 닉네임을 정해 돌려준다(아직 대화가 없으면 새로 만들고, 있으면 그 값). AI 없음, 목록(형용사 × 동물)에서 코드가 고른다. **[11/22 열림]** 대화가 없고 잠겼으면 recommendSeniors와 같은 `locked` 응답.
 ```json
 { "myNickname": "용감한 수달" }
 ```
 
 ### getMessages()
-`role`은 이 대화에서 내 역할: `asker`(쪽지를 보낸 사람) | `senior`(받은 선배). `nickname`은 **상대**의 이름으로, 내가 asker면 `"독일어과 선배 A"`, senior면 `"용감한 수달"`. `askerInfo`는 senior에게만 온다(학과 없음).
+`role`은 이 대화에서 내 역할: `asker`(쪽지를 보낸 사람) | `senior`(받은 선배). `nickname`은 **상대**의 이름으로, 내가 asker면 `"독일어과 선배 A"`, senior면 `"용감한 수달"`. `askerInfo`는 senior에게만 온다(학과 없음). **[11/22 열림]** `관심`은 보낸 사람의 수요 인터뷰·질문함에서 최근 것부터 최대 2개, 「분야·세부」 형식(국제교류는 「교환학생·독일」, 현장실습은 「현장실습·공공기관」, 비교과는 「비교과·진로·취업 교육과정」). `시기`는 수요 인터뷰에서 고른 것(「아직 몰라요」면 없음). 상황·바라는 것 답변 원문은 선배에게 보내지 않는다.
 ```json
 { "threads": [
   { "threadId": "T-0001", "role": "asker", "withId": "H0469", "nickname": "독일어과 선배 A", "myNickname": "용감한 수달",
     "status": "accepted", "requestedAt": "2026-11-20T10:00:00+09:00", "unread": 1,
     "messages": [ { "from": "me", "text": "...", "at": "..." }, { "from": "them", "text": "...", "at": "..." } ] },
   { "threadId": "T-0002", "role": "senior", "withId": "H0102", "nickname": "조용한 고래",
-    "askerInfo": { "학년": 2, "관심": ["교환학생·독일"] },
+    "askerInfo": { "학년": 2, "관심": ["교환학생·독일"], "시기": "다음 학기" },
     "status": "waiting", "requestedAt": "2026-11-21T09:00:00+09:00", "unread": 1,
     "messages": [ { "from": "them", "text": "...", "at": "..." } ] } ],
   "waitingCount": 1, "waitingLimit": 3 }
@@ -335,6 +350,35 @@ payload `{threadId, accept: true|false}` 또는 `{threadId, cancel: true}`.
   "publicDraft": { "sections": [ "...summarizeInterview의 publicDraft 그대로" ] } }
 ```
 
+### demandNext(state) [11/22 열림]
+「궁금한 것 정리하기」(수요 인터뷰) 다음 단계 하나. **AI 없음** — 칩과 규칙만(`functions/demand.py`). interviewNext처럼 서버는 기억하지 않고, 화면이 응답의 `state`를 들고 다니다 고른 값·쓴 답을 넣어 다시 보낸다.
+순서: `field`(국제교류·현장실습·비교과·잘 모르겠어요) → (`explore`: 「잘 모르겠어요」면 고민 칩으로 분야·분류를 정함) → `detail`(국제교류 = 나라, 현장실습 = 기관 유형, 비교과 = 프로그램 분류, `programs.json` `세부`) → `program`(그 분류의 프로그램 + 「아직 정하지 않았어요」) → `section`(노트 틀 칸, 후배 질문 제외) → `when`(이번 학기·다음 학기·1년 뒤·아직 몰라요) → **답변 3개** `situation`(지금 내 상황) · `question`(고른 칸에 대해 선배에게 묻고 싶은 것) · `hope`(이 경험이 남겨 줬으면 하는 것) → `more`(더 궁금한 것 최대 2개, `canSkip` — 건너뛰려면 `state.moreDone = true`).
+- 칩 단계의 값: `state[step] = 고른 값`. `detail` 칩은 `{value, label}`이고 「아직 정하지 않았어요」는 `value: null`. `explore`는 `state.explore = 고른 label`(state.field는 「잘 모르겠어요」 그대로).
+- 답변 단계: `state[step] = 쓴 문장`, `more`는 `state.more = [..., 문장]`. **유효 답변** = 10자 이상, 「몰라요」류·같은 글자 반복 아님, `check_message`(학번·연락처·비방) 통과. 아니면 같은 단계 + `retry`(문구).
+- `progress.answered`는 유효 답변 수(칩은 세지 않음), `need`는 3.
+- **물어보기에서 이어 하기**: askBoo가 보류(`hold`)한 내 질문으로 시작하면 `state = { fromQuestionId: "Q-0001" }` → 분야·세부·프로그램·칸·질문 문장이 미리 채워져 `when`부터 묻는다(답변 1개가 이미 있음). 남의 질문이면 `{"error": "볼 수 없는 기록이에요"}`.
+```json
+{ "done": false, "step": "detail", "question": "어느 나라가 궁금해요?",
+  "options": [ { "value": "프랑스", "label": "프랑스" }, { "value": "독일", "label": "독일" }, { "value": null, "label": "아직 정하지 않았어요" } ],
+  "progress": { "answered": 0, "need": 3 }, "state": { "field": "국제교류" } }
+{ "done": false, "step": "situation", "question": "지금 어느 정도 준비됐어요? …", "examples": ["2학년이고 어학 점수를 준비하고 있어요"],
+  "retry": "조금만 더 자세히 적어 주세요(10자 이상).", "progress": { "answered": 0, "need": 3 }, "state": { … } }
+{ "done": true, "progress": { "answered": 3, "need": 3 }, "state": { … },
+  "summary": { "interest": "교환학생·독일", "program": "마르부르크필립스대학교", "section": "학점", "when": "다음 학기",
+               "situation": "2학년이고 독일어 B1, 어학 점수를 준비하고 있어요", "questions": ["학점 인정은 전공 몇 학점까지 되나요?"],
+               "hope": "외국어로 일상을 꾸려 본 자신감을 얻고 싶어요" } }
+```
+화면은 `done`이면 「내가 궁금한 것」 카드(summary)와 동의 문구 「이 질문을 선배와 담당 부서에 전해도 될까요?」를 보여 주고 `saveDemand`를 부른다.
+
+### saveDemand(state) [11/22 열림]
+payload `{state, consent: true}`. 서버가 같은 규칙으로 다시 검사한다. 끝나지 않았으면 `{ "ok": false, "message": "아직 정리가 끝나지 않았어요", "next": {demandNext 응답} }`.
+저장: 질문 문장(가장 궁금한 것 + 더 궁금한 것)을 **질문함에 `hold`로**(`프로그램명`·`칸`·`시기`·`수요: true`) — 다음 그 프로그램 선배의 들려주기가 「후배 질문」으로 먼저 묻고(작업 74), 콘솔 수요 현황에도 합산된다. `fromQuestionId`로 시작했으면 그 질문 행에 맥락만 붙인다(질문함이 늘지 않음). 상황·바라는 것은 `runtime/demands.json`에만 둔다(선배에게 보내지 않음, 부서 집계는 P1).
+```json
+{ "ok": true, "demandId": "R-0001", "questionIds": ["Q-0003"],
+  "recommend": { "ready": true, "by": "ask", "need": 3, "talk": { "answered": 0, "shared": 0 }, "ask": true }, "unlocked": true }
+```
+`unlocked: true`면 이번에 처음 열린 것 → 토스트 「선배 추천이 열렸어요」 + 「닮은선배 보기」.
+
 ### reportStatement(lineId, reason)
 payload `{lineId, reason?}`. 신고된 문장은 즉시 숨김, 부서 리포트에 집계.
 ```json
@@ -361,6 +405,7 @@ interviewNext(program, answers) · summarizeInterview(program, transcript) · sa
 listNotes(filter) · getNote(id) · scrapNote(noteId, scrap = true) · saveQuestion(noteId, section) · reportStatement(lineId, reason)   // scrapNote·saveQuestion [11/22]
 recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept) · cancelRequest(threadId)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85)
 getInbox() · getMyNote(id) · getDeptReport(dept)   // getMyNote [11/22]
+demandNext(state = {}) · saveDemand(state)   // [11/22 열림] 궁금한 것 정리하기 → 선배 추천 열림. 열림 상태는 getMe().recommend
 getDepartments() · getAdminOverview(dept, period) · getAdminSuggestions(dept, period) · setSuggestionStatus(id, status)
 getReportSettings(dept) · saveReportSettings(dept, settings) · issueReport(dept, period) · listIssuedReports(dept) · getIssuedReport(reportId)   // 작업 66, PRD 7장
 currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이 성공 시 저장)

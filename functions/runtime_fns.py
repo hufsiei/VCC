@@ -13,12 +13,15 @@
 # 내 경험노트(11/22): getInbox.myNotes 카드(share·filled/total·sharedLines)와 getMyNote(id) 상세는 _my_note_view 하나로 계산.
 # 쪽지 규칙(11/18·11/20, spec 4장 sendMessage, 작업 85): 선배당 요청 1건 · 보낸 사람 수락 대기 3건 · 받는 선배 5건 ·
 #   요청 취소(7일 재요청 금지) · 7일 자동 만료. status = waiting | accepted | declined | cancelled | expired
+# 선배 추천 열림(11/22, demand.py): 경험 나눔(답변 3 + 1문장 공유) 또는 수요 제공(궁금한 것 정리하기) 전에는
+#   recommendSeniors·previewNickname·sendMessage(새 요청)가 {locked} / reason "잠김"으로 막는다. 받은 선배의 답장은 막지 않는다.
 # recommendSeniors(작업 85): 점수는 score.py(원우), 목록 보관·더 보기·재계산은 여기(spec 4장 인원 규칙).
 import json
 import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import demand
 import notes
 import score
 import store
@@ -178,6 +181,9 @@ def previewNickname(me, p):
         _, t = _find_thread(me, to)
         if t:
             return {"myNickname": t["askerNickname"]}
+        lk = demand.locked(me)
+        if lk:
+            return lk
         raw = store.load("pendingNicknames", {})
         key = f"{to}|{me}"
         if key not in raw:
@@ -212,6 +218,9 @@ def sendMessage(me, p):
             tid, t = _find_thread(me, to)
 
         if t is None:                                   # 첫 메시지 = 쪽지 요청
+            lk = demand.locked(me)
+            if lk:
+                return {"ok": False, "reason": "잠김", "message": lk["message"], "recommend": lk["recommend"]}
             err = _limit_error(me, to)
             if err:
                 return err
@@ -228,6 +237,9 @@ def sendMessage(me, p):
             if t["status"] == "cancelled" and _days_since(t.get("cancelledAt")) < COOLDOWN_DAYS:
                 return {"ok": False, "reason": "취소",
                         "message": "요청을 취소한 선배에게는 7일 뒤에 다시 보낼 수 있어요."}
+            lk = demand.locked(me)
+            if lk:
+                return {"ok": False, "reason": "잠김", "message": lk["message"], "recommend": lk["recommend"]}
             err = _limit_error(me, to)
             if err:
                 return err
@@ -281,14 +293,13 @@ def getMessages(me, p):
 
 
 def _asker_info(asker):
-    """선배에게 보여 줄 보낸 사람 정보: 학년 + 관심 경험(질문함의 프로그램). 학과는 넣지 않는다."""
-    grade = student(asker).get("regst_grad")
-    interests = []
-    for q in store.load("questions", []):
-        name = q.get("프로그램명")
-        if q.get("colreg_no") == asker and name and name not in interests:
-            interests.append(name)
-    return {"학년": grade, "관심": interests[:2]}
+    """선배에게 보여 줄 보낸 사람 정보: 학년 + 관심(「교환학생·독일」, 최대 2) + 시기(수요 인터뷰에서 고른 것).
+    학과·상황 답변 원문은 넣지 않는다(11/22, demand.py)."""
+    info = {"학년": student(asker).get("regst_grad"), "관심": demand.interest_labels(asker)}
+    when = demand.latest_when(asker)
+    if when:
+        info["시기"] = when
+    return info
 
 
 def respondRequest(me, p):
@@ -341,6 +352,9 @@ def recommendSeniors(me, p):
     note_id = p.get("noteId")
     if not note_id:
         return {"error": "노트를 골라 주세요"}
+    lk = demand.locked(me)          # 경험 나눔·수요 제공 전에는 잠김(11/22)
+    if lk:
+        return lk
     program = _program_of(note_id)
     nid = notes.note_id(program)
     with store.lock():
@@ -392,15 +406,17 @@ def add_question(me, text, program=None, section=None, status="hold", note_id=No
         return qid
 
 
-def save_my_note(me, program, draft_id, my_note, public_draft):
-    """summarizeInterview(작업 21)가 부른다. 같은 사람·같은 프로그램이면 같은 myNoteId를 갱신."""
+def save_my_note(me, program, draft_id, my_note, public_draft, answered=0):
+    """summarizeInterview(작업 21)가 부른다. 같은 사람·같은 프로그램이면 같은 myNoteId를 갱신.
+    answered = 이번 인터뷰의 유효 답변 수(demand.count_interview_answers) — 이어 쓰면 큰 값을 남긴다(추천 열림)."""
     with store.lock():
         notes = store.load("myNotes", {})
         mid = next((k for k, v in notes.items() if v["owner"] == me and v["program"] == program), None)
         mid = mid or store.next_id("M")
         old = notes.get(mid, {})
         notes[mid] = {"owner": me, "program": program, "draftId": draft_id, "myNote": my_note,
-                      "publicDraft": public_draft, "share": old.get("share", "private"), "updatedAt": now()}
+                      "publicDraft": public_draft, "share": old.get("share", "private"), "updatedAt": now(),
+                      "answered": max(int(old.get("answered", 0)), int(answered))}
         store.save("myNotes")
         return mid
 
@@ -422,6 +438,7 @@ def saveConsent(me, p):
         else:
             removed.add(ch.get("lineId"))
             rejected.append({"lineId": ch.get("lineId"), "reason": r["reasons"][0], "message": r["message"]})
+    ready_before = demand.recommend_status(me)["ready"]
     with store.lock():
         mid, note = next(((k, v) for k, v in store.load("myNotes", {}).items()
                           if v["owner"] == me and v["draftId"] == draft_id), (None, None))
@@ -448,6 +465,8 @@ def saveConsent(me, p):
         store.save("myNotes")
         _alert(me, "해봤노트에 내 이야기가 반영됐어요", noteId=nid)   # 바로 반영되므로 완료 알림(디자인 규칙 7-②, 11/22)
         out = {"ok": True, "noteId": nid, "added": added, "answered": answered}
+        st = demand.recommend_status(me)          # [11/22] 이번 공유로 선배 추천이 열렸으면 unlocked
+        out["recommend"], out["unlocked"] = st, st["ready"] and not ready_before
         if rejected:
             out["rejected"] = rejected     # 화면은 걸린 문장마다 message를 보여 준다
         return out
@@ -583,5 +602,6 @@ ROUTES = {
     "getMyNote": getMyNote,   # [11/22] 내 경험노트 상세
     "reportStatement": reportStatement,
     "getInbox": getInbox,
+    **demand.ROUTES,     # [11/22] demandNext·saveDemand (궁금한 것 정리하기, AI 없음)
     **notes.ROUTES,      # getNote·listNotes (AI 없음, 작업 26·74)
 }

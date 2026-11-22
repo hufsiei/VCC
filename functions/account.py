@@ -100,6 +100,8 @@ def getMe(me, p):
     out["비교과이수내역"] = _pick(_rows("extracurricular"), "가상학번", me, EXTRA_KEYS)
     out["귀국보고서"] = _pick(_rows("reports"), "학번", me, REPORT_KEYS)
     out["현장실습후기"] = _pick(_rows("internships"), "학번", me, INTERN_KEYS)
+    import demand   # [11/22] 선배 추천 열림(닮은선배 잠김 화면·인터BOO 안내)
+    out["recommend"] = demand.recommend_status(me)
     return out
 
 
