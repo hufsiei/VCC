@@ -137,5 +137,26 @@ expect("신고 → 근거 풀에서 빠짐", all(x["id"] != sid for x in notes.i
 # 11) 없는 노트
 expect("없는 노트는 오류", "error" in notes.getNote(JUNIOR, {"id": "N-없음"}))
 
+# 12) 국가(카드 띠 「교환학생 · 독일」) — 국제교류만, 인턴·비교과는 null
+cards = {n["id"]: n for n in notes.listNotes(JUNIOR, {})["notes"]}
+expect("국가: 마르부르크 = 독일", cards["N-marburg"]["country"] == "독일" and notes.getNote(JUNIOR, {"id": "N-marburg"})["country"] == "독일")
+expect("국가: 비교과는 null", cards["N-3ca17d"]["country"] is None and cards["N-3ca17d"]["completedCount"] == 150)
+expect("국가: 인턴은 null", all(c["country"] is None for c in cards.values() if c["type"] == "인턴"))
+
+# 13) 스크랩 켜기·끄기 → 카드·노트 scrapped, 내 보관함 scraps(최근이 위), 사람마다 따로
+expect("스크랩 처음엔 꺼짐", cards["N-marburg"]["scrapped"] is False and getInbox(JUNIOR, {})["scraps"] == [])
+s1 = notes.scrapNote(JUNIOR, {"noteId": "N-marburg"})
+notes.scrapNote(JUNIOR, {"noteId": "N-3ca17d", "scrap": True})
+notes.scrapNote(JUNIOR, {"noteId": "N-marburg", "scrap": True})   # 두 번 눌러도 하나
+expect("스크랩 응답", s1 == {"ok": True, "noteId": "N-marburg", "scrapped": True})
+expect("보관함 scraps 최근이 위·중복 없음", [s["noteId"] for s in getInbox(JUNIOR, {})["scraps"]] == ["N-3ca17d", "N-marburg"]
+       and getInbox(JUNIOR, {})["scraps"][1]["program"] == PROGRAM)
+expect("카드·노트 scrapped", notes.getNote(JUNIOR, {"id": "N-marburg"})["scrapped"] is True
+       and {n["id"]: n for n in notes.listNotes(JUNIOR, {})["notes"]}["N-3ca17d"]["scrapped"] is True)
+expect("다른 사람에게는 꺼짐", notes.getNote(OTHER, {"id": "N-marburg"})["scrapped"] is False and getInbox(OTHER, {})["scraps"] == [])
+off = notes.scrapNote(JUNIOR, {"noteId": "N-marburg", "scrap": False})
+expect("스크랩 끄기", off["scrapped"] is False and [s["noteId"] for s in getInbox(JUNIOR, {})["scraps"]] == ["N-3ca17d"])
+expect("없는 노트 스크랩은 오류", "error" in notes.scrapNote(JUNIOR, {"noteId": "N-없음"}) and "error" in notes.scrapNote(JUNIOR, {}))
+
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)

@@ -333,7 +333,10 @@
         "forWhom": "독일어권 파견을 생각하는 1~2학년",
         "evidenceCount": 7,
         "lastSemester": "2026-1",
-        "satisfaction": null
+        "satisfaction": null,
+        "completedCount": null,
+        "country": "독일",
+        "scrapped": true
       },
       {
         "id": "N-kotra",
@@ -343,7 +346,23 @@
         "forWhom": "해외영업·전시 분야 현장실습을 생각하는 2~3학년",
         "evidenceCount": 3,
         "lastSemester": "2025-여름",
-        "satisfaction": null
+        "satisfaction": null,
+        "completedCount": null,
+        "country": null,
+        "scrapped": false
+      },
+      {
+        "id": "N-3ca17d",
+        "program": "HUFS 동문멘토링 데이",
+        "type": "비교과",
+        "oneLine": "",
+        "forWhom": "2학년이 많이 이수한 비교과",
+        "evidenceCount": 0,
+        "lastSemester": "2026-1",
+        "satisfaction": 4.2,
+        "completedCount": 150,
+        "country": null,
+        "scrapped": false
       }
     ]
   },
@@ -357,6 +376,9 @@
       "evidenceCount": 8,
       "lastSemester": "2026-1",
       "satisfaction": null,
+      "completedCount": null,
+      "country": "독일",
+      "scrapped": true,
       "officialUrl": "https://example.com/hufs/exchange",
       "sections": [
         {
@@ -503,6 +525,9 @@
       "evidenceCount": 3,
       "lastSemester": "2025-여름",
       "satisfaction": null,
+      "completedCount": null,
+      "country": null,
+      "scrapped": false,
       "officialUrl": "https://example.com/hufs/intern",
       "sections": [
         {
@@ -577,6 +602,38 @@
           "semester": "2025-여름"
         }
       }
+    },
+    "N-3ca17d": {
+      "id": "N-3ca17d",
+      "program": "HUFS 동문멘토링 데이",
+      "type": "비교과",
+      "oneLine": "",
+      "forWhom": "2학년이 많이 이수한 비교과",
+      "evidenceCount": 0,
+      "lastSemester": "2026-1",
+      "satisfaction": 4.2,
+      "completedCount": 150,
+      "country": null,
+      "scrapped": false,
+      "officialUrl": "https://job.hufs.ac.kr/job/main/index.do",
+      "sections": [
+        {
+          "name": "활동내용",
+          "interviewOnly": false,
+          "lines": []
+        },
+        {
+          "name": "배운점",
+          "interviewOnly": false,
+          "lines": []
+        },
+        {
+          "name": "후배 질문",
+          "interviewOnly": true,
+          "lines": []
+        }
+      ],
+      "sources": {}
     }
   },
   "recommendSeniors": {
@@ -2047,5 +2104,10 @@
     "issuedAt": "2026-11-21T10:00:00+09:00",
     "summary": "2026년 2학기 질문은 208건이고 미답변은 21건(보류율 10%)이에요. 질문이 많은 프로그램은 마르부르크필립스대학교, 밀라노대학교, 리스본종합대학교이에요. 노트가 비어 있는 신규 수요 묶음이 1개 있어요.",
     "html": "<article class=\"rpt\"><header class=\"rpt-head\"><p class=\"rpt-period\">2026년 2학기</p><h1 class=\"rpt-dept\">국제교류팀 해봤노트 리포트</h1></header><section class=\"rpt-kpi\"><div class=\"rpt-card\"><p class=\"rpt-card-label\">질문 수</p><p class=\"rpt-card-value\">208</p></div><div class=\"rpt-card\"><p class=\"rpt-card-label\">미답변 질문</p><p class=\"rpt-card-value\">21</p></div><div class=\"rpt-card\"><p class=\"rpt-card-label\">신규 수요</p><p class=\"rpt-card-value\">1</p></div><div class=\"rpt-card\"><p class=\"rpt-card-label\">개선 요청</p><p class=\"rpt-card-value\">3</p></div></section><section class=\"rpt-rank\"><h2>프로그램별 질문 순위</h2><ol><li>마르부르크필립스대학교 · 14건</li><li>밀라노대학교 · 14건</li><li>리스본종합대학교 · 11건</li><li>뤼미에르 리옹 2대학 · 9건</li><li>볼로냐대학교 · 8건</li></ol></section><section class=\"rpt-insight\"><h2>주요 인사이트</h2><ul><li>[신규 수요] ISO 국제학생회 BUDDY 프로그램 수료자 배운점 경험이 아직 없어요 · 근거 질문 3건</li><li>[검토 필요] 콜럼버스주립대학교 질문이 반복돼요 · 근거 질문 3건</li><li>[검토 필요] 마르부르크 질문이 반복돼요 · 근거 질문 3건</li></ul></section><section class=\"rpt-hold\"><h2>미답변 질문</h2><ul><li>ISO 국제학생회 BUDDY 프로그램 수료자 진로에 도움 됐어요?</li><li>ISO 국제학생회 BUDDY 프로그램 수료자 이수하고 뭐가 달라졌어요?</li><li>ISO 국제학생회 BUDDY 프로그램 수료자 이수하고 뭐가 달라졌어요?</li><li>콜럼버스주립대학교 현지에서 인턴 구할 수 있어요?</li><li>콜럼버스주립대학교 가서 아르바이트 할 수 있어요?</li></ul></section><section class=\"rpt-reported\"><h2>신고된 진술 2건</h2></section><section class=\"rpt-summary\"><h2>요약</h2><p>2026년 2학기 질문은 208건이고 미답변은 21건(보류율 10%)이에요. 질문이 많은 프로그램은 마르부르크필립스대학교, 밀라노대학교, 리스본종합대학교이에요. 노트가 비어 있는 신규 수요 묶음이 1개 있어요.</p></section><footer class=\"rpt-foot\"><a href=\"https://oia.hufs.ac.kr\">공식 안내 보기</a></footer></article>"
+  },
+  "scrapNote": {
+    "ok": true,
+    "noteId": "N-marburg",
+    "scrapped": true
   }
 }
