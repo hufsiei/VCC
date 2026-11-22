@@ -80,7 +80,7 @@ def run(rows, model, askboo, pause=0.0):
             expect_ids = {s.strip() for s in (r.get("기대 근거ID") or "").split(",") if s.strip()}
             used = {ln["sourceId"] for ln in lines}
             out.append({
-                "번호": r["번호"], "유형": r.get("유형", ""), "기대결과": r["기대결과"], "결과": got,
+                "번호": r["번호"], "모델": model, "유형": r.get("유형", ""), "기대결과": r["기대결과"], "결과": got,
                 "일치": "O" if got == want else "X",
                 "근거없는답": "O" if got == "ok" and (bad or want != "ok") else "",
                 "근거적중": ("O" if used & expect_ids else "X") if want == "ok" and got == "ok" and expect_ids else "",
@@ -145,24 +145,28 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8")   # 한글 콘솔(cp949)에서도 출력이 깨지지 않게
 
     if a.merge:
-        rows, models = [], set()
+        rows = []
         for f in a.merge:
             with open(f, encoding="utf-8-sig") as fh:
                 part = list(csv.DictReader(fh))
+            if part and "모델" not in part[0]:
+                sys.exit(f"모델 열이 없는 옛 결과 파일입니다: {f}")
             for r in part:
                 for k in ("줄수", "폴백줄"):
                     r[k] = int(r[k] or 0)
                 r["초"] = float(r["초"] or 0)
             rows += part
-            models.add(Path(f).stem.split("_")[2] if Path(f).stem.count("_") >= 3 else "?")
-        seen = {}
-        for r in rows:
-            seen[r["번호"]] = r          # 같은 번호가 두 번이면 나중 것
-        rows = list(seen.values())
-        s = summary("+".join(sorted(models)), rows)
+        sums = []
+        for m in sorted({r["모델"] for r in rows}):          # 모델이 섞여 있으면 모델별로 따로 요약
+            seen = {}
+            for r in rows:
+                if r["모델"] == m:
+                    seen[r["번호"]] = r                        # 같은 번호가 두 번이면 나중 것
+            sums.append(summary(m, list(seen.values())))
         out = Path(a.merge[0]).parent / f"eval_요약_합침_{datetime.now().strftime('%Y%m%d-%H%M')}.csv"
-        write_csv(out, [s])
-        print(json.dumps(s, ensure_ascii=False))
+        write_csv(out, sums)
+        for s_ in sums:
+            print(json.dumps(s_, ensure_ascii=False))
         print(f"저장: {out}")
         return
 
@@ -174,6 +178,8 @@ def main():
             part = part.strip()
             if "-" in part:
                 lo, hi = part.split("-", 1)
+                if not (lo.strip().isdigit() and hi.strip().isdigit()):
+                    sys.exit(f"--only 범위는 숫자-숫자로 적어 주세요: {part}")
                 keep |= {str(n) for n in range(int(lo), int(hi) + 1)}
             elif part:
                 keep.add(part)
