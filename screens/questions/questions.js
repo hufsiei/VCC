@@ -152,21 +152,20 @@ function renderTabsMeta() {
 // ---------------------------------------------------------------------------
 
 // --- 내 경험노트 탭 ---
-// 공유 상태 라벨(7-⑥): 나만 보기=중립, 반영 중=중립, N문장 공유=중립, 해봤노트 공유됨=긍정
-// [임시 — 미리님 확인 전] spec·mock의 myNotes에는 share가 없어 없으면 「나만 보기」로 둔다(서버 기본값 private).
-// 채운 칸 수·공유 문장 수·「반영 중」 값이 spec에 들어오면 여기만 바꾼다.
+// 공유 상태 라벨(7-⑥): 나만 보기=중립, N문장 공유=중립, 해봤노트 공유됨=긍정
+// spec 4장 getInbox [11/22]: share = private | partial | shared 셋뿐(「반영 중」 없음 — saveConsent가 바로 반영).
+// partial의 N = sharedLines, 「노트 틀 N/M」 = filled/total.
 function shareLabel(note) {
   if (note.share === "shared") return statusLabel("success", "check", "해봤노트 공유됨");
   if (note.share === "partial") {
-    return statusLabel("neutral", "share-2", Number.isFinite(note.sharedCount) ? `${note.sharedCount}문장 공유` : "일부 공유");
+    return statusLabel("neutral", "share-2", Number.isFinite(note.sharedLines) ? `${note.sharedLines}문장 공유` : "일부 공유");
   }
-  if (note.share === "pending") return statusLabel("neutral", "clock", "반영 중");
   return statusLabel("neutral", "lock", "나만 보기");
 }
 
 function myNoteCard(note) {
-  const pub = notesByProgram.get(note.program); // 같은 프로그램의 해봤노트 → 분야
-  const cat = pub ? CATEGORY[pub.type] : null;
+  const pub = notesByProgram.get(note.program); // type이 없을 때만 같은 프로그램의 해봤노트로 분야를 찾는다
+  const cat = CATEGORY[note.type] || (pub ? CATEGORY[pub.type] : null);
   const frame = Number.isFinite(note.filled) && Number.isFinite(note.total) ? `노트 틀 ${note.filled}/${note.total}` : `노트 틀 ${DASH}`;
 
   // 「자소서용 요약 보기」 — v4.3: 비활성 + 「운영 연계 시 열려요」(6-6)
