@@ -5,6 +5,8 @@
 #   python tools/run_eval.py --model hcx,sonnet,opus      # askBoo의 고르기·변환 모델만 바꿔 차례로 측정
 #   python tools/run_eval.py --questions <봉인 xlsx> --out <저장소 밖 폴더> --model hcx,sonnet
 #   python tools/run_eval.py --dry                        # AI 없이 흐름만 시험(고르기=1번, 변환=폴백)
+#   python tools/run_eval.py --merge <질문별 csv 여러 개>         # 나눠 돌린 결과를 합쳐 요약(같은 모델끼리)
+#   python tools/run_eval.py --model hcx --only 1-15 --pause 4   # 번호 범위 + 문항 사이 4초(HCX 테스트 키 분당 60요청 ≈ 분당 15문항, HCX 원칙 8절)
 #
 # - askBoo를 그대로 부른다(save=False, 질문함에 저장 안 함). 모델 비교는 실행 중에만 ai.PROVIDER의
 #   '고르기'·'변환'을 바꾼다 — functions/ 파일은 고치지 않는다. 키는 ai.py가 .env에서 읽는다.
@@ -54,7 +56,7 @@ def dry_call(작업명, messages, system=None, **_):
     return {"ok": False, "text": "", "json": None, "model": "dry", "error": "dry"}
 
 
-def run(rows, model, askboo):
+def run(rows, model, askboo, pause=0.0):
     import ai
     saved = {t: ai.PROVIDER[t] for t in TASKS}
     if model not in ("표", "dry"):
@@ -78,7 +80,7 @@ def run(rows, model, askboo):
             expect_ids = {s.strip() for s in (r.get("기대 근거ID") or "").split(",") if s.strip()}
             used = {ln["sourceId"] for ln in lines}
             out.append({
-                "번호": r["번호"], "유형": r.get("유형", ""), "기대결과": r["기대결과"], "결과": got,
+                "번호": r["번호"], "모델": model, "유형": r.get("유형", ""), "기대결과": r["기대결과"], "결과": got,
                 "일치": "O" if got == want else "X",
                 "근거없는답": "O" if got == "ok" and (bad or want != "ok") else "",
                 "근거적중": ("O" if used & expect_ids else "X") if want == "ok" and got == "ok" and expect_ids else "",
@@ -89,6 +91,8 @@ def run(rows, model, askboo):
             })
             print(f"  {out[-1]['일치']} {r['번호']:>3} [{r['기대결과']}/{r.get('유형','')}] → {got} ({sec}초)"
                   + (f"  근거밖 {len(bad)}줄" if bad else ""))
+            if pause:
+                time.sleep(pause)
     finally:
         for t, v in saved.items():
             ai.PROVIDER[t] = v
@@ -132,16 +136,53 @@ def main():
     ap.add_argument("--questions", default=str(ROOT / "data" / "eval-questions.csv"))
     ap.add_argument("--model", default="표", help="표(PROVIDER 그대로) 또는 hcx,sonnet,opus 쉼표 구분")
     ap.add_argument("--out", default=str(paths.LOGS))
-    ap.add_argument("--only", default="", help="번호만 골라 실행(쉼표 구분)")
+    ap.add_argument("--only", default="", help="번호만 골라 실행(쉼표·범위: 1-15,23)")
+    ap.add_argument("--pause", type=float, default=0.0, help="문항 사이 쉬는 초(호출 한도 대비)")
     ap.add_argument("--dry", action="store_true")
+    ap.add_argument("--merge", nargs="+", help="질문별 결과 csv들을 합쳐 요약만 출력·저장")
     a = ap.parse_args()
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")   # 한글 콘솔(cp949)에서도 출력이 깨지지 않게
 
+    if a.merge:
+        rows = []
+        for f in a.merge:
+            with open(f, encoding="utf-8-sig") as fh:
+                part = list(csv.DictReader(fh))
+            if part and "모델" not in part[0]:
+                sys.exit(f"모델 열이 없는 옛 결과 파일입니다: {f}")
+            for r in part:
+                for k in ("줄수", "폴백줄"):
+                    r[k] = int(r[k] or 0)
+                r["초"] = float(r["초"] or 0)
+            rows += part
+        sums = []
+        for m in sorted({r["모델"] for r in rows}):          # 모델이 섞여 있으면 모델별로 따로 요약
+            seen = {}
+            for r in rows:
+                if r["모델"] == m:
+                    seen[r["번호"]] = r                        # 같은 번호가 두 번이면 나중 것
+            sums.append(summary(m, list(seen.values())))
+        out = Path(a.merge[0]).parent / f"eval_요약_합침_{datetime.now().strftime('%Y%m%d-%H%M')}.csv"
+        write_csv(out, sums)
+        for s_ in sums:
+            print(json.dumps(s_, ensure_ascii=False))
+        print(f"저장: {out}")
+        return
+
     qpath, out_dir = Path(a.questions), Path(a.out)
     rows = read_questions(qpath)
     if a.only:
-        keep = {s.strip() for s in a.only.split(",")}
+        keep = set()
+        for part in a.only.split(","):
+            part = part.strip()
+            if "-" in part:
+                lo, hi = part.split("-", 1)
+                if not (lo.strip().isdigit() and hi.strip().isdigit()):
+                    sys.exit(f"--only 범위는 숫자-숫자로 적어 주세요: {part}")
+                keep |= {str(n) for n in range(int(lo), int(hi) + 1)}
+            elif part:
+                keep.add(part)
         rows = [r for r in rows if r["번호"] in keep]
     sealed = "봉인" in qpath.name or any((r.get("봉인") or "").strip() for r in rows)
     if sealed and (inside(out_dir, ROOT) or inside(out_dir, paths.MAIN_ROOT)):
@@ -155,11 +196,11 @@ def main():
     if wrong or not rows:
         sys.exit(f"모델 이름 확인: {wrong}" if wrong else "측정할 질문이 없습니다(질문·기대결과 열 확인).")
     out_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    stamp = datetime.now().strftime("%Y%m%d-%H%M") + (f"_{a.only.replace(',', '+')}" if a.only else "")
     sums = []
     for m in models:
         print(f"[{m}] {qpath.name} {len(rows)}개")
-        out = run(rows, m, askboo)
+        out = run(rows, m, askboo, 0 if a.dry else a.pause)
         write_csv(out_dir / f"eval_{qpath.stem}_{m}_{stamp}.csv", out)
         sums.append(summary(m, out))
     write_csv(out_dir / f"eval_요약_{qpath.stem}_{stamp}.csv", sums)
