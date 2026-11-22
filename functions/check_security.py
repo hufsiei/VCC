@@ -164,7 +164,8 @@ def check_secrets():
     add(3, "커밋된 파일에 .env 값 없음", not leaked,
         f".env 값 {len(vals)}개 대조, 0건" if not leaked else "발견: " + ", ".join(leaked[:5]) + " → 키 폐기·재발급")
     add(3, "커밋된 파일에 키 모양 문자열 없음", not shaped, "0건" if not shaped else "확인: " + ", ".join(shaped[:5]))
-    hist = git("log", "-p", "--all", "-S", "sk-ant-", "--format=%h").split()
+    # -S "sk-ant-"는 이 파일의 정규식 글자까지 잡아 오탐(원우 11/22). 실제 키 모양(뒤에 20자 이상)만 찾는다
+    hist = git("log", "-p", "--all", "-G", "sk-ant-[A-Za-z0-9_-]{20,}", "--format=%h").split()
     add(3, "커밋 이력에 sk-ant- 없음", not hist, "0건" if not hist else f"{len(hist)}개 커밋에 흔적")
 
     logs = list(paths.LOGS.glob("*")) if paths.LOGS.exists() else []
