@@ -1,14 +1,19 @@
-// 공개 동의 바텀시트 (작업 70) — AI 요약 미리보기의 「해봤노트에 공유」에서 열린다.
+// 공개 동의 바텀시트 (작업 70) — 인터BOO AI 요약 미리보기의 「해봤노트에 공유」와
+// 내 보관함 · 내 경험노트 상세의 「해봤노트에 공유」/「공유 범위 바꾸기」가 같이 쓴다(11/22 common으로 옮김).
+// 쓰는 법: 화면 HTML에 <script type="module" src="../../common/consent.js"></script> 한 줄.
+//   시트 마크업은 이 파일이 body 끝에 만든다(화면 HTML에 #consentSheet를 두지 않는다).
+//   열기: document에 "open-consent"(detail = summarizeInterview 응답 또는 getMyNote 응답)를 보내거나 openConsent(같은 값).
+//   getMyNote 응답으로 열면(share가 private가 아닐 때) 스위치 처음 상태 = 지금 해봤노트에 보이는 문장(lines[].shared).
 // 기준: docs/design-rules.md 7-② 공개 동의 바텀시트 · 8절 '공개 동의' · 5-10, docs/spec-v1.md 4장(summarizeInterview·saveConsent)
 // 규칙: 데이터는 common/data.js 함수로만, 화면 글은 textContent로만(innerHTML 금지), 색은 style.css 변수만.
 //
-// 흐름: talk.js가 document에 "open-consent"(detail = summarizeInterview 응답)를 보낸다
+// 흐름: 화면이 document에 "open-consent"(detail = {draftId, program, publicDraft, …})를 보낸다
 //   → 시트를 연다 → 「동의하고 공유」 → saveConsent(draftId, {removed:[끈 lineId]})
-//   → 성공하면 시트를 닫고 document에 "consent-saved"(detail = {draftId, result, shared, removed})를 보낸다(토스트는 talk.js가 띄움).
+//   → 성공하면 시트를 닫고 document에 "consent-saved"(detail = {draftId, result, shared, removed})를 보낸다(토스트는 연 화면이 띄움).
 //   → 응답에 rejected(서버가 거절한 문장)가 있으면 시트를 닫지 않고 그 문장 아래에 message를 보여 준 뒤 「확인」으로 닫는다.
 // 끈 문장은 removed로만 보낸다. 내 경험노트(myNote)는 서버가 이미 저장했으므로 끈 문장도 거기에는 남는다.
 
-import { saveConsent, listNotes } from "../../common/data.js";
+import { saveConsent, listNotes } from "./data.js";
 
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };
@@ -34,20 +39,58 @@ const statusLabel = (kind, iconName, text) =>
   el("span", { className: `status-label status-label--${kind}` }, [iconName ? icon(iconName) : null, text]);
 
 // ---------------------------------------------------------------------------
-// 시트 틀 (index.html의 #consentSheet)
+// 시트 틀 — body 끝에 한 번 만든다(내용은 아래 render*가 채운다)
 // ---------------------------------------------------------------------------
 
-const root = document.getElementById("consentSheet");
+function buildSheet() {
+  const existing = document.getElementById("consentSheet");
+  if (existing) return existing;
+  const layer = el("div", { className: "sheet-layer", attrs: { id: "consentSheet", hidden: true } }, [
+    el("div", { className: "sheet-scrim" }),
+    el("div", { className: "sheet", attrs: { role: "dialog", "aria-modal": "true", "aria-labelledby": "consentTitle", tabindex: "-1" } }, [
+      el("div", { className: "sheet__handle", attrs: { "aria-hidden": "true" } }),
+      el("h2", { className: "sheet__title", text: "해봤노트 공개 동의", attrs: { id: "consentTitle" } }),
+      el("div", { className: "sheet__body" }, [
+        // 공유 후 서버가 일부 문장을 거절했을 때 결과(saveConsent.rejected)
+        el("div", { className: "consent-result", attrs: { id: "consentResult", role: "status", hidden: true } }),
+        // ① 반영될 해봤노트
+        el("div", { className: "consent-target", attrs: { id: "consentTarget" } }),
+        // ② 칸별 문장 + 공개 스위치
+        el("div", {}, [
+          el("p", { className: "sub", text: "문장마다 공개할지 골라 주세요. 끈 문장은 내 경험노트에만 남아요." }),
+          el("div", { className: "consent-lines", attrs: { id: "consentLines" } }),
+        ]),
+        // ③ 공개되는 것 / 공개되지 않는 것
+        el("div", { className: "consent-scope", attrs: { id: "consentScope" } }),
+        // ④ 동의 체크
+        el("label", { className: "check-row" }, [
+          el("input", { className: "checkbox", attrs: { type: "checkbox", id: "consentAgree" } }),
+          el("span", { text: "위 내용을 확인했고, 켠 문장을 해봤노트에 공개하는 데 동의해요." }),
+        ]),
+        el("div", { className: "consent-error", attrs: { id: "consentError", role: "alert" } }),
+      ]),
+      el("div", { className: "sheet__footer" }, [
+        el("button", { className: "btn btn--primary btn--block", text: "동의하고 공유", attrs: { id: "consentSubmit", type: "button", disabled: true } }),
+        el("p", { className: "btn-reason", attrs: { id: "consentReason" } }, [icon("info"), el("span")]),
+        el("button", { className: "btn btn--text", text: "취소", attrs: { id: "consentCancel", type: "button" } }),
+      ]),
+    ]),
+  ]);
+  (document.querySelector(".app") || document.body).append(layer);
+  return layer;
+}
+
+const root = buildSheet();
 const panel = root.querySelector(".sheet");
-const targetBox = document.getElementById("consentTarget");
-const linesBox = document.getElementById("consentLines");
-const scopeBox = document.getElementById("consentScope");
-const agreeBox = document.getElementById("consentAgree");
-const agreeError = document.getElementById("consentError");
-const submitBtn = document.getElementById("consentSubmit");
-const submitReason = document.getElementById("consentReason");
-const cancelBtn = document.getElementById("consentCancel");
-const resultBox = document.getElementById("consentResult");
+const targetBox = root.querySelector("#consentTarget");
+const linesBox = root.querySelector("#consentLines");
+const scopeBox = root.querySelector("#consentScope");
+const agreeBox = root.querySelector("#consentAgree");
+const agreeError = root.querySelector("#consentError");
+const submitBtn = root.querySelector("#consentSubmit");
+const submitReason = root.querySelector("#consentReason");
+const cancelBtn = root.querySelector("#consentCancel");
+const resultBox = root.querySelector("#consentResult");
 
 const state = {
   draft: null,        // summarizeInterview 응답
@@ -64,6 +107,15 @@ const remembered = new Map(); // draftId → Map(lineId → bool)
 const rememberedRejected = new Map(); // draftId → Map(lineId → message)
 
 document.addEventListener("open-consent", (event) => openSheet(event.detail));
+export const openConsent = (draft) => openSheet(draft);
+
+// getMyNote 응답(sections[].lines[].lineId·shared)이면 지금 해봤노트에 보이는 문장 lineId 묶음, 아니면 null
+function currentlyShared(draft) {
+  if (!Array.isArray(draft.sections) || !draft.share || draft.share === "private") return null;
+  const ids = new Set();
+  for (const s of draft.sections) for (const l of s.lines || []) if (l && l.lineId && l.shared) ids.add(l.lineId);
+  return ids;
+}
 
 function openSheet(draft) {
   if (!draft || !draft.publicDraft) return;
@@ -74,11 +126,14 @@ function openSheet(draft) {
   state.rejected = new Map(rememberedRejected.get(draft.draftId) || []);
 
   const prev = remembered.get(draft.draftId);
+  const sharedNow = currentlyShared(draft); // 「공유 범위 바꾸기」: 지금 상태에서 시작
   state.on = new Map();
   for (const line of allLines(draft)) {
     // 기본 켬. 본인 식별 문장(identifying)은 기본 꺼짐 — 판단은 사용자가 한다(7-②)
     // 서버가 거절한 문장은 해봤노트에 들어가지 않았으므로 꺼짐
-    const on = prev && prev.has(line.lineId) ? prev.get(line.lineId) : line.identifying !== true;
+    const on = prev && prev.has(line.lineId) ? prev.get(line.lineId)
+      : sharedNow ? sharedNow.has(line.lineId)
+      : line.identifying !== true;
     state.on.set(line.lineId, state.rejected.has(line.lineId) ? false : on);
   }
   state.lineCount = state.on.size;
@@ -350,7 +405,7 @@ function showResult(rejectedCount) {
   const shared = onCount();
   resultBox.replaceChildren(
     shared > 0
-      ? statusLabel("success", "check", "해봤노트에 반영하고 있어요")
+      ? statusLabel("success", "check", "해봤노트에 반영됐어요")
       : statusLabel("warning", "triangle-alert", "해봤노트에 넣은 문장이 없어요"),
     el("p", { className: "sub", text: `${rejectedCount}문장은 해봤노트에 넣지 못했어요. 내 경험노트에는 남아 있어요.` }),
   );

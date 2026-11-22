@@ -194,5 +194,36 @@ expect("없는 칸·후배 질문 칸·없는 노트는 오류",
        and "error" in notes.saveQuestion(JUNIOR, {"noteId": "N-marburg", "section": "후배 질문"})
        and "error" in notes.saveQuestion(JUNIOR, {"noteId": "N-없음", "section": "비용"}))
 
+# 16) [11/22] 내 경험노트 카드(getInbox.myNotes)·상세(getMyNote) — 공유 상태 셋, 칸 수, 공유 문장, 본인만
+import runtime_fns
+WRITER = "H0002"
+my = {"sections": [{"name": "생활", "lines": [{"text": "나는 기숙사를 바로 신청했다."}, {"text": "나는 버스를 학생증으로 탔다."}]},
+                   {"name": "지원", "lines": [{"text": "나는 TestDaF를 3학기 전부터 준비했다."}]}]}
+pubd = {"sections": [{"name": "생활", "lines": [{"lineId": "L-DT-1", "text": "기숙사를 바로 신청했어요.", "match": True},
+                                                {"lineId": "L-DT-2", "text": "버스를 학생증으로 탔어요.", "match": True}]},
+                     {"name": "지원", "lines": [{"lineId": "L-DT-3", "text": "TestDaF를 3학기 전부터 준비했어요.", "match": True}]}]}
+mid = runtime_fns.save_my_note(WRITER, PROGRAM, "D-TEST", my, pubd)
+card = next(n for n in getInbox(WRITER, {})["myNotes"] if n["id"] == mid)
+expect("카드: 공유 전 = private·칸 2/7·공유 0",
+       card["share"] == "private" and card["filled"] == 2 and card["total"] == 7 and card["sharedLines"] == 0
+       and card["type"] == "교환" and card["noteId"] == "N-marburg" and mid.startswith("M"))
+c = saveConsent(WRITER, {"draftId": "D-TEST", "edits": {"removed": ["L-DT-2"]}, "consent": True})
+card = next(n for n in getInbox(WRITER, {})["myNotes"] if n["id"] == mid)
+expect("카드: 일부 공유 = partial·2문장", c.get("ok") and card["share"] == "partial" and card["sharedLines"] == 2)
+expect("공유 알림 = 반영됐어요(반영 중 없음)",
+       any(a["text"] == "해봤노트에 내 이야기가 반영됐어요" and a.get("noteId") == "N-marburg" for a in getInbox(WRITER, {})["alerts"]))
+d = runtime_fns.getMyNote(WRITER, {"id": mid})
+expect("상세: 칸은 노트 틀 순서·빈 칸 포함", [s["name"] for s in d["sections"]] == notes.FRAMES["교환"]["칸"])
+life = next(s for s in d["sections"] if s["name"] == "생활")["lines"]
+expect("상세: 문장마다 공유 여부·해봤노트 문장", [ln["shared"] for ln in life] == [True, False]
+       and life[0]["publicText"] == "기숙사를 바로 신청했어요." and life[0]["lineId"] == "L-DT-1")
+expect("상세: 동의 시트 다시 열 값", d["draftId"] == "D-TEST" and d["publicDraft"] == pubd and d["share"] == "partial")
+expect("상세: 남의 것·없는 것은 오류", "error" in runtime_fns.getMyNote(JUNIOR, {"id": mid})
+       and "error" in runtime_fns.getMyNote(WRITER, {"id": "M-없음"}))
+saveConsent(WRITER, {"draftId": "D-TEST", "edits": {}, "consent": True})
+card = next(n for n in getInbox(WRITER, {})["myNotes"] if n["id"] == mid)
+expect("카드: 전부 공유 = shared·3문장", card["share"] == "shared" and card["sharedLines"] == 3)
+expect("카드에는 학번·문장 원문 없음", not any(k in card for k in ("owner", "sections", "publicDraft")))
+
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)

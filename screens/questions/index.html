@@ -2,11 +2,162 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>questions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>내 보관함 · 외대人사이드</title>
 <link rel="stylesheet" href="../../common/style.css">
+<style>
+  /* 내 보관함 화면 배치용. 색은 style.css 변수만 쓴다. */
+  .inbox-top { display: flex; flex-direction: column; gap: 12px; }
+  .inbox-top .status-label { align-self: flex-start; }
+
+  /* 상단 탭(7-⑥): 활성 NAVY 600 + 아래 2px NAVY 밑줄, 비활성 TEXT MUTED, 탭 영역 하단 1px BORDER */
+  .top-tabs {
+    display: flex;
+    margin: var(--space-lg) calc(-1 * var(--page-gutter)) 0;
+    padding: 0 var(--page-gutter);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .top-tab {
+    position: relative;
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    min-height: 48px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-body);
+    cursor: pointer;
+  }
+  .top-tab[aria-selected="true"] { border-bottom-color: var(--color-hufs-navy); color: var(--color-hufs-navy); font-weight: 600; }
+  .top-tab__count { font-size: var(--font-size-secondary); font-variant-numeric: tabular-nums; }
+  /* 새 소식 점: 이름 오른쪽 위 6px 오류색 */
+  .top-tab__label { position: relative; }
+  .top-tab__dot {
+    position: absolute;
+    top: -2px;
+    right: -8px;
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--status-error-fg);
+  }
+
+  .tab-panel { display: flex; flex-direction: column; gap: 12px; margin-top: var(--space-md); }
+  .inbox-skeleton { height: 140px; }
+  a.note-card__body { color: inherit; text-decoration: none; }
+
+  /* 내 경험노트 카드 */
+  .mynote__body { display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-md); }
+  .mynote__meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-sm); font-size: var(--font-size-secondary); color: var(--color-text-muted); }
+
+  /* 질문 카드 */
+  .question { display: flex; flex-direction: column; gap: var(--space-sm); }
+  .question .status-label { align-self: flex-start; }
+  .question__text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+  .question__date { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+  .question__info { font-size: var(--font-size-secondary); color: var(--color-text-muted); }
+  .question .btn-row { margin-top: var(--space-xs); }
+  .question .btn-row .btn { font-size: var(--font-size-secondary); }
+
+  /* 알림 목록(8절): 행 = 아이콘 + 문장 + 시간, 안 읽은 알림은 SOFT BLUE */
+  .alert-list { display: flex; flex-direction: column; margin: 0 calc(-1 * var(--page-gutter)); }
+  .alert-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 64px;
+    padding: var(--space-md) var(--page-gutter);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: inherit;
+    text-decoration: none;
+  }
+  .alert-row--unread { background: var(--color-soft-blue); }
+  .alert-row > .icon { margin-top: 2px; color: var(--color-hufs-navy); }
+  .alert-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-xs); }
+  .alert-row__time { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+
+  .state-box { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-lg) 0; text-align: center; }
+  .state-box__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
+  .state-box .boo-illust { width: 80px; height: 80px; }
+</style>
 </head>
 <body>
-<div class="app"></div>
+<div class="app">
+
+  <!-- ===== 1단계: 내 보관함 (메인 헤더 + 하단 탭) ===== -->
+  <section id="viewInbox" class="has-tabbar">
+    <header class="header">
+      <button class="icon-btn" type="button" aria-label="메뉴"><i data-lucide="menu" class="icon"></i></button>
+      <a class="header__brand" href="../talk/">
+        <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
+        외대人사이드
+      </a>
+      <div class="header__actions">
+        <!-- 직원 계정일 때만 보임(5-1): PC 관리자 콘솔을 새 탭으로 -->
+        <a class="icon-btn" id="consoleBtn" href="../admin/" target="_blank" rel="noopener" aria-label="관리자 콘솔" hidden><i data-lucide="chart-column" class="icon"></i></a>
+        <a class="icon-btn" id="bellBtn" href="#alerts" aria-label="알림"><i data-lucide="bell" class="icon"></i><span class="icon-btn__dot" id="bellDot" hidden></span></a>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="inbox-top">
+        <h1 class="page-title">내 보관함</h1>
+        <p class="sub">내 경험노트, 질문, 담아 둔 해봤노트를 모아 봐요.</p>
+        <span class="status-label status-label--info"><i data-lucide="lock" class="icon"></i>나만 보기</span>
+      </div>
+
+      <div class="top-tabs" role="tablist" aria-label="내 보관함">
+        <button class="top-tab" type="button" role="tab" id="tab-notes" data-tab="notes" aria-controls="tabPanel" aria-selected="true">
+          <span class="top-tab__label">내 경험노트<span class="top-tab__dot" hidden></span></span><span class="top-tab__count"></span>
+        </button>
+        <button class="top-tab" type="button" role="tab" id="tab-questions" data-tab="questions" aria-controls="tabPanel" aria-selected="false">
+          <span class="top-tab__label">질문함<span class="top-tab__dot" hidden></span></span><span class="top-tab__count"></span>
+        </button>
+        <button class="top-tab" type="button" role="tab" id="tab-scraps" data-tab="scraps" aria-controls="tabPanel" aria-selected="false">
+          <span class="top-tab__label">스크랩<span class="top-tab__dot" hidden></span></span><span class="top-tab__count"></span>
+        </button>
+      </div>
+
+      <div class="tab-panel" id="tabPanel" role="tabpanel" aria-busy="true"></div>
+    </main>
+
+    <!-- 하단 탭(5-3) — 1단계 화면에만 -->
+    <nav class="tabbar" aria-label="주 메뉴">
+      <a class="tabbar__item" href="../talk/"><i data-lucide="message-circle" class="icon"></i>인터BOO</a>
+      <a class="tabbar__item" href="../note/"><i data-lucide="notebook-text" class="icon"></i>해봤노트</a>
+      <a class="tabbar__item" href="../senior/"><i data-lucide="users" class="icon"></i>닮은선배</a>
+      <a class="tabbar__item" href="../questions/" aria-current="page"><i data-lucide="archive" class="icon"></i>내 보관함</a>
+    </nav>
+  </section>
+
+  <!-- ===== 2단계: 알림 목록 (상세 헤더 + 하단 탭 숨김, 5-2·8절) ===== -->
+  <section id="viewAlerts" hidden>
+    <header class="header">
+      <button class="icon-btn" id="alertsBack" type="button" aria-label="뒤로"><i data-lucide="arrow-left" class="icon"></i></button>
+      <h2 class="header__title">알림</h2>
+      <span class="icon-btn" aria-hidden="true"></span>
+    </header>
+    <main class="page">
+      <div id="alertsBody"></div>
+    </main>
+  </section>
+
+  <div class="toast-host" id="toastHost" role="status" aria-live="polite"></div>
+</div>
+
+<script src="../../assets/lucide/lucide.min.js"></script>
+<script type="module" src="./questions.js"></script>
 </body>
 </html>
