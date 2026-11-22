@@ -158,5 +158,41 @@ off = notes.scrapNote(JUNIOR, {"noteId": "N-marburg", "scrap": False})
 expect("스크랩 끄기", off["scrapped"] is False and [s["noteId"] for s in getInbox(JUNIOR, {})["scraps"]] == ["N-3ca17d"])
 expect("없는 노트 스크랩은 오류", "error" in notes.scrapNote(JUNIOR, {"noteId": "N-없음"}) and "error" in notes.scrapNote(JUNIOR, {}))
 
+# 14) [11/22] 배운점 선배 글자 — 노트 안에서만 「선배 A」, 학과·학번 없음, 같은 사람은 같은 글자
+lesson_ids = [nid for nid, n in notes.NOTES.items()
+              if len({notes._source_owner(ln["sourceId"]) for s in n["sections"] if s["name"] == "배운점" for ln in s["lines"]}) >= 2]
+expect("배운점 선배 둘 이상인 사전 노트가 있다", bool(lesson_ids))
+ok_label = True
+for nid in lesson_ids[:10]:
+    lines = section(notes.getNote(JUNIOR, {"id": nid}), "배운점")
+    who = {}
+    for ln in lines:
+        lab, sid = ln.get("senior"), ln["sourceId"]
+        ok_label &= bool(lab) and re.fullmatch(r"선배 [A-Z]", lab or "") is not None
+        owner = notes._source_owner(sid)
+        ok_label &= who.setdefault(owner, lab) == lab   # 같은 사람 = 같은 글자
+    ok_label &= len(set(who.values())) == len(who)        # 다른 사람 = 다른 글자
+    ok_label &= lines[0]["senior"] == "선배 A"
+    ok_label &= not any(re.search(r"H\d{4}", json.dumps(ln, ensure_ascii=False)) for ln in lines)
+expect("배운점 senior: 선배 A부터, 사람마다 하나, 학번 없음", ok_label)
+other_secs = [ln for s in notes.getNote(JUNIOR, {"id": lesson_ids[0]})["sections"] if s["name"] != "배운점" for ln in s["lines"]]
+expect("배운점 밖 문장에는 senior 없음", all("senior" not in ln for ln in other_secs))
+
+# 15) [11/22] saveQuestion — 「질문함에 담기」: hold로 저장, 멱등, 다음 인터뷰가 먼저 묻는다
+q1 = notes.saveQuestion(JUNIOR, {"noteId": "N-marburg", "section": "비용"})
+q2 = notes.saveQuestion(JUNIOR, {"noteId": "N-marburg", "section": "비용"})
+expect("질문함 담기 응답", q1.get("ok") and q1["already"] is False and q1["questionId"].startswith("Q"))
+expect("같은 칸 두 번 → 같은 질문", q2["already"] is True and q2["questionId"] == q1["questionId"])
+row = next(q for q in store.load("questions", []) if q["id"] == q1["questionId"])
+expect("질문함 행: hold·칸·노트·프로그램",
+       row["status"] == "hold" and row["칸"] == "비용" and row["noteId"] == "N-marburg" and row["프로그램명"] == PROGRAM)
+expect("다음 선배 인터뷰가 먼저 묻는다", any(q["id"] == q1["questionId"] for q in interview.junior_questions(OTHER, PROGRAM)))
+expect("보관함 질문함에 보인다", any(q.get("id") == q1["questionId"] or q.get("questionId") == q1["questionId"]
+                                for q in getInbox(JUNIOR, {})["questions"]))
+expect("없는 칸·후배 질문 칸·없는 노트는 오류",
+       "error" in notes.saveQuestion(JUNIOR, {"noteId": "N-marburg", "section": "없는칸"})
+       and "error" in notes.saveQuestion(JUNIOR, {"noteId": "N-marburg", "section": "후배 질문"})
+       and "error" in notes.saveQuestion(JUNIOR, {"noteId": "N-없음", "section": "비용"}))
+
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)

@@ -454,7 +454,8 @@
               "text": "\"낯선 행정 절차를 혼자 끝까지 처리하는 법을 배웠어요.\"",
               "sourceId": "I05-1-2",
               "lineId": "L-I05-1-2",
-              "official": false
+              "official": false,
+              "senior": "선배 A"
             }
           ]
         },
@@ -565,7 +566,8 @@
               "sourceId": "T01-3-1",
               "lineId": "L-T01-3-1",
               "official": false,
-              "autoClassified": true
+              "autoClassified": true,
+              "senior": "선배 A"
             }
           ]
         },
@@ -2109,5 +2111,11 @@
     "ok": true,
     "noteId": "N-marburg",
     "scrapped": true
+  },
+  "saveQuestion": {
+    "ok": true,
+    "questionId": "Q-0101",
+    "already": false,
+    "message": "질문함에 담았어요. 다음 선배 인터뷰 때 먼저 물어볼게요."
   }
 }
