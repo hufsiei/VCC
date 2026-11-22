@@ -159,47 +159,87 @@
               "filled": 0,
               "total": 7
             },
-            "pendingQuestions": 1
-          },
-          {
-            "done": false,
-            "section": "지원",
-            "question": "마르부르크 파견은 언제부터 준비하셨어요?",
-            "progress": {
-              "filled": 0,
-              "total": 7
-            },
-            "examples": [
-              "출국 3학기 전",
-              "1년 전",
-              "합격 후"
+            "pendingQuestions": 1,
+            "covered": [
+              "지원",
+              "학점",
+              "비용",
+              "생활",
+              "팁"
             ]
           },
           {
             "done": false,
-            "section": "학점",
-            "question": "현지에서 들은 수업은 학점으로 어떻게 인정받으셨어요?",
+            "section": "팁",
+            "question": "후배들이 마르부르크에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?",
             "progress": {
               "filled": 1,
               "total": 7
-            }
+            },
+            "pendingQuestions": 0,
+            "covered": [
+              "지원",
+              "학점",
+              "비용",
+              "생활",
+              "팁"
+            ],
+            "depth": true
           },
           {
             "done": false,
-            "section": "생활",
-            "question": "기숙사나 현지 생활은 어땠나요?",
+            "section": "지원",
+            "question": "다시 준비 과정을 거친다면 무엇부터 하실 것 같아요?",
             "progress": {
               "filled": 2,
               "total": 7
-            }
+            },
+            "pendingQuestions": 0,
+            "covered": [
+              "지원",
+              "학점",
+              "비용",
+              "생활",
+              "팁"
+            ],
+            "depth": true,
+            "examples": [
+              "어학 시험",
+              "기숙사 신청",
+              "학점 인정 확인"
+            ]
+          },
+          {
+            "done": false,
+            "section": "배운점",
+            "question": "이 경험에서 배운 점을 한 문장으로 들려주세요.",
+            "progress": {
+              "filled": 3,
+              "total": 7
+            },
+            "pendingQuestions": 0,
+            "covered": [
+              "지원",
+              "학점",
+              "비용",
+              "생활",
+              "팁"
+            ]
           }
         ],
         "done": {
           "done": true,
           "progress": {
-            "filled": 7,
+            "filled": 4,
             "total": 7
-          }
+          },
+          "covered": [
+            "지원",
+            "학점",
+            "비용",
+            "생활",
+            "팁"
+          ]
         }
       }
     },
