@@ -5,7 +5,7 @@
 # 목적: 후배는 "무역 쪽 인턴", "번역 직무"처럼 업체 이름 없이 묻는다. askBoo 1단계에서 프로그램명·별칭 대조가
 #   0건이면 이 사전으로 후보 업체 1~3개를 고른다(functions/askboo.py match_programs, 미리).
 # 파일 모양(spec 7장 + 문맥): {"문맥": ["인턴", ...], "직군": {"키워드": ["업체명", ...]}, "기관유형": {...}, "약칭": {}}
-#   값은 programs.json 현장실습 프로그램명과 글자 그대로 같다. 업체 약칭(㈜ 등을 뗀 이름)은 사전 대신
+#   값은 programs.json 현장실습 프로그램명과 글자 그대로 같다. [11/22] 키워드마다 해당 업체를 모두 담는다(3곳 상한은 읽는 쪽에서) — 후기가 적은 업체도 사전에 들어가게(50/50). 업체 약칭(㈜ 등을 뗀 이름)은 사전 대신
 #   programs.json 별칭으로 넣었다(sheet_to_json.py short_name) — 그래서 "약칭"은 비어 있다.
 # 읽는 규칙(askBoo 1단계, 이 파일의 match()가 기준 구현):
 #   1) 프로그램명·별칭 대조가 0건이고 2) 질문에 "문맥" 말이 하나라도 있을 때만
@@ -80,6 +80,10 @@ KEYWORDS = {
     "재택": {"기관유형": ["온라인 현장실습(국내 기관)", "현지 협력기관(온라인)"]},
     "비대면": {"기관유형": ["온라인 현장실습(국내 기관)", "현지 협력기관(온라인)"]},
     "해외협력기관": {"기관유형": ["현지 협력기관(온라인)"]}, "현지협력기관": {"기관유형": ["현지 협력기관(온라인)"]},
+    # [11/22] 후기에 실제로 나오는 업무 말
+    "CAT툴": {"직군": ["번역 검수 지원", "번역 프로젝트 지원"]}, "인보이스": {"직군": ["수출입 사무 지원", "해외영업 지원"]},
+    "수출서류": {"직군": ["수출입 사무 지원"]}, "바이어": {"직군": ["해외영업 지원", "시장조사 지원", "전시·행사 지원"]},
+    "원격": {"기관유형": ["온라인 현장실습(국내 기관)", "현지 협력기관(온라인)"]},
 }
 
 # 직군 질문 시험: (질문, 기대 조건) — 나온 업체가 모두 조건에 맞아야 통과. 개발·봉인 질문과 겹치지 않게 새로 씀.
@@ -143,7 +147,7 @@ def build(programs, interns):
     out = {"문맥": CONTEXT, "직군": {}, "기관유형": {}, "약칭": {}}
     for word in sorted(KEYWORDS, key=lambda w: (-len(norm(w)), w)):
         group = "직군" if "직군" in KEYWORDS[word] else "기관유형"
-        names = companies_for(KEYWORDS[word], programs, interns)[:LIMIT]
+        names = companies_for(KEYWORDS[word], programs, interns)   # 전부(순서 = 답변 우선순위)
         if names:
             out[group][word] = names
     return out
@@ -195,6 +199,23 @@ def check(keywords, programs, interns):
     print(f"  {ok}/{len(TESTS)} 통과 (기준 {need})")
     if ok < need:
         errs.append(f"직군 질문 시험 {ok}/{len(TESTS)} — 기준 {need} 미달")
+
+    covered = {n for g in ("직군", "기관유형", "약칭") for v in keywords.get(g, {}).values() for n in v}
+    miss = sorted(intern_names - covered)
+    print(f"[업체 포함] 사전에 들어간 업체 {len(covered & intern_names)}/{len(intern_names)}" + (f" — 빠짐 {miss}" if miss else ""))
+    if miss:
+        errs.append(f"사전에 없는 업체 {len(miss)}곳: {miss}")
+
+    # 후기 문장 샘플: 각 업체 후기에 그 업체를 가리키는 키워드가 실제로 쓰였나(키워드가 후기 말과 맞는지 보는 참고 지표)
+    by_word = {norm(w): set(v) for g in ("직군", "기관유형") for w, v in keywords.get(g, {}).items()}
+    hit_comp, total_comp = 0, 0
+    for name in sorted(intern_names):
+        texts = [norm(r["후기"]) for r in interns if r["업체명"] == name]
+        if not texts:
+            continue
+        total_comp += 1
+        hit_comp += any(w in t and name in v for t in texts for w, v in by_word.items())
+    print(f"[후기 문장 대조] 자기 후기에 자기를 가리키는 키워드가 나오는 업체 {hit_comp}/{total_comp}(참고)")
 
     print("[인턴과 관계없는 질문 — 걸리면 안 됨]")
     bad = [(q, match(q, terms, keywords)) for q in NEGATIVE]
