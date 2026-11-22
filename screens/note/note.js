@@ -2,7 +2,7 @@
 // 기준: docs/design-rules.md 7-③·5-5·6-3~6-5, docs/spec-v1.md 4장 listNotes
 // 규칙: 데이터는 common/data.js 함수로만, 화면 글은 textContent로만(innerHTML 금지), 색은 style.css 변수만.
 
-import { currentUser, listNotes } from "../../common/data.js";
+import { currentUser, listNotes, scrapNote } from "../../common/data.js";
 
 // ---------------------------------------------------------------------------
 // 0. 로그인 확인
@@ -15,23 +15,14 @@ if (me && me.status === "직원") document.getElementById("consoleBtn").hidden =
 // 노트 종류(type) → 분야(3-3). 교환·파견은 국제교류, 인턴은 현장실습
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };
-// 띠의 세부 분류. listNotes에 국가·기관 유형이 없어서 종류만 쓴다(비교과는 분야 태그와 같아 비움)
+// 띠의 세부 분류: 종류 + 국가(spec [11/22] country). country가 null이면 종류만(비교과는 분야 태그와 같아 비움)
 const KIND_NAME = { 교환: "교환학생", 파견: "파견", 인턴: "인턴", 비교과: "" };
 const DASH = "–";
 
-// ---------------------------------------------------------------------------
-// 확인용 예시(?demo=1일 때만). mock-data.json에 비교과·빈 요약 노트가 없어서 화면 폴더 안에만 둔다.
-// mock에 비교과 노트가 들어오면 이 블록을 지운다.
-// ---------------------------------------------------------------------------
-
-const DEMO = new URLSearchParams(location.search).get("demo") === "1";
-const DEMO_NOTES = [
-  { id: "N-demo-extra", program: "HUFS 동문멘토링 데이", type: "비교과",
-    oneLine: "", forWhom: "진로를 고민하는 1~2학년",
-    evidenceCount: 0, lastSemester: "2026-1", satisfaction: 4.2, completedCount: 150 },
-  { id: "N-demo-dispatch", program: "(예시) 파견 노트 — 값이 비어 있을 때", type: "파견",
-    oneLine: "", forWhom: "", evidenceCount: 0, lastSemester: null, satisfaction: null, completedCount: null },
-];
+function kindText(note) {
+  const kind = KIND_NAME[note.type] ?? "";
+  return note.country ? [kind, note.country].filter(Boolean).join(" · ") : kind;
+}
 
 // ---------------------------------------------------------------------------
 // 1. 작은 도우미 — 요소 만들기(글은 textContent로만), 아이콘
@@ -48,6 +39,15 @@ function el(tag, props = {}, children = []) {
 }
 const icon = (name) => el("i", { className: "icon", attrs: { "data-lucide": name } });
 const drawIcons = () => window.lucide && window.lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
+
+// 토스트(5-10): 하단 탭 위, 3초
+function toast(text, iconName = "check") {
+  const host = document.getElementById("toastHost");
+  host.replaceChildren(el("span", { className: "toast" }, [icon(iconName), el("span", { text })]));
+  drawIcons();
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => host.replaceChildren(), 3000);
+}
 
 // 빈 값(null·undefined·빈 문자열)은 "–"
 const orDash = (v) => (v === null || v === undefined || String(v).trim() === "" ? DASH : String(v));
@@ -66,12 +66,41 @@ function semesterText(s) {
 // 2. 노트 커버 — 공통 부품 .note-card(7-③ 커버 5항목)
 // ---------------------------------------------------------------------------
 
+// 스크랩 버튼(5-5 띠 오른쪽). 상태는 서버 응답의 scrapped로만 바꾼다(spec [11/22] scrapNote)
+function setScrapState(btn, on) {
+  btn.setAttribute("aria-pressed", String(on));
+  btn.setAttribute("aria-label", on ? "스크랩 취소" : "스크랩");
+}
+
+function scrapButton(note) {
+  const btn = el("button", { className: "icon-btn", attrs: { type: "button" } }, [icon("bookmark")]);
+  setScrapState(btn, note.scrapped === true);
+  btn.addEventListener("click", async () => {
+    const want = btn.getAttribute("aria-pressed") !== "true";
+    btn.disabled = true;
+    try {
+      const res = await scrapNote(note.id, want);
+      if (!res || !res.ok) throw new Error((res && res.error) || "스크랩 실패");
+      note.scrapped = res.scrapped === true; // 필터를 바꿔 다시 그려도 상태가 남게
+      setScrapState(btn, note.scrapped);
+      toast(note.scrapped ? "내 보관함 스크랩에 담았어요" : "스크랩을 해제했어요");
+    } catch (err) {
+      console.error(err);
+      toast("스크랩하지 못했어요. 다시 시도해 주세요", "circle-alert");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  return btn;
+}
+
 function noteCover(note) {
   const cat = CATEGORY[note.type] || "global";
 
   const band = el("div", { className: "note-card__band" }, [
     el("span", { className: "category-tag", text: CATEGORY_NAME[cat] }),
-    el("span", { className: "note-card__kind", text: KIND_NAME[note.type] ?? "" }),
+    el("span", { className: "note-card__kind", text: kindText(note) }),
+    scrapButton(note),
   ]);
 
   // 메타 줄: 근거 N건 · 최근 학기 · ★ 만족도 (비교과는 · 이수 N명 추가)
@@ -153,7 +182,6 @@ async function load() {
   try {
     const res = await listNotes({});
     allNotes = Array.isArray(res && res.notes) ? res.notes : [];
-    if (DEMO) allNotes = allNotes.concat(DEMO_NOTES);
     loaded = true;
     render();
   } catch (err) {
@@ -174,6 +202,5 @@ document.getElementById("filters").addEventListener("click", (e) => {
   if (loaded) render(); // 불러오는 중이거나 오류면 그 화면을 그대로 둔다
 });
 
-if (DEMO) document.getElementById("demoNotice").hidden = false;
 drawIcons();
 if (me) load();

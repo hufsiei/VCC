@@ -31,7 +31,6 @@
   .state-box { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-lg) 0; text-align: center; }
   .state-box__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
   .state-box .boo-illust { width: 80px; height: 80px; }
-  .demo-notice { margin-top: var(--space-md); }
 </style>
 </head>
 <body>
@@ -72,10 +71,6 @@
       </div>
     </div>
 
-    <div id="demoNotice" class="demo-notice" hidden>
-      <span class="status-label status-label--info"><i data-lucide="info" class="icon"></i>확인용 예시 카드가 섞여 있어요</span>
-    </div>
-
     <p class="note-count" id="noteCount" aria-live="polite"></p>
     <div class="note-list" id="noteList" aria-busy="true"></div>
   </main>
@@ -87,6 +82,8 @@
     <a class="tabbar__item" href="../senior/"><i data-lucide="users" class="icon"></i>닮은선배</a>
     <a class="tabbar__item" href="../questions/"><i data-lucide="archive" class="icon"></i>내 보관함</a>
   </nav>
+
+  <div class="toast-host" id="toastHost" role="status" aria-live="polite"></div>
 </div>
 
 <script src="../../assets/lucide/lucide.min.js"></script>
