@@ -2,11 +2,94 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>note</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>해봤노트 · 외대人사이드</title>
 <link rel="stylesheet" href="../../common/style.css">
+<style>
+  /* 해봤노트 화면 배치용. 색은 style.css 변수만 쓴다. */
+  .note-top { display: flex; flex-direction: column; gap: var(--space-md); }
+  /* 채팅형 검색창(7-③): 누르면 인터BOO 물어보기로 이동 */
+  .ask-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    min-height: var(--button-height);
+    padding: 0 var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-button);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    text-decoration: none;
+  }
+  .ask-link .icon { color: var(--color-hufs-navy); }
+  .ask-link__text { flex: 1; }
+  .filter-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+  .filter-row .choice-chip { font-size: var(--font-size-secondary); cursor: pointer; }
+  .note-count { margin-top: var(--space-lg); font-size: var(--font-size-secondary); color: var(--color-text-muted); }
+  .note-list { display: flex; flex-direction: column; gap: 12px; margin-top: var(--space-sm); }
+  .note-skeleton { height: 168px; }
+  .state-box { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-lg) 0; text-align: center; }
+  .state-box__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
+  .state-box .boo-illust { width: 80px; height: 80px; }
+  .demo-notice { margin-top: var(--space-md); }
+</style>
 </head>
 <body>
-<div class="app"></div>
+<div class="app has-tabbar">
+
+  <!-- 1단계: 메인 헤더(5-1) -->
+  <header class="header">
+    <button class="icon-btn" type="button" aria-label="메뉴"><i data-lucide="menu" class="icon"></i></button>
+    <a class="header__brand" href="../talk/">
+      <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
+      외대人사이드
+    </a>
+    <div class="header__actions">
+      <!-- 직원 계정일 때만 보임(5-1): PC 관리자 콘솔을 새 탭으로 -->
+      <a class="icon-btn" id="consoleBtn" href="../admin/" target="_blank" rel="noopener" aria-label="관리자 콘솔" hidden><i data-lucide="chart-column" class="icon"></i></a>
+      <a class="icon-btn" href="../questions/#alerts" aria-label="알림"><i data-lucide="bell" class="icon"></i></a>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="note-top">
+      <div class="page-intro__text">
+        <h1 class="page-title">해봤노트</h1>
+        <p class="sub">이수 기록으로 확인된 선배들의 경험을 프로그램별로 모았어요.</p>
+      </div>
+
+      <a class="ask-link" href="../talk/">
+        <i data-lucide="message-circle" class="icon"></i>
+        <span class="ask-link__text">BOO에게 물어보기</span>
+        <i data-lucide="arrow-right" class="icon"></i>
+      </a>
+
+      <div class="filter-row" id="filters" role="group" aria-label="분야 필터">
+        <button class="choice-chip" type="button" data-cat="" aria-pressed="true">전체</button>
+        <button class="choice-chip" type="button" data-cat="global" aria-pressed="false">국제교류</button>
+        <button class="choice-chip" type="button" data-cat="practice" aria-pressed="false">현장실습</button>
+        <button class="choice-chip" type="button" data-cat="extra" aria-pressed="false">비교과</button>
+      </div>
+    </div>
+
+    <div id="demoNotice" class="demo-notice" hidden>
+      <span class="status-label status-label--info"><i data-lucide="info" class="icon"></i>확인용 예시 카드가 섞여 있어요</span>
+    </div>
+
+    <p class="note-count" id="noteCount" aria-live="polite"></p>
+    <div class="note-list" id="noteList" aria-busy="true"></div>
+  </main>
+
+  <!-- 하단 탭(5-3) -->
+  <nav class="tabbar" aria-label="주 메뉴">
+    <a class="tabbar__item" href="../talk/"><i data-lucide="message-circle" class="icon"></i>인터BOO</a>
+    <a class="tabbar__item" href="../note/" aria-current="page"><i data-lucide="notebook-text" class="icon"></i>해봤노트</a>
+    <a class="tabbar__item" href="../senior/"><i data-lucide="users" class="icon"></i>닮은선배</a>
+    <a class="tabbar__item" href="../questions/"><i data-lucide="archive" class="icon"></i>내 보관함</a>
+  </nav>
+</div>
+
+<script src="../../assets/lucide/lucide.min.js"></script>
+<script type="module" src="./note.js"></script>
 </body>
 </html>
