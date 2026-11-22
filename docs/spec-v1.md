@@ -10,7 +10,7 @@
 > 11/16 개정(PRD 4-1): 교환·파견 노트 틀에 `배운점`(인터뷰로만) 추가 → 6칸. `summarizeInterview`가 끝나면 myNote를 서버가 바로 저장(저장은 기본, 공유는 선택). `saveConsent`의 `edits.removed`가 문장 단위 비공개를 뜻함. 공개 초안 문장에 `identifying` 표시 추가. 사람 이름: 추천 선배는 `독일어과 선배 A`, 쪽지 보낸 사람은 `형용사 + 동물`(대화마다 새로) — `previewNickname`·`respondRequest` 신설, `sendMessage`·`getMessages`에 `myNickname`·`role`·`askerInfo` 추가.
 > **11/19 개정 ②(작업 18·22)**: askBoo 응답에 **`status: "official"`**(규정 질문 → 공식 안내 연결) 추가(3·4·6·8장). 닮은 선배 점수는 서버가 Python이므로 `common/score.js`를 없애고 **`functions/score.py`(원우)** 한 벌로 계산한다.
 > **11/19 개정 ③(작업 18)**: askBoo `lines[]`에 **`fallback`**(사후 검증에 걸려 근거 원문을 보여 준 줄) 추가(4장). `noteId`는 `data/notes.json`이 생기기 전까지 프로그램 이름으로 나간다.
-> **11/22 개정(작업 23, 민지 요청)**: `listNotes`·`getNote`에 **`country`**(국제교류 = `programs.json` `세부` 국가, 인턴·비교과 `null`, 카드 띠 「교환학생 · 독일」)와 **`scrapped`**(내가 스크랩했는지) 추가. 새 함수 **`scrapNote(noteId, scrap)`**(켜기·끄기, 멱등) → `getInbox.scraps`가 실제로 채워진다(최근이 위). 바뀐 곳은 **[11/22]** 표시.
+> **11/22 개정(작업 23, 민지 요청)**: `listNotes`·`getNote`에 **`country`**(국제교류 = `programs.json` `세부` 국가, 인턴·비교과 `null`, 카드 띠 「교환학생 · 독일」)와 **`scrapped`**(내가 스크랩했는지) 추가. 새 함수 **`scrapNote(noteId, scrap)`**(켜기·끄기, 멱등) → `getInbox.scraps`가 실제로 채워진다(최근이 위). **[11/22 오후]** `getNote` 배운점 문장에 **`senior`**(「선배 A」, 노트 안에서만 쓰는 글자, 학과 없음 — PRD 9-1), 새 함수 **`saveQuestion(noteId, section)`**(「질문함에 담기」). 바뀐 곳은 **[11/22]** 표시.
 > **11/20 개정(닮은 선배 실제 데이터 기준)**: 시연 인물을 `가상데이터_1000명.xlsx` 실제 값에 맞췄다. 선배2를 H0745 → **H0241**(독일어과 3학년·경영학, 마르부르크 2026-1, 12점 2위)로 바꾸고, 선배1과 후배1의 공통 비교과를 `합격 면접 취업특강(커리어랩)` → **`한국외국어대학교 직무탐색 집중교육`**으로 바꿨다. H0241은 공통 비교과가 없다(12점 = 학과 5 + 이중전공 4 + 단과대 3). 후배1은 현장실습 이수가 없다. 선배1 보고서 학기 2024-1 → 2025-1(1·4·6장 예시 포함).
 
 ## 0. 공통 규칙
@@ -191,11 +191,21 @@ payload `{noteId, scrap?: true|false}`(생략 = 켜기). 같은 상태로 다시
 ```
 mock은 기억하지 않는다(받은 값을 그대로 돌려주고, 목록·노트의 `scrapped`는 mock-data.json 고정값). 화면은 응답의 `scrapped`로 버튼 상태를 바꾼다.
 
+### saveQuestion(noteId, section) [11/22]
+「질문함에 담기」 버튼(디자인 규칙 6-2 근거 없음 · 6-1 오래된 근거, PRD ⑧). 그 노트의 한 칸을 **질문함에 `hold`로** 넣는다 → 다음 선배 인터뷰(`interviewNext`)가 「후배가 이렇게 물었어요」로 먼저 묻고, 답이 공유되면 `answered` + 질문자 알림(기존 흐름 그대로). 질문 글은 서버가 정한다(`"{칸} 이야기를 최근 경험으로 듣고 싶어요."`, 자유 입력 없음 → 검사·AI 없음). 같은 사람·노트·칸의 `hold` 질문이 있으면 새로 만들지 않고 `already: true`(멱등). `후배 질문` 칸과 노트에 없는 칸은 오류.
+```json
+{ "ok": true, "questionId": "Q-0101", "already": false, "message": "질문함에 담았어요. 다음 선배 인터뷰 때 먼저 물어볼게요." }
+{ "error": "담을 수 없는 칸이에요" }
+{ "error": "노트를 찾지 못했어요" }
+```
+화면은 `message`를 토스트로 보여 주고, 버튼을 「질문함에 담았어요」(비활성)로 바꾼다. mock은 고정값을 돌려준다.
+
 ### getNote(id)
 칸 순서와 이름은 `data/frames.json`을 따른다. 빈 칸도 `lines: []`로 보낸다. `interviewOnly`가 true인 칸은 선배 인터뷰로만 채워진다.
 **[11/19] 노트가 만들어지는 규칙(작업 26, PRD 4-2)**: 노트 = `data/notes.json`(사전 생성) + `runtime/noteLines.json`(동의 통과 인터뷰 문장)의 합집합.
 - `tools/build_notes.py`(원우)가 `evidence.json`을 프로그램별·칸별로 묶어 `notes.json`을 만든다. 칸 문장 = 근거 문단 **원문 그대로 1:1**(`text` = `evidence.text`, `sourceId` = `evidence.id`, AI 변환 없음). `official`은 학점·장학·선발·자격 키워드 정규식. `forWhom`은 템플릿(`"{국가}권 {분야}를 생각하는 1~2학년"` / 인턴 `"{직군} 분야 현장실습을 생각하는 2~3학년"`), `oneLine`은 근거가 가장 많은 칸의 첫 문장(P1-여건 78: 칸별 AI 한 줄 요약 `sectionSummary`), `evidenceCount` = 보고서 문단 + 동의 인터뷰 문장, `lastSemester` = 최대 학기. 현장실습 노트의 자동 분류 문장은 `autoClassified: true`(화면 「자동 분류」 라벨).
 - 서버는 응답할 때 `noteLines.json`의 같은 `noteId` 문장을 해당 칸 뒤에 붙인다(`docType: "인터뷰"`). **「후배 질문」 칸**의 문장은 `asked`(Q)와 `text`(A)를 함께 보내고, 화면은 Q·A 쌍으로 원문 인용한다(합쳐 요약하지 않음). 같은 `answersQuestionId`에 선배 여럿이 답하면 A가 쌓인다.
+- **[11/22] 배운점 `senior`**: 배운점 칸 문장마다 `"senior": "선배 A"`. 글자는 **이 노트 안에서만** 쓰는 것으로, 칸에 처음 나온 선배부터 A·B·C(같은 선배는 같은 글자). 학과는 넣지 않는다 — PRD 9-1(노트가 프로그램 단위라 학과까지 보이면 소수 학과에서 특정됨). 닮은선배 `nickname`과도 같은 글자를 쓰지 않는다(이으면 학과가 드러남). 화면은 「선배 A · 2025」(senior + 출처 연도). 쓴 사람을 모르면 `senior`가 없다 → 출처만.
 - `sources[*].semester`는 그대로 보내고 화면이 연도만 표시한다(0장). 근거 1~2건인 칸은 화면이 「선배 1명의 경험이에요」 라벨(`lines.length`로 판단, 서버 필드 없음).
 ```json
 { "id": "N-marburg", "program": "마르부르크필립스대학교", "type": "교환",
@@ -216,7 +226,7 @@ mock은 기억하지 않는다(받은 값을 그대로 돌려주고, 목록·노
 `officialUrl`은 서버가 **프로그램의 `운영부서코드` → `departments.json`의 `공식안내URL`** 순서로 찾아 넣는다(프로그램 목록 시트에는 URL 열이 없다, PRD 6-2).
 
 ### recommendSeniors(noteId, more)
-payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명 「학과 + 선배 + 영문 대문자」(예: `"독일어과 선배 A"`, 디자인 규칙 1-2절). 같은 선배는 닮은선배·프로필·해봤노트 인용·쪽지창에서 같은 이름이다. 점수 계산은 `functions/score.py`(원우). AI 없음.
+payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명 「학과 + 선배 + 영문 대문자」(예: `"독일어과 선배 A"`, 디자인 규칙 1-2절). 같은 선배는 닮은선배·프로필·쪽지창에서 같은 이름이다. **[11/22]** 해봤노트 배운점 인용은 이 이름을 쓰지 않고 노트 안에서만 쓰는 「선배 A」(getNote `senior`, PRD 9-1). 점수 계산은 `functions/score.py`(원우). AI 없음.
 
 **[11/20 개정] 후보·점수 규칙 (작업 22):**
 - 후보 = 그 노트(희망 프로그램)의 경험자 **전부**. 점수 하한은 없다(단과대가 달라도 그 경험을 한 선배는 추천한다). 직원 행·본인은 뺀다.
@@ -329,7 +339,7 @@ payload `{lineId, reason?}`. 신고된 문장은 즉시 숨김, 부서 리포트
 ```js
 login(id, pw) · getMe() · askBoo(question)
 interviewNext(program, answers) · summarizeInterview(program, transcript) · saveConsent(draftId, edits)
-listNotes(filter) · getNote(id) · scrapNote(noteId, scrap = true) · reportStatement(lineId, reason)   // scrapNote [11/22]
+listNotes(filter) · getNote(id) · scrapNote(noteId, scrap = true) · saveQuestion(noteId, section) · reportStatement(lineId, reason)   // scrapNote·saveQuestion [11/22]
 recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept) · cancelRequest(threadId)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85)
 getInbox() · getDeptReport(dept)
 getDepartments() · getAdminOverview(dept, period) · getAdminSuggestions(dept, period) · setSuggestionStatus(id, status)
