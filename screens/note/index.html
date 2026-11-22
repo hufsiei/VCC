@@ -2,11 +2,166 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>note</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>해봤노트 · 외대人사이드</title>
 <link rel="stylesheet" href="../../common/style.css">
+<style>
+  /* 해봤노트 화면 배치용. 색은 style.css 변수만 쓴다. */
+
+  /* ---------- 목록(1단계) ---------- */
+  .note-top { display: flex; flex-direction: column; gap: var(--space-md); }
+  /* 채팅형 검색창(7-③): 누르면 인터BOO 물어보기로 이동 */
+  .ask-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    min-height: var(--button-height);
+    padding: 0 var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-button);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    text-decoration: none;
+  }
+  .ask-link .icon { color: var(--color-hufs-navy); }
+  .ask-link__text { flex: 1; }
+  .filter-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+  .filter-row .choice-chip { font-size: var(--font-size-secondary); cursor: pointer; }
+  .note-count { margin-top: var(--space-lg); font-size: var(--font-size-secondary); color: var(--color-text-muted); }
+  .note-list { display: flex; flex-direction: column; gap: 12px; margin-top: var(--space-sm); }
+  .note-skeleton { height: 168px; }
+  /* 카드 본문 전체가 상세로 가는 링크(띠의 스크랩 버튼은 따로) */
+  a.note-card__body { color: inherit; text-decoration: none; }
+  .state-box { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-lg) 0; text-align: center; }
+  .state-box__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
+  .state-box .boo-illust { width: 80px; height: 80px; }
+
+  /* ---------- 상세(2단계) ---------- */
+  .detail { display: flex; flex-direction: column; gap: var(--space-lg); }
+  /* 노트 틀 탭: 칸이 많으면 가로 스크롤(5-7과 같은 방식) */
+  .section-tabs {
+    position: relative;
+    display: flex;
+    gap: var(--space-sm);
+    margin: 0 calc(-1 * var(--page-gutter));
+    padding: 0 var(--page-gutter) var(--space-xs);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .section-tabs::-webkit-scrollbar { display: none; }
+  .section-tabs .choice-chip { flex: none; font-size: var(--font-size-secondary); cursor: pointer; }
+  .section-tabs .choice-chip[aria-selected="true"] { border-color: transparent; background: var(--color-hufs-navy); color: var(--color-on-primary); }
+  .section-panel { display: flex; flex-direction: column; gap: 12px; }
+  /* 칸 문장(원문 인용) */
+  .line {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+  .line__meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-xs) var(--space-sm); font-size: var(--font-size-caption); color: var(--color-text-muted); }
+  .line__meta .icon-btn { margin-left: auto; color: var(--color-text-muted); }
+  .line__meta .icon-btn .icon { width: 20px; height: 20px; }
+  /* 배운점: 선배 말을 그대로 옮긴 인용 */
+  .line--quote .line__text { padding-left: 12px; border-left: 3px solid var(--color-border); }
+  /* 후배 질문: Q(SOFT BLUE 인용) + A(선배 답) */
+  .qa { display: flex; flex-direction: column; gap: var(--space-sm); }
+  .qa__q { display: flex; gap: var(--space-sm); padding: 12px; border-radius: var(--radius-card); background: var(--color-soft-blue); }
+  .qa__mark { flex: none; font-weight: 700; color: var(--color-hufs-navy); }
+  .qa__a { display: flex; gap: var(--space-sm); }
+  .qa__a-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-sm); }
+  .detail-skeleton { height: 120px; }
+</style>
 </head>
 <body>
-<div class="app"></div>
+<div class="app">
+
+  <!-- ===== 1단계: 해봤노트 목록 (메인 헤더 + 하단 탭) ===== -->
+  <section id="viewList" class="has-tabbar">
+    <header class="header">
+      <button class="icon-btn" type="button" aria-label="메뉴"><i data-lucide="menu" class="icon"></i></button>
+      <a class="header__brand" href="../talk/">
+        <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
+        외대人사이드
+      </a>
+      <div class="header__actions">
+        <!-- 직원 계정일 때만 보임(5-1): PC 관리자 콘솔을 새 탭으로 -->
+        <a class="icon-btn" id="consoleBtn" href="../admin/" target="_blank" rel="noopener" aria-label="관리자 콘솔" hidden><i data-lucide="chart-column" class="icon"></i></a>
+        <a class="icon-btn" href="../questions/#alerts" aria-label="알림"><i data-lucide="bell" class="icon"></i></a>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="note-top">
+        <div class="page-intro__text">
+          <h1 class="page-title">해봤노트</h1>
+          <p class="sub">이수 기록으로 확인된 선배들의 경험을 프로그램별로 모았어요.</p>
+        </div>
+
+        <a class="ask-link" href="../talk/">
+          <i data-lucide="message-circle" class="icon"></i>
+          <span class="ask-link__text">BOO에게 물어보기</span>
+          <i data-lucide="arrow-right" class="icon"></i>
+        </a>
+
+        <div class="filter-row" id="filters" role="group" aria-label="분야 필터">
+          <button class="choice-chip" type="button" data-cat="" aria-pressed="true">전체</button>
+          <button class="choice-chip" type="button" data-cat="global" aria-pressed="false">국제교류</button>
+          <button class="choice-chip" type="button" data-cat="practice" aria-pressed="false">현장실습</button>
+          <button class="choice-chip" type="button" data-cat="extra" aria-pressed="false">비교과</button>
+        </div>
+      </div>
+
+      <p class="note-count" id="noteCount" aria-live="polite"></p>
+      <div class="note-list" id="noteList" aria-busy="true"></div>
+    </main>
+
+    <!-- 하단 탭(5-3) — 1단계 화면에만 -->
+    <nav class="tabbar" aria-label="주 메뉴">
+      <a class="tabbar__item" href="../talk/"><i data-lucide="message-circle" class="icon"></i>인터BOO</a>
+      <a class="tabbar__item" href="../note/" aria-current="page"><i data-lucide="notebook-text" class="icon"></i>해봤노트</a>
+      <a class="tabbar__item" href="../senior/"><i data-lucide="users" class="icon"></i>닮은선배</a>
+      <a class="tabbar__item" href="../questions/"><i data-lucide="archive" class="icon"></i>내 보관함</a>
+    </nav>
+  </section>
+
+  <!-- ===== 2단계: 해봤노트 상세 (상세 헤더 + 하단 탭 숨김, 5-2) ===== -->
+  <section id="viewDetail" hidden>
+    <header class="header">
+      <button class="icon-btn" id="detailBack" type="button" aria-label="뒤로"><i data-lucide="arrow-left" class="icon"></i></button>
+      <h2 class="header__title" id="detailTitle">해봤노트</h2>
+      <span class="icon-btn" aria-hidden="true"></span>
+    </header>
+    <main class="page">
+      <div class="detail" id="detailBody" aria-busy="true"></div>
+    </main>
+  </section>
+
+  <!-- ===== 신고 바텀시트 (5-10) — 화면 위에 덮임 ===== -->
+  <div class="sheet-layer" id="reportSheet" hidden>
+    <div class="sheet-scrim"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="reportTitle" tabindex="-1">
+      <div class="sheet__handle" aria-hidden="true"></div>
+      <h2 class="sheet__title" id="reportTitle">이 문장을 신고할까요?</h2>
+      <div class="sheet__body">
+        <p class="sub">신고하면 이 문장은 바로 숨겨지고, 담당 부서가 확인해요.</p>
+        <div class="choice-list" id="reportReasons" role="group" aria-label="신고 사유"></div>
+      </div>
+      <div class="sheet__footer">
+        <button class="btn btn--danger btn--block" id="reportSubmit" type="button" disabled>신고하기</button>
+        <p class="btn-reason" id="reportReason"><i data-lucide="info" class="icon"></i><span>사유를 하나 골라 주세요</span></p>
+        <button class="btn btn--text" id="reportCancel" type="button">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-host" id="toastHost" role="status" aria-live="polite"></div>
+</div>
+
+<script src="../../assets/lucide/lucide.min.js"></script>
+<script type="module" src="./note.js"></script>
 </body>
 </html>
