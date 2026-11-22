@@ -129,44 +129,12 @@
     </div>
   </section>
 
-  <!-- ===== 공개 동의 바텀시트 (7-② · 8절, 작업 70) — 화면 이동이 아니라 위에 덮임. 내용은 consent.js가 채운다 ===== -->
-  <div class="sheet-layer" id="consentSheet" hidden>
-    <div class="sheet-scrim"></div>
-    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="consentTitle" tabindex="-1">
-      <div class="sheet__handle" aria-hidden="true"></div>
-      <h2 class="sheet__title" id="consentTitle">해봤노트 공개 동의</h2>
-      <div class="sheet__body">
-        <!-- 공유 후 서버가 일부 문장을 거절했을 때 결과(saveConsent.rejected) -->
-        <div class="consent-result" id="consentResult" role="status" hidden></div>
-        <!-- ① 반영될 해봤노트 -->
-        <div class="consent-target" id="consentTarget"></div>
-        <!-- ② 칸별 문장 + 공개 스위치 -->
-        <div>
-          <p class="sub">문장마다 공개할지 골라 주세요. 끈 문장은 내 경험노트에만 남아요.</p>
-          <div class="consent-lines" id="consentLines"></div>
-        </div>
-        <!-- ③ 공개되는 것 / 공개되지 않는 것 -->
-        <div class="consent-scope" id="consentScope"></div>
-        <!-- ④ 동의 체크 -->
-        <label class="check-row">
-          <input class="checkbox" type="checkbox" id="consentAgree">
-          <span>위 내용을 확인했고, 켠 문장을 해봤노트에 공개하는 데 동의해요.</span>
-        </label>
-        <div id="consentError" class="consent-error" role="alert"></div>
-      </div>
-      <div class="sheet__footer">
-        <button class="btn btn--primary btn--block" id="consentSubmit" type="button" disabled>동의하고 공유</button>
-        <p class="btn-reason" id="consentReason"><i data-lucide="info" class="icon"></i><span></span></p>
-        <button class="btn btn--text" id="consentCancel" type="button">취소</button>
-      </div>
-    </div>
-  </div>
 
   <div class="toast-host" id="toastHost" role="status" aria-live="polite"></div>
 </div>
 
 <script src="../../assets/lucide/lucide.min.js"></script>
 <script type="module" src="./talk.js"></script>
-<script type="module" src="./consent.js"></script>
+<script type="module" src="../../common/consent.js"></script>
 </body>
 </html>

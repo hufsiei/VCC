@@ -710,16 +710,21 @@ shareBtn.addEventListener("click", () => {
   document.dispatchEvent(new CustomEvent("open-consent", { detail: summaryResult }));
 });
 
-// 공유가 끝나면(consent.js가 알림): 토스트 + 내 경험노트에 「반영 중」(중립) + 버튼은 「공유 범위 바꾸기」(7-②, 8절)
+// 공유가 끝나면(common/consent.js가 알림): 토스트 + 공유 상태 라벨 + 버튼은 「공유 범위 바꾸기」(7-②, 8절)
+// 「반영 중」은 없다 — saveConsent가 그 자리에서 해봤노트에 반영한다(spec 4장 getInbox [11/22])
 document.addEventListener("consent-saved", (event) => {
   if (!summaryResult || event.detail.draftId !== summaryResult.draftId) return;
   shareBtn.textContent = "공유 범위 바꾸기";
-  // 서버가 문장을 모두 거절해 실제로 들어간 문장이 없으면 「반영 중」·토스트를 띄우지 않는다
+  // 서버가 문장을 모두 거절해 실제로 들어간 문장이 없으면 라벨·토스트를 띄우지 않는다
   if (event.detail.shared === 0) return;
-  summaryStatus.querySelector(".status-label--neutral")?.remove();
-  summaryStatus.append(" ", statusLabel("neutral", "clock", "반영 중"));
+  summaryStatus.querySelector(".status-label--neutral, .status-label--shared")?.remove();
+  const label = event.detail.removed.length
+    ? statusLabel("neutral", "share-2", `${event.detail.shared}문장 공유`)
+    : statusLabel("success", "check", "해봤노트 공유됨");
+  label.classList.add("status-label--shared");
+  summaryStatus.append(" ", label);
   measureDock();
-  toast("해봤노트에 반영하고 있어요");
+  toast("해봤노트에 반영됐어요");
 });
 
 // 「나중에 할게요」 → 내 보관함 · 내 경험노트 탭(토스트는 보관함 화면이 from=later를 보고 띄운다)
