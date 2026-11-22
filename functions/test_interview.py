@@ -64,9 +64,36 @@ expect("total 7", s["progress"]["total"] == 7)
 
 answers = [{"section": "후배 질문", "question": s["asked"], "questionId": qid, "answer": "학기 중엔 어렵고 방학에 단기 인턴 했어요."}]
 s = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers})
-first = interview.section_order(PROGRAM, ["지원", "학점", "비용", "생활", "팁", "배운점"])[0]
-expect("다음은 근거 적은 칸", s.get("section") == first and not s.get("done"))
+# [11/22] 마르부르크는 다섯 칸 모두 최근 근거가 있다(지원15·학점15·비용5·생활20·팁5) → 기본 질문 없이 깊이 질문
+depth = interview.depth_questions(PROGRAM, ["지원", "학점", "비용", "생활", "팁", "배운점"])
+expect("교환 깊이 질문 3개, 근거 적은 칸 먼저(팁 → 지원 → 생활)", [d[0] for d in depth] == ["팁", "지원", "생활"])
+expect("{p}는 프로그램 짧은 이름으로", "{p}" not in depth[0][1] and "마르부르크" in depth[0][1])
+first = depth[0][0]
+expect("다음은 깊이 질문(팁)", s.get("section") == first and s.get("depth") and s.get("question") == depth[0][1])
+expect("근거 충분한 칸은 covered", s.get("covered") == ["지원", "학점", "비용", "생활", "팁"])
 expect("배운점은 마지막", interview.section_order(PROGRAM, ["배운점", "지원", "팁"])[-1] == "배운점")
+expect("0건 칸은 물어야 함", interview.is_gap([]) and interview.is_gap(None))
+expect("모두 2년 넘은 칸은 물어야 함", interview.is_gap([2022, 2023], this_year=2026))
+expect("최근 근거 하나라도 있으면 묻지 않음", not interview.is_gap([2022, 2025], this_year=2026))
+expect("연도 모르는 근거가 섞이면 묻지 않음", not interview.is_gap([2020, None], this_year=2026))
+
+# 1-2) 비었거나 오래된 칸이 있으면 깊이 질문보다 먼저, 오래된 칸은 「최근 경험이 없어요」 머리말
+real_stats = interview.evidence_stats
+interview.evidence_stats = lambda p: {"지원": [2026] * 9, "학점": [], "비용": [2022, 2023], "생활": [2026], "팁": [2026]}
+g1 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers})
+g2 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers + [
+    {"section": "학점", "question": g1.get("question"), "answer": "현지 수업 두 과목이 전공으로 인정됐어요."}]})
+expect("0건 칸 먼저(학점, 기본 질문)", g1.get("section") == "학점" and not g1.get("depth")
+       and g1.get("question") == interview.base_question(PROGRAM, "학점"))
+expect("그다음 오래된 칸(비용) + 머리말", g2.get("section") == "비용" and g2.get("question", "").startswith("비용 칸은 최근 경험이 없어요."))
+expect("covered에는 빈 칸·오래된 칸이 없다", g1.get("covered") == ["지원", "생활", "팁"])
+interview.evidence_stats = real_stats
+
+# 1-3) 인턴·비교과도 깊이 질문이 틀의 칸에 담긴다
+for kind, frame in (("인턴", interview.FRAMES["인턴"]["칸"]), ("비교과", interview.FRAMES["비교과"]["칸"])):
+    expect(f"{kind} 깊이 질문 칸은 틀 안에", all(s in frame for s, _ in interview.DEPTH_QUESTIONS[kind]))
+intern = next(p for p in interview.askboo.PROGRAMS if interview.kind_of(p) == "인턴")
+expect("인턴 깊이 질문은 2개", len(interview.depth_questions(intern, interview.FRAMES["인턴"]["칸"])) == 2)
 
 # 2) 부족한 답 → 꼬리 질문 1회, 다시 부족해도 다음 칸
 answers.append({"section": s["section"], "question": s["question"], "answer": "그냥 그랬어요."})
@@ -75,12 +102,16 @@ expect("부족하면 꼬리 질문", s2.get("followUp") and s2.get("section") ==
 answers.append({"section": first, "question": s2["question"], "answer": "음 월세가 450유로였고요, 교통은 학생증으로 공짜였어요."})
 s3 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers})
 expect("꼬리 질문은 칸당 1회", s3.get("section") != first and not s3.get("followUp"))
+expect("다음은 두 번째 깊이 질문(지원)", s3.get("section") == "지원" and s3.get("question") == depth[1][1])
 
-# 3) 끝까지 답하면 done
+# 3) 끝까지 답하면 done: 후배 질문 → 깊이 2개 → 배운점
+order = []
 while not s3.get("done"):
+    order.append(s3["section"])
     answers.append({"section": s3["section"], "question": s3["question"], "answer": "합격 메일 받고 바로 기숙사 신청했어요."})
     s3 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers})
-expect("done + filled 7/7", s3["done"] and s3["progress"] == {"filled": 7, "total": 7})
+expect("남은 순서 = 지원 → 생활 → 배운점", order == ["지원", "생활", "배운점"])
+expect("done + filled 5/7 + covered", s3["done"] and s3["progress"] == {"filled": 5, "total": 7} and len(s3["covered"]) == 5)
 
 # 4) 요약: 화면처럼 questionId를 빼고 보내도 질문 원문으로 찾는다
 transcript = [{k: a[k] for k in ("section", "question", "answer")} for a in answers]

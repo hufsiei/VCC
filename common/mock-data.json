@@ -159,47 +159,105 @@
               "filled": 0,
               "total": 7
             },
-            "pendingQuestions": 1
-          },
-          {
-            "done": false,
-            "section": "지원",
-            "question": "마르부르크 파견은 언제부터 준비하셨어요?",
-            "progress": {
-              "filled": 0,
-              "total": 7
-            },
-            "examples": [
-              "출국 3학기 전",
-              "1년 전",
-              "합격 후"
+            "pendingQuestions": 1,
+            "covered": [
+              "지원",
+              "학점",
+              "비용",
+              "생활",
+              "팁"
             ]
           },
           {
             "done": false,
-            "section": "학점",
-            "question": "현지에서 들은 수업은 학점으로 어떻게 인정받으셨어요?",
+            "section": "팁",
+            "question": "후배들이 마르부르크에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?",
             "progress": {
               "filled": 1,
               "total": 7
-            }
+            },
+            "pendingQuestions": 0,
+            "covered": [
+              "지원",
+              "학점",
+              "비용",
+              "생활",
+              "팁"
+            ],
+            "depth": true
+          },
+          {
+            "done": false,
+            "section": "지원",
+            "question": "다시 준비 과정을 거친다면 무엇부터 하실 것 같아요?",
+            "progress": {
+              "filled": 2,
+              "total": 7
+            },
+            "pendingQuestions": 0,
+            "covered": [
+              "지원",
+              "학점",
+              "비용",
+              "생활",
+              "팁"
+            ],
+            "depth": true,
+            "examples": [
+              "어학 시험",
+              "기숙사 신청",
+              "학점 인정 확인"
+            ]
           },
           {
             "done": false,
             "section": "생활",
-            "question": "기숙사나 현지 생활은 어땠나요?",
+            "question": "출국 전에 걱정했던 것과 실제로 달랐던 게 있었나요?",
             "progress": {
-              "filled": 2,
+              "filled": 3,
               "total": 7
-            }
+            },
+            "pendingQuestions": 0,
+            "covered": [
+              "지원",
+              "학점",
+              "비용",
+              "생활",
+              "팁"
+            ],
+            "depth": true
+          },
+          {
+            "done": false,
+            "section": "배운점",
+            "question": "이 경험에서 배운 점을 한 문장으로 들려주세요.",
+            "progress": {
+              "filled": 4,
+              "total": 7
+            },
+            "pendingQuestions": 0,
+            "covered": [
+              "지원",
+              "학점",
+              "비용",
+              "생활",
+              "팁"
+            ]
           }
         ],
         "done": {
           "done": true,
           "progress": {
-            "filled": 7,
+            "filled": 5,
             "total": 7
-          }
+          },
+          "covered": [
+            "지원",
+            "학점",
+            "비용",
+            "생활",
+            "팁"
+          ]
         }
       }
     },
@@ -753,8 +811,15 @@
   "getInbox": {
     "myNotes": [
       {
-        "id": "N-marburg",
-        "program": "마르부르크필립스대학교"
+        "id": "M-0001",
+        "program": "마르부르크필립스대학교",
+        "type": "교환",
+        "noteId": "N-marburg",
+        "share": "partial",
+        "filled": 4,
+        "total": 7,
+        "sharedLines": 3,
+        "updatedAt": "2026-11-19T14:00:00+09:00"
       }
     ],
     "questions": [
@@ -2117,5 +2182,130 @@
     "questionId": "Q-0101",
     "already": false,
     "message": "질문함에 담았어요. 다음 선배 인터뷰 때 먼저 물어볼게요."
+  },
+  "getMyNote": {
+    "id": "M-0001",
+    "program": "마르부르크필립스대학교",
+    "type": "교환",
+    "noteId": "N-marburg",
+    "share": "partial",
+    "filled": 4,
+    "total": 7,
+    "sharedLines": 3,
+    "updatedAt": "2026-11-19T14:00:00+09:00",
+    "draftId": "D-0001",
+    "sections": [
+      {
+        "name": "지원",
+        "lines": [
+          {
+            "text": "나는 출국 3학기 전부터 TestDaF를 준비했다.",
+            "publicText": "출국 3학기 전부터 TestDaF를 준비했어요.",
+            "lineId": "L-D1-1",
+            "shared": true
+          }
+        ]
+      },
+      {
+        "name": "학점",
+        "lines": [
+          {
+            "text": "나는 학점 4.3으로 성적우수 장학금을 받았다.",
+            "publicText": "학점 4.3으로 성적우수 장학금을 받았어요.",
+            "lineId": "L-D1-4",
+            "shared": false
+          }
+        ]
+      },
+      {
+        "name": "비용",
+        "lines": []
+      },
+      {
+        "name": "생활",
+        "lines": [
+          {
+            "text": "나는 합격 직후 기숙사를 신청했고, 첫 학기에는 생활에 적응하느라 바빴다.",
+            "publicText": "합격 직후 기숙사를 신청했어요.",
+            "lineId": "L-D1-2",
+            "shared": true
+          }
+        ]
+      },
+      {
+        "name": "팁",
+        "lines": []
+      },
+      {
+        "name": "배운점",
+        "lines": []
+      },
+      {
+        "name": "후배 질문",
+        "lines": [
+          {
+            "text": "나는 학기 중에는 수업이 많아 인턴을 못 했고, 방학에 단기 인턴을 했다.",
+            "publicText": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.",
+            "lineId": "L-D1-7",
+            "shared": true,
+            "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+            "answersQuestionId": "Q-0001"
+          }
+        ]
+      }
+    ],
+    "publicDraft": {
+      "sections": [
+        {
+          "name": "지원",
+          "lines": [
+            {
+              "lineId": "L-D1-1",
+              "text": "출국 3학기 전부터 TestDaF를 준비했어요.",
+              "match": true
+            }
+          ]
+        },
+        {
+          "name": "학점",
+          "lines": [
+            {
+              "lineId": "L-D1-4",
+              "text": "학점 4.3으로 성적우수 장학금을 받았어요.",
+              "match": true,
+              "identifying": true
+            }
+          ]
+        },
+        {
+          "name": "생활",
+          "lines": [
+            {
+              "lineId": "L-D1-2",
+              "text": "합격 직후 기숙사를 신청했어요.",
+              "match": true
+            },
+            {
+              "lineId": "L-D1-3",
+              "text": "첫 학기에는 생활에 적응하느라 바빴어요.",
+              "match": true
+            }
+          ]
+        },
+        {
+          "name": "후배 질문",
+          "lines": [
+            {
+              "lineId": "L-D1-7",
+              "answersQuestionId": "Q-0001",
+              "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+              "text": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.",
+              "match": true,
+              "identifying": false
+            }
+          ]
+        }
+      ]
+    }
   }
 }

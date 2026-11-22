@@ -10,7 +10,8 @@
 > 11/16 개정(PRD 4-1): 교환·파견 노트 틀에 `배운점`(인터뷰로만) 추가 → 6칸. `summarizeInterview`가 끝나면 myNote를 서버가 바로 저장(저장은 기본, 공유는 선택). `saveConsent`의 `edits.removed`가 문장 단위 비공개를 뜻함. 공개 초안 문장에 `identifying` 표시 추가. 사람 이름: 추천 선배는 `독일어과 선배 A`, 쪽지 보낸 사람은 `형용사 + 동물`(대화마다 새로) — `previewNickname`·`respondRequest` 신설, `sendMessage`·`getMessages`에 `myNickname`·`role`·`askerInfo` 추가.
 > **11/19 개정 ②(작업 18·22)**: askBoo 응답에 **`status: "official"`**(규정 질문 → 공식 안내 연결) 추가(3·4·6·8장). 닮은 선배 점수는 서버가 Python이므로 `common/score.js`를 없애고 **`functions/score.py`(원우)** 한 벌로 계산한다.
 > **11/19 개정 ③(작업 18)**: askBoo `lines[]`에 **`fallback`**(사후 검증에 걸려 근거 원문을 보여 준 줄) 추가(4장). `noteId`는 `data/notes.json`이 생기기 전까지 프로그램 이름으로 나간다.
-> **11/22 개정(작업 23, 민지 요청)**: `listNotes`·`getNote`에 **`country`**(국제교류 = `programs.json` `세부` 국가, 인턴·비교과 `null`, 카드 띠 「교환학생 · 독일」)와 **`scrapped`**(내가 스크랩했는지) 추가. 새 함수 **`scrapNote(noteId, scrap)`**(켜기·끄기, 멱등) → `getInbox.scraps`가 실제로 채워진다(최근이 위). **[11/22 오후]** `getNote` 배운점 문장에 **`senior`**(「선배 A」, 노트 안에서만 쓰는 글자, 학과 없음 — PRD 9-1), 새 함수 **`saveQuestion(noteId, section)`**(「질문함에 담기」). 바뀐 곳은 **[11/22]** 표시.
+> **11/22 개정(작업 23, 민지 요청)**: `listNotes`·`getNote`에 **`country`**(국제교류 = `programs.json` `세부` 국가, 인턴·비교과 `null`, 카드 띠 「교환학생 · 독일」)와 **`scrapped`**(내가 스크랩했는지) 추가. 새 함수 **`scrapNote(noteId, scrap)`**(켜기·끄기, 멱등) → `getInbox.scraps`가 실제로 채워진다(최근이 위). **[11/22 오후]** `getNote` 배운점 문장에 **`senior`**(「선배 A」, 노트 안에서만 쓰는 글자, 학과 없음 — PRD 9-1), 새 함수 **`saveQuestion(noteId, section)`**(「질문함에 담기」). **[11/22 저녁]** `getInbox.myNotes` 카드 값(`share`·`filled`/`total`·`sharedLines` 등), 새 함수 **`getMyNote(id)`**(내 경험노트 상세), 공유 상태는 셋뿐(「반영 중」 없음). 바뀐 곳은 **[11/22]** 표시.
+> **11/22 개정 ②(작업 21, 미리)**: `interviewNext`가 보고서가 이미 답한 칸은 묻지 않고(빈 칸·오래된 칸만), **깊이 질문**(`depth`, 교환·파견 3개·인턴·비교과 2개)을 묻는다. 묻지 않은 칸은 **`covered`**로 알린다(4장).
 > **11/20 개정(닮은 선배 실제 데이터 기준)**: 시연 인물을 `가상데이터_1000명.xlsx` 실제 값에 맞췄다. 선배2를 H0745 → **H0241**(독일어과 3학년·경영학, 마르부르크 2026-1, 12점 2위)로 바꾸고, 선배1과 후배1의 공통 비교과를 `합격 면접 취업특강(커리어랩)` → **`한국외국어대학교 직무탐색 집중교육`**으로 바꿨다. H0241은 공통 비교과가 없다(12점 = 학과 5 + 이중전공 4 + 단과대 3). 후배1은 현장실습 이수가 없다. 선배1 보고서 학기 2024-1 → 2025-1(1·4·6장 예시 포함).
 
 ## 0. 공통 규칙
@@ -79,6 +80,7 @@ const FN_BASE = "http://localhost:8787";
 | askBoo | 4장의 규정 질문 표현이 있으면 `askBoo.official`, 아니면 질문에 `교환\|파견\|독일\|마르부르크`가 있으면 `askBoo.exchange`, 그 외 `askBoo.hold` |
 | interviewNext | **[11/20]** `program`이 `interviewNext.byProgram`에 있으면(마르부르크 시연 대본) `answers.length`번째 `steps`, 다 쓰면 `done`(steps[0]은 「후배 질문」). 그 밖의 프로그램은 서버(`interview.py`)처럼 `data/programs.json`의 `분야` → `data/frames.json` 노트 틀을 고르고, 아직 답하지 않은 칸을 틀 순서대로(「배운점」은 마지막) `interviewNext.questions[칸]` 문장으로 묻는다(`{p}` = 별칭 첫째 또는 프로그램명). 꼬리 질문·후배 질문은 없다(`pendingQuestions: 0`) |
 | getNote | `getNote[id]`가 있으면 그것, 없으면 `getNote["N-marburg"]` |
+| getMyNote [11/22] | `getMyNote` 하나(M-0001, 일부 공유 예시). 받은 `id`를 그대로 넣어 돌려준다 |
 | checkMessage | 숫자가 8자리 이상 연속(전화·학번)이면 `checkMessage.blocked`, 그 외 `checkMessage.ok` |
 | 나머지 | `m[name]` 그대로 |
 
@@ -138,11 +140,13 @@ docType: `귀국보고서` | `현장실습후기` | `인터뷰`
 { "done": false, "section": "후배 질문", "questionId": "Q-0001", "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
   "question": "후배가 이렇게 물었어요 — \"마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?\" 경험이 있으면 들려주세요.",
   "progress": { "filled": 0, "total": 7 }, "pendingQuestions": 1 }
-{ "done": false, "section": "지원", "question": "마르부르크 파견은 언제부터 준비하셨어요?", "examples": ["출국 3학기 전", "1년 전", "합격 후"], "progress": { "filled": 1, "total": 7 } }
-{ "done": true, "progress": { "filled": 7, "total": 7 } }
+{ "done": false, "section": "팁", "question": "후배들이 마르부르크에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?", "depth": true,
+  "covered": ["지원", "학점", "비용", "생활", "팁"], "progress": { "filled": 1, "total": 7 }, "pendingQuestions": 0 }
+{ "done": false, "section": "학점", "question": "학점 칸은 최근 경험이 없어요. 마르부르크에서 들은 수업과 학점 인정은 어땠어요?", "covered": ["지원", "비용", "생활", "팁"], "progress": { "filled": 1, "total": 7 } }
+{ "done": true, "progress": { "filled": 4, "total": 7 }, "covered": ["지원", "학점", "비용", "생활", "팁"] }
 ```
 `total`은 그 프로그램 종류의 `frames.json` 칸 수(**[11/19] 교환·파견 7**, 인턴 6, 비교과 3). `배운점`은 다른 칸을 묻고 난 뒤 마지막에 묻는다.
-**[11/19] 질문 순서(작업 74)**: ① 서버가 `questions.json`에서 **같은 프로그램**의 `status: "hold"` 질문을 최근순으로 최대 3개 꺼내 먼저 묻는다(`section: "후배 질문"`, `questionId`, `asked` = 후배 질문 원문. 본인이 한 질문·이미 `answered`인 것은 뺀다). 화면은 「경험이 없어요」 버튼을 두고, 누르면 `answers`에 `{questionId, skipped: true}`로 보내 건너뛴다(질문은 `hold` 유지, 다른 선배에게 다시 나온다). ② 그 뒤 근거가 적은 칸 순(기존). 질문함 질문은 `progress.filled`에 세지 않고 `pendingQuestions`로 따로 알린다.
+**[11/19] 질문 순서(작업 74)**: ① 서버가 `questions.json`에서 **같은 프로그램**의 `status: "hold"` 질문을 최근순으로 최대 3개 꺼내 먼저 묻는다(`section: "후배 질문"`, `questionId`, `asked` = 후배 질문 원문. 본인이 한 질문·이미 `answered`인 것은 뺀다). 화면은 「경험이 없어요」 버튼을 두고, 누르면 `answers`에 `{questionId, skipped: true}`로 보내 건너뛴다(질문은 `hold` 유지, 다른 선배에게 다시 나온다). ② **[11/22] 보고서가 이미 답한 칸은 다시 묻지 않는다**: 그 뒤 근거(보고서 + 동의 통과 인터뷰 문장)가 **0건이거나 모두 2년 넘은 칸만** 기본 질문(근거 적은 칸 순, 오래된 칸은 「○○ 칸은 최근 경험이 없어요.」 머리말 — 디자인 규칙 6-2와 같은 기준). ③ **깊이 질문**(`depth: true`, 교환·파견 3개·인턴·비교과 2개): 보고서에 잘 안 쓰는 판단·비교·후회·오해를 묻는 고정 문장(`interview.py` `DEPTH_QUESTIONS`, 종류별 2~3개 중 근거 적은 칸에 담기는 것부터 — AI가 만들지 않음). 답은 그 칸에 담긴다. ④ `배운점` 마지막. 근거가 충분해 묻지 않은 칸은 **`covered`**(칸 이름 목록)로 매 응답에 알린다 — 화면은 진행 칩에서 비어 있지 않게(예: 「보고서로 채워짐」) 보여 주고, `done`이면 「노트 틀을 모두 채웠어요」 대신 답한 칸 기준 문구를 쓴다(민지). 마르부르크(지원15·학점15·비용5·생활20·팁5)는 후배 질문 → 팁(깊이) → 지원(깊이) → 생활(깊이) → 배운점. 꼬리 질문은 각 칸의 첫 답에 그대로 붙는다. 질문함 질문은 `progress.filled`에 세지 않고 `pendingQuestions`로 따로 알린다.
 **[11/19] `examples`(P1-여건, 작업 84)**: `frames.json`의 칸별 `예시`가 있으면 2~3개를 함께 보낸다. 화면은 칩으로 보여 주고 탭하면 입력창에 채운다. 없으면 생략.
 
 ### summarizeInterview(program, transcript)
@@ -308,13 +312,28 @@ payload `{threadId, accept: true|false}` 또는 `{threadId, cancel: true}`.
 
 ### getInbox()
 ```json
-{ "myNotes": [ { "id": "N-marburg", "program": "마르부르크필립스대학교" } ],
+{ "myNotes": [ { "id": "M-0001", "program": "마르부르크필립스대학교", "type": "교환", "noteId": "N-marburg",
+                 "share": "partial", "filled": 4, "total": 7, "sharedLines": 3, "updatedAt": "..." } ],   // [11/22] 최근에 요약한 것이 위
   "questions": [ { "questionId": "Q-0001", "text": "...", "status": "hold", "askedAt": "..." },
                  { "questionId": "Q-0002", "text": "...", "status": "answered", "noteId": "N-marburg", "answeredAt": "..." } ],
   "scraps": [ { "noteId": "N-marburg", "program": "마르부르크필립스대학교" } ],   // [11/22] scrapNote로 켠 노트, 최근이 위
   "alerts": [ { "text": "내 질문에 선배가 답했어요 · 마르부르크필립스대학교 해봤노트", "questionId": "Q-0002", "noteId": "N-marburg", "at": "..." } ] }
 ```
+**[11/22] 내 경험노트 카드(`myNotes`)**: `id`는 내 경험노트 번호(`M-…`), `noteId`는 공유되는 해봤노트 번호. `share` = `private`(나만 보기) | `partial`(일부 공유 — 화면 「N문장 공유」, N = `sharedLines`) | `shared`(해봤노트 공유됨). **「반영 중」 상태는 없다** — `saveConsent`가 그 자리에서 해봤노트에 반영하므로(11/22 미리 결정), 공유 직후 알림은 「해봤노트에 내 이야기가 반영됐어요」(`noteId` 포함). `filled`/`total` = 노트 틀에서 내 문장이 있는 칸 수 / 전체 칸 수(「노트 틀 4/7」). `sharedLines` = 지금 해봤노트에 보이는 내 문장 수(신고로 숨긴 것 제외).
 **[11/19]** 질문 `status`는 `hold`(미답변) | `answered`. 화면은 `answered`에 「선배가 답했어요」 라벨 + 노트 「후배 질문」 칸 링크. (이전 예시의 `waiting`은 쓰지 않는다.)
+
+### getMyNote(id) [11/22]
+내 경험노트 상세(디자인 규칙 8절). **본인 것만**(남의 것·없는 것은 `{"error": "볼 수 없는 기록이에요"}`). AI 없음.
+카드 값(`getInbox.myNotes`와 같음)에 더해, 칸은 노트 틀 순서(빈 칸도 `lines: []`), 문장마다 `text`(내 경험노트 1인칭 문장) · `publicText`(해봤노트용 해요체 문장) · `lineId`(공개 동의 시트의 문장 번호) · `shared`(지금 해봤노트에 보이는지 — 「공유됨」 라벨). 「해봤노트에 공유」/「공유 범위 바꾸기」는 `publicDraft`·`draftId`로 공개 동의 시트를 다시 열고 `saveConsent(draftId, edits)`를 그대로 부른다(다시 부르면 이번 범위로 바뀐다).
+```json
+{ "id": "M-0001", "program": "마르부르크필립스대학교", "type": "교환", "noteId": "N-marburg",
+  "share": "partial", "filled": 4, "total": 7, "sharedLines": 3, "updatedAt": "...", "draftId": "D-0001",
+  "sections": [ { "name": "지원", "lines": [ { "text": "나는 출국 3학기 전부터 TestDaF를 준비했다.",
+                  "publicText": "출국 3학기 전부터 TestDaF를 준비했어요.", "lineId": "L-D1-1", "shared": true } ] },
+                { "name": "학점", "lines": [ { "text": "...", "publicText": "...", "lineId": "L-D1-4", "shared": false } ] },
+                { "name": "비용", "lines": [] } ],
+  "publicDraft": { "sections": [ "...summarizeInterview의 publicDraft 그대로" ] } }
+```
 
 ### reportStatement(lineId, reason)
 payload `{lineId, reason?}`. 신고된 문장은 즉시 숨김, 부서 리포트에 집계.
@@ -341,7 +360,7 @@ login(id, pw) · getMe() · askBoo(question)
 interviewNext(program, answers) · summarizeInterview(program, transcript) · saveConsent(draftId, edits)
 listNotes(filter) · getNote(id) · scrapNote(noteId, scrap = true) · saveQuestion(noteId, section) · reportStatement(lineId, reason)   // scrapNote·saveQuestion [11/22]
 recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept) · cancelRequest(threadId)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85)
-getInbox() · getDeptReport(dept)
+getInbox() · getMyNote(id) · getDeptReport(dept)   // getMyNote [11/22]
 getDepartments() · getAdminOverview(dept, period) · getAdminSuggestions(dept, period) · setSuggestionStatus(id, status)
 getReportSettings(dept) · saveReportSettings(dept, settings) · issueReport(dept, period) · listIssuedReports(dept) · getIssuedReport(reportId)   // 작업 66, PRD 7장
 currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이 성공 시 저장)
