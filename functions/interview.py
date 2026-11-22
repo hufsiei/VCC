@@ -25,6 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 import askboo
+import demand
 import identify
 import store
 from ai import callAI, load_prompt
@@ -295,12 +296,15 @@ def summarizeInterview(me, payload):
     public_draft = identify.mark({"sections": pub_sections})
     my_note = {"sections": my_sections}
     try:
-        my_note_id = save_my_note(me, program, draft_id, my_note, public_draft)
+        my_note_id = save_my_note(me, program, draft_id, my_note, public_draft,
+                                  answered=demand.count_interview_answers(transcript))
         saved = True
     except OSError:
         my_note_id, saved = None, False
+    # [11/22] answered = 유효 답변 수(서로 다른 질문, 10자 이상). need(3) 이상 + 1문장 공유면 선배 추천이 열린다
     return {"draftId": draft_id, "program": program, "saved": saved, "myNoteId": my_note_id,
-            "myNote": my_note, "publicDraft": public_draft}
+            "myNote": my_note, "publicDraft": public_draft,
+            "answered": demand.count_interview_answers(transcript), "need": demand.NEED}
 
 
 def _append(sections, name, lines):

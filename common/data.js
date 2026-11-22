@@ -77,6 +77,95 @@ function mockInterview(m, p) {
   return { done: false, section: next, question: template.replaceAll("{p}", short).replaceAll("{s}", next), progress, pendingQuestions: 0 };
 }
 
+// ── 선배 추천 열림 + 「궁금한 것 정리하기」 mock (functions/demand.py를 흉내 낸다, 11/22) ──
+// mock 기본값은 「열림」(지금 만드는 화면이 갑자기 잠기지 않게). 잠김 화면을 보려면 주소 끝에 ?locked=1.
+// ?locked=1이어도 mock saveDemand·saveConsent를 부르면 이 탭에서는 열린다(sessionStorage "mockUnlocked").
+const NEED = 3;
+const DEMAND = {
+  fields: ["국제교류", "현장실습", "비교과"], unsure: "잘 모르겠어요", notYet: "아직 정하지 않았어요",
+  fieldLabel: { 국제교류: "교환학생", 현장실습: "현장실습", 비교과: "비교과" }, detailLabel: { "1회성": "1회성 특강" },
+  explore: [
+    { label: "외국에서 살아 보기", field: "국제교류" }, { label: "일 경험 해 보기", field: "현장실습" },
+    { label: "진로 찾기", field: "비교과", detail: "진로·취업 교육과정" }, { label: "공부 방법 찾기", field: "비교과", detail: "학습공동체·튜터링·멘토링" },
+  ],
+  when: ["이번 학기", "다음 학기", "1년 뒤", "아직 몰라요"],
+  junk: new Set(["몰라요", "모르겠어요", "잘 모르겠어요", "없어요", "없음", "아무거나", "글쎄요", "그냥요", "딱히요", "ㅇㅇ", "네", "아니요"]),
+  q: {
+    explore: "괜찮아요. 요즘 가장 고민인 게 뭐예요?", field: "어떤 경험이 궁금해요?",
+    detail: { 국제교류: "어느 나라가 궁금해요?", 현장실습: "어떤 곳에서 일해 보고 싶어요?", 비교과: "어떤 종류의 프로그램이 궁금해요?" },
+    program: "궁금한 프로그램을 골라 주세요. 아직 정하지 않았어도 괜찮아요.", section: "그중에서 무엇이 가장 궁금해요?",
+    when: "언제쯤 해 보려고 해요?", situation: "지금 어느 정도 준비됐어요? 선배가 답할 때 참고할 수 있게 지금 상황을 적어 주세요.",
+    question: "{s}에 대해 무엇이 궁금해요? 선배에게 묻고 싶은 것을 한 문장으로 적어 주세요.",
+    hope: "이 경험이 나에게 무엇을 남겨 줬으면 좋겠어요?", more: "더 궁금한 게 있으면 적어 주세요. 없으면 넘어가도 돼요.",
+  },
+  examples: { situation: ["2학년이고 어학 점수를 준비하고 있어요", "아직 아무것도 준비하지 못했어요"], hope: ["외국어로 일상을 꾸려 본 자신감", "진로를 정할 실마리"] },
+};
+const mockReady = () => sessionStorage.getItem("mockUnlocked") === "1" || !new URLSearchParams(location.search).has("locked");
+const mockStatus = () => {
+  const ready = mockReady();
+  return { ready, by: ready ? "ask" : null, need: NEED, talk: { answered: 0, shared: 0 }, ask: ready };
+};
+const LOCKED = () => ({ locked: true, message: "경험을 들려주거나 궁금한 것을 정리하면 선배 추천이 열려요", recommend: mockStatus() });
+
+function answerProblem(text) {
+  const t = String(text || "").trim();
+  if (DEMAND.junk.has(t.replace(/[.!?~ ]+$/, ""))) return "선배가 답할 수 있게 구체적으로 적어 주세요.";
+  if (t.length < 10) return "조금만 더 자세히 적어 주세요(10자 이상).";
+  if (new Set(t.replace(/\s/g, "")).size <= 2) return "선배가 답할 수 있게 구체적으로 적어 주세요.";
+  if (/\d{8,}|\d{2,3}-\d{3,4}-\d{4}/.test(t)) return "연락처는 넣을 수 없어요.";
+  return null;
+}
+const countInterview = (tr) =>
+  new Set((tr || []).filter((a) => a && !a.skipped && !answerProblem(a.answer)).map((a) => `${a.section}|${String(a.question || "").replace(/\s+/g, "")}`)).size;
+
+function mockDemand(m, raw) {
+  const s = { ...(raw || {}) };
+  const programs = m._programs || [];
+  if (s.fromQuestionId && !s._prefilled) { // mock 질문함의 보류 질문 → 마르부르크·생활로 미리 채움
+    const info = programs.find((x) => x["프로그램명"] === "마르부르크필립스대학교") || {};
+    Object.assign(s, { field: info["분야"], detail: info["세부"], program: info["프로그램명"], section: "생활",
+      question: "마르부르크에서 학기 중 현지 인턴을 병행할 수 있어요?", _prefilled: true }, raw);
+  }
+  if (s.field === DEMAND.unsure && s.explore) {
+    const e = DEMAND.explore.find((x) => x.label === s.explore);
+    if (e) Object.assign(s, { field: e.field, explored: true }, e.detail ? { detail: e.detail } : {});
+  }
+  if (s.detail === DEMAND.notYet) s.detail = null;
+  if (s.program === DEMAND.notYet) s.program = null;
+  s.more = (s.more || []).filter((x) => typeof x === "string" && x.trim()).slice(0, 2);
+  if (s.moreDone) s.more = s.more.filter((x) => !answerProblem(x));
+  const valid = ["situation", "question", "hope"].filter((k) => s[k] && !answerProblem(s[k])).length + s.more.filter((x) => !answerProblem(x)).length;
+  const step = (name, extra) => ({ done: false, step: name, state: s, progress: { answered: valid, need: NEED }, ...extra });
+
+  if (s.field === DEMAND.unsure && !s.explored) return step("explore", { question: DEMAND.q.explore, options: DEMAND.explore.map((e) => e.label) });
+  if (!DEMAND.fields.includes(s.field)) return step("field", { question: DEMAND.q.field, options: [...DEMAND.fields, DEMAND.unsure] });
+  if (!("detail" in s)) {
+    const counts = {};
+    for (const x of programs) if (x["분야"] === s.field && x["세부"]) counts[x["세부"]] = (counts[x["세부"]] || 0) + 1;
+    const details = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+    return step("detail", { question: DEMAND.q.detail[s.field],
+      options: [...details.map((d) => ({ value: d, label: DEMAND.detailLabel[d] || d })), { value: null, label: DEMAND.notYet }] });
+  }
+  if (!("program" in s)) {
+    const list = programs.filter((x) => x["분야"] === s.field && (s.detail == null || x["세부"] === s.detail)).map((x) => x["프로그램명"]).sort();
+    return step("program", { question: DEMAND.q.program, options: [...list, DEMAND.notYet] });
+  }
+  const info = programs.find((x) => x["프로그램명"] === s.program) || { 분야: s.field };
+  const frame = (m._frames || {})[KIND_BY_FIELD[info["분야"]] || "교환"] || { 칸: [] };
+  const sections = frame["칸"].filter((x) => x !== QUESTION_SECTION);
+  if (!sections.includes(s.section)) return step("section", { question: DEMAND.q.section, options: sections });
+  if (!DEMAND.when.includes(s.when)) return step("when", { question: DEMAND.q.when, options: DEMAND.when });
+  for (const k of ["situation", "question", "hope"]) {
+    const bad = s[k] ? answerProblem(s[k]) : null;
+    if (!s[k] || bad) return step(k, { question: DEMAND.q[k].replace("{s}", s.section), examples: DEMAND.examples[k] || [], ...(bad ? { retry: bad } : {}) });
+  }
+  const badMore = s.more.find((x) => answerProblem(x));
+  if (!s.moreDone && (s.more.length < 2 || badMore)) return step("more", { question: DEMAND.q.more, canSkip: true, ...(badMore ? { retry: answerProblem(badMore) } : {}) });
+  const label = DEMAND.fieldLabel[s.field] + (s.detail ? `·${DEMAND.detailLabel[s.detail] || s.detail}` : "");
+  return { done: true, state: s, progress: { answered: valid, need: NEED },
+    summary: { interest: label, program: s.program, section: s.section, when: s.when, situation: s.situation, questions: [s.question, ...s.more], hope: s.hope } };
+}
+
 // 입력에 따라 다른 mock을 고르는 곳은 여기 한 곳입니다 (명세 3장).
 function pickMock(m, name, p) {
   switch (name) {
@@ -101,6 +190,31 @@ function pickMock(m, name, p) {
       return m.saveQuestion; // mock은 기억하지 않는다(내 보관함 질문함 목록은 고정값)
     case "checkMessage":
       return /\d{8,}/.test(p.text || "") ? m.checkMessage.blocked : m.checkMessage.ok;
+    // ── 선배 추천 열림(11/22) ──
+    case "getMe":
+      return { ...m.getMe, recommend: mockStatus() };
+    case "recommendSeniors":
+    case "previewNickname":
+      return mockReady() ? m[name] : LOCKED();
+    case "sendMessage":
+      return mockReady() ? m.sendMessage : { ok: false, reason: "잠김", message: LOCKED().message, recommend: mockStatus() };
+    case "summarizeInterview":
+      return { ...m.summarizeInterview, program: p.program || m.summarizeInterview.program, answered: countInterview(p.transcript), need: NEED };
+    case "saveConsent": {
+      const before = mockReady();
+      sessionStorage.setItem("mockUnlocked", "1"); // mock은 답변 수를 기억하지 않으므로 공유하면 열린다고 본다
+      return { ...m.saveConsent, recommend: mockStatus(), unlocked: !before };
+    }
+    case "demandNext":
+      return mockDemand(m, p.state);
+    case "saveDemand": {
+      if (!p.consent) return { error: "선배와 부서에 전하는 데 동의해 주세요" };
+      const next = mockDemand(m, p.state);
+      if (!next.done) return { ok: false, message: "아직 정리가 끝나지 않았어요", next };
+      const before = mockReady();
+      sessionStorage.setItem("mockUnlocked", "1");
+      return { ok: true, demandId: "R-0001", questionIds: [p.state && p.state.fromQuestionId ? p.state.fromQuestionId : "Q-0003"], recommend: mockStatus(), unlocked: !before };
+    }
     case "getAdminOverview":
     case "getAdminSuggestions":
     case "getReportSettings":
@@ -185,6 +299,14 @@ export const cancelRequest = (threadId) => call("respondRequest", { threadId, ca
 export const getInbox = () => call("getInbox");
 // 내 경험노트 상세(본인만) → { id, program, type, noteId, share, filled, total, sharedLines, draftId, sections[{name, lines[{text, publicText, lineId, shared}]}], publicDraft } (spec 4장)
 export const getMyNote = (id) => call("getMyNote", { id });
+// ── 선배 추천 열림(11/22, spec 4장) ──
+// 열림 여부는 getMe().recommend = { ready, by: "talk"|"ask"|null, need: 3, talk: {answered, shared}, ask }.
+// 잠겼을 때 recommendSeniors·previewNickname은 { locked: true, message, recommend }, sendMessage(새 요청)는 { ok: false, reason: "잠김", message }.
+// 「궁금한 것 정리하기」(수요 인터뷰): state를 들고 다니며 demandNext를 부르고, done이면 동의 후 saveDemand.
+//   demandNext(state) → { done:false, step, question, options?, examples?, retry?, canSkip?, progress:{answered, need}, state } | { done:true, summary, state, progress }
+//   물어보기에서 보류된 질문으로 시작: demandNext({ fromQuestionId: questionId })
+export const demandNext = (state = {}) => call("demandNext", { state });
+export const saveDemand = (state) => call("saveDemand", { state, consent: true }); // → { ok, demandId, questionIds, recommend, unlocked }
 export const getDeptReport = (dept) => call("getDeptReport", { dept });
 
 // ── 관리자 콘솔(직원 계정 전용, PRD 7장·작업 66) ──

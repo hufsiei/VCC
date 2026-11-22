@@ -39,6 +39,19 @@ def thread(me, tid):
     return next((t for t in getMessages(me, {})["threads"] if t["threadId"] == tid), None)
 
 
+def unlock(*ids):
+    """선배 추천 열림(demand.py) — 수요 인터뷰를 마친 것처럼 기록만 넣는다(열림 규칙 자체는 test_demand.py)."""
+    store.load("demands", []).extend({"id": f"R-{h}", "owner": h} for h in ids)
+
+
+# ── 0. [11/22] 경험 나눔·수요 제공 전에는 추천·새 쪽지 요청이 잠김 ──────────
+r = recommendSeniors(JUNIOR, {"noteId": MARBURG})
+expect("잠김: 추천 목록 없이 locked + 안내", r.get("locked") is True and "seniors" not in r and r["recommend"]["ready"] is False)
+expect("잠김: 닉네임 미리보기도 막힘", rf.previewNickname(JUNIOR, {"to": SENIOR1}).get("locked") is True)
+s = sendMessage(JUNIOR, {"to": SENIOR1, "text": HELLO})
+expect("잠김: 새 쪽지 요청은 reason 잠김", s.get("ok") is False and s.get("reason") == "잠김")
+unlock(JUNIOR)
+
 # ── 1. 닮은선배: 처음 3명 → 더 보기 → 바닥 ─────────────────────────────
 r = recommendSeniors(JUNIOR, {"noteId": MARBURG})
 ids = [s["studentId"] for s in r["seniors"]]
@@ -113,6 +126,7 @@ expect("남이 수락·거절 못 함", "error" in respondRequest(JUNIOR, {"thre
 # ── 6. 받는 선배 5건 한도 → requestsFull ────────────────────────────────
 juniors = ["H0001", "H0002", "H0003", "H0004", "H0005", "H0006"]
 juniors = [h for h in juniors if h in rf.score._data()[0]][:6]
+unlock(*juniors)
 for j in juniors[:5]:
     sendMessage(j, {"to": SENIOR2, "text": HELLO})
 s = sendMessage(juniors[5], {"to": SENIOR2, "text": HELLO})
