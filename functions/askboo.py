@@ -224,6 +224,11 @@ def askBoo(me, payload, save=True):
     if not programs:
         return _hold(me, question, None, None, save, why="프로그램 없음")
 
+    # ①‴ [11/24] 보고서(교환·파견)에 없는 주제는 고르기 전에 보류 — 질문정리가 칸을 못 정했고 주제어 정규식도 없으면
+    #   (낱말이 겹친다고 답이 되는 건 아님: 「기차 여행」이 「공항에서 기차로」 문장을 받는 것을 막는다. 현장실습 후기는 칸 없는 자유 서술이라 제외)
+    if plan and plan["의도"] == "경험질문" and plan["칸"] is None and not has_topic(question)             and all(PROGRAMS.get(p, {}).get("분야") == "국제교류" for p in programs):
+        return _hold(me, question, programs[0], None, save, why="질문정리: 보고서 칸에 없는 주제")
+
     # ①″ [11/23] 사람을 찾는 질문이나 나라만 말한 질문인데 주제어가 없으면 → 해봤노트 카드로 안내(AI 없음)
     if not plan and not has_topic(question) and (PERSON_RE.search(question) or country):
         found = _notes(programs, country)

@@ -85,6 +85,13 @@ res, calls = run("마르부르크 기숙사 월세 얼마였어요?", [],
                  plan={"의도": "규정", "분야": None, "나라": None, "프로그램후보": [PROGRAM], "제외": [], "칸": None, "정리된질문": "x"})
 expect("질문정리가 규정이라고 하면 official", res["status"] == "official")
 
+res, calls = run("마르부르크 주변에서 스키 타기 좋아요?", [],
+                 plan={"의도": "경험질문", "분야": "국제교류", "나라": None, "프로그램후보": [PROGRAM], "제외": [], "칸": None, "정리된질문": "마르부르크 주변에서 스키 타기 좋아요?"})
+expect("보고서에 없는 주제(칸 null·주제어 없음) → 고르기 전에 보류", res["status"] == "hold" and [c[0] for c in calls] == ["질문정리"] and "칸에 없는" in res["_why"], res)
+res, calls = run("마르부르크 기숙사 신청 언제 했어요?", [],
+                 plan={"의도": "경험질문", "분야": "국제교류", "나라": None, "프로그램후보": [PROGRAM], "제외": [], "칸": None, "정리된질문": "x"}, answer=None)
+expect("칸 null이어도 주제어(기숙사)가 있으면 v1 주제어 경로로 답", res["status"] == "ok", res.get("status"))
+
 # ── ② 답쓰기 + 검증 ────────────────────────────────────────────────────
 def first_cands():
     cands, _, _ = askboo.extract("마르부르크 기숙사 어땠어요?", [PROGRAM])
