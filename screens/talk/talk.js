@@ -331,11 +331,14 @@ function renderAnswer(res, question) {
     // 답이 아니므로 근거 블록은 두지 않는다.
     const { msg, body } = booMessage({ wide: true });
     const cards = (res.notes || []).filter((n) => n && n.noteId);
-    // 카드가 없을 때(notes가 비었거나 없음) 「골라 보세요」라고 하지 않는다
-    const fallback = cards.length ? "궁금한 해봤노트를 골라 보세요." : "지금은 보여 드릴 해봤노트가 없어요. 궁금한 내용을 물어보셔도 돼요.";
+    // 현장실습을 나라로 물으면 카드 대신 기관 유형(kinds) — spec 4장 [v2] notes
+    const kinds = (Array.isArray(res.kinds) ? res.kinds : []).filter((k) => typeof k === "string" && k.trim());
+    // 고를 것(카드·유형)이 없을 때 「골라 보세요」라고 하지 않는다
+    const fallback = cards.length || kinds.length ? "궁금한 해봤노트를 골라 보세요." : "지금은 보여 드릴 해봤노트가 없어요. 궁금한 내용을 물어보셔도 돼요.";
     appendAll(body,
       el("p", { className: "msg__bubble", text: res.message || fallback }),
       cards.length ? el("div", { className: "note-links" }, cards.map(noteLinkCard)) : null,
+      kinds.length ? kindChips(kinds) : null,
       res.suggestSenior !== false
         ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } })
         : null,
@@ -387,9 +390,32 @@ function noteLinkCard(n) {
     band,
     el("a", { className: "note-card__body", attrs: { href: noteHref(n.noteId) } }, [
       el("span", { className: "note-card__title", text: n.program || "–" }),
+      // 커버 한 줄(oneLine) — 해봤노트 목록 카드와 같은 부품, 최대 2줄. 없으면 줄을 뺀다
+      n.oneLine ? el("span", { className: "note-card__summary", text: n.oneLine }) : null,
       el("span", { className: "note-card__meta", text: `근거 ${count}건` }),
     ]),
   ]);
+}
+
+// 기관 유형 칩: 누르면 「{유형} 인턴 어디 있어요?」로 BOO에게 바로 다시 묻는다(11/23 민지 결정, PR #168).
+// 한 번 고르면 같은 줄의 칩은 끈다(들려주기 예시답 칩과 같은 모양 .chip-row).
+function kindChips(kinds) {
+  const row = el("div", { className: "chip-row" });
+  for (const kind of kinds) {
+    row.append(el("button", {
+      className: "btn btn--secondary",
+      text: kind,
+      attrs: { type: "button" },
+      on: {
+        click: () => {
+          if (ask.busy) return;
+          for (const b of row.querySelectorAll("button")) b.disabled = true;
+          sendQuestion(`${kind} 인턴 어디 있어요?`);
+        },
+      },
+    }));
+  }
+  return row;
 }
 
 // 화면 안 오류(6-5): 오류 라벨 + 문구 + 다시 시도(외곽선)
