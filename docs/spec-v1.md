@@ -447,7 +447,7 @@ payload `{threadId, reason?, block?}`. 쪽지 대화 ⋮ 메뉴의 신고·차�
 화면(민지): 질문 상세에서만, 하단 Text 「질문 고치기」「질문 삭제」. 삭제는 확인 대화상자(디자인 규칙 5-10), 고치기는 입력창 + Secondary 「저장」 / Text 「취소」(공개 동의 시트 「문장 고치기」와 같은 모양). 목록 카드에는 두지 않는다.
 
 ### saveInterviewDraft(program, answers) · getInterviewDraft(program) [v2, P1-여건 79]
-들려주기 미완성 초안. 답할 때마다 `saveInterviewDraft(program, answers)`(answers는 interviewNext payload와 같은 모양), 들어올 때 `getInterviewDraft(program)` → `{answers, savedAt}` 또는 `{answers: []}`. 사람·프로그램별 하나, `runtime/interviewDrafts.json`. **7일** 지나면 없는 것으로 보고, `summarizeInterview`가 끝나면 지운다(0장 보관기간). 마스킹 전 원문이므로 본인만(`owner == me`). AI 없음.
+들려주기 미완성 초안. 답할 때마다 `saveInterviewDraft(program, answers)`(answers는 interviewNext payload와 같은 모양), 들어올 때 `getInterviewDraft(program)` → `{answers, savedAt}` 또는 `{answers: []}`. 사람·프로그램별 하나, `runtime/interviewDrafts.json`. **7일** 지나면 없는 것으로 보고, `summarizeInterview`가 끝나면 지운다(0장 보관기간). 마스킹 전 원문이므로 본인만(`owner == me`). AI 없음. 빈 `answers`로 저장하면 초안을 지운다(`savedAt: null`). 답은 30개·한 답 1000자까지 남기고, 읽거나 쓸 때 7일 지난 초안을 모두 지운다(스케줄러 없음).
 - **1단계(즉시, 서버 없음)**: 화면이 들려주기·물어보기 대화를 `sessionStorage`에 프로그램별로 저장·복원한다(탭마다 따로 — 두 창 시연). 돌아오면 BOO가 「아까 이야기를 이어서 할게요」 + 마지막 질문을 다시 보인다. 물어보기 저장분은 askBoo `history`로도 쓴다.
 - **2단계(작업 79)**: 위 두 함수. 다른 기기·다음 날에도 이어 쓴다.
 ```json

@@ -221,6 +221,17 @@ function pickMock(m, name, p) {
       return { ok: true, noteId: p.noteId, scrapped: p.scrap !== false }; // mock은 기억하지 않는다(목록·노트의 scrapped는 고정값)
     case "getMyNote":
       return { ...m.getMyNote, id: p.id || m.getMyNote.id }; // mock 경험노트는 하나뿐(M-0001)
+    case "saveInterviewDraft": { // [v2 작업 79] 이 탭에서만 기억(sessionStorage mockDraft:<program>)
+      if (!p.program) return { error: "들려줄 경험을 먼저 골라 주세요" };
+      const key = `mockDraft:${p.program}`;
+      if (!(p.answers || []).length) { sessionStorage.removeItem(key); return { ok: true, savedAt: null, expiresAt: null }; }
+      const at = new Date();
+      sessionStorage.setItem(key, JSON.stringify({ answers: p.answers, savedAt: at.toISOString() }));
+      return { ok: true, savedAt: at.toISOString(), expiresAt: new Date(at.getTime() + 7 * 864e5).toISOString() };
+    }
+    case "getInterviewDraft": {
+      try { return JSON.parse(sessionStorage.getItem(`mockDraft:${p.program}`)) || { answers: [] }; } catch { return { answers: [] }; }
+    }
     case "deleteQuestion":
     case "updateQuestion": { // [v2 작업 91] mock은 기억하지 않는다. answered·official 질문이면 서버와 같은 error
       const verb = name === "deleteQuestion" ? "지울" : "고칠";
@@ -264,6 +275,7 @@ function pickMock(m, name, p) {
       return mockReady() ? m.sendMessage : { ok: false, reason: "잠김", message: LOCKED().message, recommend: mockStatus() };
     case "summarizeInterview": {
       const out = { ...m.summarizeInterview, program: p.program || m.summarizeInterview.program, answered: countInterview(p.transcript), need: NEED };
+      sessionStorage.removeItem(`mockDraft:${p.program}`); // [작업 79] 요약하면 미완성 초안을 지운다(서버와 같게)
       return p.append === true ? mockAppend(m, out) : out;
     }
     case "saveConsent": {
@@ -379,6 +391,11 @@ export const getInbox = () => call("getInbox");
 //   deleteQuestion → { ok, questionId, status: "deleted" } (목록에서 빠짐) · updateQuestion → { ok, questionId, text, editedAt } | { error, reason? }
 export const deleteQuestion = (questionId) => call("deleteQuestion", { questionId });
 export const updateQuestion = (questionId, text) => call("updateQuestion", { questionId, text });
+// [v2 작업 79] 들려주기 미완성 초안(다른 기기·다음 날에도 이어 쓰기). answers = interviewNext에 보내는 것과 같은 모양
+//   답할 때마다 saveInterviewDraft → { ok, savedAt, expiresAt }(빈 answers면 지움) · 들어올 때 getInterviewDraft → { answers, savedAt } | { answers: [] }
+//   본인만, 7일 지나면 없음, summarizeInterview가 끝나면 서버가 지운다
+export const saveInterviewDraft = (program, answers) => call("saveInterviewDraft", { program, answers });
+export const getInterviewDraft = (program) => call("getInterviewDraft", { program });
 // [11/23] 닮은선배 추천받기 켜기·끄기(기본 켬, getMe().recommendable). 끄면 추천 후보와 새 쪽지 요청에서 빠지고, 수락한 대화는 이어진다
 export const setRecommendable = (on) => call("setRecommendable", { on });
 // 내 경험노트 상세(본인만) → { id, program, type, noteId, share, filled, total, sharedLines, draftId, sections[{name, lines[{text, publicText, lineId, shared}]}], publicDraft } (spec 4장)
