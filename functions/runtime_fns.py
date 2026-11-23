@@ -223,6 +223,9 @@ def sendMessage(me, p):
         if t and t["status"] == "blocked":               # 누가 차단했든 그 두 사람 사이는 막힌다(11/23)
             return {"ok": False, "reason": "차단", "message": BLOCKED_MESSAGE}
 
+        if t is None or t["status"] in ("cancelled", "expired"):   # 새 요청·다시 요청
+            if not recommendable(to):                    # [11/23] 추천받기를 끈 선배에게는 새 요청을 보내지 않는다
+                return {"ok": False, "reason": "추천 제외", "message": OPT_OUT_MESSAGE}
         if t is None:                                   # 첫 메시지 = 쪽지 요청
             lk = demand.locked(me)
             if lk:
@@ -381,6 +384,30 @@ def note_version(nid):
     return store.load("noteVersions", {}).get(nid, 0)
 
 
+# ---------- [11/23] 닮은선배 추천받기 끄기 ----------
+# 경험자는 기본으로 추천 후보다. 선배가 끄면 recommendSeniors 후보와 새 쪽지 요청에서 빠진다.
+# 이미 수락한 대화는 그대로 이어진다. 귀국보고서·후기 문장은 해봤노트 근거로 계속 쓰인다(학교 제출 자료, 쪽지와는 다른 동의).
+OPT_OUT_MESSAGE = "이 선배는 지금 쪽지 요청을 받지 않아요."
+
+
+def recommendable(who):
+    return who not in store.load("recommendOptOut", {})
+
+
+def setRecommendable(me, p):
+    on = p.get("on")
+    if not isinstance(on, bool):
+        return {"error": "켜기·끄기를 골라 주세요"}
+    with store.lock():
+        off = store.load("recommendOptOut", {})
+        if on:
+            off.pop(me, None)
+        else:
+            off.setdefault(me, {"at": now()})
+        store.save("recommendOptOut")
+    return {"ok": True, "recommendable": on}
+
+
 def recommendSeniors(me, p):
     """처음 3명, more면 3명씩 더해 최대 9명. 목록은 shownSeniors.json에 노트 버전과 함께 보관하고
     노트 버전이 바뀌었을 때(saveConsent)만 다시 계산한다. 학기·프로필 변경 재계산은 P1(아직 없음)."""
@@ -398,7 +425,8 @@ def recommendSeniors(me, p):
         for t in _threads().values():
             if t["status"] == "waiting":
                 waiting[t["senior"]] = waiting.get(t["senior"], 0) + 1
-        ranked = score.rank_seniors(me, program, waiting=waiting)
+        ranked = [r for r in score.rank_seniors(me, program, waiting=waiting)
+                  if recommendable(r["studentId"])]          # [11/23] 추천받기를 끈 선배는 후보에서 뺀다
         by_id = {r["studentId"]: r for r in ranked}
         cap = min(MAX_SHOWN, len(ranked))
 
@@ -634,6 +662,7 @@ ROUTES = {
     "respondRequest": respondRequest,
     "reportThread": reportThread,           # [11/23] 쪽지 신고·차단 (AI 없음)
     "recommendSeniors": recommendSeniors,   # AI 없음 → 호출 한도와 무관(작업 85)
+    "setRecommendable": setRecommendable,   # [11/23] 닮은선배 추천받기 켜기·끄기 (AI 없음)
     "saveConsent": saveConsent,
     "getMyNote": getMyNote,   # [11/22] 내 경험노트 상세
     "reportStatement": reportStatement,

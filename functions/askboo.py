@@ -28,6 +28,13 @@ MAX_LINES = 3        # 답변 문장 수 상한 (spec 8장: 출처 달린 문장
 MAX_CANDIDATES = 30  # 고르기에 넣는 문장 수 상한 (최근 학기 순)
 
 HOLD_MESSAGE = "이 부분은 아직 경험한 선배가 없어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?"
+# [11/23] 보류 이유별 문구 — 노트가 있는데 「경험한 선배가 없어요」라고 하지 않는다(미리 실사용)
+HOLD_NO_PROGRAM = "질문에 맞는 해봤노트를 찾지 못했어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?"
+HOLD_NO_TOPIC = "{program} 해봤노트에는 아직 이 내용이 없어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?"
+MAX_NOTES = 5        # status "notes"로 보여 주는 노트 카드 수 상한
+
+# [11/23] 사람을 찾는 질문(「네덜란드 교환 다녀온 선배?」) — 주제어가 없으면 답 대신 해봤노트 카드로 안내한다
+PERSON_RE = re.compile(r"(다녀온|갔다\s*온|가\s*본|해\s*본|경험한|다녀오신|해보신)\s*(선배|사람|분)|선배\s*(있|계|없|\?|$)")
 
 # ── ①′ 규정 질문 (spec 4장 [11/19] 판별 표현 그대로) ────────────────────
 OFFICIAL_RE = re.compile(r"평점|장학금|몇\s*학점|선발\s*(인원|기준)|휴학|등록금|초과학기|인정\s*신청|인정받을 수")
@@ -38,6 +45,7 @@ TOPICS_EXCHANGE = [
     (r"입학\s*허가|지원\s*서류|서류|지원하려면|지원\s*방법|원서", ["1-1", "1-3"]),
     (r"비자|보험|항공|비행기", ["1-2"]),
     (r"출국\s*전|준비물|챙겨\s*가|챙길|짐", ["1-3"]),
+    (r"준비", ["1-1", "1-3"]),   # [11/23] 「가려면 뭘 준비해요?」 — 지원 서류·출국 전 준비
     (r"공항|교통편|어떻게\s*가", ["2-1"]),
     (r"수강\s*신청|시간표", ["2-2"]),
     (r"수업|강의|어학|과제|세미나", ["2-3"]),
@@ -74,6 +82,11 @@ for _e in _json("evidence.json", []):
 for _rows in EVIDENCE.values():
     _rows.sort(key=lambda e: (e.get("학년도", 0), e.get("학기", 0)), reverse=True)   # 최근 학기 먼저
 INTERN_KEYWORDS = _json("intern-keywords.json", {})   # 작업 81(원우). 없으면 빈 사전
+# [11/23] 나라 이름 → 그 나라 국제교류 프로그램(programs.json 세부). 프로그램명 대조가 실패했을 때만 쓴다
+COUNTRIES = {}
+for _name, _p in PROGRAMS.items():
+    if _p.get("분야") == "국제교류" and _p.get("세부"):
+        COUNTRIES.setdefault(_p["세부"], []).append(_name)
 
 
 def _norm(s):
@@ -118,6 +131,9 @@ def askBoo(me, payload, save=True):
         return {"error": "질문은 300자 안으로 적어 주세요"}
 
     programs = match_programs(question)
+    country = None
+    if not programs:                       # [11/23] 프로그램명이 없으면 나라 이름으로(근거 많은 순)
+        country, programs = match_country(question)
 
     # ①′ 규정 질문 → 공식 안내
     if OFFICIAL_RE.search(question):
@@ -126,6 +142,12 @@ def askBoo(me, payload, save=True):
     # ① 프로그램이 없으면 보류
     if not programs:
         return _hold(me, question, None, None, save, why="프로그램 없음")
+
+    # ①″ [11/23] 사람을 찾는 질문이나 나라만 말한 질문인데 주제어가 없으면 → 해봤노트 카드로 안내(AI 없음)
+    if not has_topic(question) and (PERSON_RE.search(question) or country):
+        found = _notes(programs, country)
+        if found:
+            return found
 
     # ② 근거 추출
     cands, section, why = extract(question, programs)
@@ -185,6 +207,46 @@ def match_programs(question):
         names = [names] if isinstance(names, str) else list(names)
         found += [n for n in names if n in PROGRAMS and n not in found]
     return found[:3]
+
+
+SCHOOL_NAME = re.compile(r"\S(?:대학교|대학|대)(?:\s|에서|에|은|는|이|가|을|를|의|로|$)|university", re.I)
+
+
+def match_country(question):
+    """[11/23] 돌려주는 값: (나라, 그 나라 프로그램 중 근거가 있는 것 — 근거 많은 순). 못 찾으면 (None, []).
+    「독일어」「일본어」처럼 언어 이름은 나라로 보지 않는다(독일어과 학생의 비교과 질문이 독일 교환으로 가지 않게).
+    질문에 학교 이름(…대학교·…대학)이 있는데 ①에서 못 찾았으면 목록에 없는 학교이므로 나라로 넘기지 않는다
+    (함정 53 「남스웨덴공과대학교」 → 스웨덴의 다른 학교로 답하면 안 됨, 보류)."""
+    if SCHOOL_NAME.search(question):
+        return None, []
+    for c in sorted(COUNTRIES, key=len, reverse=True):
+        if re.search(re.escape(c) + r"(?!어)", question):
+            names = [n for n in COUNTRIES[c] if evidence_count(n)]
+            return c, sorted(names, key=evidence_count, reverse=True)
+    return None, []
+
+
+def evidence_count(name):
+    """노트 커버의 evidenceCount와 같은 셈: 보고서 문단 + 동의 통과 인터뷰 문장(spec 5장)."""
+    return len(EVIDENCE.get(name, [])) + len(notes.interview_lines(name))
+
+
+def has_topic(question):
+    return any(re.search(pattern, question) for pattern, _ in TOPICS_EXCHANGE)
+
+
+def _notes(programs, country):
+    """status "notes": 답을 만들지 않고 해봤노트 카드로 안내한다(질문함에 저장하지 않음 — 답할 질문이 아니라 길 안내)."""
+    cards = [{"noteId": notes.note_id(n), "program": n, "country": PROGRAMS.get(n, {}).get("세부") if
+              PROGRAMS.get(n, {}).get("분야") == "국제교류" else None, "evidenceCount": evidence_count(n)}
+             for n in programs if evidence_count(n)][:MAX_NOTES]
+    if not cards:
+        return None
+    if len(cards) == 1:
+        message = f"{cards[0]['program']} 해봤노트에서 선배들의 경험을 볼 수 있어요. 궁금한 내용을 물어보셔도 돼요."
+    else:
+        message = f"{country or '관련'} 해봤노트가 {len(cards)}개 있어요. 궁금한 노트를 골라 보세요."
+    return {"status": "notes", "lines": [], "sources": {}, "notes": cards, "suggestSenior": True, "message": message}
 
 
 # ── ② 근거 추출 ───────────────────────────────────────────────────────
@@ -356,7 +418,15 @@ def _official(me, question, programs, save):
 
 def _hold(me, question, program, section, save, why=""):
     qid = _save(me, question, program, section, "hold", save)
-    out = {"status": "hold", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": True, "message": HOLD_MESSAGE}
+    if not program:
+        message = HOLD_NO_PROGRAM
+    elif evidence_count(program):     # 노트는 있는데 이 내용만 없다 → 그 노트로 갈 수 있게 noteId도 준다
+        message = HOLD_NO_TOPIC.format(program=program)
+    else:
+        message = HOLD_MESSAGE
+    out = {"status": "hold", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": True, "message": message}
+    if program and evidence_count(program):
+        out["noteId"] = notes.note_id(program)
     if not save:
         out["_why"] = why   # 평가 스크립트에서만 보이는 보류 이유
     return out

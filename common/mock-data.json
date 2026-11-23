@@ -85,7 +85,8 @@
       }
     ],
     "귀국보고서": [],
-    "현장실습후기": []
+    "현장실습후기": [],
+    "recommendable": true
   },
   "askBoo": {
     "exchange": {
@@ -126,6 +127,21 @@
       },
       "noteId": "N-marburg",
       "suggestSenior": false
+    },
+    "notes": {
+      "status": "notes",
+      "lines": [],
+      "sources": {},
+      "notes": [
+        {
+          "noteId": "N-marburg",
+          "program": "마르부르크필립스대학교",
+          "country": "독일",
+          "evidenceCount": 8
+        }
+      ],
+      "suggestSenior": true,
+      "message": "마르부르크필립스대학교 해봤노트에서 선배들의 경험을 볼 수 있어요. 궁금한 내용을 물어보셔도 돼요."
     },
     "hold": {
       "status": "hold",
@@ -2313,5 +2329,9 @@
         }
       ]
     }
+  },
+  "setRecommendable": {
+    "ok": true,
+    "recommendable": false
   }
 }
