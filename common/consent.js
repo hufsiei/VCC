@@ -310,11 +310,12 @@ function renderScope() {
   scopeBox.replaceChildren(
     el("div", { className: "consent-scope__col" }, [
       el("h3", { className: "consent-scope__title", text: "공개되는 것" }),
-      el("ul", {}, [item("check", `켠 문장 ${on}개`), item("check", "전공"), item("check", "이수 학기")]),
+      // 출처는 연도만 보인다(PRD 9-1·spec 0장 [11/19]). 학과·학기는 소수 학과에서 사람을 특정하게 하므로 공개하지 않는다(11/23)
+      el("ul", {}, [item("check", `켠 문장 ${on}개`), item("check", "이수 연도")]),
     ]),
     el("div", { className: "consent-scope__col" }, [
       el("h3", { className: "consent-scope__title", text: "공개되지 않는 것" }),
-      el("ul", {}, [item("lock", "이름"), item("lock", "학번"), item("lock", "대화 원문"), item("lock", `끈 문장 ${off}개`)]),
+      el("ul", {}, [item("lock", "이름"), item("lock", "학번"), item("lock", "전공"), item("lock", "이수 학기"), item("lock", "대화 원문"), item("lock", `끈 문장 ${off}개`)]),
     ]),
   );
 }
