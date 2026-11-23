@@ -1,6 +1,6 @@
 # test_note_summary.py — getNote 칸별 요약 문단 summary·newLines (작업 78, spec 4장 getNote [v2])
 # 실행: cd functions && python test_note_summary.py
-# notes.json에 summary가 아직 없으므로 메모리의 마르부르크 노트에 summary를 넣어 시험한다. AI 없음.
+# notes.json의 summary(#188 사전 생성)를 메모리에서 먼저 지우고, 마르부르크 노트에 가짜 summary를 넣어 시험한다. AI 없음.
 # 기록은 임시 폴더에 쓴다(data/runtime을 건드리지 않음). 하나라도 틀리면 종료코드 1.
 import json
 import sys
@@ -30,6 +30,8 @@ NID, PROGRAM, ME = "N-marburg", "마르부르크필립스대학교", "H0143"
 base = notes.NOTES[NID]
 cost_ids = [ln["sourceId"] for ln in sec(base, "비용")["lines"]]
 life_ids = [ln["sourceId"] for ln in sec(base, "생활")["lines"]]
+for s in base["sections"]:   # #188 사전 생성 summary는 빼고 아래 가짜 값만으로 시험
+    s.pop("summary", None)
 sec(base, "비용")["summary"] = [
     {"text": "한 달 생활비는 110만~140만 원 사이였어요.", "sources": cost_ids[:2], "years": [2025, 2026]},
     {"text": "정착 초기 비용은 따로 들어요.", "sources": cost_ids[2:3], "years": [2026]}]
