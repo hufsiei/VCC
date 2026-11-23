@@ -214,6 +214,11 @@ payload `{draftId, edits:{removed:[lineId], changed:[{lineId, text}]}, consent:t
 { "ok": true, "noteId": "N-marburg", "added": 2,
   "rejected": [{ "lineId": "L3", "reason": "연락처", "message": "해봤노트에는 연락처·메일·링크·주소를 넣을 수 없어요." }] }
 ```
+**[11/23 고치기]** 공개 동의 시트의 「문장 고치기」(`common/consent.js`)가 `changed`를 보낸다. 서버 규칙:
+- 앞뒤 공백을 지운다. 빈 문장은 고침으로 보지 않는다(원래 문장 그대로 — 공개하지 않으려면 `removed`). **300자**를 넘으면 그 문장만 `rejected`(`reason: "길이"`).
+- 검사를 통과한 고친 문장은 해봤노트(`noteLines.json`)뿐 아니라 **내 경험노트의 공개 초안**(`myNotes[…].publicDraft`)에도 남긴다: `text` = 고친 문장, `edited: true`, `aiText` = 처음 AI가 만든 문장(처음 고칠 때 한 번만), `match`는 지운다(선배가 직접 쓴 문장은 원문 일치 검사 대상이 아님), `identifying`은 다시 검사한 값. 그래서 `getMyNote`의 `publicText`·`publicDraft`에 고친 문장이 나오고, 「공유 범위 바꾸기」로 다시 공유해도 AI 문장으로 돌아가지 않는다. 거절된 문장은 공개 초안을 바꾸지 않는다.
+- **내 경험노트 문장(`myNote`)은 바꾸지 않는다.** 두 노트는 읽는 사람이 달라(본인 / 처음 보는 후배) 표현이 다를 수 있으므로 따로 고친다(내 경험노트 고치기는 `updateMyNote`, 예정).
+- 화면: 문장 아래 Text 버튼 「문장 고치기」 → 입력창(라벨 「해봤노트에 보일 문장」, 안내 「내 경험노트 문장은 그대로예요. 연락처·메일·링크는 넣을 수 없어요.」) + Secondary 「저장」 / Text 「취소」. 고친 문장(이번에 고친 것·`edited: true`)에는 중립 라벨 「내가 고친 문장」, 「원문과 다를 수 있어요」는 붙이지 않는다. 고치는 중에는 「동의하고 공유」 비활성 + 「고치는 중인 문장을 저장하거나 취소해 주세요」.
 
 ### listNotes(filter)
 payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"}}`
