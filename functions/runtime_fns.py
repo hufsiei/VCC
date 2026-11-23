@@ -753,10 +753,61 @@ def getInbox(me, p):
                       "status": q["status"] if q["status"] in ("answered", "official") else "hold",
                       **({"noteId": q["noteId"]} if q.get("noteId") else {}),
                       **({"answeredAt": q["answeredAt"]} if q.get("answeredAt") else {})}
-                     for q in store.load("questions", []) if q["colreg_no"] == me]
+                     for q in store.load("questions", []) if q["colreg_no"] == me
+                     and q.get("status") != "deleted"]   # [v2 작업 91] 지운 질문은 목록에 없다(행은 통계용으로 남음)
         questions.sort(key=lambda q: (q["status"] != "answered", q["askedAt"]))   # 답변 도착이 맨 위
         alerts = sorted(store.load("alerts", {}).get(me, []), key=lambda a: a["at"], reverse=True)
     return {"myNotes": my_notes, "questions": questions, "scraps": notes.inbox_scraps(me), "alerts": alerts}
+
+
+# ---------- 내 질문 지우기·고치기 [v2 작업 91, spec 4장 deleteQuestion·updateQuestion] ----------
+# 본인 질문이고 hold일 때만. 지우기는 소프트 삭제(status "deleted" — 콘솔 통계에만 남고 interviewNext·getInbox·
+# 콘솔 제안의 미답변에서는 빠진다). 선배가 답하는 도중 지워지면 publish_lines가 칸 문장으로만 싣는다(알림 없음).
+# 고치기는 check_public_text(선배 화면에 그대로 나감) + 300자. 프로그램·칸은 바꾸지 않는다. AI 없음.
+MAX_QUESTION_CHARS = 300
+QUESTION_LOCKED = {"answered": "선배가 답한 질문은 {verb} 수 없어요", "official": "공식 안내 질문은 {verb} 수 없어요"}
+
+
+def _my_hold_question(me, qid, verb):
+    """(질문 행, None) 또는 (None, 오류 응답). store.lock() 안에서 부른다."""
+    q = next((x for x in store.load("questions", []) if x.get("id") == qid), None) if qid else None
+    if not q or q.get("colreg_no") != me or q.get("status") == "deleted":
+        return None, {"error": "볼 수 없는 기록이에요"}
+    if q.get("status") in QUESTION_LOCKED:
+        return None, {"error": QUESTION_LOCKED[q["status"]].format(verb=verb)}
+    if q.get("status") != "hold":
+        return None, {"error": "볼 수 없는 기록이에요"}
+    return q, None
+
+
+def deleteQuestion(me, p):
+    with store.lock():
+        q, err = _my_hold_question(me, (p.get("questionId") or "").strip(), "지울")
+        if err:
+            return err
+        q.update(status="deleted", deletedAt=now())
+        store.save("questions")
+        return {"ok": True, "questionId": q["id"], "status": "deleted"}
+
+
+def updateQuestion(me, p):
+    text = " ".join(str(p.get("text") or "").split())   # 앞뒤 공백·줄바꿈 정리
+    if not text:
+        return {"error": "질문을 적어 주세요"}
+    if len(text) > MAX_QUESTION_CHARS:
+        return {"error": f"질문은 {MAX_QUESTION_CHARS}자까지 쓸 수 있어요"}
+    chk = check_public_text(text)
+    if not chk["ok"]:
+        reason = chk["reasons"][0]
+        msg = "질문에 연락처·메일·링크를 넣을 수 없어요" if reason == "연락처" else chk["message"]
+        return {"error": msg, "reason": reason}
+    with store.lock():
+        q, err = _my_hold_question(me, (p.get("questionId") or "").strip(), "고칠")
+        if err:
+            return err
+        q.update(질문=text, editedAt=now())
+        store.save("questions")
+        return {"ok": True, "questionId": q["id"], "text": text, "editedAt": q["editedAt"]}
 
 
 ROUTES = {
@@ -773,6 +824,8 @@ ROUTES = {
     "updateMyNote": updateMyNote,   # [11/23] 내 경험노트 문장 고치기 (AI 없음)
     "reportStatement": reportStatement,
     "getInbox": getInbox,
+    "deleteQuestion": deleteQuestion,   # [v2 작업 91]
+    "updateQuestion": updateQuestion,
     **demand.ROUTES,     # [11/22] demandNext·saveDemand (궁금한 것 정리하기, AI 없음)
     **notes.ROUTES,      # getNote·listNotes (AI 없음, 작업 26·74)
 }
