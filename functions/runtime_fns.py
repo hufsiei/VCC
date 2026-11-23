@@ -267,7 +267,9 @@ def sendMessage(me, p):
 
 
 def getMessages(me, p):
-    """내 대화 목록. 부르면 안 읽은 메시지를 읽음으로 바꾼다(unread는 이번 응답에만 보임)."""
+    """내 대화 목록. [11/23] 목록만 볼 때(닮은선배 버튼 상태·내 쪽지 목록)는 읽음으로 바꾸지 않는다.
+    payload {read: threadId}면 그 대화만 읽음으로 바꾼다(대화창을 열 때). unread는 읽음 처리 전 수."""
+    read = p.get("read")
     with store.lock():
         out = []
         threads = _threads()
@@ -297,7 +299,8 @@ def getMessages(me, p):
                 item["declined"] = True
             if t["status"] == "blocked":
                 item["blockedByMe"] = t.get("blockedBy") == me
-            t["lastRead"][me] = now()
+            if read and tid == read:
+                t["lastRead"][me] = now()
             out.append(item)
         store.save("messages")
         return {"threads": out, "waitingCount": _waiting(asker=me), "waitingLimit": WAIT_LIMIT}

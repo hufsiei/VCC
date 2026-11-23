@@ -123,6 +123,21 @@ expect("수락하면 선배가 답장 가능", sendMessage(SENIOR1, {"to": JUNIO
 expect("보낸 사람은 수락 요청을 취소 못 함", respondRequest(JUNIOR, {"threadId": tid1, "cancel": True})["reason"] == "상태")
 expect("남이 수락·거절 못 함", "error" in respondRequest(JUNIOR, {"threadId": tid1, "accept": True}))
 
+# ── 5-1. [11/23] 목록만 보면 읽음으로 바꾸지 않음 · {read: threadId}면 그 대화만 ──
+later(0.01)   # 시계가 멈춰 있으면 보낸 시각 = 읽은 시각이라 조금 옮긴다
+getMessages(JUNIOR, {"read": tid1})
+later(0.01)
+sendMessage(SENIOR1, {"to": JUNIOR, "text": "궁금한 것 물어보세요."})
+expect("선배 답장 → 안 읽음 1", thread(JUNIOR, tid1)["unread"] == 1)
+expect("목록을 다시 봐도 안 읽음 그대로(닮은선배 버튼 상태용 호출)", thread(JUNIOR, tid1)["unread"] == 1)
+other_tid = next(t["threadId"] for t in getMessages(JUNIOR, {})["threads"] if t["threadId"] != tid1)
+getMessages(JUNIOR, {"read": other_tid})
+expect("다른 대화를 읽어도 이 대화는 안 읽음", thread(JUNIOR, tid1)["unread"] == 1)
+opened = next(t for t in getMessages(JUNIOR, {"read": tid1})["threads"] if t["threadId"] == tid1)
+expect("대화를 여는 응답은 읽기 전 수", opened["unread"] == 1)
+expect("연 뒤 목록에서는 0", thread(JUNIOR, tid1)["unread"] == 0)
+expect("선배 쪽 읽음은 그대로(본인 것만 바뀜)", thread(SENIOR1, tid1)["unread"] == 0)
+
 # ── 6. 받는 선배 5건 한도 → requestsFull ────────────────────────────────
 juniors = ["H0001", "H0002", "H0003", "H0004", "H0005", "H0006"]
 juniors = [h for h in juniors if h in rf.score._data()[0]][:6]

@@ -312,7 +312,8 @@ export const recommendSeniors = (noteId, more) => call("recommendSeniors", more 
 export const checkMessage = (text) => call("checkMessage", { text });
 export const previewNickname = (to) => call("previewNickname", { to });
 export const sendMessage = (to, text) => call("sendMessage", { to, text });
-export const getMessages = () => call("getMessages");
+// [11/23] 그냥 부르면 목록만(읽음으로 바꾸지 않음). 대화창을 열 때는 getMessages(threadId) → 그 대화만 읽음
+export const getMessages = (read) => call("getMessages", read ? { read } : {});
 export const respondRequest = (threadId, accept) => call("respondRequest", { threadId, accept });
 // 보낸 사람이 수락 대기(waiting) 요청을 거둔다 → status "cancelled". 서버 함수는 respondRequest 하나(spec 4장)
 export const cancelRequest = (threadId) => call("respondRequest", { threadId, cancel: true });
