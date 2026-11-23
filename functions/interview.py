@@ -536,8 +536,11 @@ def group_answers(me, program, transcript):
         if key not in by_key:
             keys.append(key)
             by_key[key] = {"section": section, "questionId": qid,
-                           "asked": a.get("asked", "") if is_junior(a) else a.get("question", ""), "answers": []}
+                           "asked": a.get("asked", "") if is_junior(a) else a.get("question", ""),
+                           "answers": [], "questions": []}
         by_key[key]["answers"].append(a["answer"])
+        q = a.get("asked") if is_junior(a) else _unwrap(a.get("question"))
+        by_key[key]["questions"].append((q or "").strip())
     keys.sort(key=lambda k: order.index(k[0]) if k[0] in order else len(order))   # 안정 정렬: 칸 안에서는 들어온 순서
     groups = [by_key[k] for k in keys]
     for g in groups:
@@ -545,23 +548,35 @@ def group_answers(me, program, transcript):
     return groups
 
 
+def _qa_text(g):
+    """[작업 21] 요약 입력: 질문·답 쌍을 차례로. 「네, 그랬어요」 같은 답도 질문이 있어야 뜻이 통한다."""
+    qs = g.get("questions") or [""] * len(g.get("answers", []))
+    return "\n".join((f"질문: {q}\n" if q else "") + f"답: {a}" for q, a in zip(qs, g.get("answers", [])))
+
+
 def summarize_group(g):
-    """돌려주는 값: [{"text", "fallback"?}] — 검증을 통과한 해요체 문장, 없으면 답 원문 문장."""
-    r = _call("요약", f"칸: {g['section']}\n답: {g['source']}\n출력:")
+    """돌려주는 값: [{"text", "fallback"?}] — 검증을 통과한 해요체 문장, 없으면 답 원문 문장.
+    [작업 21] AI에 질문도 함께 넘기고, 원문 대조(outside_source)도 질문+답 기준. 정보 없는 짧은 문장은 AI 문장도 뺀다."""
+    if "answers" not in g:   # 옛 호출(source만): 답 하나로 본다
+        g = {**g, "answers": [g["source"]], "questions": []}
+    context = " ".join(q for q in g.get("questions", []) if q) + " " + g["source"]
+    r = _call("요약", f"칸: {g['section']}\n{_qa_text(g)}\n출력:")
     j = r.get("json")
     lines = []
     if r["ok"] and isinstance(j, dict) and isinstance(j.get("문장"), list):
         for s in j["문장"][:3]:
-            if isinstance(s, str) and s.strip() and not outside_source(s.strip(), g["source"]):
-                lines.append({"text": s.strip()})
+            s = s.strip() if isinstance(s, str) else ""
+            if s and not too_thin(s) and not outside_source(s, context):
+                lines.append({"text": s})
     if lines:
         return lines
     src = [askboo.clean_source(s) for s in askboo.split_sentences(g["source"])]
     return [{"text": s, "fallback": True} for s in src if s and not too_thin(s)][:3]
 
 
-# 요약이 실패해 원문을 그대로 쓸 때, 정보가 없는 짧은 답(「생각보다 많이 들었어요.」)은 해봤노트에 올리지 않는다
+# 정보가 없는 짧은 문장(「생각보다 많이 들었어요.」)은 해봤노트에 올리지 않는다
 # (원우 11/22 제보 → 미리 결정: 빼기). 숫자가 있으면 짧아도 정보로 본다(「비자는 2주 걸렸어요.」).
+# [작업 21] 원문 fallback뿐 아니라 AI 요약 문장에도 쓴다(질문 맥락 없이 답만 옮긴 문장 거르기).
 MIN_FALLBACK_CHARS = 12
 
 

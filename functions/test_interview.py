@@ -189,6 +189,34 @@ expect("fallback: 긴 답은 남긴다", not interview.too_thin("기숙사는 �
 g_short = {"section": "팁", "source": "생각보다 많이 들었어요. 월세는 450유로였어요."}
 expect("fallback 묶음에서 짧은 답만 빠짐",
        [ln["text"] for ln in interview.summarize_group(g_short)] == ["월세는 450유로였어요."])
+
+# 5-1) [작업 21] 요약에 질문 맥락: 질문이 AI에 가고, 질문에 있는 낱말은 원문으로 치고, AI 문장도 too_thin
+SEEN = []
+def ai_with(sentences):
+    def call(작업명, messages, system=None):
+        SEEN.append(messages[-1]["content"])
+        import json
+        text = json.dumps({"문장": sentences}, ensure_ascii=False)
+        return {"ok": True, "text": text, "json": {"문장": sentences}, "model": "fake"}
+    return call
+g_qa = interview.group_answers(SENIOR, PROGRAM, [
+    {"section": "지원", "question": "TOEFL 점수는 몇 점이었어요?", "answer": "90점이었어요."},
+    {"section": "지원", "question": "준비는 어땠어요?", "answer": "생각보다 오래 걸렸어요."}])
+expect("묶음에 질문도 담김", g_qa[0]["questions"] == ["TOEFL 점수는 몇 점이었어요?", "준비는 어땠어요?"])
+interview.callAI = ai_with(["TOEFL은 90점이었어요.", "오래 걸렸어요.", "TOEFL 준비는 생각보다 오래 걸렸어요."])
+SEEN.clear()
+got = [ln["text"] for ln in interview.summarize_group(g_qa[0])]
+expect("요약 입력에 질문·답 쌍", "질문: TOEFL 점수는 몇 점이었어요?\n답: 90점이었어요." in SEEN[0]
+       and "질문: 준비는 어땠어요?\n답: 생각보다 오래 걸렸어요." in SEEN[0])
+expect("질문에 있는 영문(TOEFL)은 원문 밖이 아님", "TOEFL은 90점이었어요." in got)
+expect("AI 문장도 정보 없는 짧은 문장은 뺌", "오래 걸렸어요." not in got and len(got) == 2)
+interview.callAI = ai_with(["IELTS는 7점이었어요."])
+expect("질문·답 어디에도 없는 영문은 여전히 막힘(fallback)",
+       [ln.get("fallback") for ln in interview.summarize_group(g_qa[0])] == [True])
+interview.callAI = ai_with(["월세는 450유로였어요."])
+expect("옛 호출(source만)도 됨", [ln["text"] for ln in interview.summarize_group(g_short)] == ["월세는 450유로였어요."])
+interview.callAI = lambda *a, **k: {"ok": False, "text": "", "json": None, "model": "fake", "error": "x"}
+
 s4 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers[:2]})
 expect("판정 실패면 다음 칸으로", not s4.get("followUp") and s4.get("section"))
 expect("빈 transcript는 오류", "error" in interview.summarizeInterview(SENIOR, {"program": PROGRAM, "transcript": []}))
