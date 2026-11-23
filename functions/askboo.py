@@ -166,14 +166,19 @@ def match_programs(question):
     if found:
         return found
     # 작업 81: 인턴 사전 data/intern-keywords.json
-    #   {"문맥": [...], "약칭": {키워드: [업체명...]}, "직군": {...}, "기관유형": {...}}
+    #   {"문맥": [...], "약칭제외": [...], "약칭": {키워드: [업체명...]}, "직군": {...}, "기관유형": {...}}
     # 원본 규칙은 tools/build_intern_keywords.py의 match()(원우) — 바꾸면 두 곳을 같이 바꾼다.
-    #   ① 질문에 인턴 문맥 말(인턴·현장실습 등)이 있을 때만 사전을 본다
+    #   ① [11/23] "약칭"(KOTRA·코트라 → 권역 3곳)은 문맥 말 없이도 본다.
+    #      단 질문에 "약칭제외" 말(목록에 없는 권역·탐방)이 있으면 약칭은 보지 않는다(함정 33 「아시아 권역」은 보류).
+    #      "직군"·"기관유형"은 질문에 인턴 문맥 말(인턴·현장실습 등)이 있을 때만 본다
     #   ② 겹치는 키워드는 긴 것만 남기고, 긴 키워드의 업체부터 담는다
     kw = INTERN_KEYWORDS if isinstance(INTERN_KEYWORDS, dict) else {}
-    if not any(_norm(c) and _norm(c) in q for c in kw.get("문맥", [])):
-        return []
-    hits = [(_norm(w), names) for g in ("약칭", "직군", "기관유형")
+    groups = []
+    if not any(_norm(b) and _norm(b) in q for b in kw.get("약칭제외", [])):
+        groups.append("약칭")
+    if any(_norm(c) and _norm(c) in q for c in kw.get("문맥", [])):
+        groups += ["직군", "기관유형"]
+    hits = [(_norm(w), names) for g in groups
             for w, names in (kw.get(g) or {}).items() if _norm(w) and _norm(w) in q]
     hits = [(t, names) for t, names in hits if not any(t != t2 and t in t2 for t2, _ in hits)]
     for t, names in sorted(hits, key=lambda h: -len(h[0])):
