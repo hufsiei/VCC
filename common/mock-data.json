@@ -183,6 +183,14 @@
       "suggestSenior": true,
       "message": "이 부분은 아직 경험한 선배가 없어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?"
     },
+    "holdSaved": {
+      "status": "hold",
+      "lines": [],
+      "sources": {},
+      "questionId": "Q-0001",
+      "suggestSenior": true,
+      "message": "질문함에 담아 두었어요. 선배가 답하면 알려 드릴게요."
+    },
     "official": {
       "status": "official",
       "lines": [],
