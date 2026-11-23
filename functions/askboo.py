@@ -311,6 +311,8 @@ def _call(작업명, content):
 
 # Max tokens 30에서 목록이 잘린 경우: '{"관련":[1,2,3' 처럼 정해진 모양의 앞부분만 있을 때
 _TRUNCATED_PICK = re.compile(r'^\s*\{\s*"관련"\s*:\s*\[\s*(\d+(?:\s*,\s*\d+)*)\s*,?\s*$')
+# [11/23] HCX가 빈 목록에서 닫는 괄호만 빠뜨린 경우: '{"관련":[]' — 형식 오류가 아니라 「고른 근거 없음」
+_EMPTY_PICK = re.compile(r'^\s*\{\s*"관련"\s*:\s*\[\s*\]\s*\}?\s*$')
 
 
 def pick(question, cands):
@@ -321,6 +323,8 @@ def pick(question, cands):
     j = r.get("json")
     if isinstance(j, dict) and isinstance(j.get("관련"), list):
         chosen = j["관련"]
+    elif _EMPTY_PICK.match(r["text"] or ""):
+        chosen = []
     else:
         m = _TRUNCATED_PICK.match(r["text"])
         if not m:
