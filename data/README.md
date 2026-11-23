@@ -141,7 +141,7 @@
 | 로그인 정보 | 화면이 `sessionStorage`의 `"me"`에 저장한다. 함수는 따로 받지 않는다 |
 | docType | `귀국보고서` · `현장실습후기` · `인터뷰` |
 
-## 함수 15개 (+ 11/22 추가 5개)
+## 함수 15개 (+ 11/22 추가 5개, 11/23 추가 1개)
 
 | 함수 | 보내는 값 |
 |---|---|
@@ -161,6 +161,7 @@
 | sendMessage(to, text) | `{to, text}` (to는 상대 studentId) |
 | getMessages() | 없음 |
 | respondRequest(threadId, accept) | `{threadId, accept}` (받은 선배의 수락·거절) |
+| reportThread(threadId, reason, block) [11/23] | `{threadId, reason?, block?}` (쪽지 대화 ⋮ 메뉴의 신고·차단, reason은 신고 사유 최대 100자) |
 | getInbox() | 없음 |
 | getMyNote(id) [11/22] | `{id}` (내 경험노트 상세, 본인 것만) |
 | demandNext(state) [11/22] | `{state}` (「궁금한 것 정리하기」 다음 단계, AI 없음) |
@@ -292,6 +293,7 @@
 | threadId | 글자 | 대화 번호. 첫 메시지는 쪽지 신청이 된다 |
 | myNickname | 글자 | 이 대화에서 선배에게 보이는 내 이름(형용사 + 동물, 대화마다 새로) |
 | at | 글자 | 보낸 시각 |
+| reason / message | 글자 | 실패일 때만. `연락처`·`학번`·`비방`(검사) · `한도`·`선배한도` · `잠김` · **[11/23] `차단`**(차단된 대화 — 누가 차단했든 양쪽 모두, 「더 이어 갈 수 없는 대화예요」) |
 
 ### previewNickname
 
@@ -308,10 +310,24 @@
 | threads[].nickname | 글자 | 상대 이름. asker에게는 `독일어과 선배 A`, senior에게는 `용감한 수달` |
 | threads[].myNickname | 글자 | asker일 때 선배에게 보이는 내 이름 |
 | threads[].askerInfo.학년 / 관심 | 숫자 · 목록 | senior에게만. 보낸 사람의 학년과 관심 경험(학과 없음) |
-| threads[].accepted | 참/거짓 | 상대가 수락했는지 |
+| threads[].status | 글자 | `waiting` · `accepted` · `declined` · `cancelled` · `expired` · **[11/23] `blocked`** |
+| threads[].accepted | 참/거짓 | 상대가 수락했는지(옛 필드, 새 화면은 `status`) |
+| threads[].blockedByMe [11/23] | 참/거짓 | `blocked`일 때 내가 차단했는지. 화면은 차단한 쪽 「차단한 대화예요」, 당한 쪽 「더 이어 갈 수 없는 대화예요」 |
 | threads[].unread | 숫자 | 안 읽은 메시지 수 |
 | threads[].messages[].from | 글자 | `me` 또는 `them` |
 | threads[].messages[].text / at | 글자 | 내용, 시각 |
+
+### reportThread [11/23]
+
+| 필드 | 형식 | 뜻 |
+|---|---|---|
+| ok | 참/거짓 | 처리 여부 |
+| reported | 참/거짓 | `reason`이 있어 신고를 남겼는지(`threadReports.json`). 신고만 하면 대화는 이어진다 |
+| blocked | 참/거짓 | `block: true`로 차단했는지. 상대에게 알리지 않는다 |
+| status | 글자 | 처리 뒤 대화 상태(차단이면 `blocked`) |
+| error | 글자 | `reason`·`block` 둘 다 없으면 「신고 사유를 골라 주세요」, 그 대화의 사람이 아니면 「볼 수 없는 기록이에요」 |
+
+차단 풀기는 P1. 자세한 규칙은 `docs/spec-v1.md` 4장 reportThread 절.
 
 ### getInbox
 
