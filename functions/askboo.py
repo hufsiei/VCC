@@ -193,9 +193,12 @@ def askBoo(me, payload, save=True):
     plan = clarify(question, history)
     effective = question
     if plan:
-        if plan["의도"] == "규정":
-            return _official(me, question, programs, save)
+        # 질문정리가 「규정」이라 해도 정규식(①′)에 안 걸리면 공식 안내로 보내지 않는다 — 규정 판별은 정규식만(보수 규칙).
+        # 11/24 개발 32번 「하이델베르크대학교 파견 서류 뭐 내요?」(기대 보류)가 official로 바뀌어 되돌림. 경험질문으로 이어 간다.
         effective = plan["정리된질문"] or question
+        # 질문정리가 프로그램 이름을 댔는데 하나도 대조되지 않으면(목록에 없는 학교·권역) 답하지 않고 보류 — 지어낸 이름 방지
+        if plan["후보원문"] and not plan["프로그램후보"] and not programs:
+            return _hold(me, question, None, None, save, why="프로그램 없음(정리 후보 대조 실패)")
         # 프로그램: 정리 결과(대조 통과분)가 있으면 그것, 없으면 정규식 결과. 「제외」는 뺀다
         if plan["프로그램후보"]:
             programs, country = plan["프로그램후보"], None
@@ -306,11 +309,16 @@ def clarify(question, history):
     if not isinstance(j, dict) or j.get("의도") not in INTENTS:
         return None
 
+    raw_names = [s for s in (j.get("프로그램후보") if isinstance(j.get("프로그램후보"), list) else []) if isinstance(s, str) and s.strip()]
+    kw = INTERN_KEYWORDS if isinstance(INTERN_KEYWORDS, dict) else {}
+    # 「아시아 권역」처럼 목록에 없는 권역·탐방 말이 질문에 있으면 약칭(KOTRA → 권역 3곳)으로 넓히지 않는다(함정 33, match_programs와 같은 규칙)
+    allow_abbr = not any(_norm(b) and _norm(b) in _norm(question) for b in kw.get("약칭제외", []))
+
     def names(key):
         found = []
         for s in j.get(key) if isinstance(j.get(key), list) else []:
             if isinstance(s, str):
-                for n in match_programs(s) or ([s] if s in PROGRAMS else []):
+                for n in match_programs(s, allow_abbr=allow_abbr) or ([s] if s in PROGRAMS else []):
                     if n not in found:
                         found.append(n)
         return found[:3]
@@ -320,7 +328,7 @@ def clarify(question, history):
     asked = j.get("정리된질문") if isinstance(j.get("정리된질문"), str) else ""
     asked = asked.strip()[:300] or question
     return {"의도": j["의도"], "분야": j.get("분야") if j.get("분야") in FIELDS else None, "나라": country,
-            "프로그램후보": names("프로그램후보"), "제외": names("제외"), "칸": section, "정리된질문": asked}
+            "프로그램후보": names("프로그램후보"), "후보원문": raw_names, "제외": names("제외"), "칸": section, "정리된질문": asked}
 
 
 ALL_SECTIONS = {s for f in notes.FRAMES.values() for s in f.get("칸", [])} | set(SECTION_BY_ITEM.values())
@@ -375,7 +383,8 @@ def _explore(plan, programs, country):
 
 
 # ── ① 프로그램 대조 ───────────────────────────────────────────────────
-def match_programs(question):
+def match_programs(question, allow_abbr=True):
+    """allow_abbr=False면 인턴 사전의 약칭(KOTRA → 권역 3곳)으로 넓히지 않는다([v2] clarify가 질문의 약칭제외 문맥을 넘길 때)."""
     q = _norm(question)
     hits = [(t, name) for t, name, is_alias in _TERMS if t in q and (not is_alias or _alias_ok(t, q))]
     keep = [(t, name) for t, name in hits if not any(t != t2 and t in t2 for t2, _ in hits)]
@@ -391,7 +400,7 @@ def match_programs(question):
     #   ② 겹치는 키워드는 긴 것만 남기고, 긴 키워드의 업체부터 담는다
     kw = INTERN_KEYWORDS if isinstance(INTERN_KEYWORDS, dict) else {}
     groups = []
-    if not any(_norm(b) and _norm(b) in q for b in kw.get("약칭제외", [])):
+    if allow_abbr and not any(_norm(b) and _norm(b) in q for b in kw.get("약칭제외", [])):
         groups.append("약칭")
     if any(_norm(c) and _norm(c) in q for c in kw.get("문맥", [])):
         groups += ["직군", "기관유형"]
