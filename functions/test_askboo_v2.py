@@ -42,7 +42,7 @@ def make_fake(plan=None, answer=None, match=True, pick=(1, 2)):
             return ok({"관련": list(pick)})
         if 작업명 == "답쓰기":
             return ok(answer) if answer is not None else FAIL
-        if 작업명 == "일치검사":
+        if 작업명 == "답검사":
             return ok({"일치": match})
         if 작업명 == "변환":
             src = re.search(r"근거: (.*)\n출력", messages[-1]["content"], re.S).group(1)
@@ -108,12 +108,12 @@ expect("답쓰기 ok + cites", res["status"] == "ok" and len(res["lines"]) == 1 
 expect("근거 번호 없는·근거 밖 숫자·고유명사·반말 문장은 버림", all("9999" not in l["text"] and "괴테" not in l["text"] for l in res["lines"]) and len(res["lines"]) == 1)
 expect("sources는 인용한 것만", set(res["sources"]) == set(res["lines"][0]["cites"]))
 expect("singleSenior 계산", isinstance(res["singleSenior"], bool))
-expect("호출 순서: 질문정리 → 고르기 → 답쓰기 → 일치검사", [c[0] for c in calls] == ["질문정리", "고르기", "답쓰기", "일치검사"], [c[0] for c in calls])
+expect("호출 순서: 질문정리 → 고르기 → 답쓰기 → 답검사", [c[0] for c in calls] == ["질문정리", "고르기", "답쓰기", "답검사"], [c[0] for c in calls])
 expect("답쓰기 입력에 번호·출처·선배 표시", "[1] 결과보고서" in calls[2][1] and "선배A" in calls[2][1])
 expect("질문정리 입력에 이전 대화 없음 표시", "(없음)" in calls[0][1])
 
 res, calls = run("마르부르크 기숙사 어땠어요?", [], plan=plan_q, answer=answer, match=False)
-expect("일치검사가 거짓이면 다 버려져 v1 원문 인용 폴백", res["status"] == "ok" and all(l.get("cites") == [l["sourceId"]] for l in res["lines"]) and "A1" not in res["lines"][0]["lineId"], res.get("lines"))
+expect("답검사가 거짓이면 다 버려져 v1 원문 인용 폴백", res["status"] == "ok" and all(l.get("cites") == [l["sourceId"]] for l in res["lines"]) and "A1" not in res["lines"][0]["lineId"], res.get("lines"))
 
 res, calls = run("마르부르크 기숙사 어땠어요?", [], plan=plan_q, answer=None)
 expect("답쓰기 실패 → 폴백(원문 인용), 줄 수 ≤ 3", res["status"] == "ok" and 1 <= len(res["lines"]) <= 3)

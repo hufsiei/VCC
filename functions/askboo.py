@@ -8,7 +8,7 @@
 #   ②  코드: 의도별 분기 — 대화 → status "chat"(고정 문구 + 칩, AI 없음, 질문함 저장 없음) / 탐색·사람찾기 → "notes" /
 #        규정 → "official" / 경험질문 → 아래 ③. 「제외」 프로그램은 후보에서 뺀다.
 #   ⑤  AI(답쓰기, Sonnet): 정리된 질문 + 고른 문장(번호·출처·연도·선배 표시) → {"답":[{"text","근거":[번호]}]} 2~4문장.
-#   ⑥  코드 + AI(일치검사, Opus): 문장마다 인용한 근거 원문과 대조(숫자·영문·고유명사·수량 + 일치검사). 근거 번호 없는 문장·
+#   ⑥  코드 + AI(답검사, Opus): 문장마다 인용한 근거 원문과 대조(숫자·영문·고유명사·수량 + 답검사 — 전하는 말투 허용). 근거 번호 없는 문장·
 #        걸린 문장은 버린다. 다 버려지면 v1 방식(고른 문장 원문 인용, fallback)으로 돌려준다 → v1의 답이 최악의 경우.
 #   응답: lines[].cites(인용 sourceId), singleSenior(근거가 한 사람뿐), 새 status "chat"(message·chips), notes에 oneLine·kinds.
 #
@@ -337,6 +337,9 @@ def _chat(plan, history):
     elif last and last["status"] == "hold":
         message = "아직 그 내용을 들려준 선배가 없어서 질문함에 담아 두었어요. 선배가 답하면 알림으로 알려 드릴게요."
         chips.append({"label": "닮은선배 보기", "action": "ask", "payload": {}})
+    elif last and last["status"] == "notes":
+        message = "방금 보여 드린 노트 목록이 맞지 않았나요? 궁금한 프로그램 이름이나 주제(기숙사·비용·업무 등)를 적어 주시면 그 노트로 답해 드릴게요."
+        chips.append({"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field}})
     else:
         message = "무엇이 궁금한지 조금 더 구체적으로 물어봐 주세요. 예: 「마르부르크 기숙사 어땠어요?」"
         chips.append({"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field}})
@@ -597,19 +600,16 @@ def _single_senior(source_ids):
     return len({_person_of(s) for s in source_ids}) <= 1
 
 
-def _call_plain(작업명, content):
-    system, shots = load_prompt(작업명)   # docs/prompts/일치검사.txt (인터뷰와 같은 프롬프트)
-    return callAI(작업명, shots + [{"role": "user", "content": content}], system=system)
-
-
 def verify_facts(sentence, source):
-    """답쓰기 문장용 검증: 숫자·영문·고유명사·수량만 본다(「새 낱말」·길이는 바꿔 쓰기를 허용하므로 일치검사가 대신 본다)."""
+    """답쓰기 문장용 검증: 숫자·영문·고유명사·수량만 본다(「새 낱말」·길이는 바꿔 쓰기를 허용하므로 답검사가 대신 본다)."""
     return [p for p in verify(sentence, source) if not p.startswith(("새 낱말", "원문보다"))]
 
 
 def match_check(source, sentence):
+    """AI(답검사, Opus): 답 문장이 인용 근거 원문과 맞는지. 인터뷰 일치검사와 달리 BOO가 전하는 말투(「~라는 선배도 있었어요」)는 일치.
+    호출 실패·형식 오류는 불일치로 본다(문장을 버림 → 다 버려지면 원문 인용 폴백)."""
     try:
-        r = _call_plain("일치검사", f"원문: {source}\n요약: {sentence}\n출력:")
+        r = _call("답검사", f"원문: {source}\n답: {sentence}\n출력:")
     except Exception:
         return False
     j = r.get("json")
@@ -633,7 +633,7 @@ def compose(question, picked):
     answers = j.get("답") if isinstance(j, dict) else None
     if not isinstance(answers, list):
         return None
-    lines, sources, used = [], {}, set()
+    todo = []   # (문장, 인용 근거) — 코드 검증을 통과한 것만 일치검사로
     for a in answers:
         if not isinstance(a, dict) or not isinstance(a.get("text"), str):
             continue
@@ -649,8 +649,19 @@ def compose(question, picked):
         if not text or not nums or not POLITE_END.search(text):   # 근거 번호 없는 문장·반말은 버린다
             continue
         cited = [picked[n - 1] for n in nums]
-        source = " ".join(c["text"] for c in cited)
-        if verify_facts(text, source) or not match_check(source, text):
+        if verify_facts(text, " ".join(c["text"] for c in cited)):
+            continue
+        todo.append((text, cited))
+        if len(todo) >= MAX_ANSWER_LINES:
+            break
+    if not todo:
+        return None
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(MAX_ANSWER_LINES) as pool:   # 일치검사는 문장별로 동시에(인터뷰 요약과 같은 방식)
+        matched = list(pool.map(lambda tc: match_check(" ".join(c["text"] for c in tc[1]), tc[0]), todo))
+    lines, sources, used = [], {}, set()
+    for (text, cited), ok in zip(todo, matched):
+        if not ok:
             continue
         cites = []
         for c in cited:
@@ -659,8 +670,6 @@ def compose(question, picked):
             sources[c["sourceId"]] = {"docType": c["docType"], "program": c["program"], "semester": c["semester"]}
         lines.append({"text": text, "sourceId": cites[0], "cites": cites, "lineId": f"L-A1-{len(lines) + 1}"})
         used.update(cites)
-        if len(lines) >= MAX_ANSWER_LINES:
-            break
     if not lines:
         return None
     return {"status": "ok", "lines": lines, "sources": sources, "singleSenior": _single_senior(used)}

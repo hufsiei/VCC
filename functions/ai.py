@@ -40,6 +40,7 @@ PROVIDER = {
     "질문정리": "sonnet",  # [v2 작업 87] askBoo ① 최근 대화 + 질문 → 의도·프로그램·제외·칸·정리된 질문. 실패하면 정규식 경로
     "고르기":   "hcx",     # askBoo ④ 근거 번호 고르기 — 11/20 작업 54 재측정 40/40(100%)으로 확정. 상한 8(v2). CLOVA 자리
     "답쓰기":   "sonnet",  # [v2 작업 87] askBoo ⑤ 고른 근거로 2~4문장, 문장마다 근거 번호. 번호 없는 문장은 코드가 버림, 다 버려지면 원문 인용
+    "답검사":   "opus",    # [v2 작업 87] askBoo ⑥ 답 문장 ↔ 인용 근거 원문 대조. 인터뷰 일치검사와 말한 사람 규칙이 달라(BOO가 전하는 말투 허용) 프롬프트 따로
     "변환":     "hcx",     # askBoo ④ 근거 → 해요체 한 문장
     "충분판정": "hcx",     # 인터뷰 답이 칸을 채웠나 {"충분":true} — HCX 10/10
     "꼬리질문": "hcx",     # 인터뷰 꼬리 질문 1개 — HCX 9/10
@@ -59,7 +60,8 @@ SETTINGS = {
     "연습":     {"max_tokens": 256,  "temperature": 0.5},
     "질문정리": {"max_tokens": 1500, "effort": "low"},      # 생각 토큰이 max_tokens에 들어가므로 출력(200자 안팎)보다 넉넉히
     "고르기":   {"max_tokens": 30,   "temperature": 0, "top_p": 0.1},
-    "답쓰기":   {"max_tokens": 3000, "effort": "medium"},
+    "답쓰기":   {"max_tokens": 3000, "effort": "low"},      # medium 6.4초 → low로 시연 시간 단축(품질은 측정으로 확인)
+    "답검사":   {"max_tokens": 1500, "effort": "low"},
     "변환":     {"max_tokens": 150,  "temperature": 0},
     "충분판정": {"max_tokens": 30,   "temperature": 0},
     "꼬리질문": {"max_tokens": 100,  "temperature": 0.3},
