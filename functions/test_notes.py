@@ -1,6 +1,7 @@
 # test_notes.py — 질문함 → 인터뷰 → 공개 동의 → 질문자 알림 → 노트 Q·A → askBoo 근거 (작업 74·26)
 # 실행: cd functions && python test_notes.py
 # 완료 기준(작업 74): 후배1의 가상질문 23번 → 선배1 인터뷰 첫 질문 → 공개 동의 → 후배1 알림 → 노트 「후배 질문」 칸 Q·A
+# [v2 작업 89] 「후배 질문」 칸은 없다 → 답 문장은 질문의 칸(여기서는 문단분류 가짜가 고른 「팁」)에 answersQuestionId·asked와 함께
 # AI는 가짜로 바꿔 돈을 쓰지 않는다. 기록은 임시 폴더에 쓴다(data/runtime을 건드리지 않음). 하나라도 틀리면 종료코드 1.
 import json
 import re
@@ -32,7 +33,8 @@ def fake_call(작업명, messages, system=None):
     elif 작업명 == "변환":
         text = json.dumps({"1": re.search(r"근거: (.*)\n출력", c, re.S).group(1)}, ensure_ascii=False)
     else:
-        text = {"충분판정": '{"충분":true}', "일치검사": '{"일치":true}', "고르기": '{"관련":[1]}', "1인칭": "{}"}[작업명]
+        text = {"충분판정": '{"충분":true}', "일치검사": '{"일치":true}', "고르기": '{"관련":[1]}', "1인칭": "{}",
+                "문단분류": '{"칸":"팁"}'}[작업명]
     return {"ok": True, "text": text, "json": first_json(text), "model": "fake"}
 
 
@@ -61,11 +63,12 @@ other_qid = add_question(OTHER, "다른 학교 질문이에요", program="국립
 
 # 2) 선배1 인터뷰 첫 질문 = 그 후배 질문
 s = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": []})
-expect("선배1 첫 질문 = 23번", s.get("section") == "후배 질문" and s.get("questionId") == qid and s.get("asked") == Q23)
+expect("선배1 첫 질문 = 23번(junior, 칸 = 팁)", s.get("junior") and s.get("section") == "팁"
+       and s.get("questionId") == qid and s.get("asked") == Q23)
 
-# 3) 요약. 후배 질문 칸이지만 질문함에 없는 질문(질문 id 없음), 다른 프로그램 질문 id를 붙인 답도 섞는다
+# 3) 요약. 옛 화면(「후배 질문」 칸)으로 온 질문함에 없는 질문(질문 id 없음), 다른 프로그램 질문 id를 붙인 답도 섞는다
 transcript = [
-    {"section": "후배 질문", "question": Q23, "questionId": qid, "answer": A23},
+    {"section": s["section"], "question": s["question"], "questionId": qid, "answer": A23},
     {"section": "후배 질문", "question": "질문함에 없는 질문이에요?", "answer": "그건 잘 모르겠어요."},
     {"section": "후배 질문", "question": "다른 학교 질문이에요", "questionId": other_qid, "answer": "거기는 안 가 봤어요."},
     {"section": "지원", "question": "언제부터 준비하셨어요?", "answer": "출국 3학기 전부터 어학 시험을 준비했어요."},
@@ -98,20 +101,24 @@ expect("내 보관함: answered + 노트 링크 + 맨 위", q["status"] == "answ
        and inbox["questions"][0]["questionId"] == qid and q.get("answeredAt"))
 expect("내 보관함 알림 맨 위", inbox["alerts"][0]["questionId"] == qid)
 
-# 7) 노트 「후배 질문」 칸 Q·A 원문 인용
+# 7) 노트: 「후배 질문」 칸은 없고 답은 질문의 칸(팁) 뒤에 원문 인용
 note = notes.getNote(JUNIOR, {"id": "N-marburg"})
-qa = section(note, "후배 질문")
-expect("후배 질문 칸 Q·A 1쌍 + 질문 id 없는 답 1개", len(qa) == 3 and qa[0]["asked"] == Q23 and qa[0]["answersQuestionId"] == qid)
+expect("「후배 질문」 칸 없음", section(note, "후배 질문") is None)
+tip = section(note, "팁")
+qa = [ln for ln in tip if ln.get("sourceId", "").startswith("I-")]
+expect("팁 칸 뒤에 인터뷰 문장 3개(23번 답 + 질문 id 없는 답 + 남의 질문 id 답)",
+       len(qa) == 3 and qa[0]["asked"] == Q23 and qa[0]["answersQuestionId"] == qid)
 expect("A는 선배 문장 그대로(합치지 않음)", qa[0]["text"] == A23)
 expect("질문 id 없는 답은 Q·질문 id 없이", "asked" not in qa[1] and "answersQuestionId" not in qa[1])
-expect("다른 프로그램 질문 id는 노트에 남지 않음", all(ln.get("answersQuestionId") != other_qid for ln in qa))
+expect("다른 프로그램 질문 id는 노트에 남지 않음(asked도)", all(ln.get("answersQuestionId") != other_qid for ln in qa)
+       and "asked" not in qa[2])
 sid = qa[0]["sourceId"]
 expect("출처 = 인터뷰 + 학기", note["sources"][sid]["docType"] == "인터뷰" and (note["sources"][sid]["semester"] or "").startswith("20"))
 expect("지원 칸 뒤에 인터뷰 문장", section(note, "지원")[-1]["text"] == "출국 3학기 전부터 어학 시험을 준비했어요.")
 expect("evidenceCount + 4", note["evidenceCount"] == base_count + 4)
 expect("응답에 선배 학번 없음", SENIOR not in json.dumps(note, ensure_ascii=False))
 expect("officialUrl", "officialUrl" in note)
-expect("사전 생성 노트는 그대로(메모리)", len(section(base, "후배 질문")) == 0)
+expect("사전 생성 노트는 그대로(메모리)", not any(ln.get("sourceId", "").startswith("I-") for ln in section(base, "팁")))
 
 card = next(n for n in notes.listNotes(JUNIOR, {"filter": {"q": PROGRAM}})["notes"] if n["id"] == "N-marburg")
 expect("listNotes 근거 수 = getNote", card["evidenceCount"] == note["evidenceCount"])
@@ -122,7 +129,8 @@ note2 = notes.getNote(JUNIOR, {"id": "N-marburg"})
 expect("다시 동의: answered 빈 목록", c2["answered"] == [] and len(answered_alerts) == 1 ==
        len([a for a in store.load("alerts", {})[JUNIOR] if a["text"].startswith("내 질문에")]))
 expect("다시 동의: 뺀 문장만 빠짐 + sourceId 유지",
-       note2["evidenceCount"] == base_count + 3 and section(note2, "후배 질문")[0]["sourceId"] == sid)
+       note2["evidenceCount"] == base_count + 3
+       and [ln for ln in section(note2, "팁") if ln.get("answersQuestionId")][0]["sourceId"] == sid)
 
 # 9) 다음 후배의 askBoo 근거가 된다
 r2 = askboo.askBoo(OTHER, {"question": Q23})
@@ -131,7 +139,7 @@ expect("다른 후배 23번 → 답변(근거 = 선배 인터뷰)", r2["status"]
 
 # 10) 신고한 문장은 노트·근거 풀에서 숨김
 reportStatement(OTHER, {"lineId": "L-" + sid, "reason": "기타"})
-expect("신고 → 노트에서 숨김", all(ln["sourceId"] != sid for ln in section(notes.getNote(JUNIOR, {"id": "N-marburg"}), "후배 질문")))
+expect("신고 → 노트에서 숨김", all(ln["sourceId"] != sid for ln in section(notes.getNote(JUNIOR, {"id": "N-marburg"}), "팁")))
 expect("신고 → 근거 풀에서 빠짐", all(x["id"] != sid for x in notes.interview_lines(PROGRAM)))
 
 # 11) 없는 노트
@@ -204,8 +212,8 @@ pubd = {"sections": [{"name": "생활", "lines": [{"lineId": "L-DT-1", "text": "
                      {"name": "지원", "lines": [{"lineId": "L-DT-3", "text": "TestDaF를 3학기 전부터 준비했어요.", "match": True}]}]}
 mid = runtime_fns.save_my_note(WRITER, PROGRAM, "D-TEST", my, pubd)
 card = next(n for n in getInbox(WRITER, {})["myNotes"] if n["id"] == mid)
-expect("카드: 공유 전 = private·칸 2/7·공유 0",
-       card["share"] == "private" and card["filled"] == 2 and card["total"] == 7 and card["sharedLines"] == 0
+expect("카드: 공유 전 = private·칸 2/6(후배 질문 칸 없음)·공유 0",
+       card["share"] == "private" and card["filled"] == 2 and card["total"] == 6 and card["sharedLines"] == 0
        and card["type"] == "교환" and card["noteId"] == "N-marburg" and mid.startswith("M"))
 c = saveConsent(WRITER, {"draftId": "D-TEST", "edits": {"removed": ["L-DT-2"]}, "consent": True})
 card = next(n for n in getInbox(WRITER, {})["myNotes"] if n["id"] == mid)
@@ -213,7 +221,7 @@ expect("카드: 일부 공유 = partial·2문장", c.get("ok") and card["share"]
 expect("공유 알림 = 반영됐어요(반영 중 없음)",
        any(a["text"] == "해봤노트에 내 이야기가 반영됐어요" and a.get("noteId") == "N-marburg" for a in getInbox(WRITER, {})["alerts"]))
 d = runtime_fns.getMyNote(WRITER, {"id": mid})
-expect("상세: 칸은 노트 틀 순서·빈 칸 포함", [s["name"] for s in d["sections"]] == notes.FRAMES["교환"]["칸"])
+expect("상세: 칸은 노트 틀 순서·빈 칸 포함", [s["name"] for s in d["sections"]] == notes.frame_sections("교환") and "후배 질문" not in [s["name"] for s in d["sections"]])
 life = next(s for s in d["sections"] if s["name"] == "생활")["lines"]
 expect("상세: 문장마다 공유 여부·해봤노트 문장", [ln["shared"] for ln in life] == [True, False]
        and life[0]["publicText"] == "기숙사를 바로 신청했어요." and life[0]["lineId"] == "L-DT-1")

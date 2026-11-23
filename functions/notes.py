@@ -4,9 +4,10 @@
 #   노트 = data/notes.json(사전 생성, 원우 build_notes.py) + runtime/noteLines.json(공개 동의를 통과한 인터뷰 문장)
 #   쓰는 쪽은 runtime_fns.saveConsent(noteLines에 쌓기·질문 answered·알림). 여기는 읽기만 한다.
 #
-#   getNote(me, {id})          — 칸 뒤에 인터뷰 문장을 붙인다. 「후배 질문」 칸은 Q(asked)·A(text) 쌍, 질문별로 모아 원문 인용
+#   getNote(me, {id})          — 칸 뒤에 인터뷰 문장을 붙인다. [v2 작업 89] 「후배 질문」 칸은 없다 — 후배 질문에 답한
+#                                문장은 질문의 칸에 일반 문장으로 들어가고 answersQuestionId·asked만 붙는다(화면 라벨용)
 #   listNotes(me, {filter})    — 카드 목록. evidenceCount·lastSemester에 인터뷰 문장을 더한다
-#   interview_lines(program)   — askBoo 근거 풀에 더할 인터뷰 문장(후배 질문 A 포함)
+#   interview_lines(program)   — askBoo 근거 풀에 더할 인터뷰 문장(후배 질문 답도 그 칸 문장으로)
 #   scrapNote(me, {noteId, scrap}) — 스크랩 켜기·끄기(runtime/scraps.json). 카드·노트의 scrapped, getInbox.scraps
 #   saveQuestion(me, {noteId, section}) — [11/22] 「질문함에 담기」: 그 칸을 질문함에 hold로(다음 인터뷰가 먼저 묻는다)
 #   카드·노트의 country = 국제교류 프로그램의 programs.json 「세부」(국가). 인턴·비교과는 null
@@ -23,8 +24,10 @@ from pathlib import Path
 import store
 
 DATA = Path(__file__).resolve().parent.parent / "data"
-QUESTION_SECTION = "후배 질문"
+QUESTION_SECTION = "후배 질문"   # [v2 작업 89] 없어진 칸. frames.json·옛 noteLines에 남아 있으면 걸러 낸다
 INTERVIEW = "인터뷰"
+# 후배 질문의 칸을 모를 때(칸이 없거나 틀 밖) 넣는 칸 — spec 4장 interviewNext [v2]
+FALLBACK_SECTION = {"교환": "팁", "*": "배운점"}
 FIXED_IDS = {"마르부르크필립스대학교": "N-marburg"}   # tools/build_notes.py note_id()와 같은 규칙
 KIND_BY_FIELD = {"국제교류": "교환", "현장실습": "인턴", "비교과": "비교과"}
 SUMMARY_KEYS = ("id", "program", "type", "oneLine", "forWhom", "evidenceCount", "lastSemester",
@@ -70,37 +73,57 @@ def experience_semester(colreg_no, program):
     return _semesters.get((colreg_no, program))
 
 
+# ── 노트 틀 [v2 작업 89] ──────────────────────────────────────────────
+def _kind(program):
+    return KIND_BY_FIELD.get(PROGRAMS.get(program, {}).get("분야"), "교환")
+
+
+def frame_sections(kind):
+    """그 종류의 노트 틀 칸(「후배 질문」 빼고). frames.json에서 원우가 지우기 전후 모두 같은 값."""
+    return [s for s in (FRAMES.get(kind) or {}).get("칸", []) if s != QUESTION_SECTION]
+
+
+def fallback_section(program):
+    """후배 질문의 칸을 모를 때 넣는 칸: 교환·파견 「팁」, 인턴·비교과 「배운점」(틀에 없으면 틀의 마지막 칸)."""
+    kind = _kind(program)
+    names = frame_sections(kind)
+    s = FALLBACK_SECTION.get(kind, FALLBACK_SECTION["*"])
+    return s if s in names or not names else names[-1]
+
+
+def section_for_question(program, q):
+    """질문함 행의 칸이 그 프로그램 틀 안에 있으면 그 칸, 아니면 None(부르는 쪽이 정한다)."""
+    s = (q or {}).get("칸")
+    return s if s in frame_sections(_kind(program)) else None
+
+
 # ── noteLines 읽기 ────────────────────────────────────────────────────
+def _legacy_section(r, questions):
+    """11/23 이전에 「후배 질문」 칸으로 쌓인 문장 → 질문의 칸(없으면 fallback_section). 저장된 행은 바꾸지 않는다."""
+    if r.get("section") != QUESTION_SECTION:
+        return r
+    program = r.get("program", "")
+    s = section_for_question(program, questions.get(r.get("answersQuestionId"))) or fallback_section(program)
+    return {**r, "section": s}
+
+
 def _visible_lines(nid=None, program=None):
-    """동의 통과 인터뷰 문장 중 신고로 숨겨지지 않은 것."""
+    """동의 통과 인터뷰 문장 중 신고로 숨겨지지 않은 것. 옛 「후배 질문」 칸 문장은 질문의 칸으로 읽는다."""
     with store.lock():
         rows = list(store.load("noteLines", []))
         hidden = set(store.load("reported", {}))
-    return [r for r in rows
+        questions = {q.get("id"): q for q in store.load("questions", [])} \
+            if any(r.get("section") == QUESTION_SECTION for r in rows) else {}
+    return [_legacy_section(r, questions) for r in rows
             if (nid is None or r.get("noteId") == nid) and (program is None or r.get("program") == program)
             and "L-" + r.get("sourceId", "") not in hidden]
 
 
 def _out_line(r):
     line = {"text": r["text"], "sourceId": r["sourceId"], "lineId": "L-" + r["sourceId"], "official": bool(r.get("official"))}
-    if r.get("section") == QUESTION_SECTION and r.get("answersQuestionId"):
+    if r.get("answersQuestionId"):   # [v2] 화면은 중립 라벨 「후배 질문에 답한 문장」만(Q는 질문자 보관함에서)
         line = {"asked": r.get("asked", ""), "answersQuestionId": r["answersQuestionId"], **line}
     return line
-
-
-def _question_pairs(rows):
-    """「후배 질문」 칸: 같은 질문의 답을 붙여 둔다(질문이 처음 답해진 순서, 답은 동의 순서). 합치지 않는다."""
-    order = []
-    for r in rows:
-        key = r.get("answersQuestionId") or r.get("asked") or r["sourceId"]
-        if key not in order:
-            order.append(key)
-    return sorted(rows, key=lambda r: (order.index(r.get("answersQuestionId") or r.get("asked") or r["sourceId"]),
-                                       r.get("at", "")))
-
-
-def _kind(program):
-    return KIND_BY_FIELD.get(PROGRAMS.get(program, {}).get("분야"), "교환")
 
 
 def _empty_note(nid, program):
@@ -109,7 +132,8 @@ def _empty_note(nid, program):
     frame = FRAMES.get(kind) or {"칸": [], "인터뷰로만": []}
     return {"id": nid, "program": program, "type": kind, "oneLine": "", "forWhom": "",
             "evidenceCount": 0, "lastSemester": None, "satisfaction": None, "completedCount": None,
-            "sections": [{"name": s, "interviewOnly": s in frame["인터뷰로만"], "lines": []} for s in frame["칸"]],
+            "sections": [{"name": s, "interviewOnly": s in frame.get("인터뷰로만", []), "lines": []}
+                         for s in frame_sections(kind)],
             "sources": {}}
 
 
@@ -138,6 +162,8 @@ def _merge(nid, rows):
     note = copy.deepcopy(base) if base else _empty_note(nid, rows[0].get("program", ""))
     with store.lock():
         hidden = set(store.load("reported", {}))
+    # [v2] 사전 생성 노트에 남은 「후배 질문」 칸은 뺀다(인터뷰 문장은 _visible_lines가 질문의 칸으로 옮겨 둠)
+    note["sections"] = [s for s in note["sections"] if s.get("name") != QUESTION_SECTION]
     for sec in note["sections"]:   # 신고로 숨긴 보고서 문장도 뺀다
         sec["lines"] = [ln for ln in sec.get("lines", []) if ln.get("lineId") not in hidden]
 
@@ -149,8 +175,6 @@ def _merge(nid, rows):
         if sec is None:   # 틀에 없는 칸(틀이 바뀐 경우)은 맨 뒤에 둔다
             sec = {"name": name, "interviewOnly": True, "lines": []}
             note["sections"].append(sec)
-        if name == QUESTION_SECTION:
-            items = _question_pairs(items)
         sec["lines"] += [_out_line(r) for r in items]
         for r in items:
             note.setdefault("sources", {})[r["sourceId"]] = {"docType": INTERVIEW, "program": note["program"],

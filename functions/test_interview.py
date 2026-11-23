@@ -23,7 +23,9 @@ FAKE = {
                      else '{"문장":["방학에 단기 인턴을 했어요."]}'),
     "일치검사": lambda c: '{"일치":true}',
     "1인칭": lambda c: fake_first_person(c),
+    "문단분류": lambda c: (CLASSIFY_CALLS.append(c), '{"칸":"생활"}')[1],   # [v2] 칸 없는 후배 질문 → 칸 고르기
 }
+CLASSIFY_CALLS = []
 
 
 def fake_first_person(content):
@@ -56,14 +58,30 @@ def expect(name, cond):
 qid = add_question(JUNIOR, "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?", program=PROGRAM, status="hold")
 add_question(SENIOR, "내가 한 질문은 나에게 안 나와야 해요", program=PROGRAM, status="hold")
 
-# 1) 첫 질문은 후배 질문
+# 1) 첫 질문은 후배 질문 — [v2 작업 89] 「후배 질문」 칸은 없고, section은 그 질문의 칸
 s = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": []})
-expect("첫 질문 = 후배 질문", s.get("section") == "후배 질문" and s.get("questionId") == qid)
+expect("첫 질문 = 후배 질문(junior)", s.get("junior") is True and s.get("questionId") == qid and s.get("asked"))
+expect("칸 없는 질문은 문단분류로 칸(생활)", s.get("section") == "생활" and len(CLASSIFY_CALLS) == 1)
 expect("본인 질문 제외", s.get("pendingQuestions") == 1)
-expect("total 7", s["progress"]["total"] == 7)
+expect("total 6(후배 질문 칸 없음)", s["progress"]["total"] == 6 and s["progress"].get("mine") == 0)
+expect("후배 질문 단계에도 covered", s.get("covered") == ["지원", "학점", "비용", "생활", "팁"])
+s_again = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": []})
+expect("칸 고르기는 질문마다 한 번(캐시)", s_again.get("section") == "생활" and len(CLASSIFY_CALLS) == 1)
+q_tip = add_question(JUNIOR, "현지에서 은행 계좌 여는 법이 궁금해요", program=PROGRAM, section="팁", status="hold")
+s_tip = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": [{"questionId": qid, "skipped": True}]})
+expect("칸 있는 질문은 AI 없이 그 칸", s_tip.get("questionId") == q_tip and s_tip.get("section") == "팁"
+       and len(CLASSIFY_CALLS) == 1 and s_tip.get("pendingQuestions") == 1)
+skip_tip = [{"questionId": q_tip, "skipped": True}]
 
-answers = [{"section": "후배 질문", "question": s["asked"], "questionId": qid, "answer": "학기 중엔 어렵고 방학에 단기 인턴 했어요."}]
+answers = skip_tip + [{"section": s["section"], "question": s["question"], "questionId": qid, "junior": True,
+                       "answer": "학기 중엔 어렵고 방학에 단기 인턴 했어요."}]
 s = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers})
+expect("후배 질문 답은 그 칸으로 셈", s["progress"]["filled"] == 1 and s["progress"]["mine"] == 1)
+expect("후배 질문 답엔 꼬리 질문 없음", not s.get("followUp"))
+legacy = skip_tip + [{"section": "후배 질문", "question": s_again["asked"], "answer": "학기 중엔 어렵고 방학에 단기 인턴 했어요."}]
+s_legacy = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": legacy})
+expect("옛 화면(「후배 질문」 칸)도 같은 다음 질문", s_legacy.get("question") == s.get("question")
+       and s_legacy["progress"] == s["progress"])
 # [11/22] 마르부르크는 다섯 칸 모두 최근 근거가 있다(지원15·학점15·비용5·생활20·팁5) → 기본 질문 없이 깊이 질문
 depth = interview.depth_questions(PROGRAM, ["지원", "학점", "비용", "생활", "팁", "배운점"])
 expect("교환 깊이 질문 3개, 근거 적은 칸 먼저(팁 → 지원 → 생활)", [d[0] for d in depth] == ["팁", "지원", "생활"])
@@ -130,26 +148,34 @@ while not s3.get("done"):
     answers.append({"section": s3["section"], "question": s3["question"], "answer": "합격 메일 받고 바로 기숙사 신청했어요."})
     s3 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers})
 expect("남은 순서 = 지원 → 생활 → 배운점", order == ["지원", "생활", "배운점"])
-expect("done + filled 5/7 + covered", s3["done"] and s3["progress"] == {"filled": 5, "total": 7} and len(s3["covered"]) == 5)
+expect("done + filled 4/6 + covered", s3["done"] and s3["progress"] == {"filled": 4, "mine": 4, "total": 6}
+       and len(s3["covered"]) == 5)
 
-# 4) 요약: 화면처럼 questionId를 빼고 보내도 질문 원문으로 찾는다
-transcript = [{k: a[k] for k in ("section", "question", "answer")} for a in answers]
+# 4) 요약: 화면처럼 questionId를 빼고 보내도 질문 글(감싼 글)로 찾는다
+transcript = [{k: a[k] for k in ("section", "question", "answer")} for a in answers if not a.get("skipped")]
 r = interview.summarizeInterview(SENIOR, {"program": PROGRAM, "transcript": transcript})
 expect("저장됨", r.get("saved") and r.get("myNoteId", "").startswith("M-") and r.get("draftId", "").startswith("D-"))
 pub = {sec["name"]: sec["lines"] for sec in r["publicDraft"]["sections"]}
 texts = [ln["text"] for lines in pub.values() for ln in lines]
 expect("원문에 없는 숫자(900) 0건", not any("900" in t for t in texts))
 expect("원문 숫자(450)는 남음", any("450" in t for t in texts))
-junior = pub.get("후배 질문", [{}])[0]
-expect("후배 질문 answersQuestionId·asked", junior.get("answersQuestionId") == qid and junior.get("asked"))
+expect("「후배 질문」 칸 없음", "후배 질문" not in pub)
+junior = [ln for ln in pub.get("생활", []) if ln.get("answersQuestionId")]
+expect("후배 질문 답은 질문의 칸(생활)에 answersQuestionId·asked",
+       len(junior) == 1 and junior[0]["answersQuestionId"] == qid and junior[0].get("asked") == s_again["asked"])
+expect("같은 칸의 다른 답과 섞어 요약하지 않음", len(pub["생활"]) >= 2
+       and all(not ln.get("answersQuestionId") for ln in pub["생활"] if ln is not junior[0]))
+expect("칸 순서는 틀 순서", list(pub) == [n for n in interview.sections_of(PROGRAM) if n in pub])
 expect("문장마다 lineId·match·identifying",
        all("lineId" in ln and "match" in ln and "identifying" in ln for lines in pub.values() for ln in lines))
 expect("myNote 칸 = 공개 초안 칸", [s["name"] for s in r["myNote"]["sections"]] == list(pub))
 mine = [ln["text"] for sec in r["myNote"]["sections"] for ln in sec["lines"]]
 expect("myNote는 1인칭 해라체", any(t.startswith("나는 ") and t.endswith("다.") for t in mine))
 expect("1인칭 변환이 숫자를 지어내면 해요체 그대로", not any("900" in t for t in mine) and "월세는 450유로였어요." in mine)
-expect("myNote 후배 질문도 answersQuestionId",
-       all(ln.get("answersQuestionId") == qid for sec in r["myNote"]["sections"] if sec["name"] == "후배 질문" for ln in sec["lines"]))
+expect("myNote 후배 질문 답도 answersQuestionId",
+       sum(1 for sec in r["myNote"]["sections"] for ln in sec["lines"] if ln.get("answersQuestionId") == qid) == 1)
+g_old = interview.group_answers(SENIOR, PROGRAM, [{"section": "후배 질문", "question": s_again["asked"], "answer": "방학에 했어요."}])
+expect("옛 transcript(「후배 질문」 칸)도 질문의 칸으로", g_old[0]["section"] == "생활" and g_old[0]["questionId"] == qid)
 r2 = interview.summarizeInterview(SENIOR, {"program": PROGRAM, "transcript": transcript})
 expect("다시 요약하면 같은 myNoteId", r2["myNoteId"] == r["myNoteId"])
 

@@ -5,6 +5,9 @@
 # interviewNext(program, answers) — 다음 질문 하나
 #   ① 코드: 질문함(questions.json)에서 같은 프로그램의 hold 질문을 최근순 최대 3개 먼저 묻는다(작업 74).
 #        본인이 한 질문·이미 answered·이번 인터뷰에서 답했거나 건너뛴 질문은 뺀다.
+#        [v2 작업 89] 「후배 질문」 칸은 없다. 응답은 junior: true, section = 그 질문의 칸(질문 행의 「칸」, 틀 밖이거나
+#        없으면 AI(문단분류, Sonnet)가 틀 안의 칸 하나를 고르고, 그것도 안 되면 교환 「팁」·인턴·비교과 「배운점」).
+#        답은 그 칸에 담기고 progress.filled에 센다. 꼬리 질문은 붙이지 않는다.
 #   ② 코드: [11/22] 그 뒤 근거가 0건이거나 모두 2년 넘은 칸만 기본 질문(근거 적은 칸 순). 근거가 충분한 칸은
 #        묻지 않고 covered로 알린다 → 깊이 질문(교환·파견 3, 인턴·비교과 2 — DEPTH_QUESTIONS, 판단·비교·후회·오해) → 「배운점」 마지막.
 #        [11/23 작업 84] 기본·깊이·배운점 질문에 예시답 칩(examples). 말머리 칩만 보낸 답은 빼고 같은 질문을 다시 묻는다(retry).
@@ -12,7 +15,7 @@
 #      AI(꼬리질문, HCX): 꼬리 질문 하나 — 칸당 1회. 형식이 틀리거나 답에 없는 숫자·고유명사가 있으면 버리고 다음 칸.
 #
 # summarizeInterview(program, transcript) — 요약 2종 + 내 경험노트 저장
-#   ① AI(요약, Sonnet): 칸(후배 질문은 질문마다)별로 답 원문 → 해요체 문장 1~3개 {"문장":[...]}
+#   ① AI(요약, Sonnet): 칸별로(후배 질문 답은 그 칸 안에서 질문마다 따로) 답 원문 → 해요체 문장 1~3개 {"문장":[...]}
 #   ② 코드: 사후 검증 — 답 원문에 없는 숫자·영문·수량·고유명사가 있는 문장은 버린다.
 #      다 버려지거나 AI가 실패하면 답 원문 문장을 그대로 쓴다(fallback: true).
 #   ③ AI(일치검사, Opus): 남은 문장마다 원문과 대조 → match. 호출이 실패하면 match: false(「원문과 다를 수 있어요」).
@@ -28,11 +31,12 @@ from datetime import date
 import askboo
 import demand
 import identify
+import notes
 import store
 from ai import callAI, load_prompt
 from runtime_fns import save_my_note
 
-QUESTION_SECTION = "후배 질문"
+QUESTION_SECTION = notes.QUESTION_SECTION   # [v2] 없어진 칸 — 옛 화면·옛 transcript가 보내면 질문의 칸으로 옮긴다
 LAST_SECTION = "배운점"
 MAX_JUNIOR = 3          # 먼저 묻는 질문함 질문 수 (spec 4장)
 MAX_ANSWER = 1000       # 답 하나 글자 수 상한
@@ -104,6 +108,67 @@ def kind_of(program):
 
 def frame_of(program):
     return FRAMES.get(kind_of(program)) or FRAMES.get("교환") or {"칸": [], "인터뷰로만": []}
+
+
+def sections_of(program):
+    """노트 틀 칸(「후배 질문」 빼고, frames.json 순서)."""
+    return [s for s in frame_of(program)["칸"] if s != QUESTION_SECTION]
+
+
+# ── 후배 질문의 칸 [v2 작업 89] ───────────────────────────────────────
+_section_cache = {}   # 질문 id → 칸(문단분류 결과). questions.json에는 쓰지 않는다(콘솔 집계의 「칸」을 바꾸지 않게)
+
+
+def question_section(program, q):
+    """질문함 질문이 담길 칸. 질문 행의 칸 → (없거나 틀 밖) AI 문단분류 → 교환 「팁」·그 밖 「배운점」."""
+    s = notes.section_for_question(program, q)
+    if s:
+        return s
+    names = sections_of(program)
+    key = (q or {}).get("id") or askboo._norm((q or {}).get("질문"))
+    if key in _section_cache:
+        return _section_cache[key]
+    text = ((q or {}).get("질문") or "").strip()
+    s = None
+    if text and names:
+        r = _call("문단분류", f"칸 목록: {', '.join(names)}\n문장: {text}\n출력:")
+        j = r.get("json")
+        s = j.get("칸") if r["ok"] and isinstance(j, dict) else None
+    s = s if s in names else notes.fallback_section(program)
+    if key:
+        _section_cache[key] = s
+    return s
+
+
+def _question_row(program, qid=None, asked=None):
+    """질문함 행. id로 찾고, 화면이 id를 빠뜨렸으면 질문 원문으로 찾는다. 없으면 None."""
+    asked = askboo._norm(asked)
+    with store.lock():
+        rows = list(store.load("questions", []))
+    if qid:
+        q = next((q for q in rows if q.get("id") == qid), None)
+        if q and q.get("프로그램명") == program:
+            return q
+    if asked:
+        for q in reversed(rows):
+            if q.get("프로그램명") == program and askboo._norm(q.get("질문")) == asked:
+                return q
+    return None
+
+
+JUNIOR_ASK = "후배가 이렇게 물었어요 — \"{q}\" 경험이 있으면 들려주세요."
+_JUNIOR_ASK_RE = re.compile(r'^후배가 이렇게 물었어요 — "(.*)" 경험이 있으면 들려주세요\.?$', re.S)
+
+
+def _unwrap(question):
+    """interviewNext가 감싼 후배 질문 글 → 후배 질문 원문. 감싼 글이 아니면 그대로."""
+    m = _JUNIOR_ASK_RE.match((question or "").strip())
+    return m.group(1) if m else question
+
+
+def is_junior(a):
+    """후배 질문에 대한 답인가(questionId가 있거나 옛 화면이 「후배 질문」 칸으로 보냄)."""
+    return bool(a.get("questionId") or a.get("junior") or a.get("section") == QUESTION_SECTION)
 
 
 def short_name(program):
@@ -178,32 +243,39 @@ def interviewNext(me, payload):
     program = (payload.get("program") or "").strip()
     if not program:
         return {"error": "들려줄 경험을 먼저 골라 주세요"}
-    answers = _clean_answers(payload.get("answers"))
+    # [v2] 후배 질문 답은 질문의 칸으로(옛 「후배 질문」 칸·questionId를 빠뜨린 답도)
+    answers = [_place_junior(program, a) for a in _clean_answers(payload.get("answers"))]
     # [11/23 작업 84] 말머리 칩만 보낸 답은 빼고 센다. 방금 그랬으면 같은 질문을 다시 묻는다(아래).
     last_raw = answers[-1] if answers else None
-    retry = last_raw if last_raw and not last_raw.get("skipped") and bare_stem(last_raw.get("answer")) else None
+    retry = last_raw if last_raw and not last_raw.get("skipped") and not is_junior(last_raw) \
+        and bare_stem(last_raw.get("answer")) else None   # 후배 질문은 아래 ①이 다시 묻는다
     answers = [a for a in answers if a.get("skipped") or not bare_stem(a.get("answer"))]
     frame = frame_of(program)
-    sections = [s for s in frame["칸"] if s != QUESTION_SECTION]
-    total = len(frame["칸"])
+    sections = sections_of(program)
     answered = {a.get("section") for a in answers if not a.get("skipped") and a.get("answer")}
-    filled = len([s for s in sections if s in answered]) + (1 if QUESTION_SECTION in answered else 0)
-    progress = {"filled": filled, "total": total}
+    filled = len([s for s in sections if s in answered])   # [v2] 후배 질문 답도 그 칸으로 센다
+    progress = {"filled": filled, "mine": filled, "total": len(sections)}
+
+    # [11/22] 근거가 충분해 묻지 않을 칸(covered) — [v2] 후배 질문 단계에도 매 응답에 알린다
+    stats = evidence_stats(program)
+    gaps = [s for s in section_order(program, sections, stats) if s != LAST_SECTION and is_gap(stats.get(s))]
+    covered = [s for s in sections if s != LAST_SECTION and s not in gaps]
 
     # ① 질문함의 후배 질문 먼저
     juniors = junior_questions(me, program)
     seen_q = {a.get("questionId") for a in answers if a.get("questionId")}
-    seen_text = {askboo._norm(a.get("question")) for a in answers if a.get("section") == QUESTION_SECTION}
+    seen_text = {askboo._norm(a.get(k)) for a in answers if is_junior(a) for k in ("asked", "question")}
     waiting = [q for q in juniors if q["id"] not in seen_q and askboo._norm(q["질문"]) not in seen_text]
     if waiting:
         q = waiting[0]
-        return {"done": False, "section": QUESTION_SECTION, "questionId": q["id"], "asked": q["질문"],
-                "question": f"후배가 이렇게 물었어요 — \"{q['질문']}\" 경험이 있으면 들려주세요.",
-                "progress": progress, "pendingQuestions": len(waiting)}
+        return {"done": False, "junior": True, "section": question_section(program, q),
+                "questionId": q["id"], "asked": q["질문"],
+                "question": JUNIOR_ASK.format(q=q["질문"]),
+                "progress": progress, "pendingQuestions": len(waiting), "covered": covered}
 
     if retry and retry.get("section") in sections and retry.get("question"):
         step = {"done": False, "section": retry["section"], "question": RETRY_PREFIX + retry["question"],
-                "progress": progress, "pendingQuestions": 0, "retry": True}
+                "progress": progress, "pendingQuestions": 0, "retry": True, "covered": covered}
         ex = chips_for(program, retry["section"], retry["question"])
         if ex:
             step["examples"] = ex
@@ -211,18 +283,18 @@ def interviewNext(me, payload):
 
     # ③ 방금 들어온 답이 그 칸의 첫 답이면 충분한지 보고, 부족하면 꼬리 질문(칸당 1회)
     last = answers[-1] if answers else None
-    if last and not last.get("skipped") and last.get("answer") and last.get("section") in sections:
-        same = [a for a in answers if a.get("section") == last["section"] and not a.get("skipped")]
+    # [v2] 후배 질문 답에는 꼬리 질문을 붙이지 않고, 그 칸의 「첫 답」으로도 세지 않는다(그 칸 질문의 꼬리는 그대로)
+    if last and not last.get("skipped") and last.get("answer") and last.get("section") in sections \
+            and not is_junior(last):
+        same = [a for a in answers if a.get("section") == last["section"] and not a.get("skipped")
+                and not is_junior(a)]
         if len(same) == 1:
             follow = follow_up(last["section"], last.get("question", ""), last["answer"])
             if follow:
                 return {"done": False, "section": last["section"], "question": follow,
-                        "followUp": True, "progress": progress, "pendingQuestions": 0}
+                        "followUp": True, "progress": progress, "pendingQuestions": 0, "covered": covered}
 
     # ② [11/22] 비었거나(0건) 오래된 칸만 기본 질문 — 근거가 충분한 칸은 묻지 않는다(covered)
-    stats = evidence_stats(program)
-    gaps = [s for s in section_order(program, sections, stats) if s != LAST_SECTION and is_gap(stats.get(s))]
-    covered = [s for s in sections if s != LAST_SECTION and s not in gaps]
     base = {"done": False, "progress": progress, "pendingQuestions": 0, "covered": covered}
     for s in gaps:
         if s not in answered:
@@ -386,37 +458,46 @@ def _append(sections, name, lines):
     sections.append({"name": name, "lines": lines})
 
 
+def _place_junior(program, a):
+    """[v2 작업 89] 후배 질문 답을 질문의 칸에 놓는다. 돌려주는 값은 새 dict(questionId·asked 채움).
+    화면이 보낸 칸이 틀 안이면 그대로(interviewNext가 준 칸), 옛 「후배 질문」 칸·틀 밖이면 질문으로 다시 정한다."""
+    if is_junior(a):
+        q = _question_row(program, a.get("questionId"), a.get("asked") or _unwrap(a.get("question")))
+    else:   # 화면이 questionId·junior를 빠뜨렸어도 질문 글이 질문함 질문이면 후배 질문 답으로 본다
+        q = _question_row(program, None, _unwrap(a.get("question"))) if a.get("question") else None
+        if not q:
+            return a
+    a = dict(a)
+    if q:
+        a["questionId"] = q.get("id")
+        a.setdefault("asked", q.get("질문", ""))
+    a.setdefault("asked", _unwrap(a.get("question", "")))
+    if a.get("section") not in sections_of(program):
+        a["section"] = question_section(program, q or {"질문": a["asked"]})
+    return a
+
+
 def group_answers(me, program, transcript):
-    """칸별로 답을 모은다(첫 답 + 꼬리 답). 후배 질문은 질문마다 따로. 순서는 frames.json 칸 순서."""
-    order = frame_of(program)["칸"]
+    """칸별로 답을 모은다(첫 답 + 꼬리 답). 순서는 frames.json 칸 순서.
+    [v2 작업 89] 「후배 질문」 칸은 없다 — 후배 질문 답은 질문의 칸에 담되, 칸 안에서 질문마다 따로 모은다
+    (문장에 answersQuestionId·asked를 붙여야 하므로 그 칸의 다른 답과 섞어 요약하지 않는다)."""
+    order = sections_of(program)
     by_key, keys = {}, []
     for a in transcript:
+        a = _place_junior(program, a)
         section = a.get("section") or "기타"
-        qid = None
-        if section == QUESTION_SECTION:
-            qid = a.get("questionId") or _find_question_id(program, a.get("question"))
-        key = (section, qid or (a.get("question") if section == QUESTION_SECTION else None))
+        qid = a.get("questionId") if is_junior(a) else None
+        key = (section, qid or (askboo._norm(a.get("asked")) if is_junior(a) else None))
         if key not in by_key:
             keys.append(key)
-            by_key[key] = {"section": section, "questionId": qid, "asked": a.get("question", ""), "answers": []}
+            by_key[key] = {"section": section, "questionId": qid,
+                           "asked": a.get("asked", "") if is_junior(a) else a.get("question", ""), "answers": []}
         by_key[key]["answers"].append(a["answer"])
-    keys.sort(key=lambda k: order.index(k[0]) if k[0] in order else len(order))
+    keys.sort(key=lambda k: order.index(k[0]) if k[0] in order else len(order))   # 안정 정렬: 칸 안에서는 들어온 순서
     groups = [by_key[k] for k in keys]
     for g in groups:
         g["source"] = " ".join(g["answers"])
     return groups
-
-
-def _find_question_id(program, asked):
-    """화면이 questionId를 빠뜨려도 질문 원문으로 질문함에서 찾는다."""
-    asked = askboo._norm(asked)
-    if not asked:
-        return None
-    with store.lock():
-        for q in reversed(store.load("questions", [])):
-            if q.get("프로그램명") == program and askboo._norm(q.get("질문")) == asked:
-                return q.get("id")
-    return None
 
 
 def summarize_group(g):
