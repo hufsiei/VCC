@@ -192,9 +192,10 @@ payload `{question, history?: [{question, status, program?}]}`. 규정 질문이
 ```json
 { "status": "notes", "lines": [], "sources": {}, "suggestSenior": true,
   "message": "네덜란드 해봤노트가 2개 있어요. 궁금한 노트를 골라 보세요.",
-  "notes": [ { "noteId": "N-c158df", "program": "레이던 대학교", "country": "네덜란드", "evidenceCount": 36 },
-             { "noteId": "N-f03daf", "program": "흐로닝언대학교", "country": "네덜란드", "evidenceCount": 24 } ] }
+  "notes": [ { "noteId": "N-c158df", "program": "레이던 대학교", "type": "교환", "country": "네덜란드", "evidenceCount": 36 },
+             { "noteId": "N-f03daf", "program": "흐로닝언대학교", "type": "교환", "country": "네덜란드", "evidenceCount": 24 } ] }
 ```
+**[11/23 노트]** 카드 `type`(교환·파견·인턴·비교과)은 `listNotes` 카드의 `type`과 같은 값 — 분야 띠는 해봤노트 화면과 같은 규칙(`country`가 있으면 「교환학생 · 독일」).
 화면(인터BOO 물어보기): `message` 말풍선 + 노트 카드(분야 띠·노트명·근거 N건, 누르면 `../note/?id=`) + 「닮은선배 보기」. 근거 블록은 두지 않는다(답이 아니므로). 노트가 1개면 `message`는 「{프로그램} 해봤노트에서 선배들의 경험을 볼 수 있어요. 궁금한 내용을 물어보셔도 돼요.」
 **[11/19] 근거 풀** = `data/notes.json`의 문장 + `runtime/noteLines.json`의 동의 통과 문장(**[v2]** 후배 질문에 답한 문장은 질문의 칸에 들어가 있음). 그래서 선배가 답한 후배 질문은 다음 후배의 근거가 된다.
 ```json

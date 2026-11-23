@@ -71,6 +71,7 @@ res, calls = run("코트라 말고 전반적인 무역 인턴 소개해주세요
                  plan={"의도": "탐색", "분야": "현장실습", "나라": None, "프로그램후보": [], "제외": ["코트라"], "칸": None, "정리된질문": "KOTRA를 뺀 무역 인턴은 어떤 곳이 있나요?"})
 expect("탐색 + 제외 → notes 카드, KOTRA 없음", res["status"] == "notes" and res["notes"] and all(KOTRA != c["program"] for c in res["notes"]), res)
 expect("notes 카드에 oneLine 키", all("oneLine" in c for c in res["notes"]))
+expect("notes 카드에 type(현장실습 → 인턴)", all(c.get("type") == "인턴" for c in res["notes"]), [c.get("type") for c in res["notes"]])
 expect("제외가 별칭(코트라)으로 와도 프로그램명으로 대조", KOTRA not in [c["program"] for c in res["notes"]])
 
 res, calls = run("독일에서 인턴하고 싶은데 어디어디 있어요?", [],

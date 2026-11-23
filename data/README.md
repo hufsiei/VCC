@@ -243,7 +243,7 @@
 | questionId | 글자 | `hold`·`official`일 때. 질문함에 자동 저장된 질문 번호 |
 | officialUrl | 글자 | `official`일 때. 담당 부서의 공식 안내 주소 |
 | message | 글자 | `hold`·`official`·`notes`일 때. 안내 문구(**[11/23]** `hold` 문구는 이유별 세 가지 — spec 4장) |
-| notes[].noteId / program / country / evidenceCount [11/23] | 글자·숫자 | `notes`일 때. 해봤노트 카드 최대 5개(근거 있는 것만, 근거 많은 순). 근거 블록은 두지 않는다 |
+| notes[].noteId / program / type / country / evidenceCount [11/23] | 글자·숫자 | `notes`일 때. 해봤노트 카드 최대 5개(근거 있는 것만, 근거 많은 순). 근거 블록은 두지 않는다 |
 
 ### interviewNext
 
