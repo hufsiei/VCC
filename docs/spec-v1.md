@@ -15,6 +15,7 @@
 > **11/23 개정 ③(선배가 요약 문장 고치기, 미리 결정)**: 내 경험노트와 해봤노트 공개 문장은 **따로** 고친다(읽는 사람이 달라 표현이 다를 수 있음). 공개 문장은 공개 동의 시트의 「문장 고치기」(`saveConsent` `changed`, **[11/23 고치기]**), 내 경험노트 문장은 새 함수 **`updateMyNote(id, changed)`**. `getMyNote` 문장에 `edited`. 바뀐 곳은 **[11/23 고치기]** 표시.
 > **11/23 개정 ②(작업 29 실사용, 미리 결정)**: ① `askBoo`에 새 `status: "notes"` — 사람을 찾는 질문(「네덜란드 교환 다녀온 선배?」)이나 나라만 말한 질문에 주제어가 없으면 답 대신 해봤노트 카드(`notes[]`)로 안내한다. 프로그램명이 없으면 **나라 이름**(`programs.json` `세부`)으로 그 나라 프로그램을 찾는다. `hold` 문구를 이유별로 나누고(노트가 있는데 「경험한 선배가 없어요」라고 하지 않음), 노트가 있으면 `hold`에도 `noteId`. ② 닮은선배 **추천받기 끄기** — 새 함수 **`setRecommendable(on)`**, `getMe.recommendable`, `sendMessage`의 `reason: "추천 제외"`. 경험자는 기본으로 후보이고, 끈 선배는 추천·새 쪽지 요청에서 빠진다. 바뀐 곳은 **[11/23 노트]**·**[11/23 추천]** 표시.
 > **11/23 개정(작업 28, 민지 요청)**: 쪽지 대화 ⋮ 메뉴용 새 함수 **`reportThread(threadId, reason, block)`** — 신고(`threadReports.json`)·차단(`status: "blocked"`, 양쪽 다 더 못 보냄). `sendMessage`에 `reason: "차단"`, `getMessages`에 `blockedByMe`. 바뀐 곳은 **[11/23 차단]** 표시.
+> **11/23 개정 ⑤(askBoo v2 검토안, 팀 합의 — `docs/askBoo-v2 반영 검토안 (2026-11-23, 상의용).md`)**: ① `askBoo`에 **`history`**(최근 대화 4턴)와 서버의 **질문 정리**(의도·프로그램·제외·칸, Sonnet) → 의도가 `대화`면 새 **`status: "chat"`**(질문함 저장 없음), `탐색`이면 `notes`(카드에 `oneLine`, 현장실습은 `kinds`). `ok` 답은 **답 쓰기**(Sonnet, 2~4문장)로 만들고 문장마다 **`cites`**(인용한 sourceId)가 붙는다 — 근거 번호 없는 문장·근거에 없는 숫자·이름은 코드가 버리고, 다 버려지면 지금 방식(원문 인용) 폴백. 고르기는 HCX 그대로(상한 8). ② **노트 틀에서 「후배 질문」 칸 삭제**(교환·파견 6칸, 인턴 5칸, 비교과 2칸). 후배 질문은 `interviewNext`가 여전히 먼저 묻되(`junior: true`) 답은 **질문이 속한 칸**에 들어간다. 해봤노트 문장의 `answersQuestionId`는 유지(화면 라벨 「후배 질문에 답한 문장」), Q·A 쌍은 질문자의 내 보관함 질문 상세에서만. ③ **이어 쓰기**: `interviewNext`가 내 경험노트의 칸을 답한 것으로 치고, `summarizeInterview`에 `append`. ④ 새 함수 **`deleteQuestion`·`updateQuestion`**(hold만, 소프트 삭제), **`saveInterviewDraft`·`getInterviewDraft`**(미완성 초안 7일, P1-여건 79). ⑤ (P1-여건 78·C 단계) `getNote` 칸별 **`summary`**(사전 생성 요약 문단, 문장마다 `sources`). 바뀐 곳은 **[v2]** 표시. 화면 반영은 민지, 데이터(frames.json)는 원우, 서버는 미리.
 > **11/23 개정 ④(쪽지 읽음, 미리 결정)**: `getMessages()`는 목록만 돌려주고 **읽음으로 바꾸지 않는다**(닮은선배 화면이 버튼 상태를 볼 때 안 읽음이 사라지던 것). 대화창을 열 때 `getMessages(threadId)`(payload `{read: threadId}`)로 부르면 그 대화만 읽음. 바뀐 곳은 **[11/23 읽음]** 표시.
 > **11/22 개정 ②(작업 21, 미리)**: `interviewNext`가 보고서가 이미 답한 칸은 묻지 않고(빈 칸·오래된 칸만), **깊이 질문**(`depth`, 교환·파견 3개·인턴·비교과 2개)을 묻는다. 묻지 않은 칸은 **`covered`**로 알린다(4장).
 > **11/20 개정(닮은 선배 실제 데이터 기준)**: 시연 인물을 `가상데이터_1000명.xlsx` 실제 값에 맞췄다. 선배2를 H0745 → **H0241**(독일어과 3학년·경영학, 마르부르크 2026-1, 12점 2위)로 바꾸고, 선배1과 후배1의 공통 비교과를 `합격 면접 취업특강(커리어랩)` → **`한국외국어대학교 직무탐색 집중교육`**으로 바꿨다. H0241은 공통 비교과가 없다(12점 = 학과 5 + 이중전공 4 + 단과대 3). 후배1은 현장실습 이수가 없다. 선배1 보고서 학기 2024-1 → 2025-1(1·4·6장 예시 포함).
@@ -33,7 +34,7 @@
 - **[11/19] 외부 AI로 나가는 글은 서버가 먼저 마스킹한다.** `functions/mask.py`(작업 72, 원우 27 정규식 공용화)가 전화(지역번호·휴대폰 전부)·이메일·학번(`H`+숫자 4자리, 9자리 숫자)·URL·주소 패턴을 `[연락처]` `[메일]` `[학번]` `[링크]` `[주소]`로 바꾼다. **[11/20]** 주소는 넓은 단위(시·도·시군구·읍면동·도로명)는 남기고 건물번호·지번·동·층·호만 `[주소]`로 가린다(예: `동대문구 이문로 107, 101동 1203호` → `동대문구 이문로 [주소], [주소]`, 붙여 쓴 주소도 같다). 가리는 곳은 `callAI` 입구(messages·system)이고, 로그의 오류 문구도 가린 뒤 남긴다. 로그 `ai-calls.jsonl`도 마스킹 뒤 값만 남긴다. AI에게 마스킹 판단을 맡기지 않는다.
 - **[11/19] 사용자별 AI 호출 한도.** `X-Token`으로 확인한 사용자 기준 분당 10회·일 100회(`runtime/aiUsage.json`). **[작업 86] 전역 일일 상한 2,000건**(`aiUsage.json`의 `"_global"`, 시연 계정도 센다. 초과 시 `{ "error": "오늘 사용량을 다 썼어요. 내일 다시 시도해 주세요" }`). 초과 시 `{ "error": "잠시 뒤에 다시 시도해 주세요" }`. 시연 계정(H0143·H0469·H0241·H0745·staff01·staff02)은 제외 목록. 닮은선배·집계·노트 조회는 AI를 안 부르므로 한도와 무관. **세는 단위는 AI를 쓰는 함수 요청 1건**이다(askBoo 질문 1개 = 1회. 안에서 AI를 몇 번 부르는지는 세지 않음). 구현: `functions/limits.py`, 대상 함수는 `local_fn.py`의 `AI_ROUTES`(작업 72).
 - **[11/19] 출처 표기는 연도만.** 응답의 `semester`는 그대로 두되, 화면의 출처 칩은 `"2024"`처럼 연도만 보여 준다(학과+파견교+학기가 함께 보이면 소수 학과에서 사람이 특정됨 — PRD 9-1). 노트 커버의 `lastSemester`는 학기까지 표시해도 된다(프로그램 단위 집계값).
-- **[11/19] 보관기간(운영 규칙, PRD 9-3).** 쪽지 원문 90일, 인터뷰 답변 원문은 요약·동의 처리 뒤 30일, 질문 로그는 학번 제거 후 통계만, 대회 종료(12/9) 후 runtime 전체 삭제(`reset_runtime.py`). 시연 기간에는 삭제 스케줄러를 만들지 않고 규칙만 문서화한다.
+- **[11/19] 보관기간(운영 규칙, PRD 9-3).** 쪽지 원문 90일, 인터뷰 답변 원문은 요약·동의 처리 뒤 30일, **[v2] 인터뷰 미완성 초안(`interviewDrafts.json`)은 7일**(요약하면 삭제, 지나면 삭제 — 마스킹 전 원문이라 쪽지·요약 후 원문보다 짧게), 질문 로그는 학번 제거 후 통계만(삭제한 질문도 `status: "deleted"`로 남아 통계에만 쓰임), 대회 종료(12/9) 후 runtime 전체 삭제(`reset_runtime.py`). 시연 기간에는 삭제 스케줄러를 만들지 않고 규칙만 문서화한다.
 - **선배·후배를 사람에게 고정하지 않는다.** 같은 사람이 어떤 프로그램에서는 묻고, 다른 프로그램에서는 답한다. 그 프로그램을 이수한 기록(가상비교과·가상학생의 파견·인턴 열·귀국보고서·현장실습후기)이 있으면 그 프로그램에 대해 답할 수 있다. 학년과 상관없다. "닮은 선배"의 선배는 "그 경험을 먼저 해 본 사람"이라는 뜻이다.
 
 ## 1. 시연 인물과 가상 계정 (README.md에도 적을 것)
@@ -62,7 +63,7 @@
 
 - **지금(로컬):** `functions/local_fn.py`가 시작할 때 `data/runtime/*.json`을 읽어 메모리에 두고, 기록이 바뀔 때마다 그 파일을 다시 쓴다(임시 파일에 쓴 뒤 바꿔 끼워 반쯤 쓰인 파일이 남지 않게). 서버를 껐다 켜도 남는다.
 - **Cloud Functions 이사 후:** 같은 파일 이름을 NCP **Object Storage**의 객체로 둔다. 바꾸는 곳은 `functions/store.py`의 저장 방식 한 곳뿐이다(`STORE_BACKEND=file|ncp`). 다른 코드는 `store.load(이름)`·`store.save(이름)`만 쓰고 파일을 직접 열지 않는다.
-- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `demands.json`(**[11/22 열림]** 궁금한 것 정리하기 — 분야·세부·프로그램·칸·시기·상황·바라는 것, 선배 추천 열림 근거) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · **[11/23 차단]** `threadReports.json`(쪽지 대화 신고) · **[11/23 추천]** `recommendOptOut.json`(닮은선배 추천받기를 끈 사람) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별 지금 추천 목록 최대 9명과 노트 버전) · `counters.json`(번호 매기기) · **[작업 85]** `noteVersions.json`(노트별 버전 — saveConsent가 +1, recommendSeniors가 비교) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(인터뷰 중간 저장, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 12개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·reportThread·recommendSeniors·setRecommendable·saveConsent·updateMyNote·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). **[작업 66]** 관리자 콘솔용 `reportSettings.json`(부서코드별 발행 설정) · `issuedReports.json`(발행 이력) · `reportHtml.json`(리포트 id → HTML, PRD 6-4의 `reports/{id}.html` 대신 한 파일) · `suggestionStatus.json`(제안 id → 상태). 코드: `functions/admin.py`.
+- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `demands.json`(**[11/22 열림]** 궁금한 것 정리하기 — 분야·세부·프로그램·칸·시기·상황·바라는 것, 선배 추천 열림 근거) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · **[11/23 차단]** `threadReports.json`(쪽지 대화 신고) · **[11/23 추천]** `recommendOptOut.json`(닮은선배 추천받기를 끈 사람) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별 지금 추천 목록 최대 9명과 노트 버전) · `counters.json`(번호 매기기) · **[작업 85]** `noteVersions.json`(노트별 버전 — saveConsent가 +1, recommendSeniors가 비교) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(**[v2]** 인터뷰 미완성 초안 — 사람·프로그램별 `answers`와 `savedAt`, 7일, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·reportThread·recommendSeniors·setRecommendable·saveConsent·updateMyNote·reportStatement·getInbox, **[v2]** deleteQuestion·updateQuestion·saveInterviewDraft·getInterviewDraft, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). **[작업 66]** 관리자 콘솔용 `reportSettings.json`(부서코드별 발행 설정) · `issuedReports.json`(발행 이력) · `reportHtml.json`(리포트 id → HTML, PRD 6-4의 `reports/{id}.html` 대신 한 파일) · `suggestionStatus.json`(제안 id → 상태). 코드: `functions/admin.py`.
 - **누가 부르는지:** 서버는 헤더 `X-Token`을 `sessions.json`(`functions/sessions.py`, 토큰 24시간, 같은 계정 동시 로그인 허용)으로 풀어 사용자를 안다. 토큰이 없거나 만료·폐기면 `{ "error": "로그인이 필요해요" }`(`checkMessage`·`login`만 예외). `login`이 난수 토큰을 발급해 `user.token`으로 주고, `logout`이 폐기한다. 로그인 비번은 `data/`가 아니라 환경변수 `VCC_LOGIN_PW`(.env·NCP 기본 파라미터)에만 둔다. 표의 `"*"`는 가상학생 전원의 공용 비번(청중 체험용, 개별 항목이 우선, 직원에는 적용 안 됨). 순서: 토큰 확인 → 전역 상한 → 사용자별 한도 → 함수. **[11/19] 남의 기록은 서버가 막는다**: `getMessages`·`respondRequest`는 `me`가 그 대화의 asker·senior일 때만, 내 경험노트·`saveConsent`는 `owner == me`일 때만, 관리자 함수는 `권한`이 있을 때만 응답하고 그 외는 `{ "error": "볼 수 없는 기록이에요" }`. (작업 73)
 - **초기화:** 리허설 전 `python functions/reset_runtime.py` → runtime 파일을 비우고 시연 시작 상태로 돌린다.
 - `data/runtime/`은 커밋하지 않는다(`.gitignore`). 시연 중 쌓인 기록이 저장소에 섞이지 않게.
@@ -82,15 +83,17 @@ const FN_BASE = "http://localhost:8787";
 | 함수 | 규칙 |
 |---|---|
 | login | 비밀번호가 비어 있으면 `login.fail`. 아니면 `id`가 `"staff01"`이면 `login.staff`, `"staff02"`이면 `login.staffDept`, 학번 모양(`H` + 숫자 4자리)이면 `login.student`, 그 외 `login.fail`(비번은 대조하지 않는다 — 공개 코드에 비번을 두지 않음) |
-| askBoo | 4장의 규정 질문 표현이 있으면 `askBoo.official`, **[11/23 노트]** 사람을 찾는 표현(`다녀온 선배`·`선배 있어요?` 등)이 있고 주제어(기숙사·비용·수업·서류·학점·팁·조언·어땠)가 없으면 `askBoo.notes`, 아니면 질문에 `교환\|파견\|독일\|마르부르크`가 있으면 `askBoo.exchange`, 그 외 `askBoo.hold` |
+| askBoo | **[v2]** 대화 표현(`아까|말고|그 말이 아니|데이터 없|그게 아니`)이 있으면 `askBoo.chat`. 4장의 규정 질문 표현이 있으면 `askBoo.official`, **[11/23 노트]** 사람을 찾는 표현(`다녀온 선배`·`선배 있어요?` 등)이나 탐색 표현(`어디 있|추천해|어떤 게 있`)이 있고 주제어(기숙사·비용·수업·서류·학점·팁·조언·어땠)가 없으면 `askBoo.notes`, 아니면 질문에 `교환\|파견\|독일\|마르부르크`가 있으면 `askBoo.exchange`(문장마다 `cites`), 그 외 `askBoo.hold`. `history`는 무시한다 |
 | setRecommendable [11/23 추천] | 이 탭에서만 기억(sessionStorage `mockRecommendable`). `getMe.recommendable`도 그 값 |
-| interviewNext | **[11/20]** `program`이 `interviewNext.byProgram`에 있으면(마르부르크 시연 대본) `answers.length`번째 `steps`, 다 쓰면 `done`(steps[0]은 「후배 질문」). 그 밖의 프로그램은 서버(`interview.py`)처럼 `data/programs.json`의 `분야` → `data/frames.json` 노트 틀을 고르고, 아직 답하지 않은 칸을 틀 순서대로(「배운점」은 마지막) `interviewNext.questions[칸]` 문장으로 묻는다(`{p}` = 별칭 첫째 또는 프로그램명). 꼬리 질문·후배 질문은 없다(`pendingQuestions: 0`) |
+| interviewNext | **[11/20]** `program`이 `interviewNext.byProgram`에 있으면(마르부르크 시연 대본) `answers.length`번째 `steps`, 다 쓰면 `done`(steps[0]은 후배 질문 — **[v2]** `junior: true`, `section`은 그 질문의 칸). 그 밖의 프로그램은 서버(`interview.py`)처럼 `data/programs.json`의 `분야` → `data/frames.json` 노트 틀을 고르고, 아직 답하지 않은 칸을 틀 순서대로(「배운점」은 마지막) `interviewNext.questions[칸]` 문장으로 묻는다(`{p}` = 별칭 첫째 또는 프로그램명). 꼬리 질문·후배 질문은 없다(`pendingQuestions: 0`) |
 | getNote | `getNote[id]`가 있으면 그것, 없으면 `getNote["N-marburg"]` |
 | getMyNote [11/22] | `getMyNote` 하나(M-0001, 일부 공유 예시). 받은 `id`를 그대로 넣어 돌려준다 |
 | updateMyNote [11/23 고치기] | `getMyNote`에 `changed`를 적용해 `ok: true`와 함께 돌려준다(기억하지 않음). 빈 문장·없는 문장은 서버와 같은 `error` |
 | 선배 추천 열림 [11/22 열림] | mock 기본은 **열림**. 주소에 `?locked=1`이면 잠김: `getMe.recommend.ready: false`, `recommendSeniors`·`previewNickname` → `locked`, `sendMessage` → `reason: "잠김"`. mock `saveDemand`·`saveConsent`를 부르면 그 탭은 열린다(sessionStorage `mockUnlocked`) |
 | demandNext·saveDemand [11/22 열림] | `data.js`의 `mockDemand`가 서버(`demand.py`)와 같은 순서로 `programs.json`·`frames.json`에서 칩을 만든다. `fromQuestionId`는 마르부르크·생활 보류 질문으로 채운다 |
-| summarizeInterview [11/22 열림] | `summarizeInterview` + transcript로 센 `answered`, `need: 3` |
+| summarizeInterview [11/22 열림] | `summarizeInterview` + transcript로 센 `answered`, `need: 3`. **[v2]** `append: true`면 `getMyNote` 문장 뒤에 새 문장을 붙인 모양 |
+| deleteQuestion·updateQuestion [v2] | 받은 값으로 `ok: true`를 돌려준다(기억하지 않음). `getInbox.questions`의 `answered`·`official` id면 서버와 같은 `error` |
+| saveInterviewDraft·getInterviewDraft [v2] | 이 탭에서만 기억(sessionStorage `mockDraft:<program>`) |
 | checkMessage | 숫자가 8자리 이상 연속(전화·학번)이면 `checkMessage.blocked`, 그 외 `checkMessage.ok` |
 | 나머지 | `m[name]` 그대로 |
 
@@ -136,10 +139,47 @@ payload `{on: true|false}`(불리언이 아니면 `{error}`). 켜기·끄기, �
 
 귀국보고서 항목 예: `{ "학년도": 2024, "학기": 1, "국가": "독일", "대학명": "마르부르크필립스대학교" }` · 현장실습후기 항목 예: `{ "학년도": 2025, "학기": 2, "업체명": "KOTRA 해외무역관(유럽 권역)", "직군": "전시·행사 지원" }`(학기 2 = 여름방학). 학기 숫자를 화면에 낼 때는 9장의 학기 코드표로 바꾼다.
 
-### askBoo(question)
-payload `{question}`. 규정 질문이면 `official`, 근거가 있으면 `ok`, 없으면 `hold`(`hold`·`official` 질문은 자동으로 질문함에 저장되고 `questionId`가 옴).
+### askBoo(question, history?)
+payload `{question, history?: [{question, status, program?}]}`. 규정 질문이면 `official`, 근거가 있으면 `ok`, 없으면 `hold`(`hold`·`official` 질문은 자동으로 질문함에 저장되고 `questionId`가 옴). **[v2]** 대화·탐색은 `chat`·`notes`(질문함에 저장하지 않음).
+
+**[v2] askBoo v2 — 질문 정리·답 쓰기(검토안 2장, 팀 합의 11/23).** 지금 4+1단계 위에 두 단계를 더한다. 가드레일(프로그램 범위 안 근거·사후 검증·보류→질문함)은 그대로다.
+
+| 단계 | 누가 | 하는 일 |
+|---|---|---|
+| ①′ | 코드 | 규정 판별(아래 [11/19]·[11/23] 표현). 걸리면 `official`, 질문 정리보다 먼저 |
+| ① | Sonnet | **질문 정리**: `history`(화면이 sessionStorage에서 최근 4턴을 보냄 — 서버는 기억하지 않음) + 이번 질문 → `{의도: 경험질문|탐색|대화|규정|사람찾기, 분야, 나라, 프로그램후보[], 제외[], 칸, 정리된질문}`. 코드가 프로그램 이름을 `programs.json`과 대조해 없는 이름은 버린다. 별칭 대조·인턴 사전·나라 대조·사람 찾기 정규식은 **정리 결과를 보정하는 2차 수단**(AI 실패 시 지금 경로 그대로) |
+| ② | 코드 | **의도별 분기**: `대화` → `chat`(고정 문구 + 칩, AI 없음, 저장 없음) / `탐색`·`사람찾기` → `notes` / `규정` → `official` / `경험질문` → ③ |
+| ③ | 코드 | 근거 추출: 프로그램 최대 3개에서 `제외`를 뺀 뒤 후보 30개. 주제어가 있으면 문항으로 좁히고, 없으면 겹치는 근거를 넘긴다(#156) |
+| ④ | HCX | 고르기 `{"관련":[…]}` 상한 **8**. 관련 없으면 빈 목록 → `hold` |
+| ⑤ | Sonnet | **답 쓰기**: 정리된 질문 + 고른 문장(번호·프로그램·연도·몇 명의 경험인지) → `{"답":[{"text":"…","근거":[2,5]}, …]}` 2~4문장 해요체. 규칙: 문장마다 근거 번호 1개 이상 / 근거에 없는 숫자·이름·조언·맺음말 금지 / 근거가 한 사람뿐이면 코드가 라벨로 알림 |
+| ⑥ | 코드 + Opus | 문장마다 **인용한 근거 원문**과 대조: `verify`의 숫자·영문·고유명사·수량 검사 + **답검사**(Opus, `docs/prompts/askBoo-답검사.txt` — 인터뷰 일치검사와 달리 BOO가 전하는 말투 「~라는 선배도 있었어요」·숫자 묶음 「270~380유로」는 일치, 문장별로 동시에 호출). 「새 낱말」 규칙은 답 쓰기에는 쓰지 않는다. 걸린 문장·근거 번호 없는 문장은 버린다. **다 버려지면 ④에서 고른 문장을 원문 인용(지금 방식, `fallback: true`)으로 돌려준다** |
+
+- 모델: 고르기 = HCX(CLOVA 유지), 질문 정리·답 쓰기 = Sonnet, 답검사 = Opus(HCX 원칙 v3 4절). 변환(끝맺음만)은 폴백 줄에만. 11/24 실측: ok 답 1건 5~6초(질문정리 1초 · 고르기 0.7초 · 답쓰기 low 5초 · 답검사 문장별 1~2초 동시).
+- 호출 수: 질문 1건 = AI 한도 1회(0장)이고 안에서 Claude 2~3회가 더 붙는다. 측정은 개발 70 + 다중 턴·탐색·대화 20개(원우 기대답), 근거 없는 답 0건 유지.
+- `history` 항목: `{question: 사용자 말, status: 그때 응답 status, program?: 그때 답한 프로그램}`. 화면은 물어보기 대화를 sessionStorage에 두고(3-6) 보낼 때 최근 4개만 자른다. 마스킹은 0장과 같다.
+
+**[v2] 응답 변경**
+- `ok`: `lines[].cites` = 그 문장이 인용한 sourceId 목록(1개 이상). `fallback: true` 줄은 `cites`가 그 줄의 `sourceId` 하나. `sources`·`noteId`는 그대로. 근거가 한 사람뿐이면 `singleSenior: true`(화면 「선배 1명의 경험이에요」 라벨, 그 아래 「이 경험을 한 선배에게 더 묻기 · 질문함에 담기」).
+- **새 `status: "chat"`**: 대화·메타(「아까도 한 얘기잖아」「데이터가 없나요?」「코트라 말고요」만 있고 질문이 없을 때). `message`는 서버 고정 문구(AI가 쓰지 않음), `chips`는 다음 행동. 질문함에 저장하지 않고 `questionId`가 없다.
+- `notes`: 탐색(「어디 있어요?」「추천해 주세요」)도 이 상태. 카드에 `oneLine`(노트 커버 한 줄). 현장실습을 나라로 물으면(「독일 인턴 어디 있어요?」) 카드 대신 `kinds`(기관 유형 13개)와 안내 「현장실습 노트는 나라가 아니라 기관 유형으로 나뉘어요」 — 나라 열을 추가하지 않는다(해외 인턴십 케이스가 거의 없음, 11/23 미리).
+```json
+{ "status": "ok",
+  "lines": [ { "text": "유럽 권역 무역관에서는 8주 동안 시장조사 지원과 화상 상담회 보조를 주로 했어요.", "cites": ["I007-1", "I012-2"], "lineId": "L-A1-1" },
+             { "text": "선배들은 전공 언어를 실제 업무에 써 본 점을 가장 좋았던 점으로 꼽았어요.", "cites": ["I012-3"], "lineId": "L-A1-2" } ],
+  "sources": { "I007-1": { "docType": "현장실습후기", "program": "KOTRA 해외무역관(유럽 권역)", "semester": "2025-1" }, "I012-2": { "...": "" }, "I012-3": { "...": "" } },
+  "noteId": "N-kotra", "suggestSenior": false, "singleSenior": false }
+{ "status": "chat", "lines": [], "sources": {}, "suggestSenior": false,
+  "message": "아까는 KOTRA 해외무역관 이야기였어요. 다른 기관을 찾아볼까요?",
+  "chips": [ { "label": "다른 기관 보기", "action": "notes", "payload": { "field": "현장실습", "exclude": ["KOTRA 해외무역관(유럽 권역)"] } },
+             { "label": "질문함에 담기", "action": "save", "payload": { "question": "무역 관련 인턴 전반" } } ] }
+{ "status": "notes", "lines": [], "sources": {}, "suggestSenior": true,
+  "message": "현장실습 노트는 나라가 아니라 기관 유형으로 나뉘어요. 궁금한 유형을 골라 보세요.",
+  "notes": [], "kinds": ["KOTRA 해외무역관", "중견기업 해외영업팀", "중소 무역회사", "…"] }
+```
+화면(민지): `chat`은 BOO 말풍선 + 칩(`action: notes`면 askBoo를 그 payload로 다시 부르지 않고 `../note/?type=…`로, `save`면 `saveQuestion`이 아니라 askBoo에 `{question: payload.question, force: "hold"}`로 질문함 저장). `ok`는 문장 끝에 인용 번호(HUFS GREEN 12px) + 근거 블록 「근거 원문 보기」를 펼치면 `cites` 순서로 원문. `lineId`는 `L-A{n}-{k}`(답 쓰기 줄, 신고 대상 아님 — 신고는 원문 문장에).
 **[11/19] 규정 질문 판별(작업 18)**: 1단계보다 먼저 코드로 판별한다(AI 없음). 학교가 정하는 기준·금액·기한을 묻는 질문은 선배 경험으로 답하지 않고 공식 안내로 보낸다.
 - 판별 표현: `평점|장학금|몇\s*학점|선발\s*(인원|기준)|휴학|등록금|초과학기|인정\s*신청|인정받을 수` (`가상질문` 36~45번이 `official`).
+- **[11/23] 넓힌 판별 표현**(`askboo.OFFICIAL_WIDE_RE`, 원우 `tools/rule_probe.py` 제안에서 「자격증」만 뺌): 자격·참여/지원 조건·신청/접수/제출 기한·마감·언제까지·점수/어학/성적 기준·환산·파견 연장·중복 지원·불이익·포기/취소하면·지원 가능·학비·체재비·지원금 금액·마일리지·이수증·수료 기준·발표 언제 등. 이 표현은 **지난 경험을 묻는 말투**(`…했어요?`·`어땠`·`힘들`·`고민` 등, `EXPERIENCE_TONE`)이면 `official`로 보내지 않는다. 위 판별 표현에 걸리면 말투와 상관없이 `official`(예전보다 나빠지지 않게).
 - 경험을 묻는 질문은 `official`이 아니다. "학점 인정 받을 때 주의할 점 있어요?"(5번)·"챙길 서류 있어요?"(15번)는 근거로 답한다. 그래서 "학점 인정"이라는 말만으로 판별하지 않는다.
 - `officialUrl`: 질문에서 프로그램을 찾으면 `운영부서코드` → `departments.json`의 `공식안내URL`(getNote와 같은 순서). 프로그램을 못 찾으면 `현장실습|인턴` → D02, `특교원|탄뎀` → D03, 그 외 D01.
 - 질문은 `questions.json`에 `status: "official"`로 저장한다. 내 보관함에는 「공식 안내」로 보이고, 콘솔 집계에 들어가며, `interviewNext`의 후배 질문으로는 쓰지 않는다.
@@ -156,7 +196,7 @@ payload `{question}`. 규정 질문이면 `official`, 근거가 있으면 `ok`, 
              { "noteId": "N-f03daf", "program": "흐로닝언대학교", "country": "네덜란드", "evidenceCount": 24 } ] }
 ```
 화면(인터BOO 물어보기): `message` 말풍선 + 노트 카드(분야 띠·노트명·근거 N건, 누르면 `../note/?id=`) + 「닮은선배 보기」. 근거 블록은 두지 않는다(답이 아니므로). 노트가 1개면 `message`는 「{프로그램} 해봤노트에서 선배들의 경험을 볼 수 있어요. 궁금한 내용을 물어보셔도 돼요.」
-**[11/19] 근거 풀** = `data/notes.json`의 문장 + `runtime/noteLines.json`의 동의 통과 문장(「후배 질문」 칸의 A 문장 포함). 그래서 선배가 답한 후배 질문은 다음 후배의 근거가 된다.
+**[11/19] 근거 풀** = `data/notes.json`의 문장 + `runtime/noteLines.json`의 동의 통과 문장(**[v2]** 후배 질문에 답한 문장은 질문의 칸에 들어가 있음). 그래서 선배가 답한 후배 질문은 다음 후배의 근거가 된다.
 ```json
 { "status": "ok",
   "lines": [ { "text": "...", "sourceId": "R03-1-1", "lineId": "L-R03-1-1" },
@@ -176,38 +216,43 @@ docType: `귀국보고서` | `현장실습후기` | `인터뷰`
 ### interviewNext(program, answers)
 선배 인터뷰에서 다음 질문 하나. payload `{program, answers:[{section, question, answer, questionId?, skipped?}]}`
 ```json
-{ "done": false, "section": "후배 질문", "questionId": "Q-0001", "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+{ "done": false, "section": "생활", "junior": true, "questionId": "Q-0001", "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
   "question": "후배가 이렇게 물었어요 — \"마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?\" 경험이 있으면 들려주세요.",
-  "progress": { "filled": 0, "total": 7 }, "pendingQuestions": 1 }
+  "progress": { "filled": 0, "mine": 0, "total": 6 }, "covered": ["지원", "학점", "비용", "생활", "팁"], "pendingQuestions": 1 }
 { "done": false, "section": "팁", "question": "후배들이 마르부르크에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?", "depth": true,
-  "covered": ["지원", "학점", "비용", "생활", "팁"], "progress": { "filled": 1, "total": 7 }, "pendingQuestions": 0 }
-{ "done": false, "section": "학점", "question": "학점 칸은 최근 경험이 없어요. 마르부르크에서 들은 수업과 학점 인정은 어땠어요?", "covered": ["지원", "비용", "생활", "팁"], "progress": { "filled": 1, "total": 7 } }
-{ "done": true, "progress": { "filled": 4, "total": 7 }, "covered": ["지원", "학점", "비용", "생활", "팁"] }
+  "covered": ["지원", "학점", "비용", "생활", "팁"], "progress": { "filled": 1, "mine": 1, "total": 6 }, "pendingQuestions": 0 }
+{ "done": false, "section": "학점", "question": "학점 칸은 최근 경험이 없어요. 마르부르크에서 들은 수업과 학점 인정은 어땠어요?", "covered": ["지원", "비용", "생활", "팁"], "progress": { "filled": 1, "mine": 1, "total": 6 } }
+{ "done": true, "progress": { "filled": 4, "mine": 4, "total": 6 }, "covered": ["지원", "학점", "비용", "생활", "팁"] }
 ```
-`total`은 그 프로그램 종류의 `frames.json` 칸 수(**[11/19] 교환·파견 7**, 인턴 6, 비교과 3). `배운점`은 다른 칸을 묻고 난 뒤 마지막에 묻는다.
-**[11/19] 질문 순서(작업 74)**: ① 서버가 `questions.json`에서 **같은 프로그램**의 `status: "hold"` 질문을 최근순으로 최대 3개 꺼내 먼저 묻는다(`section: "후배 질문"`, `questionId`, `asked` = 후배 질문 원문. 본인이 한 질문·이미 `answered`인 것은 뺀다). 화면은 「경험이 없어요」 버튼을 두고, 누르면 `answers`에 `{questionId, skipped: true}`로 보내 건너뛴다(질문은 `hold` 유지, 다른 선배에게 다시 나온다). ② **[11/22] 보고서가 이미 답한 칸은 다시 묻지 않는다**: 그 뒤 근거(보고서 + 동의 통과 인터뷰 문장)가 **0건이거나 모두 2년 넘은 칸만** 기본 질문(근거 적은 칸 순, 오래된 칸은 「○○ 칸은 최근 경험이 없어요.」 머리말 — 디자인 규칙 6-2와 같은 기준). ③ **깊이 질문**(`depth: true`, 교환·파견 3개·인턴·비교과 2개): 보고서에 잘 안 쓰는 판단·비교·후회·오해를 묻는 고정 문장(`interview.py` `DEPTH_QUESTIONS`, 종류별 2~3개 중 근거 적은 칸에 담기는 것부터 — AI가 만들지 않음). 답은 그 칸에 담긴다. ④ `배운점` 마지막. 근거가 충분해 묻지 않은 칸은 **`covered`**(칸 이름 목록)로 매 응답에 알린다 — 화면은 진행 칩에서 비어 있지 않게(예: 「보고서로 채워짐」) 보여 주고, `done`이면 「노트 틀을 모두 채웠어요」 대신 답한 칸 기준 문구를 쓴다(민지). 마르부르크(지원15·학점15·비용5·생활20·팁5)는 후배 질문 → 팁(깊이) → 지원(깊이) → 생활(깊이) → 배운점. 꼬리 질문은 각 칸의 첫 답에 그대로 붙는다. 질문함 질문은 `progress.filled`에 세지 않고 `pendingQuestions`로 따로 알린다.
+`total`은 그 프로그램 종류의 `frames.json` 칸 수(**[v2] 교환·파견 6**, 인턴 5, 비교과 2 — 「후배 질문」 칸 삭제). `배운점`은 다른 칸을 묻고 난 뒤 마지막에 묻는다.
+**[v2] 후배 질문은 칸이 아니라 질문이다.** 질문함 질문을 먼저 묻는 것은 그대로이고, 응답에 `junior: true`·`questionId`·`asked`가 붙으며 **`section`은 그 질문이 속한 칸**(질문 행의 `칸`. 없으면 서버가 `문단분류` 프롬프트로 틀 안의 칸 하나를 고르고, 틀 밖 응답은 교환·파견 「팁」, 인턴·비교과 「배운점」)이다. 답은 그 칸에 담기고 `progress.filled`에도 센다. 건너뛰기(`skipped`)는 그대로. 진행 칩에 「후배 질문」 칩은 없고, `pendingQuestions`가 1 이상이면 화면이 안내 라벨 「후배 N명이 이 경험을 기다리고 있어요」만 보인다.
+**[v2] 진행률**: `progress.filled` = 내가 답한 칸 수, `progress.mine`은 같은 값(이름을 분명히 하려고 둘 다 보냄), `covered`는 보고서가 이미 채운 칸. 화면은 「내 이야기 N칸 · 보고서 M칸」으로 보여 주고 `covered` 칸 칩은 「보고서로 채워짐」(중립색). `done` 문구는 「지금 물을 건 다 물었어요. 더 들려줄 칸을 고르거나 AI 요약을 눌러 주세요」.
+**[v2] 이어 쓰기(내 경험노트 반영)**: 서버는 `myNotes.json`에서 **같은 사람·같은 프로그램의 내 경험노트**를 읽어 문장이 있는 칸을 답한 것으로 친다(`answers`에 없어도). 그래서 다시 온 선배에게는 새 후배 질문·아직 안 한 깊이 질문·빈 칸만 묻고, 첫 응답에 `resumed: true`와 `myNoteId`가 붙는다(화면: 「이어서 들려주기 · 내 이야기 3칸」). 화면은 `../talk/?mode=tell&program=…`으로 들어오면 경험 선택 없이 바로 시작한다.
+**[11/19] 질문 순서(작업 74)**: ① 서버가 `questions.json`에서 **같은 프로그램**의 `status: "hold"` 질문을 최근순으로 최대 3개 꺼내 먼저 묻는다(**[v2]** `junior: true`, `section` = 그 질문의 칸, `questionId`, `asked` = 후배 질문 원문. 본인이 한 질문·이미 `answered`·`deleted`인 것은 뺀다). 화면은 「경험이 없어요」 버튼을 두고, 누르면 `answers`에 `{questionId, skipped: true}`로 보내 건너뛴다(질문은 `hold` 유지, 다른 선배에게 다시 나온다). ② **[11/22] 보고서가 이미 답한 칸은 다시 묻지 않는다**: 그 뒤 근거(보고서 + 동의 통과 인터뷰 문장)가 **0건이거나 모두 2년 넘은 칸만** 기본 질문(근거 적은 칸 순, 오래된 칸은 「○○ 칸은 최근 경험이 없어요.」 머리말 — 디자인 규칙 6-2와 같은 기준). ③ **깊이 질문**(`depth: true`, 교환·파견 3개·인턴·비교과 2개): 보고서에 잘 안 쓰는 판단·비교·후회·오해를 묻는 고정 문장(`interview.py` `DEPTH_QUESTIONS`, 종류별 2~3개 중 근거 적은 칸에 담기는 것부터 — AI가 만들지 않음). 답은 그 칸에 담긴다. ④ `배운점` 마지막. 근거가 충분해 묻지 않은 칸은 **`covered`**(칸 이름 목록)로 매 응답에 알린다 — 화면은 진행 칩에서 비어 있지 않게(예: 「보고서로 채워짐」) 보여 주고, `done`이면 「노트 틀을 모두 채웠어요」 대신 답한 칸 기준 문구를 쓴다(민지). 마르부르크(지원15·학점15·비용5·생활20·팁5)는 후배 질문 → 팁(깊이) → 지원(깊이) → 생활(깊이) → 배운점. 꼬리 질문은 각 칸의 첫 답에 그대로 붙는다. **[v2]** 질문함 질문의 답도 그 칸에 담기므로 `progress.filled`에 세고, 남은 질문 수는 `pendingQuestions`로 따로 알린다.
 **[11/19] `examples`(P1-여건, 작업 84)**: `frames.json`의 칸별 `예시`가 있으면 2~3개를 함께 보낸다. 화면은 칩으로 보여 주고 탭하면 입력창에 채운다. 없으면 생략.
 **[11/23] 칩이 붙는 질문**: 기본 질문(②)·배운점(④)은 `frames.json` 칸 예시, 깊이 질문(③)은 질문마다 정한 예시(`DEPTH_QUESTIONS` 세 번째 값). 후배 질문·꼬리 질문에는 없다. **말머리만 보낸 답**: 답이 `…`로 끝나는 칩의 앞부분뿐이면(「가장 크게 배운 건 …」, `…`를 지우고 보내도 같음) 서버는 그 답을 없던 것으로 치고 같은 질문을 `"조금만 더 이어서 써 주세요. " + 원래 질문`으로 다시 묻는다(`retry: true`, 같은 `examples`). 화면은 그 질문 그대로 `answers`에 넣으면 되고, 서버가 머리말을 떼고 원래 질문으로 센다. `summarizeInterview`도 그런 답은 뺀다.
 
-### summarizeInterview(program, transcript)
-payload `{program, transcript:[{section, question, answer}]}`. 두 장을 돌려준다: 내 경험 노트(1인칭, 나만 봄)와 공개용 초안(선배가 고치고 동의해야 공개).
+### summarizeInterview(program, transcript, append?)
+payload `{program, transcript:[{section, question, answer, questionId?}], append?: true}`. 두 장을 돌려준다: 내 경험 노트(1인칭, 나만 봄)와 공개용 초안(선배가 고치고 동의해야 공개).
 **서버는 응답과 함께 myNote를 내 경험노트로 저장한다**(`saved: true`, `myNoteId`). 화면은 "내 경험노트에 저장됨"을 표시하고, 공유는 이후 `saveConsent`로만 한다. 같은 프로그램으로 다시 요약하면 같은 `myNoteId`를 갱신한다.
+**[v2] `append: true`(이어 쓰기)**: 같은 프로그램의 내 경험노트가 있으면 **기존 문장을 지우지 않고** 이번 transcript로 만든 새 문장을 칸 뒤에 덧붙인다. 공개 초안의 새 문장은 새 `lineId`(`L-D{n}-{k}`, `n`은 새 draftId), 기존 문장의 `edited`·공유 상태·동의는 그대로. 응답 `myNote`·`publicDraft`는 **합친 전체**이고 새 문장에 `new: true`. `draftId`는 새 값이며 `saveConsent(draftId)`는 합친 초안 전체를 대상으로 한다. `append`가 없으면 지금처럼 통째로 바꾸고, 화면은 `editedLines ≥ 1`이면 「다시 요약할까요?」 확인(getInbox 참고). `../talk/?mode=tell&program=…`으로 들어온 이어 쓰기와 질문이 끝난 뒤 「이어서 쓰기」는 모두 `append: true`로 부른다. `answered`는 기존 값과 이번 값 중 큰 쪽.
+**[v2] 후배 질문의 답**: transcript 항목에 `questionId`가 있으면 그 답은 **그 항목의 `section`(질문의 칸)**에 들어가고 문장에 `answersQuestionId`·`asked`가 붙는다(「후배 질문」 칸은 없다). 화면의 요약 카드는 그 문장 앞에 「Q. …」 인용을 작게 보여 준다.
 `match`는 AI 원문 일치 검사 결과. `false`면 화면이 "원문과 다를 수 있어요" 표시.
 `identifying`은 코드(정규식·사전)가 찾은 본인 식별 문장(성적 숫자·수상·실명·특정 인물). `true`면 동의 시트에서 기본 꺼짐 + 주의 라벨.
 **[11/22 열림]** 응답에 `answered`(이번 transcript의 유효 답변 수 — 서로 다른 질문, 10자 이상, 「몰라요」류·건너뛰기 제외)와 `need`(3)를 더한다. 서버는 내 경험노트에 큰 값을 남긴다. 화면은 `answered < need`면 공유 시트에 「세 가지 이상 이야기하면 선배 추천이 열려요」를 안내한다(요약·공유 자체는 막지 않음).
-**[11/19]** 후배 질문에 답한 문장은 `section: "후배 질문"`에 들어가고 `answersQuestionId`·`asked`(질문 원문)를 유지한다. myNote·publicDraft 모두 같다. 요약 전에 transcript는 0장 마스킹을 거친다.
+**[11/19]** 후배 질문에 답한 문장은 `answersQuestionId`·`asked`(질문 원문)를 유지한다(**[v2]** 칸은 질문의 칸). myNote·publicDraft 모두 같다. 요약 전에 transcript는 0장 마스킹을 거친다.
 ```json
 { "draftId": "D-0001", "program": "마르부르크필립스대학교", "saved": true, "myNoteId": "M-0001",
   "myNote": { "sections": [ { "name": "지원", "lines": [ { "text": "나는 출국 3학기 전부터 TestDaF를 준비했다." } ] },
                            { "name": "배운점", "lines": [ { "text": "낯선 행정 절차를 혼자 끝까지 처리하는 법을 배웠다." } ] } ] },
   "publicDraft": { "sections": [ { "name": "지원", "lines": [ { "lineId": "L-D1-1", "text": "출국 3학기 전부터 TestDaF를 준비했어요.", "match": true, "identifying": false } ] },
-                                 { "name": "후배 질문", "lines": [ { "lineId": "L-D1-7", "answersQuestionId": "Q-0001", "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+                                 { "name": "생활", "lines": [ { "lineId": "L-D1-7", "answersQuestionId": "Q-0001", "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
                                                                       "text": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.", "match": true, "identifying": false } ] } ] } }
 ```
 
 ### saveConsent(draftId, edits)
 payload `{draftId, edits:{removed:[lineId], changed:[{lineId, text}]}, consent:true}`. `removed` = 동의 시트에서 끈 문장(내 경험노트에는 남고 해봤노트에는 안 들어감). 이미 공유한 경험노트에서 다시 부르면 공유 범위를 바꾼다.
-**[11/19]** 통과한 문장은 `runtime/noteLines.json`에 `{noteId, section, text, sourceId: "I-…", semester, answersQuestionId?, asked?}`로 쌓인다(작업 26·74). `answersQuestionId`가 있으면 그 질문을 `status: "answered"`, `noteId`로 바꾸고 질문자에게 알림 `「내 질문에 선배가 답했어요 · {프로그램} 해봤노트」`(`alerts.json`, `questionId`·`noteId` 포함)를 보낸다. **칸 이름이 같다는 이유만으로 알림을 보내지 않는다.** 노트가 아직 없는 프로그램이면 새 노트 id를 만든다(`"N-" + slug`).
+**[11/19]** 통과한 문장은 `runtime/noteLines.json`에 `{noteId, section, text, sourceId: "I-…", semester, answersQuestionId?, asked?}`로 쌓인다(작업 26·74). **[v2]** `section`은 질문의 칸이고(「후배 질문」 칸 없음), 삭제된 질문(`status: "deleted"`)에 답한 문장은 칸 문장으로 싣되 `answered` 전환·알림은 하지 않는다. `answersQuestionId`가 있으면 그 질문을 `status: "answered"`, `noteId`로 바꾸고 질문자에게 알림 `「내 질문에 선배가 답했어요 · {프로그램} 해봤노트」`(`alerts.json`, `questionId`·`noteId` 포함)를 보낸다. **칸 이름이 같다는 이유만으로 알림을 보내지 않는다.** 노트가 아직 없는 프로그램이면 새 노트 id를 만든다(`"N-" + slug`).
 ```json
 { "ok": true, "noteId": "N-marburg", "added": 3, "answered": ["Q-0001"],
   "recommend": { "ready": true, "by": "talk", "need": 3, "talk": { "answered": 4, "shared": 3 }, "ask": false }, "unlocked": true }
@@ -244,7 +289,7 @@ payload `{noteId, scrap?: true|false}`(생략 = 켜기). 같은 상태로 다시
 mock은 기억하지 않는다(받은 값을 그대로 돌려주고, 목록·노트의 `scrapped`는 mock-data.json 고정값). 화면은 응답의 `scrapped`로 버튼 상태를 바꾼다.
 
 ### saveQuestion(noteId, section) [11/22]
-「질문함에 담기」 버튼(디자인 규칙 6-2 근거 없음 · 6-1 오래된 근거, PRD ⑧). 그 노트의 한 칸을 **질문함에 `hold`로** 넣는다 → 다음 선배 인터뷰(`interviewNext`)가 「후배가 이렇게 물었어요」로 먼저 묻고, 답이 공유되면 `answered` + 질문자 알림(기존 흐름 그대로). 질문 글은 서버가 정한다(`"{칸} 이야기를 최근 경험으로 듣고 싶어요."`, 자유 입력 없음 → 검사·AI 없음). 같은 사람·노트·칸의 `hold` 질문이 있으면 새로 만들지 않고 `already: true`(멱등). `후배 질문` 칸과 노트에 없는 칸은 오류.
+「질문함에 담기」 버튼(디자인 규칙 6-2 근거 없음 · 6-1 오래된 근거, PRD ⑧). 그 노트의 한 칸을 **질문함에 `hold`로** 넣는다 → 다음 선배 인터뷰(`interviewNext`)가 「후배가 이렇게 물었어요」로 먼저 묻고, 답이 공유되면 `answered` + 질문자 알림(기존 흐름 그대로). 질문 글은 서버가 정한다(`"{칸} 이야기를 최근 경험으로 듣고 싶어요."`, 자유 입력 없음 → 검사·AI 없음). 같은 사람·노트·칸의 `hold` 질문이 있으면 새로 만들지 않고 `already: true`(멱등). 노트에 없는 칸은 오류(**[v2]** 「후배 질문」 칸은 없다).
 ```json
 { "ok": true, "questionId": "Q-0101", "already": false, "message": "질문함에 담았어요. 다음 선배 인터뷰 때 먼저 물어볼게요." }
 { "error": "담을 수 없는 칸이에요" }
@@ -256,7 +301,8 @@ mock은 기억하지 않는다(받은 값을 그대로 돌려주고, 목록·노
 칸 순서와 이름은 `data/frames.json`을 따른다. 빈 칸도 `lines: []`로 보낸다. `interviewOnly`가 true인 칸은 선배 인터뷰로만 채워진다.
 **[11/19] 노트가 만들어지는 규칙(작업 26, PRD 4-2)**: 노트 = `data/notes.json`(사전 생성) + `runtime/noteLines.json`(동의 통과 인터뷰 문장)의 합집합.
 - `tools/build_notes.py`(원우)가 `evidence.json`을 프로그램별·칸별로 묶어 `notes.json`을 만든다. 칸 문장 = 근거 문단 **원문 그대로 1:1**(`text` = `evidence.text`, `sourceId` = `evidence.id`, AI 변환 없음). `official`은 학점·장학·선발·자격 키워드 정규식. `forWhom`은 템플릿(`"{국가}권 {분야}를 생각하는 1~2학년"` / 인턴 `"{직군} 분야 현장실습을 생각하는 2~3학년"`), `oneLine`은 근거가 가장 많은 칸의 첫 문장(P1-여건 78: 칸별 AI 한 줄 요약 `sectionSummary`), `evidenceCount` = 보고서 문단 + 동의 인터뷰 문장, `lastSemester` = 최대 학기. 현장실습 노트의 자동 분류 문장은 `autoClassified: true`(화면 「자동 분류」 라벨).
-- 서버는 응답할 때 `noteLines.json`의 같은 `noteId` 문장을 해당 칸 뒤에 붙인다(`docType: "인터뷰"`). **「후배 질문」 칸**의 문장은 `asked`(Q)와 `text`(A)를 함께 보내고, 화면은 Q·A 쌍으로 원문 인용한다(합쳐 요약하지 않음). 같은 `answersQuestionId`에 선배 여럿이 답하면 A가 쌓인다.
+- 서버는 응답할 때 `noteLines.json`의 같은 `noteId` 문장을 해당 칸 뒤에 붙인다(`docType: "인터뷰"`). **[v2] 「후배 질문」 칸은 없다.** 후배 질문에 답한 문장은 질문의 칸에 일반 문장으로 들어가며 `answersQuestionId`·`asked`를 유지한다 → 화면은 그 문장에 중립 라벨 「후배 질문에 답한 문장」만 붙인다(Q는 보이지 않음). Q·A 쌍은 질문자의 내 보관함 질문 상세에서만 본다. 같은 질문에 선배 여럿이 답하면 그 칸에 문장이 여럿 쌓인다.
+- **[v2, P1-여건 78·C 단계] 칸별 요약 문단 `summary`**: `tools/build_notes.py`(원우)가 칸마다 askBoo ⑤ 「답 쓰기」 프롬프트를 질문 없이 돌려 만든다. `summary: [{text, sources: ["R213-6", …], years: [2023, 2026]}]`, 문장마다 `sources` 1개 이상, 코드 검증(askBoo ⑥과 같음)을 통과한 문장만. 같은 뜻 문장은 하나로 합치고 연도를 묶는다. **배운점은 만들지 않는다**(선배별 원문 인용 유지). 인터뷰로 새 문장이 들어와도 문단은 다시 만들지 않는다(화면: 문단 아래 「새로 더해진 선배 이야기 N건」 원문). 없으면 필드 생략 → 화면은 지금처럼 원문 목록. 마르부르크 1개로 먼저 시험한 뒤 11/29에 전체 적용을 정한다.
 - **[11/22] 배운점 `senior`**: 배운점 칸 문장마다 `"senior": "선배 A"`. 글자는 **이 노트 안에서만** 쓰는 것으로, 칸에 처음 나온 선배부터 A·B·C(같은 선배는 같은 글자). 학과는 넣지 않는다 — PRD 9-1(노트가 프로그램 단위라 학과까지 보이면 소수 학과에서 특정됨). 닮은선배 `nickname`과도 같은 글자를 쓰지 않는다(이으면 학과가 드러남). 화면은 「선배 A · 2025」(senior + 출처 연도). 쓴 사람을 모르면 `senior`가 없다 → 출처만.
 - `sources[*].semester`는 그대로 보내고 화면이 연도만 표시한다(0장). 근거 1~2건인 칸은 화면이 「선배 1명의 경험이에요」 라벨(`lines.length`로 판단, 서버 필드 없음).
 ```json
@@ -266,8 +312,10 @@ mock은 기억하지 않는다(받은 값을 그대로 돌려주고, 목록·노
   "officialUrl": "https://...",
   "sections": [ { "name": "지원", "interviewOnly": false,
                   "lines": [ { "text": "...", "sourceId": "R03-1-1", "lineId": "L-R03-1-1", "official": false } ] },
-                { "name": "후배 질문", "interviewOnly": true,
-                  "lines": [ { "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?", "answersQuestionId": "Q-0001",
+                { "name": "생활", "interviewOnly": false,
+                  "summary": [ { "text": "기숙사는 합격 직후 신청해야 하고 월 300~680유로 사이였어요.", "sources": ["R03-2-4", "R149-2-4"], "years": [2025, 2026] } ],   // [v2] P1-여건, 없으면 생략
+                  "lines": [ { "text": "...", "sourceId": "R03-2-4", "lineId": "L-R03-2-4", "official": false },
+                             { "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?", "answersQuestionId": "Q-0001",
                                "text": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.", "sourceId": "I-0003", "lineId": "L-I-0003", "official": false } ] } ],
   "sources": { "R03-1-1": { "docType": "귀국보고서", "program": "마르부르크필립스대학교", "semester": "2025-1" },
                "I-0003": { "docType": "인터뷰", "program": "마르부르크필립스대학교", "semester": "2025-1" } } }
@@ -384,8 +432,27 @@ payload `{threadId, reason?, block?}`. 쪽지 대화 ⋮ 메뉴의 신고·차�
   "alerts": [ { "text": "내 질문에 선배가 답했어요 · 마르부르크필립스대학교 해봤노트", "questionId": "Q-0002", "noteId": "N-marburg", "at": "..." } ] }
 ```
 **[11/22] 내 경험노트 카드(`myNotes`)**: `id`는 내 경험노트 번호(`M-…`), `noteId`는 공유되는 해봤노트 번호. `share` = `private`(나만 보기) | `partial`(일부 공유 — 화면 「N문장 공유」, N = `sharedLines`) | `shared`(해봤노트 공유됨). **「반영 중」 상태는 없다** — `saveConsent`가 그 자리에서 해봤노트에 반영하므로(11/22 미리 결정), 공유 직후 알림은 「해봤노트에 내 이야기가 반영됐어요」(`noteId` 포함). `filled`/`total` = 노트 틀에서 내 문장이 있는 칸 수 / 전체 칸 수(「노트 틀 4/7」). `sharedLines` = 지금 해봤노트에 보이는 내 문장 수(신고로 숨긴 것 제외).
-**[11/23 고치기] `editedLines`** = 선배가 고친 문장 수(내 경험노트 문장 `updateMyNote` + 공개 문장 `saveConsent` `changed`, 줄마다 `edited: true`인 것). `getMyNote`에도 같은 값. **다시 요약하면 고친 문장이 사라진다** — `summarizeInterview`는 같은 프로그램의 내 경험노트와 공개 초안을 새 AI 문장으로 통째로 바꾼다. 그래서 화면(인터BOO 들려주기)은 「AI 요약」을 누르면 `getInbox().myNotes`에서 같은 `program` 카드를 찾아 `editedLines ≥ 1`이면 확인 바텀시트를 먼저 띄운다: 제목 「다시 요약할까요?」, 본문 「고친 문장 N개가 새 요약으로 바뀌어요. 해봤노트에 이미 공유한 문장은 다시 공유하기 전까지 그대로예요.」, Primary 「새로 요약하기」 / Text 「취소」. 0이거나 카드가 없으면 바로 요약한다.
-**[11/19]** 질문 `status`는 `hold`(미답변) | `answered`. 화면은 `answered`에 「선배가 답했어요」 라벨 + 노트 「후배 질문」 칸 링크. (이전 예시의 `waiting`은 쓰지 않는다.)
+**[11/23 고치기] `editedLines`** = 선배가 고친 문장 수(내 경험노트 문장 `updateMyNote` + 공개 문장 `saveConsent` `changed`, 줄마다 `edited: true`인 것). `getMyNote`에도 같은 값. **다시 요약하면 고친 문장이 사라진다** — `summarizeInterview`는 같은 프로그램의 내 경험노트와 공개 초안을 새 AI 문장으로 통째로 바꾼다(**[v2]** `append: true`면 지우지 않고 덧붙이므로 이 확인은 `append`가 아닐 때만). 그래서 화면(인터BOO 들려주기)은 「AI 요약」을 누르면 `getInbox().myNotes`에서 같은 `program` 카드를 찾아 `editedLines ≥ 1`이면 확인 바텀시트를 먼저 띄운다: 제목 「다시 요약할까요?」, 본문 「고친 문장 N개가 새 요약으로 바뀌어요. 해봤노트에 이미 공유한 문장은 다시 공유하기 전까지 그대로예요.」, Primary 「새로 요약하기」 / Text 「취소」. 0이거나 카드가 없으면 바로 요약한다.
+**[11/19]** 질문 `status`는 `hold`(미답변) | `answered` | `official`. 화면은 `answered`에 「선배가 답했어요」 라벨 + 해봤노트 링크(**[v2]** 「후배 질문」 칸이 없으므로 질문 상세의 「선배의 답」 Q·A가 주 화면, 노트 링크는 보조). (이전 예시의 `waiting`은 쓰지 않는다.) **[v2]** `deleted`는 목록에 나오지 않는다. 카드·상세의 「더 들려주기」(`myNotes` 카드, `../talk/?mode=tell&program=…`)는 비활성 「자소서용 요약 보기」 자리에 둔다. `total`은 「후배 질문」 칸을 뺀 칸 수.
+
+### deleteQuestion(questionId) · updateQuestion(questionId, text) [v2]
+내 보관함 질문 상세의 「질문 삭제」·「질문 고치기」. **본인 질문이고 `status: "hold"`일 때만**. `answered`·`official`은 `{ "error": "선배가 답한 질문은 지울 수 없어요" }` / `{ "error": "공식 안내 질문은 고칠 수 없어요" }`, 남의 것·없는 것은 `{ "error": "볼 수 없는 기록이에요" }`.
+- `deleteQuestion`: **소프트 삭제** — `status: "deleted"`, `deletedAt`. 행은 남아 콘솔 통계(PRD 9-3 「학번 제거 후 통계 영구」)에만 쓰이고 `interviewNext`·`getInbox`·askBoo 근거·수요 집계의 「미답변」에서는 뺀다. 선배가 답하는 도중 삭제되면 saveConsent 참고.
+- `updateQuestion`: `text` 앞뒤 공백 제거, 빈 문장·**300자** 초과는 `{error}`. 선배 화면에 그대로 나가므로 `check_public_text`(학번·연락처·메일·링크·주소·금지어)를 거쳐 걸리면 `{ "error": "질문에 연락처·메일·링크를 넣을 수 없어요", "reason": "연락처" }`. 통과하면 `질문`을 덧쓰고 `editedAt`, 응답에 고친 질문. 프로그램·칸은 바꾸지 않는다(바꾸려면 삭제 후 다시 묻기). AI 없음.
+```json
+{ "ok": true, "questionId": "Q-0001", "status": "deleted" }
+{ "ok": true, "questionId": "Q-0001", "text": "마르부르크에서 학기 중에 인턴을 같이 할 수 있어요?", "editedAt": "..." }
+```
+화면(민지): 질문 상세에서만, 하단 Text 「질문 고치기」「질문 삭제」. 삭제는 확인 대화상자(디자인 규칙 5-10), 고치기는 입력창 + Secondary 「저장」 / Text 「취소」(공개 동의 시트 「문장 고치기」와 같은 모양). 목록 카드에는 두지 않는다.
+
+### saveInterviewDraft(program, answers) · getInterviewDraft(program) [v2, P1-여건 79]
+들려주기 미완성 초안. 답할 때마다 `saveInterviewDraft(program, answers)`(answers는 interviewNext payload와 같은 모양), 들어올 때 `getInterviewDraft(program)` → `{answers, savedAt}` 또는 `{answers: []}`. 사람·프로그램별 하나, `runtime/interviewDrafts.json`. **7일** 지나면 없는 것으로 보고, `summarizeInterview`가 끝나면 지운다(0장 보관기간). 마스킹 전 원문이므로 본인만(`owner == me`). AI 없음.
+- **1단계(즉시, 서버 없음)**: 화면이 들려주기·물어보기 대화를 `sessionStorage`에 프로그램별로 저장·복원한다(탭마다 따로 — 두 창 시연). 돌아오면 BOO가 「아까 이야기를 이어서 할게요」 + 마지막 질문을 다시 보인다. 물어보기 저장분은 askBoo `history`로도 쓴다.
+- **2단계(작업 79)**: 위 두 함수. 다른 기기·다음 날에도 이어 쓴다.
+```json
+{ "ok": true, "savedAt": "2026-11-23T16:00:00+09:00", "expiresAt": "2026-11-30T16:00:00+09:00" }
+{ "answers": [ { "section": "팁", "question": "…", "answer": "…" } ], "savedAt": "..." }
+```
 
 ### getMyNote(id) [11/22]
 내 경험노트 상세(디자인 규칙 8절). **본인 것만**(남의 것·없는 것은 `{"error": "볼 수 없는 기록이에요"}`). AI 없음.
@@ -418,7 +485,7 @@ payload `{id, changed: [{section, index, text}]}` — `index`는 `getMyNote`의 
 
 ### demandNext(state) [11/22 열림]
 「궁금한 것 정리하기」(수요 인터뷰) 다음 단계 하나. **AI 없음** — 칩과 규칙만(`functions/demand.py`). interviewNext처럼 서버는 기억하지 않고, 화면이 응답의 `state`를 들고 다니다 고른 값·쓴 답을 넣어 다시 보낸다.
-순서: `field`(국제교류·현장실습·비교과·잘 모르겠어요) → (`explore`: 「잘 모르겠어요」면 고민 칩으로 분야·분류를 정함) → `detail`(국제교류 = 나라, 현장실습 = 기관 유형, 비교과 = 프로그램 분류, `programs.json` `세부`) → `program`(그 분류의 프로그램 + 「아직 정하지 않았어요」) → `section`(노트 틀 칸, 후배 질문 제외) → `when`(이번 학기·다음 학기·1년 뒤·아직 몰라요) → **답변 3개** `situation`(지금 내 상황) · `question`(고른 칸에 대해 선배에게 묻고 싶은 것) · `hope`(이 경험이 남겨 줬으면 하는 것) → `more`(더 궁금한 것 최대 2개, `canSkip` — 건너뛰려면 `state.moreDone = true`).
+순서: `field`(국제교류·현장실습·비교과·잘 모르겠어요) → (`explore`: 「잘 모르겠어요」면 고민 칩으로 분야·분류를 정함) → `detail`(국제교류 = 나라, 현장실습 = 기관 유형, 비교과 = 프로그램 분류, `programs.json` `세부`) → `program`(그 분류의 프로그램 + 「아직 정하지 않았어요」) → `section`(노트 틀 칸) → `when`(이번 학기·다음 학기·1년 뒤·아직 몰라요) → **답변 3개** `situation`(지금 내 상황) · `question`(고른 칸에 대해 선배에게 묻고 싶은 것) · `hope`(이 경험이 남겨 줬으면 하는 것) → `more`(더 궁금한 것 최대 2개, `canSkip` — 건너뛰려면 `state.moreDone = true`).
 - 칩 단계의 값: `state[step] = 고른 값`. `detail` 칩은 `{value, label}`이고 「아직 정하지 않았어요」는 `value: null`. `explore`는 `state.explore = 고른 label`(state.field는 「잘 모르겠어요」 그대로).
 - 답변 단계: `state[step] = 쓴 문장`, `more`는 `state.more = [..., 문장]`. **유효 답변** = 10자 이상, 「몰라요」류·같은 글자 반복 아님, `check_message`(학번·연락처·비방) 통과. 아니면 같은 단계 + `retry`(문구).
 - `progress.answered`는 유효 답변 수(칩은 세지 않음), `need`는 3.
@@ -438,7 +505,7 @@ payload `{id, changed: [{section, index, text}]}` — `index`는 `getMyNote`의 
 
 ### saveDemand(state) [11/22 열림]
 payload `{state, consent: true}`. 서버가 같은 규칙으로 다시 검사한다. 끝나지 않았으면 `{ "ok": false, "message": "아직 정리가 끝나지 않았어요", "next": {demandNext 응답} }`.
-저장: 질문 문장(가장 궁금한 것 + 더 궁금한 것)을 **질문함에 `hold`로**(`프로그램명`·`칸`·`시기`·`수요: true`) — 다음 그 프로그램 선배의 들려주기가 「후배 질문」으로 먼저 묻고(작업 74), 콘솔 수요 현황에도 합산된다. `fromQuestionId`로 시작했으면 그 질문 행에 맥락만 붙인다(질문함이 늘지 않음). 상황·바라는 것은 `runtime/demands.json`에만 둔다(선배에게 보내지 않음, 부서 집계는 P1).
+저장: 질문 문장(가장 궁금한 것 + 더 궁금한 것)을 **질문함에 `hold`로**(`프로그램명`·`칸`·`시기`·`수요: true`) — 다음 그 프로그램 선배의 들려주기가 후배 질문으로 먼저 묻고(작업 74, **[v2]** `junior: true`), 콘솔 수요 현황에도 합산된다. `fromQuestionId`로 시작했으면 그 질문 행에 맥락만 붙인다(질문함이 늘지 않음). 상황·바라는 것은 `runtime/demands.json`에만 둔다(선배에게 보내지 않음, 부서 집계는 P1).
 ```json
 { "ok": true, "demandId": "R-0001", "questionIds": ["Q-0003"],
   "recommend": { "ready": true, "by": "ask", "need": 3, "talk": { "answered": 0, "shared": 0 }, "ask": true }, "unlocked": true }
@@ -466,8 +533,9 @@ payload `{lineId, reason?}`. 신고된 문장은 즉시 숨김, 부서 리포트
 ## 5. data.js에 둘 export (시그니처)
 
 ```js
-login(id, pw) · getMe() · askBoo(question) · setRecommendable(on)   // setRecommendable [11/23 추천]
-interviewNext(program, answers) · summarizeInterview(program, transcript) · saveConsent(draftId, edits)
+login(id, pw) · getMe() · askBoo(question, history = []) · setRecommendable(on)   // setRecommendable [11/23 추천] · history [v2]
+interviewNext(program, answers) · summarizeInterview(program, transcript, append = false) · saveConsent(draftId, edits)   // append [v2]
+deleteQuestion(questionId) · updateQuestion(questionId, text) · saveInterviewDraft(program, answers) · getInterviewDraft(program)   // [v2] 질문 삭제·고치기 · 미완성 초안(P1-여건 79)
 listNotes(filter) · getNote(id) · scrapNote(noteId, scrap = true) · saveQuestion(noteId, section) · reportStatement(lineId, reason)   // scrapNote·saveQuestion [11/22]
 recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages(read?) · respondRequest(threadId, accept) · cancelRequest(threadId) · reportThread(threadId, reason, block = false)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85) · reportThread [11/23 차단] · getMessages(threadId) = 그 대화만 읽음 [11/23 읽음]
 getInbox() · getMyNote(id) · updateMyNote(id, changed) · getDeptReport(dept)   // getMyNote [11/22] · updateMyNote [11/23 고치기]
@@ -484,20 +552,20 @@ currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이
 - `getNote["N-kotra"]`도 하나: 현장실습 노트(`KOTRA 해외무역관(유럽 권역)`, 데이터에서 후기가 가장 많은 기관), 칸은 5개 [`지원동기`, `업무내용`, `배운점`, `지원·선발`, `근무조건`]. 마지막 두 칸은 `interviewOnly: true`이고 비어 있음. (`지원·선발`은 한 칸의 이름이다)
 - 출처 학기는 선배1(H0469)의 보고서 `2025-1`, H0745의 보고서 `2025-2`. 노트의 `lastSemester`는 마르부르크 보고서 중 최근인 `2026-1`.
 - recommendSeniors는 선배1(H0469, 14점: 학과 5+이중전공 4+단과대 3+공통 비교과 `한국외국어대학교 직무탐색 집중교육` 2), 선배2(H0241, 12점: 학과·이중전공·단과대, 공통 비교과 없음) 두 명(11/20 가중치 기준. 실제 데이터의 3~5위 H0751·H0995·H0745는 8점), reasons 맨 앞은 「희망 프로그램을 경험했어요」. 가상 문장만 쓰고 실제 후기 원문을 옮기지 않는다.
-- **[11/19]** `getNote["N-marburg"]`에 7번째 칸 `후배 질문`(`interviewOnly: true`, Q·A 1쌍, `asked`·`answersQuestionId: "Q-0001"`). `interviewNext.byProgram["마르부르크필립스대학교"].steps[0]`은 `section: "후배 질문"`(questionId·asked·pendingQuestions 1), `steps[1..]`은 기존 칸, `total` 7. `summarizeInterview.publicDraft`에 `후배 질문` 칸 1문장. `saveConsent`에 `answered: ["Q-0001"]`. `getInbox.questions[1]`은 `answered`, `alerts[0]`은 「내 질문에 선배가 답했어요」. `getNote["N-kotra"]`는 칸 6개(…`근무조건`, `후배 질문`)이고 자동 분류 문장에 `autoClassified: true`.
+- ~~**[11/19]** `getNote["N-marburg"]`에 7번째 칸 `후배 질문`~~ → **[v2]** 「후배 질문」 칸을 뺀다. `getNote["N-marburg"]`는 6칸이고 생활 칸에 `answersQuestionId: "Q-0001"`·`asked`가 붙은 인터뷰 문장 1개. `interviewNext.byProgram["마르부르크필립스대학교"].steps[0]`은 `junior: true`·`section: "생활"`(questionId·asked·pendingQuestions 1), `steps[1..]`은 기존 칸, `total` 6, 모든 step에 `covered`. `summarizeInterview.publicDraft` 생활 칸에 `answersQuestionId` 문장 1개. `saveConsent`에 `answered: ["Q-0001"]`. `getInbox.questions[1]`은 `answered`, `alerts[0]`은 「내 질문에 선배가 답했어요」. `getNote["N-kotra"]`는 칸 5개(…`근무조건`)이고 자동 분류 문장에 `autoClassified: true`. **[v2]** `askBoo.chat` 하나(「아까는 KOTRA 해외무역관 이야기였어요…」 + 칩 2개), `askBoo.exchange` 문장마다 `cites`.
 
 ## 7. data/frames.json (이번에 함께 생성)
 
 ```json
 {
-  "교환": { "칸": ["지원", "학점", "비용", "생활", "팁", "배운점", "후배 질문"], "인터뷰로만": ["배운점", "후배 질문"] },
-  "파견": { "칸": ["지원", "학점", "비용", "생활", "팁", "배운점", "후배 질문"], "인터뷰로만": ["배운점", "후배 질문"] },
-  "인턴": { "칸": ["지원동기", "업무내용", "배운점", "지원·선발", "근무조건", "후배 질문"], "인터뷰로만": ["지원·선발", "근무조건", "후배 질문"] },
-  "비교과": { "칸": ["활동내용", "배운점", "후배 질문"], "인터뷰로만": ["후배 질문"] }
+  "교환": { "칸": ["지원", "학점", "비용", "생활", "팁", "배운점"], "인터뷰로만": ["배운점"] },
+  "파견": { "칸": ["지원", "학점", "비용", "생활", "팁", "배운점"], "인터뷰로만": ["배운점"] },
+  "인턴": { "칸": ["지원동기", "업무내용", "배운점", "지원·선발", "근무조건"], "인터뷰로만": ["지원·선발", "근무조건"] },
+  "비교과": { "칸": ["활동내용", "배운점"], "인터뷰로만": [] }
 }
 ```
 - 11/16: 교환·파견에 `배운점` 추가(PRD 4-1). 실제 `data/frames.json` 반영은 작업 70. `배운점` 칸은 해봤노트에서 선배별 원문 인용으로 렌더한다(합쳐 요약하지 않음).
-- **11/19: 네 틀 모두에 `후배 질문` 추가**(PRD 4-2 ⑤). 질문함의 미답변 질문과 그 답이 Q·A 쌍으로 쌓이는 칸. 보고서 문항 매핑(9장)은 바뀌지 않는다. `data/frames.json`에 11/19 반영 완료. (P1-여건, 작업 84) 칸별 `"예시"`: `{"지원": ["출국 3학기 전", "1년 전", "합격 후"], …}` 모양으로 원우가 추가하면 `interviewNext.examples`로 나간다.
+- ~~11/19: 네 틀 모두에 `후배 질문` 추가~~ → **[v2] 11/23: 「후배 질문」 칸을 뺀다**(팀 합의, 검토안 3-5). 후배 질문은 질문함에 쌓였다가 다음 선배에게 나가면 되고, 답은 질문이 속한 칸에 들어간다. `data/frames.json` 반영은 원우(작업 89), 서버·화면의 `QUESTION_SECTION` 분기 제거는 미리·민지. `인터뷰로만`은 그대로(비교과는 빈 목록). 보고서 문항 매핑(9장)은 바뀌지 않는다. (P1-여건, 작업 84) 칸별 `"예시"`: `{"지원": ["출국 3학기 전", "1년 전", "합격 후"], …}` 모양으로 원우가 추가하면 `interviewNext.examples`로 나간다.
 
 ## 8. 완료 확인
 
