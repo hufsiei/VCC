@@ -221,6 +221,9 @@ function pickMock(m, name, p) {
       return m[name][!p.dept || p.dept === "ALL" ? "ALL" : "D01"]; // mock은 전체·국제교류팀 두 벌(PRD 7장)
     case "respondRequest":
       return p.cancel ? m.cancelRequest : m.respondRequest; // 요청 취소(cancelRequest)도 같은 서버 함수
+    case "reportThread": // [11/23] mock은 기억하지 않는다(쪽지 목록은 고정값) — 응답 모양만 서버와 같게
+      if (!p.reason && !p.block) return { error: "신고 사유를 골라 주세요" };
+      return { ok: true, reported: !!p.reason, blocked: !!p.block, status: p.block ? "blocked" : "accepted" };
     default:
       return m[name];
   }
@@ -296,6 +299,8 @@ export const getMessages = () => call("getMessages");
 export const respondRequest = (threadId, accept) => call("respondRequest", { threadId, accept });
 // 보낸 사람이 수락 대기(waiting) 요청을 거둔다 → status "cancelled". 서버 함수는 respondRequest 하나(spec 4장)
 export const cancelRequest = (threadId) => call("respondRequest", { threadId, cancel: true });
+// [11/23] 쪽지 대화 ⋮ 메뉴 신고·차단. reason만 → 신고, block: true → 차단(양쪽 다 더 못 보냄, 상대에게 알림 없음). 둘 다 가능
+export const reportThread = (threadId, reason, block = false) => call("reportThread", { threadId, reason, block });
 export const getInbox = () => call("getInbox");
 // 내 경험노트 상세(본인만) → { id, program, type, noteId, share, filled, total, sharedLines, draftId, sections[{name, lines[{text, publicText, lineId, shared}]}], publicDraft } (spec 4장)
 export const getMyNote = (id) => call("getMyNote", { id });

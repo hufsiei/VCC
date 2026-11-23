@@ -12,7 +12,9 @@
 # 노트 읽기(getNote·listNotes)와 askBoo 근거 풀은 notes.py.
 # 내 경험노트(11/22): getInbox.myNotes 카드(share·filled/total·sharedLines)와 getMyNote(id) 상세는 _my_note_view 하나로 계산.
 # 쪽지 규칙(11/18·11/20, spec 4장 sendMessage, 작업 85): 선배당 요청 1건 · 보낸 사람 수락 대기 3건 · 받는 선배 5건 ·
-#   요청 취소(7일 재요청 금지) · 7일 자동 만료. status = waiting | accepted | declined | cancelled | expired
+#   요청 취소(7일 재요청 금지) · 7일 자동 만료. status = waiting | accepted | declined | cancelled | expired | blocked
+# 쪽지 신고·차단(11/23, reportThread): 신고는 threadReports.json에 남고, 차단하면 그 두 사람 사이 대화는 양쪽 다 더 못 보낸다.
+#   상대에게 알리지 않는다. 차단 풀기는 P1.
 # 선배 추천 열림(11/22, demand.py): 경험 나눔(답변 3 + 1문장 공유) 또는 수요 제공(궁금한 것 정리하기) 전에는
 #   recommendSeniors·previewNickname·sendMessage(새 요청)가 {locked} / reason "잠김"으로 막는다. 받은 선배의 답장은 막지 않는다.
 # recommendSeniors(작업 85): 점수는 score.py(원우), 목록 보관·더 보기·재계산은 여기(spec 4장 인원 규칙).
@@ -37,6 +39,8 @@ COOLDOWN_DAYS = 7            # 취소한 선배에게 다시 요청하지 못하
 PAGE, MAX_SHOWN = 3, 9       # 닮은선배: 처음 3명, 더 보기마다 3명, 한 번에 보이는 목록 최대 9명
 EXPIRED_ALERT = "선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?"
 REQUEST_ALERT = "쪽지 요청이 왔어요"
+BLOCKED_MESSAGE = "더 이어 갈 수 없는 대화예요"
+REASON_MAX = 100             # 신고 사유 글자 수 상한(화면은 고르기 + 기타)
 
 ADJECTIVES = ["용감한", "조용한", "느긋한", "다정한", "씩씩한", "궁금한", "반짝이는", "부지런한",
               "차분한", "명랑한", "수줍은", "든든한", "포근한", "재빠른", "꼼꼼한", "따뜻한"]
@@ -216,6 +220,8 @@ def sendMessage(me, p):
                 return {"ok": False, "reason": "상태", "message": "받지 않은 요청이에요"}
         else:
             tid, t = _find_thread(me, to)
+        if t and t["status"] == "blocked":               # 누가 차단했든 그 두 사람 사이는 막힌다(11/23)
+            return {"ok": False, "reason": "차단", "message": BLOCKED_MESSAGE}
 
         if t is None:                                   # 첫 메시지 = 쪽지 요청
             lk = demand.locked(me)
@@ -286,6 +292,8 @@ def getMessages(me, p):
                 item["askerInfo"] = _asker_info(t["asker"])
             if t["status"] == "declined":
                 item["declined"] = True
+            if t["status"] == "blocked":
+                item["blockedByMe"] = t.get("blockedBy") == me
             t["lastRead"][me] = now()
             out.append(item)
         store.save("messages")
@@ -328,6 +336,33 @@ def respondRequest(me, p):
         _alert(t["asker"], f"쪽지 요청이 수락됐어요 · {label}" if accept else f"이번 쪽지 요청은 연결되지 않았어요 · {label}",
                threadId=tid)
         return {"ok": True, "status": t["status"], "accepted": accept}
+
+
+def reportThread(me, p):
+    """쪽지 대화 신고·차단 {threadId, reason?, block?} (11/23, 작업 28 ⋮ 메뉴).
+    reason이 있으면 신고 기록(threadReports.json), block이면 status blocked — 양쪽 모두 더 보낼 수 없다.
+    상대에게 알리지 않는다. 대화의 asker·senior만 부를 수 있다(선배 목록에서 사라진 취소·만료 요청은 선배가 못 부름)."""
+    tid = p.get("threadId")
+    reason = str(p.get("reason") or "").strip()[:REASON_MAX]
+    block = bool(p.get("block"))
+    if not reason and not block:
+        return {"error": "신고 사유를 골라 주세요"}
+    with store.lock():
+        _expire_old()
+        t = _threads().get(tid)
+        if not t or me not in (t["asker"], t["senior"]) or                 (me == t["senior"] and t["status"] in ("cancelled", "expired")):
+            return {"error": "볼 수 없는 기록이에요"}
+        if reason:
+            store.load("threadReports", []).append({
+                "threadId": tid, "by": me, "role": "asker" if t["asker"] == me else "senior",
+                "reason": reason, "block": block, "at": now()})
+            store.save("threadReports")
+        if block and t["status"] != "blocked":
+            if t["status"] == "waiting":
+                _drop_request_alert(t["senior"], tid)
+            t.update(status="blocked", blockedBy=me, blockedAt=now(), statusBeforeBlock=t["status"])
+            store.save("messages")
+        return {"ok": True, "reported": bool(reason), "blocked": t["status"] == "blocked", "status": t["status"]}
 
 
 # ---------- 닮은선배 (spec 4장 recommendSeniors, 작업 85) ----------
@@ -597,6 +632,7 @@ ROUTES = {
     "sendMessage": sendMessage,
     "getMessages": getMessages,
     "respondRequest": respondRequest,
+    "reportThread": reportThread,           # [11/23] 쪽지 신고·차단 (AI 없음)
     "recommendSeniors": recommendSeniors,   # AI 없음 → 호출 한도와 무관(작업 85)
     "saveConsent": saveConsent,
     "getMyNote": getMyNote,   # [11/22] 내 경험노트 상세
