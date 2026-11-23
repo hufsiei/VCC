@@ -835,6 +835,12 @@
         "status": "answered",
         "noteId": "N-marburg",
         "answeredAt": "2026-11-19T15:00:00+09:00"
+      },
+      {
+        "questionId": "Q-0002",
+        "text": "마르부르크 교환학생도 장학금 받을 수 있어요?",
+        "status": "official",
+        "askedAt": "2026-11-18T10:00:00+09:00"
       }
     ],
     "scraps": [
