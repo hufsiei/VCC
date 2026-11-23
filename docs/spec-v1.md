@@ -15,6 +15,7 @@
 > **11/23 개정 ③(선배가 요약 문장 고치기, 미리 결정)**: 내 경험노트와 해봤노트 공개 문장은 **따로** 고친다(읽는 사람이 달라 표현이 다를 수 있음). 공개 문장은 공개 동의 시트의 「문장 고치기」(`saveConsent` `changed`, **[11/23 고치기]**), 내 경험노트 문장은 새 함수 **`updateMyNote(id, changed)`**. `getMyNote` 문장에 `edited`. 바뀐 곳은 **[11/23 고치기]** 표시.
 > **11/23 개정 ②(작업 29 실사용, 미리 결정)**: ① `askBoo`에 새 `status: "notes"` — 사람을 찾는 질문(「네덜란드 교환 다녀온 선배?」)이나 나라만 말한 질문에 주제어가 없으면 답 대신 해봤노트 카드(`notes[]`)로 안내한다. 프로그램명이 없으면 **나라 이름**(`programs.json` `세부`)으로 그 나라 프로그램을 찾는다. `hold` 문구를 이유별로 나누고(노트가 있는데 「경험한 선배가 없어요」라고 하지 않음), 노트가 있으면 `hold`에도 `noteId`. ② 닮은선배 **추천받기 끄기** — 새 함수 **`setRecommendable(on)`**, `getMe.recommendable`, `sendMessage`의 `reason: "추천 제외"`. 경험자는 기본으로 후보이고, 끈 선배는 추천·새 쪽지 요청에서 빠진다. 바뀐 곳은 **[11/23 노트]**·**[11/23 추천]** 표시.
 > **11/23 개정(작업 28, 민지 요청)**: 쪽지 대화 ⋮ 메뉴용 새 함수 **`reportThread(threadId, reason, block)`** — 신고(`threadReports.json`)·차단(`status: "blocked"`, 양쪽 다 더 못 보냄). `sendMessage`에 `reason: "차단"`, `getMessages`에 `blockedByMe`. 바뀐 곳은 **[11/23 차단]** 표시.
+> **11/23 개정 ④(쪽지 읽음, 미리 결정)**: `getMessages()`는 목록만 돌려주고 **읽음으로 바꾸지 않는다**(닮은선배 화면이 버튼 상태를 볼 때 안 읽음이 사라지던 것). 대화창을 열 때 `getMessages(threadId)`(payload `{read: threadId}`)로 부르면 그 대화만 읽음. 바뀐 곳은 **[11/23 읽음]** 표시.
 > **11/22 개정 ②(작업 21, 미리)**: `interviewNext`가 보고서가 이미 답한 칸은 묻지 않고(빈 칸·오래된 칸만), **깊이 질문**(`depth`, 교환·파견 3개·인턴·비교과 2개)을 묻는다. 묻지 않은 칸은 **`covered`**로 알린다(4장).
 > **11/20 개정(닮은 선배 실제 데이터 기준)**: 시연 인물을 `가상데이터_1000명.xlsx` 실제 값에 맞췄다. 선배2를 H0745 → **H0241**(독일어과 3학년·경영학, 마르부르크 2026-1, 12점 2위)로 바꾸고, 선배1과 후배1의 공통 비교과를 `합격 면접 취업특강(커리어랩)` → **`한국외국어대학교 직무탐색 집중교육`**으로 바꿨다. H0241은 공통 비교과가 없다(12점 = 학과 5 + 이중전공 4 + 단과대 3). 후배1은 현장실습 이수가 없다. 선배1 보고서 학기 2024-1 → 2025-1(1·4·6장 예시 포함).
 
@@ -336,7 +337,8 @@ payload `{to}`. 이 선배에게 보낼 대화의 내 닉네임을 정해 돌려
 { "myNickname": "용감한 수달" }
 ```
 
-### getMessages()
+### getMessages(read?)
+**[11/23 읽음]** payload `{}` 또는 `{read: threadId}`. 그냥 부르면 목록만 돌려주고 **읽음으로 바꾸지 않는다**(닮은선배 버튼 상태·내 쪽지 목록). 대화창을 열 때 `{read: threadId}`로 부르면 그 대화만 내 쪽 읽음으로 바꾼다. `unread`는 읽음 처리 전, 상대가 보낸 글 중 안 읽은 수. 내가 보내면(`sendMessage`) 그 대화는 읽음.
 `role`은 이 대화에서 내 역할: `asker`(쪽지를 보낸 사람) | `senior`(받은 선배). `nickname`은 **상대**의 이름으로, 내가 asker면 `"독일어과 선배 A"`, senior면 `"용감한 수달"`. `askerInfo`는 senior에게만 온다(학과 없음). **[11/22 열림]** `관심`은 보낸 사람의 수요 인터뷰·질문함에서 최근 것부터 최대 2개, 「분야·세부」 형식(국제교류는 「교환학생·독일」, 현장실습은 「현장실습·공공기관」, 비교과는 「비교과·진로·취업 교육과정」). `시기`는 수요 인터뷰에서 고른 것(「아직 몰라요」면 없음). 상황·바라는 것 답변 원문은 선배에게 보내지 않는다.
 ```json
 { "threads": [
@@ -466,7 +468,7 @@ payload `{lineId, reason?}`. 신고된 문장은 즉시 숨김, 부서 리포트
 login(id, pw) · getMe() · askBoo(question) · setRecommendable(on)   // setRecommendable [11/23 추천]
 interviewNext(program, answers) · summarizeInterview(program, transcript) · saveConsent(draftId, edits)
 listNotes(filter) · getNote(id) · scrapNote(noteId, scrap = true) · saveQuestion(noteId, section) · reportStatement(lineId, reason)   // scrapNote·saveQuestion [11/22]
-recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept) · cancelRequest(threadId) · reportThread(threadId, reason, block = false)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85) · reportThread [11/23 차단]
+recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages(read?) · respondRequest(threadId, accept) · cancelRequest(threadId) · reportThread(threadId, reason, block = false)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85) · reportThread [11/23 차단] · getMessages(threadId) = 그 대화만 읽음 [11/23 읽음]
 getInbox() · getMyNote(id) · updateMyNote(id, changed) · getDeptReport(dept)   // getMyNote [11/22] · updateMyNote [11/23 고치기]
 demandNext(state = {}) · saveDemand(state)   // [11/22 열림] 궁금한 것 정리하기 → 선배 추천 열림. 열림 상태는 getMe().recommend
 getDepartments() · getAdminOverview(dept, period) · getAdminSuggestions(dept, period) · setSuggestionStatus(id, status)
