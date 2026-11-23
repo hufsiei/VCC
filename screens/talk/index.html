@@ -40,6 +40,9 @@
   /* 질문이 끝난 뒤 진행 칩을 눌러 칸을 골라 이어서 쓰기: 칩 32px + 위아래 6px = 터치 영역 44px(칩 줄 위아래 여백 8px 안) */
   button.progress-chip { position: relative; font: inherit; font-size: var(--font-size-secondary); font-weight: 500; cursor: pointer; }
   button.progress-chip::after { content: ""; position: absolute; inset: -6px 0; }
+  /* [v2] 보고서로 채워짐(covered): 중립색 — 내 이야기(MINT ✓)와 구분 */
+  .progress-chip--covered { border-color: transparent; background: var(--status-neutral-bg); color: var(--status-neutral-fg); }
+  .progress-chip__note { font-size: var(--font-size-caption); font-weight: 400; }
 </style>
 </head>
 <body>
@@ -93,7 +96,7 @@
     <div class="dock" id="mainDock">
       <div id="summaryArea" hidden>
         <div class="summary-bar">
-          <span class="summary-bar__text"><i data-lucide="sparkles" class="icon"></i><span id="summaryCount">노트 틀 0/7 채움</span></span>
+          <span class="summary-bar__text"><i data-lucide="sparkles" class="icon"></i><span id="summaryCount">내 이야기 0칸 · 보고서 0칸</span></span>
           <button class="summary-bar__btn" id="summaryBtn" type="button" disabled><i data-lucide="sparkles" class="icon"></i>AI 요약</button>
         </div>
         <p class="btn-reason" id="summaryReason"><i data-lucide="lock" class="icon"></i>한 항목 이상 이야기하면 요약할 수 있어요</p>
