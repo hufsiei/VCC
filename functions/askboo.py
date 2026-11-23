@@ -45,6 +45,25 @@ PERSON_RE = re.compile(r"(다녀온|갔다\s*온|가\s*본|해\s*본|경험한|�
 
 # ── ①′ 규정 질문 (spec 4장 [11/19] 판별 표현 그대로) ────────────────────
 OFFICIAL_RE = re.compile(r"평점|장학금|몇\s*학점|선발\s*(인원|기준)|휴학|등록금|초과학기|인정\s*신청|인정받을 수")
+# [11/23 원우 #151 ①] 넓힌 표현(tools/rule_probe.py PROPOSED에서 「자격증」만 뺌) — 자격·기한·점수 기준·연장·불이익·지원금 등.
+# 같은 낱말이 경험 질문에도 나오므로 지난 경험을 묻는 말투(…했어요?·어땠어요?·힘들었어요?)면 공식 안내로 보내지 않는다.
+# OFFICIAL_RE(위)에 걸리면 말투와 상관없이 예전처럼 공식 안내(지금보다 나빠지지 않게).
+OFFICIAL_WIDE_RE = re.compile(
+    r"자격(?!증)|참여\s*조건|지원\s*조건|신청\s*(기간|마감|방법)|접수\s*(기간|마감)"
+    r"|(?<!과제)(?<!과제\s)(?<!리포트)(?<!리포트\s)(?<!레포트)(?<!레포트\s)(?<!시험)(?<!시험\s)마감(이|일)|언제까지"   # 과제·시험 마감은 수업 경험
+    r"|몇\s*점\s*(이상|넘|필요|되어야|이어야)|(어학|성적|점수)\s*기준|기준표|환산"
+    r"|(파견|교환|기간)\s*(을\s*)?(한\s*학기\s*)?연장|중복\s*지원|불이익|페널티|(포기|취소)하면"
+    r"|지원\s*가능|지원할\s*수\s*있|학비\s*(는|를|가)?\s*(어디|얼마|감면|면제|내)|체재비|지원금\s*(은|이)?\s*(얼마|나와|나오|받을\s*수)"
+    r"|마일리지|이수증|발급\s*기준|수료\s*(기준|못)|몇\s*번\s*빠지면|유효\s*기간|일정이\s*언제"
+    r"|(제출|신청|접수|모집|지원)\s*(기한|기간|마감)|기한(이|은)?\s*(언제|지났|까지)|모집\s*(인원|일정|요강|기간|있)"
+    r"|발표(가|는|일)?\s*(언제|날)|(학점|평점|성적|점수|어학)\s*기준|연장\s*(신청|가능|할\s*수)")
+EXPERIENCE_TONE = re.compile(r"(했|었|였|웠|겼|졌|냈|썼|봤|갔|왔|됐|났|셨)(어요|나요|어|니|습니까)\s*\??$|어땠|힘들|재미|느꼈|좋았|떨렸|고민|걱정")
+
+
+def is_official(question):
+    if OFFICIAL_RE.search(question):
+        return True
+    return bool(OFFICIAL_WIDE_RE.search(question)) and not EXPERIENCE_TONE.search(question)
 
 # ── ② 질문 주제어 → 보고서 문항 (국제교류). 문항은 앞 번호로 적는다 ──────────
 # 여기에 없는 주제(아르바이트·취업 등)는 보고서에 칸이 없으므로 hold → 질문함 → 선배 인터뷰로 채운다.
@@ -144,7 +163,7 @@ def askBoo(me, payload, save=True):
         country, programs = match_country(question)
 
     # ①′ 규정 질문 → 공식 안내
-    if OFFICIAL_RE.search(question):
+    if is_official(question):
         return _official(me, question, programs, save)
 
     # ① 프로그램이 없으면 보류
@@ -261,6 +280,7 @@ def _notes(programs, country):
 def extract(question, programs):
     """돌려주는 값: (후보 문장 목록, 대표 칸, 보류 이유)"""
     rows, section = [], None
+    loose, loose_names = [], set()   # 주제어 없는 국제교류 질문의 후보 문단(겹치는 말로 고른다)
     for name in programs:
         ev = EVIDENCE.get(name, [])
         iv = notes.interview_lines(name)            # 최근 동의 먼저. 후보 상한(30)에 밀리지 않게 앞에 둔다
@@ -282,28 +302,77 @@ def extract(question, programs):
                 if re.search(pattern, question):
                     items += [n for n in nums if n not in items]
             if not items:
-                rows += answers   # 보고서 칸에 없는 주제는 후배 질문 답만 후보(고르기 AI가 관련 없으면 비운다)
+                rows += answers   # 후배 질문 답은 먼저 후보로
+                # [11/23 원우 #151 ③] 주제어가 없어도 바로 보류하지 않는다. 그 프로그램 근거 중 질문과 겹치는 말이 있는
+                # 문장을 고르기 AI에 넘기고, 관련 없으면 AI가 비운다(→ 보류). 겹치는 말이 하나도 없으면 지금처럼 보류.
+                loose += [r for r in iv if r["칸"] != notes.QUESTION_SECTION] + ev
+                loose_names.add(name)
                 continue
             section = section or SECTION_BY_ITEM.get(items[0])
             sections = {SECTION_BY_ITEM.get(i) for i in items}
             rows += [r for r in iv if r["칸"] in sections or r["칸"] == notes.QUESTION_SECTION]
             rows += [e for e in ev if e["문항"].split(".")[0] in items]
-    if not rows:
-        has_any = any(EVIDENCE.get(n) or notes.interview_lines(n) for n in programs)
-        return [], section, "보고서 칸에 없는 주제" if has_any else "근거 없음"
-
     cands, keys = [], set()
+
+    def add(e, s):
+        key = _norm(FILLER_RE.sub("", s)).rstrip(".!?~")
+        if len(key) < 6 or key in keys:
+            return
+        keys.add(key)
+        cands.append({"text": s, "sourceId": e["id"], "docType": e["docType"],
+                      "program": e["프로그램명"], "semester": e.get("semester")})
+
     for e in rows:
         for s in split_sentences(e["text"]):
-            key = _norm(FILLER_RE.sub("", s)).rstrip(".!?~")
-            if len(key) < 6 or key in keys:
-                continue
-            keys.add(key)
-            cands.append({"text": s, "sourceId": e["id"], "docType": e["docType"],
-                          "program": e["프로그램명"], "semester": e.get("semester")})
+            add(e, s)
             if len(cands) >= MAX_CANDIDATES:
                 return cands, section, ""
+    if loose:   # 주제어 없는 질문: 겹치는 말이 많은 문장부터(같으면 원래 순서 = 최근 학기 순)
+        qb = _bigrams(question, loose_names)
+        scored = []
+        for e in loose:
+            for s in split_sentences(e["text"]):
+                n = len(qb & _bigrams(s))
+                if n:
+                    scored.append((-n, len(scored), e, s))
+        for _, _, e, s in sorted(scored, key=lambda x: x[:2]):
+            add(e, s)
+            if len(cands) >= MAX_CANDIDATES:
+                break
+    if not cands:
+        has_any = any(EVIDENCE.get(n) or notes.interview_lines(n) for n in programs)
+        return [], section, "보고서 칸에 없는 주제" if has_any else "근거 없음"
     return cands, section, ""
+
+
+# 겹침을 셀 때 빼는 두 글자(말투·조사·흔한 말 — 내용이 아님)
+_COMMON_BIGRAMS = {"어요", "해요", "에요", "예요", "이에", "있어", "없어", "했어", "었어", "았어", "나요", "까요", "세요", "습니", "니다",
+                   "는데", "에서", "으로", "하는", "하고", "하면", "해서", "이랑", "이나", "정도", "많이", "어떻", "떻게", "어때", "어땠",
+                   "선배", "후배", "다녀", "녀온", "가면", "가서", "있는", "없는", "그냥", "진짜", "혹시", "궁금", "금해", "뭐예", "무엇",
+                   "얼마", "언제", "어디", "누가", "할수", "수있", "같아", "같은", "이런", "그런", "저는", "제가", "우리", "학교", "대학"}
+
+
+def _bigrams(text, names=()):
+    """한글·영문 낱말 안의 두 글자 묶음. names(프로그램 이름·별칭)는 먼저 지운다 — 학교 이름이 겹친다고 관련 문장은 아니다."""
+    for n in names:
+        for w in [n] + list(PROGRAMS.get(n, {}).get("별칭") or []):
+            text = text.replace(w, " ")
+    out = set()
+    for w in re.findall(r"[가-힣A-Za-z]{2,}", text):
+        out |= {w[i:i + 2].lower() for i in range(len(w) - 1)}
+    return out - _COMMON_BIGRAMS - _FREQUENT_BIGRAMS
+
+
+# 전체 근거에서 너무 흔한 두 글자(「학기」·「현지」 등 — 근거 문장의 1.5% 넘게 나옴)는 겹침으로 세지 않는다.
+# 시연 0:40 「학기 중 현지 인턴 병행할 수 있어요?」가 흔한 말만으로 엉뚱한 근거를 받지 않게(그 질문은 보류돼야 한다).
+_FREQUENT_BIGRAMS = set()
+
+
+def _frequent_bigrams(ratio=0.015):
+    from collections import Counter
+    sents = [s for v in EVIDENCE.values() for e in v for s in split_sentences(e["text"])]
+    df = Counter(b for s in sents for b in _bigrams(s))
+    return {b for b, n in df.items() if n > len(sents) * ratio}
 
 
 def split_sentences(text):
@@ -449,3 +518,6 @@ def _save(me, question, program, section, status, save):
         return None
     from runtime_fns import add_question
     return add_question(me, question, program=program, section=section, status=status)
+
+
+_FREQUENT_BIGRAMS.update(_frequent_bigrams())   # 근거를 다 읽은 뒤 한 번만 센다
