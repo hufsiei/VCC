@@ -280,6 +280,11 @@ def pick(question, cands):
 # ── ④ 변환 + ⑤ 사후 검증 ─────────────────────────────────────────────
 def convert(source):
     """돌려주는 값: (문장, 폴백 여부). 형식·말투가 틀리거나 검증에 걸리면 원문을 쓴다."""
+    cleaned = clean_source(source)
+    if POLITE_END.search(cleaned):
+        # [11/23 작업 30] 군말만 지우면 이미 해요체·합쇼체인 문장은 AI에 보내지 않는다(낱말 0개 변경, 폴백 아님).
+        # 11/22 HCX 측정에서 폴백 45줄 중 41줄이 이런 문장이었다 — 바꿀 게 없는데 AI가 말을 바꿔 검증에 걸렸다.
+        return cleaned, False
     r = _call("변환", f"근거: {source}\n출력:")
     j = r.get("json")
     text = None
@@ -288,7 +293,7 @@ def convert(source):
         if isinstance(v, str):
             text = v.strip()
     if not text or not POLITE_END.search(text) or verify(text, source):
-        return clean_source(source), True
+        return cleaned, True
     return text, False
 
 
