@@ -522,11 +522,24 @@ function openDetail(id) {
   showDetail(id);
 }
 
+// ?type=인턴처럼 들어오면(인터BOO chat 칩 「다른 노트 보기」) 그 분야 필터를 켜고 목록을 연다
+function applyTypeFilter(type) {
+  const cat = CATEGORY[type];
+  if (!cat) return;
+  currentCat = cat;
+  for (const c of document.querySelectorAll("#filters .choice-chip")) c.setAttribute("aria-pressed", String(c.dataset.cat === cat));
+  if (loaded) renderList();
+}
+
 function route() {
-  const id = new URLSearchParams(location.search).get("id");
+  const params = new URLSearchParams(location.search);
+  const id = params.get("id");
   if (id) showDetail(id);
   else showList();
 }
+
+// ?type= 필터는 처음 들어올 때 한 번만 — 뒤로가기(popstate)로 목록에 오면 사용자가 고른 필터를 그대로 둔다
+applyTypeFilter(new URLSearchParams(location.search).get("type"));
 
 document.getElementById("detailBack").addEventListener("click", () => {
   if (cameFromList) {
