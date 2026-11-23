@@ -197,6 +197,7 @@ function pickMock(m, name, p) {
         if (!text) return { error: "문장을 적어 주세요", section: ch.section, index: ch.index };
         if (text !== line.text) Object.assign(line, { text, edited: true });
       }
+      note.editedLines = note.sections.reduce((n, s) => n + s.lines.filter((l) => l.edited).length, 0);
       return { ok: true, ...note };
     }
     case "saveQuestion":

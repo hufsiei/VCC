@@ -634,6 +634,9 @@ def _my_note_view(mid, v, detail=False):
             "share": v.get("share", "private"),
             "filled": sum(1 for n in frame if mine.get(n)), "total": len(frame),
             "sharedLines": len(shared_ids & {ln.get("lineId") for ls in pub.values() for ln in ls}),
+            # [11/23] 선배가 고친 문장 수(내 경험노트 updateMyNote + 공개 문장 saveConsent changed).
+            # 다시 「AI 요약」을 하면 summarizeInterview가 두 초안을 새 AI 문장으로 바꾸므로 화면이 먼저 경고한다
+            "editedLines": sum(1 for ls in [*mine.values(), *pub.values()] for ln in ls if ln.get("edited")),
             "updatedAt": v.get("updatedAt")}
     if not detail:
         return view

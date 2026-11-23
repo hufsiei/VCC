@@ -377,13 +377,14 @@ payload `{threadId, reason?, block?}`. 쪽지 대화 ⋮ 메뉴의 신고·차�
 ### getInbox()
 ```json
 { "myNotes": [ { "id": "M-0001", "program": "마르부르크필립스대학교", "type": "교환", "noteId": "N-marburg",
-                 "share": "partial", "filled": 4, "total": 7, "sharedLines": 3, "updatedAt": "..." } ],   // [11/22] 최근에 요약한 것이 위
+                 "share": "partial", "filled": 4, "total": 7, "sharedLines": 3, "editedLines": 0, "updatedAt": "..." } ],   // [11/22] 최근에 요약한 것이 위
   "questions": [ { "questionId": "Q-0001", "text": "...", "status": "hold", "askedAt": "..." },
                  { "questionId": "Q-0002", "text": "...", "status": "answered", "noteId": "N-marburg", "answeredAt": "..." } ],
   "scraps": [ { "noteId": "N-marburg", "program": "마르부르크필립스대학교" } ],   // [11/22] scrapNote로 켠 노트, 최근이 위
   "alerts": [ { "text": "내 질문에 선배가 답했어요 · 마르부르크필립스대학교 해봤노트", "questionId": "Q-0002", "noteId": "N-marburg", "at": "..." } ] }
 ```
 **[11/22] 내 경험노트 카드(`myNotes`)**: `id`는 내 경험노트 번호(`M-…`), `noteId`는 공유되는 해봤노트 번호. `share` = `private`(나만 보기) | `partial`(일부 공유 — 화면 「N문장 공유」, N = `sharedLines`) | `shared`(해봤노트 공유됨). **「반영 중」 상태는 없다** — `saveConsent`가 그 자리에서 해봤노트에 반영하므로(11/22 미리 결정), 공유 직후 알림은 「해봤노트에 내 이야기가 반영됐어요」(`noteId` 포함). `filled`/`total` = 노트 틀에서 내 문장이 있는 칸 수 / 전체 칸 수(「노트 틀 4/7」). `sharedLines` = 지금 해봤노트에 보이는 내 문장 수(신고로 숨긴 것 제외).
+**[11/23 고치기] `editedLines`** = 선배가 고친 문장 수(내 경험노트 문장 `updateMyNote` + 공개 문장 `saveConsent` `changed`, 줄마다 `edited: true`인 것). `getMyNote`에도 같은 값. **다시 요약하면 고친 문장이 사라진다** — `summarizeInterview`는 같은 프로그램의 내 경험노트와 공개 초안을 새 AI 문장으로 통째로 바꾼다. 그래서 화면(인터BOO 들려주기)은 「AI 요약」을 누르면 `getInbox().myNotes`에서 같은 `program` 카드를 찾아 `editedLines ≥ 1`이면 확인 바텀시트를 먼저 띄운다: 제목 「다시 요약할까요?」, 본문 「고친 문장 N개가 새 요약으로 바뀌어요. 해봤노트에 이미 공유한 문장은 다시 공유하기 전까지 그대로예요.」, Primary 「새로 요약하기」 / Text 「취소」. 0이거나 카드가 없으면 바로 요약한다.
 **[11/19]** 질문 `status`는 `hold`(미답변) | `answered`. 화면은 `answered`에 「선배가 답했어요」 라벨 + 노트 「후배 질문」 칸 링크. (이전 예시의 `waiting`은 쓰지 않는다.)
 
 ### getMyNote(id) [11/22]
