@@ -150,12 +150,13 @@
 | 로그인 정보 | 화면이 `sessionStorage`의 `"me"`에 저장한다. 함수는 따로 받지 않는다 |
 | docType | `귀국보고서` · `현장실습후기` · `인터뷰` |
 
-## 함수 15개 (+ 11/22 추가 5개, 11/23 추가 1개)
+## 함수 15개 (+ 11/22 추가 5개, 11/23 추가 3개)
 
 | 함수 | 보내는 값 |
 |---|---|
 | login(id, pw) | `{id, pw}` |
 | getMe() | 없음 |
+| setRecommendable(on) [11/23] | `{on: true\|false}` (닮은선배로 추천받기 켜기·끄기) |
 | askBoo(question) | `{question}` |
 | interviewNext(program, answers) | `{program, answers:[{section, question, answer}]}` |
 | summarizeInterview(program, transcript) | `{program, transcript:[{section, question, answer}]}` |
@@ -173,6 +174,7 @@
 | reportThread(threadId, reason, block) [11/23] | `{threadId, reason?, block?}` (쪽지 대화 ⋮ 메뉴의 신고·차단, reason은 신고 사유 최대 100자) |
 | getInbox() | 없음 |
 | getMyNote(id) [11/22] | `{id}` (내 경험노트 상세, 본인 것만) |
+| updateMyNote(id, changed) [11/23] | `{id, changed:[{section, index, text}]}` (내 경험노트 문장 고치기, index는 getMyNote 그 칸 lines 순서 0부터) |
 | demandNext(state) [11/22] | `{state}` (「궁금한 것 정리하기」 다음 단계, AI 없음) |
 | saveDemand(state) [11/22] | `{state, consent:true}` |
 | reportStatement(lineId, reason) | `{lineId, reason?}` |
@@ -202,22 +204,34 @@
 | 비교과이수내역 | 목록 | `extracurricular.json`의 내 행들(키 그대로, `번호`·`가상학번` 제외) |
 | 귀국보고서 | 목록 | 내 귀국보고서의 `학년도` `학기` `국가` `대학명` |
 | 현장실습후기 | 목록 | 내 현장실습후기의 `학년도` `학기` `업체명` `직군` |
+| recommend [11/22] | 객체 | 선배 추천 열림 상태 `{ready, by, need, talk, ask}` (spec 4장) |
+| recommendable [11/23] | 참/거짓 | 닮은선배로 추천받기(기본 true, 끈 사람만 false) |
 
 선배·후배 구분 필드는 없습니다. 어떤 프로그램에 답할 수 있는지는 위 이수 기록으로 정해집니다.
+
+### setRecommendable [11/23]
+
+| 필드 | 형식 | 뜻 |
+|---|---|---|
+| ok / recommendable | 참/거짓 | 바뀐 뒤 상태. 같은 값으로 다시 불러도 ok |
+| error | 글자 | `on`이 참/거짓이 아닐 때 |
+
+끄면 `recommendSeniors` 후보에서 빠지고, 새 쪽지 요청은 `sendMessage`가 `reason: "추천 제외"`. 이미 수락한 대화는 이어지고, 귀국보고서·현장실습후기 문장은 계속 해봤노트 근거로 쓰인다.
 
 ### askBoo
 
 | 필드 | 형식 | 뜻 |
 |---|---|---|
-| status | 글자 | `ok`(근거 있음), `hold`(근거 없음), `official`(규정 질문, 공식 안내로 연결) |
+| status | 글자 | `ok`(근거 있음), `hold`(근거 없음), `official`(규정 질문, 공식 안내로 연결), **[11/23] `notes`**(사람·나라만 묻고 주제가 없을 때 답 대신 해봤노트 카드로 안내 — 질문함에 저장 안 함) |
 | lines[].text / sourceId / lineId | 글자 | 답변 문장과 출처, 문장 번호 |
 | lines[].fallback | 참/거짓 | AI 문장이 검증에 걸려 근거 원문을 그대로 보여 준 줄이면 true. 없으면 거짓 |
 | sources | 객체 | sourceId별 `{docType, program, semester}` |
-| noteId | 글자 | `ok`일 때. 관련 노트 |
+| noteId | 글자 | `ok`일 때 관련 노트. **[11/23]** `hold`도 노트는 있는데 이 내용이 없을 때 그 노트 |
 | suggestSenior | 참/거짓 | 닮은 선배 추천을 권할지 |
 | questionId | 글자 | `hold`·`official`일 때. 질문함에 자동 저장된 질문 번호 |
 | officialUrl | 글자 | `official`일 때. 담당 부서의 공식 안내 주소 |
-| message | 글자 | `hold`·`official`일 때. 안내 문구 |
+| message | 글자 | `hold`·`official`·`notes`일 때. 안내 문구(**[11/23]** `hold` 문구는 이유별 세 가지 — spec 4장) |
+| notes[].noteId / program / country / evidenceCount [11/23] | 글자·숫자 | `notes`일 때. 해봤노트 카드 최대 5개(근거 있는 것만, 근거 많은 순). 근거 블록은 두지 않는다 |
 
 ### interviewNext
 
@@ -248,6 +262,8 @@
 | ok | 참/거짓 | 저장 성공 여부 |
 | noteId | 글자 | 반영된 노트 |
 | added | 숫자 | 추가된 문장 수 |
+
+**[11/23]** `edits.changed`(공개 동의 시트의 「문장 고치기」): 앞뒤 공백 제거, 빈 문장은 고침 아님, 300자를 넘으면 그 문장만 `rejected`(`reason: "길이"`). 통과한 문장은 해봤노트와 내 경험노트의 공개 초안에 `edited: true`·`aiText`(처음 AI 문장)로 남고, 원문 일치 검사 대상에서 빠지며 본인 식별 여부는 다시 검사한다. 내 경험노트 문장은 바뀌지 않는다.
 
 ### listNotes
 
@@ -303,7 +319,7 @@
 | threadId | 글자 | 대화 번호. 첫 메시지는 쪽지 신청이 된다 |
 | myNickname | 글자 | 이 대화에서 선배에게 보이는 내 이름(형용사 + 동물, 대화마다 새로) |
 | at | 글자 | 보낸 시각 |
-| reason / message | 글자 | 실패일 때만. `연락처`·`학번`·`비방`(검사) · `한도`·`선배한도` · `잠김` · **[11/23] `차단`**(차단된 대화 — 누가 차단했든 양쪽 모두, 「더 이어 갈 수 없는 대화예요」) |
+| reason / message | 글자 | 실패일 때만. `연락처`·`학번`·`비방`(검사) · `한도`·`선배한도` · `잠김` · **[11/23] `차단`**(차단된 대화 — 누가 차단했든 양쪽 모두, 「더 이어 갈 수 없는 대화예요」) · **[11/23] `추천 제외`**(추천받기를 끈 선배에게 새 요청, 「이 선배는 지금 쪽지 요청을 받지 않아요.」) |
 
 ### previewNickname
 
@@ -373,9 +389,13 @@
 
 질문 글은 서버가 정한 글(`"{칸} 이야기를 최근 경험으로 듣고 싶어요."`)이다. 질문함 집계·측정에서 askBoo 질문과 나눌 때는 `noteId`·칸이 채워진 행으로 본다.
 
+### updateMyNote [11/23]
+
+응답은 getMyNote와 같은 모양 + `ok: true`. 고친 줄은 `edited: true`(화면 「내가 고친 문장」)·`aiText`(처음 AI 문장). 오류: 빈 문장 「문장을 적어 주세요」, 300자 초과 「300자 안으로 적어 주세요」(둘 다 `section`·`index` 함께), 없는 칸·순서 「고칠 문장을 찾지 못했어요」, 남의 것 「볼 수 없는 기록이에요」 — **하나라도 틀리면 아무것도 바꾸지 않는다.** 해봤노트 공개 문장은 바뀌지 않는다(공개 문장은 saveConsent `changed`로 따로).
+
 ### getMyNote · demandNext · saveDemand [11/22]
 
-응답 모양은 `docs/spec-v1.md` 4장 원본을 따른다. getMyNote는 getInbox 카드 값 + 칸별 `lines[].text / publicText / lineId / shared` + `draftId`·`publicDraft`. demandNext는 `{done, step, question, options|examples, retry?, progress:{answered, need}, state}`, 끝나면 `summary`. saveDemand는 `{ok, demandId, questionIds, recommend, unlocked}`.
+응답 모양은 `docs/spec-v1.md` 4장 원본을 따른다. getMyNote는 getInbox 카드 값 + 칸별 `lines[].text / publicText / lineId / shared` (**[11/23]** 고친 문장은 `edited: true`) + `draftId`·`publicDraft`. demandNext는 `{done, step, question, options|examples, retry?, progress:{answered, need}, state}`, 끝나면 `summary`. saveDemand는 `{ok, demandId, questionIds, recommend, unlocked}`.
 
 ### reportStatement
 
