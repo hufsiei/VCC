@@ -1,8 +1,8 @@
-# test_note_summary.py — 작업 78 칸별 요약 문단(tools/build_notes.py --summary) 코드 단계 시험. AI는 가짜(askboo._call 대신).
+# test_build_summary.py — 작업 78 칸별 요약 문단(tools/build_notes.py --summary) 코드 단계 시험. AI는 가짜(askboo._call 대신).
 # 보는 것: ① 배운점·인터뷰로만·빈 칸은 AI를 부르지 않음 ② 근거 번호 없는 문장·근거에 없는 숫자·답검사 불일치는 버림
 #         ③ sources = 인용 문단 id, years = 그 연도들 ④ build()가 note-summaries.json을 입히고 check()가 통과
 #         ⑤ check()가 다른 칸 출처·틀린 연도·지어낸 숫자·배운점 요약을 잡음
-# 실행: cd functions && python test_note_summary.py   (data/note-summaries.json은 건드리지 않는다: 임시 파일로 바꿔 씀)
+# 실행: cd functions && python test_build_summary.py   (data/note-summaries.json은 건드리지 않는다: 임시 파일로 바꿔 씀)
 import copy
 import json
 import re
