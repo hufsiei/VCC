@@ -8,13 +8,17 @@
 #        [v2 작업 89] 「후배 질문」 칸은 없다. 응답은 junior: true, section = 그 질문의 칸(질문 행의 「칸」, 틀 밖이거나
 #        없으면 AI(문단분류, Sonnet)가 틀 안의 칸 하나를 고르고, 그것도 안 되면 교환 「팁」·인턴·비교과 「배운점」).
 #        답은 그 칸에 담기고 progress.filled에 센다. 꼬리 질문은 붙이지 않는다.
+#   [v2 작업 90] 이어 쓰기: 같은 사람·같은 프로그램의 내 경험노트(myNotes.json)에 문장이 있는 칸은 답한 것으로 치고,
+#        그 노트에서 이미 답한 후배 질문·이미 물은 깊이 질문(myNotes의 asked)은 다시 묻지 않는다.
+#        노트가 있으면 첫 응답(answers가 빈 때)에 resumed: true·myNoteId.
 #   ② 코드: [11/22] 그 뒤 근거가 0건이거나 모두 2년 넘은 칸만 기본 질문(근거 적은 칸 순). 근거가 충분한 칸은
 #        묻지 않고 covered로 알린다 → 깊이 질문(교환·파견 3, 인턴·비교과 2 — DEPTH_QUESTIONS, 판단·비교·후회·오해) → 「배운점」 마지막.
 #        [11/23 작업 84] 기본·깊이·배운점 질문에 예시답 칩(examples). 말머리 칩만 보낸 답은 빼고 같은 질문을 다시 묻는다(retry).
 #   ③ AI(충분판정, HCX): 칸의 첫 답이 들어오면 충분한지 본다. 부족하면
 #      AI(꼬리질문, HCX): 꼬리 질문 하나 — 칸당 1회. 형식이 틀리거나 답에 없는 숫자·고유명사가 있으면 버리고 다음 칸.
 #
-# summarizeInterview(program, transcript) — 요약 2종 + 내 경험노트 저장
+# summarizeInterview(program, transcript, append?) — 요약 2종 + 내 경험노트 저장
+#   [v2 작업 90] append: true면 기존 내 경험노트·공개 초안 뒤에 새 문장을 덧붙인다(새 문장에 new: true, 응답은 합친 전체).
 #   ① AI(요약, Sonnet): 칸별로(후배 질문 답은 그 칸 안에서 질문마다 따로) 답 원문 → 해요체 문장 1~3개 {"문장":[...]}
 #   ② 코드: 사후 검증 — 답 원문에 없는 숫자·영문·수량·고유명사가 있는 문장은 버린다.
 #      다 버려지거나 AI가 실패하면 답 원문 문장을 그대로 쓴다(fallback: true).
@@ -34,7 +38,7 @@ import identify
 import notes
 import store
 from ai import callAI, load_prompt
-from runtime_fns import save_my_note
+from runtime_fns import find_my_note, save_my_note
 
 QUESTION_SECTION = notes.QUESTION_SECTION   # [v2] 없어진 칸 — 옛 화면·옛 transcript가 보내면 질문의 칸으로 옮긴다
 LAST_SECTION = "배운점"
@@ -243,6 +247,29 @@ def interviewNext(me, payload):
     program = (payload.get("program") or "").strip()
     if not program:
         return {"error": "들려줄 경험을 먼저 골라 주세요"}
+    # [v2 작업 90] 이어 쓰기: 내 경험노트가 있으면 그 칸·질문을 이미 한 것으로 친다
+    mid, mine = find_my_note(me, program)
+    prior = prior_of(program, mine)
+    step = _next_step(me, program, payload, prior)
+    if mid and not payload.get("answers") and "error" not in step:
+        step = {**step, "resumed": True, "myNoteId": mid}
+    return step
+
+
+def prior_of(program, mine):
+    """내 경험노트에서 이미 한 것: 문장이 있는 칸, 답한 후배 질문 id, 물은 질문 글(정규화)."""
+    names = set(sections_of(program))
+    out = {"sections": set(), "questionIds": set(), "asked": set()}
+    for sec in ((mine or {}).get("myNote") or {}).get("sections", []):
+        lines = sec.get("lines") or []
+        if lines and sec.get("name") in names:
+            out["sections"].add(sec["name"])
+        out["questionIds"] |= {ln["answersQuestionId"] for ln in lines if ln.get("answersQuestionId")}
+    out["asked"] = {askboo._norm(q) for q in (mine or {}).get("asked") or []}
+    return out
+
+
+def _next_step(me, program, payload, prior):
     # [v2] 후배 질문 답은 질문의 칸으로(옛 「후배 질문」 칸·questionId를 빠뜨린 답도)
     answers = [_place_junior(program, a) for a in _clean_answers(payload.get("answers"))]
     # [11/23 작업 84] 말머리 칩만 보낸 답은 빼고 센다. 방금 그랬으면 같은 질문을 다시 묻는다(아래).
@@ -253,6 +280,7 @@ def interviewNext(me, payload):
     frame = frame_of(program)
     sections = sections_of(program)
     answered = {a.get("section") for a in answers if not a.get("skipped") and a.get("answer")}
+    answered |= prior["sections"]   # [v2 작업 90] 내 경험노트에 문장이 있는 칸
     filled = len([s for s in sections if s in answered])   # [v2] 후배 질문 답도 그 칸으로 센다
     progress = {"filled": filled, "mine": filled, "total": len(sections)}
 
@@ -263,7 +291,7 @@ def interviewNext(me, payload):
 
     # ① 질문함의 후배 질문 먼저
     juniors = junior_questions(me, program)
-    seen_q = {a.get("questionId") for a in answers if a.get("questionId")}
+    seen_q = {a.get("questionId") for a in answers if a.get("questionId")} | prior["questionIds"]
     seen_text = {askboo._norm(a.get(k)) for a in answers if is_junior(a) for k in ("asked", "question")}
     waiting = [q for q in juniors if q["id"] not in seen_q and askboo._norm(q["질문"]) not in seen_text]
     if waiting:
@@ -308,7 +336,7 @@ def interviewNext(me, payload):
             return step
 
     # ③′ 깊이 질문(보고서에 잘 안 쓰는 판단·비교) — 이번 인터뷰에서 아직 안 한 것
-    asked = {askboo._norm(a.get("question")) for a in answers}
+    asked = {askboo._norm(a.get("question")) for a in answers} | prior["asked"]   # [v2] 지난번에 물은 것도
     for s, q, ex in depth_questions(program, sections, stats):
         if askboo._norm(q) not in asked:
             step = {**base, "section": s, "question": q, "depth": True}
@@ -407,6 +435,7 @@ def summarizeInterview(me, payload):
     if not transcript:
         return {"error": "요약할 답이 아직 없어요. 질문에 하나 이상 답해 주세요"}
 
+    append = payload.get("append") is True
     groups = group_answers(me, program, transcript)
     with ThreadPoolExecutor(WORKERS) as pool:
         summaries = list(pool.map(lambda g: summarize_group(g), groups))
@@ -436,18 +465,33 @@ def summarizeInterview(me, payload):
         _append(my_sections, g["section"], my_lines)
         _append(pub_sections, g["section"], pub_lines)
 
-    public_draft = identify.mark({"sections": pub_sections})
+    public_draft = identify.mark({"sections": pub_sections})   # 새 문장만 검사(기존 문장은 선배가 고친 값 유지)
     my_note = {"sections": my_sections}
+    answered = demand.count_interview_answers(transcript)
+    asked = [_unwrap(a.get("question")) for a in transcript if a.get("question")]
     try:
         my_note_id = save_my_note(me, program, draft_id, my_note, public_draft,
-                                  answered=demand.count_interview_answers(transcript))
+                                  answered=answered, asked=asked, append=append)
         saved = True
     except OSError:
         my_note_id, saved = None, False
+    if append and saved:   # [v2 작업 90] 응답은 합친 전체, 이번에 만든 문장에 new: true
+        _, rec = find_my_note(me, program)
+        my_note, public_draft = _flag_new(rec["myNote"], my_note), _flag_new(rec["publicDraft"], public_draft)
+        answered = max(answered, int(rec.get("answered", 0)))
     # [11/22] answered = 유효 답변 수(서로 다른 질문, 10자 이상). need(3) 이상 + 1문장 공유면 선배 추천이 열린다
     return {"draftId": draft_id, "program": program, "saved": saved, "myNoteId": my_note_id,
-            "myNote": my_note, "publicDraft": public_draft,
-            "answered": demand.count_interview_answers(transcript), "need": demand.NEED}
+            "myNote": my_note, "publicDraft": public_draft, "answered": answered, "need": demand.NEED}
+
+
+def _flag_new(merged, new):
+    """합친 칸에서 이번 문장(각 칸의 마지막 n개 — save_my_note가 뒤에 붙임)에 new: true."""
+    count = {s["name"]: len(s.get("lines", [])) for s in (new or {}).get("sections", [])}
+    for sec in merged.get("sections", []):
+        n = count.get(sec["name"], 0)
+        if n:
+            sec["lines"][-n:] = [{**ln, "new": True} for ln in sec["lines"][-n:]]
+    return merged
 
 
 def _append(sections, name, lines):
