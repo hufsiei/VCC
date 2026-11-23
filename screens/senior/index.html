@@ -70,6 +70,9 @@
   .dock .composer .input { flex: 1; }
   .dock-note { display: flex; flex-direction: column; gap: var(--space-sm); }
   .dock-note .btn-reason { justify-content: center; margin-top: 0; }
+  #threadMenu[hidden], #threadMenuSpacer[hidden] { display: none; }
+
+  #reportBlockRow[hidden] { display: none; }
 
   /* ---------- 쪽지 요청 시트 ---------- */
   textarea.request-text { height: auto; min-height: 112px; padding: 12px var(--space-md); line-height: 1.5; resize: vertical; }
@@ -165,7 +168,9 @@
     <header class="header">
       <button class="icon-btn" data-back type="button" aria-label="뒤로"><i data-lucide="arrow-left" class="icon"></i></button>
       <h2 class="header__title" id="threadTitle">쪽지</h2>
-      <span class="icon-btn" aria-hidden="true"></span>
+      <!-- 쪽지 ⋮ 메뉴(5-2 보조 아이콘, 8절 익명 쪽지 대화): 신고·차단 -->
+      <button class="icon-btn" id="threadMenu" type="button" aria-label="신고·차단 메뉴" aria-haspopup="dialog" hidden><i data-lucide="ellipsis-vertical" class="icon"></i></button>
+      <span class="icon-btn" id="threadMenuSpacer" aria-hidden="true"></span>
     </header>
     <main class="page thread-page">
       <div id="threadTop"></div>
@@ -184,6 +189,28 @@
       <div class="sheet__footer">
         <button class="btn btn--primary btn--block" id="confirmOk" type="button">확인</button>
         <button class="btn btn--text" id="confirmCancel" type="button">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 신고·차단 바텀시트 (5-10 신고 사유 선택, 8절 익명 쪽지 대화 ⋮) — 차단은 확인 시트를 한 번 더 ===== -->
+  <div class="sheet-layer" id="reportSheet" hidden>
+    <div class="sheet-scrim"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="reportTitle" tabindex="-1">
+      <div class="sheet__handle" aria-hidden="true"></div>
+      <h2 class="sheet__title" id="reportTitle">이 대화를 신고할까요?</h2>
+      <div class="sheet__body">
+        <p class="sub">신고하면 담당자가 확인해요. 상대에게는 알리지 않아요.</p>
+        <div class="choice-list" id="reportReasons" role="group" aria-label="신고 사유"></div>
+        <label class="check-row" id="reportBlockRow">
+          <input class="checkbox" id="reportBlock" type="checkbox">
+          <span>차단도 하기 · 이 대화에서 두 사람 모두 더 쪽지를 보낼 수 없어요</span>
+        </label>
+      </div>
+      <div class="sheet__footer">
+        <button class="btn btn--danger btn--block" id="reportSubmit" type="button" disabled>신고하기</button>
+        <p class="btn-reason" id="reportHint"><i data-lucide="info" class="icon"></i><span>사유를 고르거나 차단을 선택해 주세요</span></p>
+        <button class="btn btn--text" id="reportCancel" type="button">취소</button>
       </div>
     </div>
   </div>
