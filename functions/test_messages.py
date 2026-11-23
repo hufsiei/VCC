@@ -103,15 +103,28 @@ expect("4번째 요청은 한도", not s["ok"] and s["reason"] == "한도")
 # ── 4. 요청 취소 → 한도에서 빠짐 · 선배 화면에서 사라짐 · 7일 재요청 금지 ──
 tid_c = thread(JUNIOR, sendMessage(JUNIOR, {"to": others[0], "text": "추가"})["threadId"])["threadId"]
 expect("남의 요청은 취소 못 함", "error" in respondRequest(SENIOR1, {"threadId": tid_c, "cancel": True}))
+retry_c = (datetime.fromisoformat(rf.now()) + timedelta(days=rf.COOLDOWN_DAYS)).isoformat(timespec="seconds")
 c = respondRequest(JUNIOR, {"threadId": tid_c, "cancel": True})
-expect("취소 → cancelled", c == {"ok": True, "status": "cancelled"})
+expect("취소 → cancelled + retryAt(취소 + 7일, KST)", c == {"ok": True, "status": "cancelled", "retryAt": retry_c}
+       and retry_c.endswith("+09:00"))
+expect("[11/24] getMessages 취소한 대화에 retryAt", thread(JUNIOR, tid_c).get("retryAt") == retry_c)
+expect("취소 아닌 대화에는 retryAt 없음", "retryAt" not in thread(JUNIOR, tid1))
+rs = {x["studentId"]: x for x in recommendSeniors(JUNIOR, {"noteId": MARBURG})["seniors"]}
+expect("[11/24] recommendSeniors: 취소한 선배 카드에만 retryAt",
+       (others[0] not in rs or rs[others[0]].get("retryAt") == retry_c)
+       and all("retryAt" not in x for h, x in rs.items() if h != others[0]))
+rf._threads()["T-retry"] = {"asker": JUNIOR, "senior": SENIOR2, "askerNickname": "x", "status": "cancelled",
+                            "cancelledAt": rf.now(), "requestedAt": rf.now(), "messages": [], "lastRead": {}}
+rs = {x["studentId"]: x for x in recommendSeniors(JUNIOR, {"noteId": MARBURG})["seniors"]}
+expect("[11/24] 목록에 있는 선배를 취소하면 카드에 retryAt", SENIOR2 in rs and rs[SENIOR2].get("retryAt") == retry_c)
+del rf._threads()["T-retry"]
 expect("취소한 요청은 선배 목록에서 사라짐", thread(others[0], tid_c) is None)
 expect("선배의 요청 알림도 지워짐", not any(a.get("threadId") == tid_c for a in getInbox(others[0], {})["alerts"]))
 expect("보낸 사람에게는 cancelled로 남음", thread(JUNIOR, tid_c)["status"] == "cancelled")
 expect("다시 취소하면 상태 오류", respondRequest(JUNIOR, {"threadId": tid_c, "cancel": True})["reason"] == "상태")
 expect("취소 뒤 한도 2건", getMessages(JUNIOR, {})["waitingCount"] == 2)
 s = sendMessage(JUNIOR, {"to": others[0], "text": HELLO})
-expect("취소한 선배에게 7일 안 재요청 금지", not s["ok"] and s["reason"] == "취소")
+expect("취소한 선배에게 7일 안 재요청 금지 + retryAt", not s["ok"] and s["reason"] == "취소" and s.get("retryAt") == retry_c)
 s = sendMessage(JUNIOR, {"to": others[2], "text": HELLO})
 expect("취소로 빈 자리에 다른 선배 요청", s["ok"])
 
@@ -158,6 +171,7 @@ expect("7일 지난 waiting → expired, 한도에서 빠짐", len(expired) == 2
 expect("보낸 사람에게 만료 알림", sum(a["text"] == rf.EXPIRED_ALERT for a in getInbox(JUNIOR, {})["alerts"]) == 2)
 expect("만료된 요청은 선배 목록에서 사라짐", thread(others[1], expired[0]["threadId"]) is None
        and thread(others[2], expired[0]["threadId"]) is None)
+expect("[11/24] 7일 지나면 retryAt 없음", "retryAt" not in thread(JUNIOR, tid_c))
 expect("받는 선배 한도도 풀림", not recommendSeniors(JUNIOR, {"noteId": MARBURG})["seniors"][1]["requestsFull"])
 s = sendMessage(JUNIOR, {"to": others[0], "text": HELLO})
 expect("7일 지나면 취소한 선배에게 다시 요청(같은 대화)", s["ok"] and s["threadId"] == tid_c

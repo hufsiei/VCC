@@ -126,6 +126,17 @@ def _days_since(iso):
         return 0
 
 
+def _retry_at(t):
+    """취소한 요청을 다시 보낼 수 있는 시각(ISO KST, 취소 + 7일). 이미 보낼 수 있거나 취소가 아니면 None (11/24)."""
+    if t.get("status") != "cancelled" or _days_since(t.get("cancelledAt")) >= COOLDOWN_DAYS:
+        return None
+    try:
+        at = datetime.fromisoformat(t["cancelledAt"]) + timedelta(days=COOLDOWN_DAYS)
+    except (KeyError, TypeError, ValueError):
+        return None
+    return at.astimezone(KST).isoformat(timespec="seconds")
+
+
 def _expire_old():
     """보낸 뒤 7일 동안 답이 없는 요청을 expired로(스케줄러 없이 호출할 때 판정, spec 4장)."""
     changed = False
@@ -244,8 +255,12 @@ def sendMessage(me, p):
             return {"ok": False, "reason": "상태", "message": "선배가 이 요청을 받지 않았어요"}
         elif t["status"] in ("cancelled", "expired"):    # 같은 선배에게 다시 요청 = 같은 대화를 다시 연다
             if t["status"] == "cancelled" and _days_since(t.get("cancelledAt")) < COOLDOWN_DAYS:
-                return {"ok": False, "reason": "취소",
-                        "message": "요청을 취소한 선배에게는 7일 뒤에 다시 보낼 수 있어요."}
+                out = {"ok": False, "reason": "취소",
+                       "message": "요청을 취소한 선배에게는 7일 뒤에 다시 보낼 수 있어요."}
+                retry = _retry_at(t)
+                if retry:
+                    out["retryAt"] = retry
+                return out
             lk = demand.locked(me)
             if lk:
                 return {"ok": False, "reason": "잠김", "message": lk["message"], "recommend": lk["recommend"]}
@@ -297,6 +312,9 @@ def getMessages(me, p):
                 item["askerInfo"] = _asker_info(t["asker"])
             if t["status"] == "declined":
                 item["declined"] = True
+            retry = _retry_at(t) if role == "asker" else None
+            if retry:                                    # [11/24] 취소한 요청: 다시 보낼 수 있는 시각
+                item["retryAt"] = retry
             if t["status"] == "blocked":
                 item["blockedByMe"] = t.get("blockedBy") == me
             if read and tid == read:
@@ -330,7 +348,7 @@ def respondRequest(me, p):
             t.update(status="cancelled", cancelledAt=now())
             store.save("messages")
             _drop_request_alert(t["senior"], tid)        # 선배에게 알리지 않는다
-            return {"ok": True, "status": "cancelled"}
+            return {"ok": True, "status": "cancelled", "retryAt": _retry_at(t)}
         if not t or t["senior"] != me or t["status"] in ("cancelled", "expired"):
             return {"error": "볼 수 없는 기록이에요"}
         if t["status"] != "waiting":
@@ -424,10 +442,12 @@ def recommendSeniors(me, p):
     nid = notes.note_id(program)
     with store.lock():
         _expire_old()
-        waiting = {}
+        waiting, retry = {}, {}
         for t in _threads().values():
             if t["status"] == "waiting":
                 waiting[t["senior"]] = waiting.get(t["senior"], 0) + 1
+            elif t["asker"] == me and _retry_at(t):        # [11/24] 내가 취소한 선배: 다시 보낼 수 있는 시각
+                retry[t["senior"]] = _retry_at(t)
         ranked = [r for r in score.rank_seniors(me, program, waiting=waiting)
                   if recommendable(r["studentId"])]          # [11/23] 추천받기를 끈 선배는 후보에서 뺀다
         by_id = {r["studentId"]: r for r in ranked}
@@ -453,7 +473,8 @@ def recommendSeniors(me, p):
         store.save("shownSeniors")
 
         seniors = [{"studentId": h, "nickname": senior_label(me, h), "score": by_id[h]["score"],
-                    "requestsFull": by_id[h]["requestsFull"], "reasons": by_id[h]["reasons"]} for h in ids]
+                    "requestsFull": by_id[h]["requestsFull"], "reasons": by_id[h]["reasons"],
+                    **({"retryAt": retry[h]} if h in retry else {})} for h in ids]
         return {"seniors": seniors, "shown": len(seniors), "hasMore": len(ids) < cap, "newCount": new_count}
 
 
