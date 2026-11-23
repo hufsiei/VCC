@@ -49,7 +49,7 @@ git worktree remove --force ../VCC-review-tmp
 - 확인한 것 한 줄(시험 결과 숫자 포함)
 - 고칠 것(파일:줄 + 왜) — 꼭 고칠 것과 다듬을 것(nit)을 나눈다
 - 미리가 정할 것(선택지 + 추천)
-- 작성자에게 보낼 말이 있으면 단톡에 붙일 수 있는 한두 문장
+- 작성자에게 보낼 말이 있으면 CLAUDE.md 「팀원에게 보내는 메시지」 형식(`[미리] PR #n merged|open` + (요청)·(결정요망)·(통지)·(참고) 개조식)으로. 병합 전에 쓰면 open, 병합 뒤면 merged
 
 ## 4. 그다음
 - 병합은 미리가 "병합해"라고 할 때만: `gh pr merge <n> --merge --admin` (hufsiei 계정, 순서대로). 병합 뒤 `git -C C:/dev/VCC pull`.
