@@ -12,6 +12,7 @@
 > **11/19 개정 ③(작업 18)**: askBoo `lines[]`에 **`fallback`**(사후 검증에 걸려 근거 원문을 보여 준 줄) 추가(4장). `noteId`는 `data/notes.json`이 생기기 전까지 프로그램 이름으로 나간다.
 > **11/22 개정(작업 23, 민지 요청)**: `listNotes`·`getNote`에 **`country`**(국제교류 = `programs.json` `세부` 국가, 인턴·비교과 `null`, 카드 띠 「교환학생 · 독일」)와 **`scrapped`**(내가 스크랩했는지) 추가. 새 함수 **`scrapNote(noteId, scrap)`**(켜기·끄기, 멱등) → `getInbox.scraps`가 실제로 채워진다(최근이 위). **[11/22 오후]** `getNote` 배운점 문장에 **`senior`**(「선배 A」, 노트 안에서만 쓰는 글자, 학과 없음 — PRD 9-1), 새 함수 **`saveQuestion(noteId, section)`**(「질문함에 담기」). **[11/22 저녁]** `getInbox.myNotes` 카드 값(`share`·`filled`/`total`·`sharedLines` 등), 새 함수 **`getMyNote(id)`**(내 경험노트 상세), 공유 상태는 셋뿐(「반영 중」 없음). 바뀐 곳은 **[11/22]** 표시.
 > **11/22 개정 ③(선배 추천 열림, 미리 결정)**: 닮은선배 추천은 **경험 나눔**(들려주기 유효 답변 3개 + 해봤노트 1문장 이상 공유) 또는 **수요 제공**(새 함수 **`demandNext`·`saveDemand`** — 「궁금한 것 정리하기」, 유효 답변 3개 + 전달 동의)을 한 뒤에 열린다. 한 번 열리면 모든 프로그램. `getMe.recommend`, 잠겼을 때 `recommendSeniors`·`previewNickname`의 `locked`와 `sendMessage`의 `reason: "잠김"`, `summarizeInterview`의 `answered`·`need`, `saveConsent`의 `recommend`·`unlocked`, `askerInfo.관심`을 「교환학생·독일」 형식으로 + `시기`. 서버 `functions/demand.py`. 바뀐 곳은 **[11/22 열림]** 표시.
+> **11/23 개정 ③(선배가 요약 문장 고치기, 미리 결정)**: 내 경험노트와 해봤노트 공개 문장은 **따로** 고친다(읽는 사람이 달라 표현이 다를 수 있음). 공개 문장은 공개 동의 시트의 「문장 고치기」(`saveConsent` `changed`, **[11/23 고치기]**), 내 경험노트 문장은 새 함수 **`updateMyNote(id, changed)`**. `getMyNote` 문장에 `edited`. 바뀐 곳은 **[11/23 고치기]** 표시.
 > **11/23 개정 ②(작업 29 실사용, 미리 결정)**: ① `askBoo`에 새 `status: "notes"` — 사람을 찾는 질문(「네덜란드 교환 다녀온 선배?」)이나 나라만 말한 질문에 주제어가 없으면 답 대신 해봤노트 카드(`notes[]`)로 안내한다. 프로그램명이 없으면 **나라 이름**(`programs.json` `세부`)으로 그 나라 프로그램을 찾는다. `hold` 문구를 이유별로 나누고(노트가 있는데 「경험한 선배가 없어요」라고 하지 않음), 노트가 있으면 `hold`에도 `noteId`. ② 닮은선배 **추천받기 끄기** — 새 함수 **`setRecommendable(on)`**, `getMe.recommendable`, `sendMessage`의 `reason: "추천 제외"`. 경험자는 기본으로 후보이고, 끈 선배는 추천·새 쪽지 요청에서 빠진다. 바뀐 곳은 **[11/23 노트]**·**[11/23 추천]** 표시.
 > **11/23 개정(작업 28, 민지 요청)**: 쪽지 대화 ⋮ 메뉴용 새 함수 **`reportThread(threadId, reason, block)`** — 신고(`threadReports.json`)·차단(`status: "blocked"`, 양쪽 다 더 못 보냄). `sendMessage`에 `reason: "차단"`, `getMessages`에 `blockedByMe`. 바뀐 곳은 **[11/23 차단]** 표시.
 > **11/22 개정 ②(작업 21, 미리)**: `interviewNext`가 보고서가 이미 답한 칸은 묻지 않고(빈 칸·오래된 칸만), **깊이 질문**(`depth`, 교환·파견 3개·인턴·비교과 2개)을 묻는다. 묻지 않은 칸은 **`covered`**로 알린다(4장).
@@ -60,7 +61,7 @@
 
 - **지금(로컬):** `functions/local_fn.py`가 시작할 때 `data/runtime/*.json`을 읽어 메모리에 두고, 기록이 바뀔 때마다 그 파일을 다시 쓴다(임시 파일에 쓴 뒤 바꿔 끼워 반쯤 쓰인 파일이 남지 않게). 서버를 껐다 켜도 남는다.
 - **Cloud Functions 이사 후:** 같은 파일 이름을 NCP **Object Storage**의 객체로 둔다. 바꾸는 곳은 `functions/store.py`의 저장 방식 한 곳뿐이다(`STORE_BACKEND=file|ncp`). 다른 코드는 `store.load(이름)`·`store.save(이름)`만 쓰고 파일을 직접 열지 않는다.
-- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `demands.json`(**[11/22 열림]** 궁금한 것 정리하기 — 분야·세부·프로그램·칸·시기·상황·바라는 것, 선배 추천 열림 근거) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · **[11/23 차단]** `threadReports.json`(쪽지 대화 신고) · **[11/23 추천]** `recommendOptOut.json`(닮은선배 추천받기를 끈 사람) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별 지금 추천 목록 최대 9명과 노트 버전) · `counters.json`(번호 매기기) · **[작업 85]** `noteVersions.json`(노트별 버전 — saveConsent가 +1, recommendSeniors가 비교) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(인터뷰 중간 저장, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 11개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·reportThread·recommendSeniors·setRecommendable·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). **[작업 66]** 관리자 콘솔용 `reportSettings.json`(부서코드별 발행 설정) · `issuedReports.json`(발행 이력) · `reportHtml.json`(리포트 id → HTML, PRD 6-4의 `reports/{id}.html` 대신 한 파일) · `suggestionStatus.json`(제안 id → 상태). 코드: `functions/admin.py`.
+- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `demands.json`(**[11/22 열림]** 궁금한 것 정리하기 — 분야·세부·프로그램·칸·시기·상황·바라는 것, 선배 추천 열림 근거) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · **[11/23 차단]** `threadReports.json`(쪽지 대화 신고) · **[11/23 추천]** `recommendOptOut.json`(닮은선배 추천받기를 끈 사람) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별 지금 추천 목록 최대 9명과 노트 버전) · `counters.json`(번호 매기기) · **[작업 85]** `noteVersions.json`(노트별 버전 — saveConsent가 +1, recommendSeniors가 비교) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(인터뷰 중간 저장, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 12개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·reportThread·recommendSeniors·setRecommendable·saveConsent·updateMyNote·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). **[작업 66]** 관리자 콘솔용 `reportSettings.json`(부서코드별 발행 설정) · `issuedReports.json`(발행 이력) · `reportHtml.json`(리포트 id → HTML, PRD 6-4의 `reports/{id}.html` 대신 한 파일) · `suggestionStatus.json`(제안 id → 상태). 코드: `functions/admin.py`.
 - **누가 부르는지:** 서버는 헤더 `X-Token`을 `sessions.json`(`functions/sessions.py`, 토큰 24시간, 같은 계정 동시 로그인 허용)으로 풀어 사용자를 안다. 토큰이 없거나 만료·폐기면 `{ "error": "로그인이 필요해요" }`(`checkMessage`·`login`만 예외). `login`이 난수 토큰을 발급해 `user.token`으로 주고, `logout`이 폐기한다. 로그인 비번은 `data/`가 아니라 환경변수 `VCC_LOGIN_PW`(.env·NCP 기본 파라미터)에만 둔다. 표의 `"*"`는 가상학생 전원의 공용 비번(청중 체험용, 개별 항목이 우선, 직원에는 적용 안 됨). 순서: 토큰 확인 → 전역 상한 → 사용자별 한도 → 함수. **[11/19] 남의 기록은 서버가 막는다**: `getMessages`·`respondRequest`는 `me`가 그 대화의 asker·senior일 때만, 내 경험노트·`saveConsent`는 `owner == me`일 때만, 관리자 함수는 `권한`이 있을 때만 응답하고 그 외는 `{ "error": "볼 수 없는 기록이에요" }`. (작업 73)
 - **초기화:** 리허설 전 `python functions/reset_runtime.py` → runtime 파일을 비우고 시연 시작 상태로 돌린다.
 - `data/runtime/`은 커밋하지 않는다(`.gitignore`). 시연 중 쌓인 기록이 저장소에 섞이지 않게.
@@ -85,6 +86,7 @@ const FN_BASE = "http://localhost:8787";
 | interviewNext | **[11/20]** `program`이 `interviewNext.byProgram`에 있으면(마르부르크 시연 대본) `answers.length`번째 `steps`, 다 쓰면 `done`(steps[0]은 「후배 질문」). 그 밖의 프로그램은 서버(`interview.py`)처럼 `data/programs.json`의 `분야` → `data/frames.json` 노트 틀을 고르고, 아직 답하지 않은 칸을 틀 순서대로(「배운점」은 마지막) `interviewNext.questions[칸]` 문장으로 묻는다(`{p}` = 별칭 첫째 또는 프로그램명). 꼬리 질문·후배 질문은 없다(`pendingQuestions: 0`) |
 | getNote | `getNote[id]`가 있으면 그것, 없으면 `getNote["N-marburg"]` |
 | getMyNote [11/22] | `getMyNote` 하나(M-0001, 일부 공유 예시). 받은 `id`를 그대로 넣어 돌려준다 |
+| updateMyNote [11/23 고치기] | `getMyNote`에 `changed`를 적용해 `ok: true`와 함께 돌려준다(기억하지 않음). 빈 문장·없는 문장은 서버와 같은 `error` |
 | 선배 추천 열림 [11/22 열림] | mock 기본은 **열림**. 주소에 `?locked=1`이면 잠김: `getMe.recommend.ready: false`, `recommendSeniors`·`previewNickname` → `locked`, `sendMessage` → `reason: "잠김"`. mock `saveDemand`·`saveConsent`를 부르면 그 탭은 열린다(sessionStorage `mockUnlocked`) |
 | demandNext·saveDemand [11/22 열림] | `data.js`의 `mockDemand`가 서버(`demand.py`)와 같은 순서로 `programs.json`·`frames.json`에서 칩을 만든다. `fromQuestionId`는 마르부르크·생활 보류 질문으로 채운다 |
 | summarizeInterview [11/22 열림] | `summarizeInterview` + transcript로 센 `answered`, `need: 3` |
@@ -217,7 +219,7 @@ payload `{draftId, edits:{removed:[lineId], changed:[{lineId, text}]}, consent:t
 **[11/23 고치기]** 공개 동의 시트의 「문장 고치기」(`common/consent.js`)가 `changed`를 보낸다. 서버 규칙:
 - 앞뒤 공백을 지운다. 빈 문장은 고침으로 보지 않는다(원래 문장 그대로 — 공개하지 않으려면 `removed`). **300자**를 넘으면 그 문장만 `rejected`(`reason: "길이"`).
 - 검사를 통과한 고친 문장은 해봤노트(`noteLines.json`)뿐 아니라 **내 경험노트의 공개 초안**(`myNotes[…].publicDraft`)에도 남긴다: `text` = 고친 문장, `edited: true`, `aiText` = 처음 AI가 만든 문장(처음 고칠 때 한 번만), `match`는 지운다(선배가 직접 쓴 문장은 원문 일치 검사 대상이 아님), `identifying`은 다시 검사한 값. 그래서 `getMyNote`의 `publicText`·`publicDraft`에 고친 문장이 나오고, 「공유 범위 바꾸기」로 다시 공유해도 AI 문장으로 돌아가지 않는다. 거절된 문장은 공개 초안을 바꾸지 않는다.
-- **내 경험노트 문장(`myNote`)은 바꾸지 않는다.** 두 노트는 읽는 사람이 달라(본인 / 처음 보는 후배) 표현이 다를 수 있으므로 따로 고친다(내 경험노트 고치기는 `updateMyNote`, 예정).
+- **내 경험노트 문장(`myNote`)은 바꾸지 않는다.** 두 노트는 읽는 사람이 달라(본인 / 처음 보는 후배) 표현이 다를 수 있으므로 따로 고친다(내 경험노트 고치기는 `updateMyNote`).
 - 화면: 문장 아래 Text 버튼 「문장 고치기」 → 입력창(라벨 「해봤노트에 보일 문장」, 안내 「내 경험노트 문장은 그대로예요. 연락처·메일·링크는 넣을 수 없어요.」) + Secondary 「저장」 / Text 「취소」. 고친 문장(이번에 고친 것·`edited: true`)에는 중립 라벨 「내가 고친 문장」, 「원문과 다를 수 있어요」는 붙이지 않는다. 고치는 중에는 「동의하고 공유」 비활성 + 「고치는 중인 문장을 저장하거나 취소해 주세요」.
 
 ### listNotes(filter)
@@ -393,6 +395,22 @@ payload `{threadId, reason?, block?}`. 쪽지 대화 ⋮ 메뉴의 신고·차�
                 { "name": "비용", "lines": [] } ],
   "publicDraft": { "sections": [ "...summarizeInterview의 publicDraft 그대로" ] } }
 ```
+**[11/23 고치기]** `updateMyNote`로 고친 문장에는 `edited: true`(화면: 중립 라벨 「내가 고친 문장」). 공개 동의 시트에서 고친 공개 문장은 `publicDraft`의 그 줄에 `edited: true`(saveConsent [11/23 고치기]).
+
+### updateMyNote(id, changed) [11/23 고치기]
+내 경험노트 문장 고치기. **본인 것만**(남의 것·없는 것은 `{"error": "볼 수 없는 기록이에요"}`). AI 없음.
+payload `{id, changed: [{section, index, text}]}` — `index`는 `getMyNote`의 그 칸 `lines` 순서(0부터).
+- `text`는 앞뒤 공백을 지운다. 빈 문장이면 `{"error": "문장을 적어 주세요", section, index}`, **300자**를 넘으면 `{"error": "300자 안으로 적어 주세요", section, index}`. 없는 칸·범위 밖 `index`면 `{"error": "고칠 문장을 찾지 못했어요"}`. **하나라도 틀리면 아무것도 바꾸지 않는다.**
+- 내 경험노트는 본인만 보므로 공개 문장 검사(`check_public_text`)는 하지 않는다(성적·실명도 적을 수 있음).
+- 고친 줄은 `text` = 고친 문장, `edited: true`, `aiText` = 처음 AI가 만든 문장(처음 고칠 때 한 번만). 같은 문장으로 저장하면 고침으로 보지 않는다. `updatedAt`을 갱신한다.
+- **해봤노트 공개 문장(`publicDraft`·`noteLines`)은 바뀌지 않는다.** 이미 공유한 노트면 화면은 저장 뒤 안내 「해봤노트 문장은 그대로예요 · 해봤노트 문장 고치기」(→ 공개 동의 시트 「공유 범위 바꾸기」)를 보여 준다.
+- 응답은 `getMyNote`와 같은 모양에 `ok: true`를 더한 것 → 화면은 그대로 다시 그린다.
+```json
+{ "ok": true, "id": "M-0001", "program": "마르부르크필립스대학교", "share": "partial", "...": "getMyNote와 같음",
+  "sections": [ { "name": "생활", "lines": [ { "text": "2~3학년에게 꼭 추천하고 싶다.", "edited": true,
+                  "publicText": "2~3학년에게 추천하고 싶어요.", "lineId": "L-D1-2", "shared": true } ] } ] }
+```
+화면(내 보관함 · 내 경험노트 상세, 민지): 문장마다 Text 버튼 「문장 고치기」 → 입력창(라벨 「내 경험노트 문장」, 안내 「나만 보는 문장이에요. 해봤노트 문장은 바뀌지 않아요.」) + Secondary 「저장」 / Text 「취소」 — 공개 동의 시트의 「문장 고치기」와 같은 모양(`common/consent.js` 참고).
 
 ### demandNext(state) [11/22 열림]
 「궁금한 것 정리하기」(수요 인터뷰) 다음 단계 하나. **AI 없음** — 칩과 규칙만(`functions/demand.py`). interviewNext처럼 서버는 기억하지 않고, 화면이 응답의 `state`를 들고 다니다 고른 값·쓴 답을 넣어 다시 보낸다.
@@ -448,7 +466,7 @@ login(id, pw) · getMe() · askBoo(question) · setRecommendable(on)   // setRec
 interviewNext(program, answers) · summarizeInterview(program, transcript) · saveConsent(draftId, edits)
 listNotes(filter) · getNote(id) · scrapNote(noteId, scrap = true) · saveQuestion(noteId, section) · reportStatement(lineId, reason)   // scrapNote·saveQuestion [11/22]
 recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept) · cancelRequest(threadId) · reportThread(threadId, reason, block = false)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85) · reportThread [11/23 차단]
-getInbox() · getMyNote(id) · getDeptReport(dept)   // getMyNote [11/22]
+getInbox() · getMyNote(id) · updateMyNote(id, changed) · getDeptReport(dept)   // getMyNote [11/22] · updateMyNote [11/23 고치기]
 demandNext(state = {}) · saveDemand(state)   // [11/22 열림] 궁금한 것 정리하기 → 선배 추천 열림. 열림 상태는 getMe().recommend
 getDepartments() · getAdminOverview(dept, period) · getAdminSuggestions(dept, period) · setSuggestionStatus(id, status)
 getReportSettings(dept) · saveReportSettings(dept, settings) · issueReport(dept, period) · listIssuedReports(dept) · getIssuedReport(reportId)   // 작업 66, PRD 7장
