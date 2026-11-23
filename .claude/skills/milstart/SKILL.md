@@ -12,7 +12,7 @@ description: 미리(VCC 총괄)의 업무 시작 루틴. "밀시작", "업무 �
 - `git -C C:/dev/VCC pull` 이 건너뛰어졌으면 이유(다른 브랜치·고친 파일)를 미리에게 알리고, 남의 작업일 수 있으니 임의로 되돌리지 않는다.
 - `.env`: **값을 읽거나 출력하지 않는다.** 키 이름 3개(CLOVA_KEY·ANTHROPIC_API_KEY·VCC_LOGIN_PW)가 있는지만 본다. 모자라면 "Bitwarden에서 다시 붙여 주세요"라고만 말한다(.env 편집은 미리가 직접 한다).
 - 계정: `gh auth status`의 활성 계정이 hufsiei인지, `git -C C:/dev/VCC config user.email`이 noreply 주소인지. 다르면 알린다.
-- 남은 작업 폴더(`C:\dev\VCC-*`)가 있으면 어떤 브랜치인지·병합됐는지 확인해 정리할지 묻는다.
+- 남은 작업 폴더(`C:\dev\VCC-*`): `python -X utf8 C:/dev/VCC/.claude/skills/milwork/board.py list`로 상태판(`C:\dev\VCC-board.md`)과 함께 본다. 줄마다 어느 작업·어느 상태인지 그대로 보고하고, 「폴더 없음」 줄은 `prune`, 「상태판에 없음」 폴더는 병합됐으면 지우고 아니면 `add`로 적을지 묻는다. 「전달 대기」가 있으면 ③ 「팀원과 맞춰야 할 일」에 넣는다.
 
 ## 2. 자료 모으기
 - 작업내역서: `H:\내 드라이브\@VCC\@VCC작업내역 v6.xlsx` (openpyxl, data_only, 읽기만). 시트 `작업목록`(번호·시기·단계·담당·기한·진행상황·비고·선행·막힌 점), `전달사항`(처리상태가 확인완료가 아닌 것), `주요링크`.

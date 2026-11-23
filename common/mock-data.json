@@ -89,22 +89,51 @@
     "recommendable": true
   },
   "askBoo": {
+    "chat": {
+      "status": "chat",
+      "lines": [],
+      "sources": {},
+      "suggestSenior": false,
+      "message": "아까는 마르부르크필립스대학교 이야기였어요. 다른 교환·파견 해봤노트를 찾아볼까요?",
+      "chips": [
+        {
+          "label": "다른 노트 보기",
+          "action": "notes",
+          "payload": {
+            "field": "국제교류",
+            "exclude": [
+              "마르부르크필립스대학교"
+            ]
+          }
+        },
+        {
+          "label": "질문함에 담기",
+          "action": "save",
+          "payload": {
+            "question": "마르부르크 말고 다른 독일 교환은 어떤가요?"
+          }
+        }
+      ]
+    },
     "exchange": {
       "status": "ok",
       "lines": [
         {
           "text": "고정비까지 월 125만 원쯤 나갔고 정착 초기 비용은 따로 들어요.",
           "sourceId": "R213-2-6",
+          "cites": ["R213-2-6"],
           "lineId": "L-R213-2-6"
         },
         {
           "text": "월세 포함 한 달에 110만 원 정도 썼어요.",
           "sourceId": "R277-2-6",
+          "cites": ["R277-2-6"],
           "lineId": "L-R277-2-6"
         },
         {
           "text": "넉넉히 월 140만 원이면 여행까지 소화됩니다.",
           "sourceId": "R209-2-6",
+          "cites": ["R209-2-6"],
           "lineId": "L-R209-2-6"
         }
       ],
@@ -126,7 +155,8 @@
         }
       },
       "noteId": "N-marburg",
-      "suggestSenior": false
+      "suggestSenior": false,
+      "singleSenior": false
     },
     "notes": {
       "status": "notes",
@@ -137,7 +167,8 @@
           "noteId": "N-marburg",
           "program": "마르부르크필립스대학교",
           "country": "독일",
-          "evidenceCount": 8
+          "evidenceCount": 11,
+          "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청"
         }
       ],
       "suggestSenior": true,
@@ -405,7 +436,7 @@
         "type": "교환",
         "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청",
         "forWhom": "독일어권 파견을 생각하는 1~2학년",
-        "evidenceCount": 8,
+        "evidenceCount": 11,
         "lastSemester": "2026-1",
         "satisfaction": null,
         "completedCount": null,
@@ -447,7 +478,7 @@
       "type": "교환",
       "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청",
       "forWhom": "독일어권 파견을 생각하는 1~2학년",
-      "evidenceCount": 8,
+      "evidenceCount": 11,
       "lastSemester": "2026-1",
       "satisfaction": null,
       "completedCount": null,
@@ -488,7 +519,26 @@
         {
           "name": "비용",
           "interviewOnly": false,
-          "lines": []
+          "lines": [
+            {
+              "text": "고정비까지 월 125만 원쯤 나갔고 정착 초기 비용은 따로 들어요.",
+              "sourceId": "R213-2-6",
+              "lineId": "L-R213-2-6",
+              "official": false
+            },
+            {
+              "text": "월세 포함 한 달에 110만 원 정도 썼어요.",
+              "sourceId": "R277-2-6",
+              "lineId": "L-R277-2-6",
+              "official": false
+            },
+            {
+              "text": "넉넉히 월 140만 원이면 여행까지 소화됩니다.",
+              "sourceId": "R209-2-6",
+              "lineId": "L-R209-2-6",
+              "official": false
+            }
+          ]
         },
         {
           "name": "생활",
@@ -588,6 +638,21 @@
           "docType": "인터뷰",
           "program": "마르부르크필립스대학교",
           "semester": "2025-1"
+        },
+        "R213-2-6": {
+          "docType": "귀국보고서",
+          "program": "마르부르크필립스대학교",
+          "semester": "2026-1"
+        },
+        "R277-2-6": {
+          "docType": "귀국보고서",
+          "program": "마르부르크필립스대학교",
+          "semester": "2026-1"
+        },
+        "R209-2-6": {
+          "docType": "귀국보고서",
+          "program": "마르부르크필립스대학교",
+          "semester": "2025-2"
         }
       }
     },
@@ -835,6 +900,7 @@
         "filled": 4,
         "total": 7,
         "sharedLines": 3,
+        "editedLines": 0,
         "updatedAt": "2026-11-19T14:00:00+09:00"
       }
     ],
@@ -2214,6 +2280,7 @@
     "filled": 4,
     "total": 7,
     "sharedLines": 3,
+    "editedLines": 0,
     "updatedAt": "2026-11-19T14:00:00+09:00",
     "draftId": "D-0001",
     "sections": [

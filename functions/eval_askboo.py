@@ -31,8 +31,10 @@ def main(only):
         bad_lines = []
         for ln in res.get("lines", []):
             fallbacks += bool(ln.get("fallback"))
-            src = EVID.get(ln["sourceId"], {}).get("text", "")
-            probs = askboo.verify(ln["text"], src)   # 폴백 줄도 다시 검사한다
+            cites = ln.get("cites") or [ln["sourceId"]]
+            src = " ".join(EVID.get(s, {}).get("text", "") for s in cites)
+            # [v2] 답쓰기 줄은 인용한 근거 전체와 대조(숫자·영문·고유명사·수량). 폴백 줄은 v1처럼 새 낱말까지 본다
+            probs = askboo.verify_facts(ln["text"], src) if len(cites) > 1 or not ln.get("fallback") else askboo.verify(ln["text"], src)
             if probs:
                 bad_lines.append({"text": ln["text"], "problems": probs})
         outside += len(bad_lines)

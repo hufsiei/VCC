@@ -176,7 +176,11 @@ function pickMock(m, name, p) {
       if (p.id === "staff02") return m.login.staffDept; // 부서 담당자
       return /^H\d{4}$/.test(String(p.id || "")) ? m.login.student : m.login.fail;
     case "askBoo":
+      // [v2] 대화·메타(질문이 아님) → chat(고정 문구 + 칩). 질문함에 저장하지 않는다
+      if (/아까|말고|그\s*말이\s*아니|그게\s*아니|데이터\s*(가|는)?\s*없|고마워/.test(p.question || "")) return m.askBoo.chat;
       if (/평점|장학금|몇\s*학점|선발\s*(인원|기준)|휴학|등록금|초과학기|인정\s*신청|인정받을 수/.test(p.question || "")) return m.askBoo.official; // 규정 질문 (명세 4장)
+      // [v2] 탐색(어디 있어요·추천·어떤 게 있어요)도 주제어가 없으면 해봤노트 카드
+      if (/어디\s*(에)?\s*있|추천해|어떤\s*(게|곳이|데가)\s*있/.test(p.question || "") && !/기숙사|비용|수업|서류|학점|팁|조언|어땠/.test(p.question || "")) return m.askBoo.notes;
       // [11/23] 사람을 찾는 질문(주제어 없음) → 해봤노트 카드(status "notes")
       if (/(다녀온|갔다\s*온|가\s*본|경험한)\s*(선배|사람|분)|선배\s*(있|계|없|\?|$)/.test(p.question || "") && !/기숙사|비용|수업|서류|학점|팁|조언|어땠/.test(p.question || "")) return m.askBoo.notes;
       return /교환|파견|독일|마르부르크/.test(p.question || "") ? m.askBoo.exchange : m.askBoo.hold;
@@ -188,6 +192,18 @@ function pickMock(m, name, p) {
       return { ok: true, noteId: p.noteId, scrapped: p.scrap !== false }; // mock은 기억하지 않는다(목록·노트의 scrapped는 고정값)
     case "getMyNote":
       return { ...m.getMyNote, id: p.id || m.getMyNote.id }; // mock 경험노트는 하나뿐(M-0001)
+    case "updateMyNote": { // [11/23] mock은 기억하지 않는다 — 고친 결과 모양만 서버와 같게
+      const note = structuredClone({ ...m.getMyNote, id: p.id || m.getMyNote.id });
+      for (const ch of p.changed || []) {
+        const line = (note.sections.find((s) => s.name === ch.section) || { lines: [] }).lines[ch.index];
+        const text = String(ch.text || "").trim();
+        if (!line) return { error: "고칠 문장을 찾지 못했어요" };
+        if (!text) return { error: "문장을 적어 주세요", section: ch.section, index: ch.index };
+        if (text !== line.text) Object.assign(line, { text, edited: true });
+      }
+      note.editedLines = note.sections.reduce((n, s) => n + s.lines.filter((l) => l.edited).length, 0);
+      return { ok: true, ...note };
+    }
     case "saveQuestion":
       return m.saveQuestion; // mock은 기억하지 않는다(내 보관함 질문함 목록은 고정값)
     case "checkMessage":
@@ -285,7 +301,7 @@ export const logout = () => {
   return done;
 };
 export const getMe = () => call("getMe");
-export const askBoo = (question) => call("askBoo", { question });
+export const askBoo = (question, history = []) => call("askBoo", { question, history }); // [v2] history = 최근 4턴 [{question, status, program?}]
 export const interviewNext = (program, answers) => call("interviewNext", { program, answers });
 export const summarizeInterview = (program, transcript) => call("summarizeInterview", { program, transcript });
 export const saveConsent = (draftId, edits) => call("saveConsent", { draftId, edits, consent: true });
@@ -301,7 +317,8 @@ export const recommendSeniors = (noteId, more) => call("recommendSeniors", more 
 export const checkMessage = (text) => call("checkMessage", { text });
 export const previewNickname = (to) => call("previewNickname", { to });
 export const sendMessage = (to, text) => call("sendMessage", { to, text });
-export const getMessages = () => call("getMessages");
+// [11/23] 그냥 부르면 목록만(읽음으로 바꾸지 않음). 대화창을 열 때는 getMessages(threadId) → 그 대화만 읽음
+export const getMessages = (read) => call("getMessages", read ? { read } : {});
 export const respondRequest = (threadId, accept) => call("respondRequest", { threadId, accept });
 // 보낸 사람이 수락 대기(waiting) 요청을 거둔다 → status "cancelled". 서버 함수는 respondRequest 하나(spec 4장)
 export const cancelRequest = (threadId) => call("respondRequest", { threadId, cancel: true });
@@ -312,6 +329,9 @@ export const getInbox = () => call("getInbox");
 export const setRecommendable = (on) => call("setRecommendable", { on });
 // 내 경험노트 상세(본인만) → { id, program, type, noteId, share, filled, total, sharedLines, draftId, sections[{name, lines[{text, publicText, lineId, shared}]}], publicDraft } (spec 4장)
 export const getMyNote = (id) => call("getMyNote", { id });
+// [11/23] 내 경험노트 문장 고치기. changed = [{ section, index, text }] (index = getMyNote 그 칸 lines 순서)
+//   → { ok: true, ...getMyNote와 같은 모양(고친 문장은 edited: true) } | { error }. 해봤노트 공개 문장은 바뀌지 않는다
+export const updateMyNote = (id, changed) => call("updateMyNote", { id, changed });
 // ── 선배 추천 열림(11/22, spec 4장) ──
 // 열림 여부는 getMe().recommend = { ready, by: "talk"|"ask"|null, need: 3, talk: {answered, shared}, ask }.
 // 잠겼을 때 recommendSeniors·previewNickname은 { locked: true, message, recommend }, sendMessage(새 요청)는 { ok: false, reason: "잠김", message }.
