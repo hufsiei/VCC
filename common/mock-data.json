@@ -166,6 +166,7 @@
         {
           "noteId": "N-marburg",
           "program": "마르부르크필립스대학교",
+          "type": "교환",
           "country": "독일",
           "evidenceCount": 11,
           "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청"

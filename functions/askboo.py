@@ -429,7 +429,9 @@ def _notes(programs, country):
     """status "notes": 답을 만들지 않고 해봤노트 카드로 안내한다(질문함에 저장하지 않음 — 답할 질문이 아니라 길 안내)."""
     cards = [{"noteId": notes.note_id(n), "program": n, "country": PROGRAMS.get(n, {}).get("세부") if
               PROGRAMS.get(n, {}).get("분야") == "국제교류" else None, "evidenceCount": evidence_count(n),
-              "oneLine": (notes.NOTES.get(notes.note_id(n)) or {}).get("oneLine", "")}   # [v2] 카드 한 줄(사전 생성 노트 커버)
+              "oneLine": (notes.NOTES.get(notes.note_id(n)) or {}).get("oneLine", ""),   # [v2] 카드 한 줄(사전 생성 노트 커버)
+              # [11/23 노트] 카드 띠용 노트 종류(교환·파견·인턴·비교과) — listNotes 카드의 type과 같은 값
+              "type": (notes.NOTES.get(notes.note_id(n)) or {}).get("type") or notes._kind(n)}
              for n in programs if evidence_count(n)][:MAX_NOTES]
     if not cards:
         return None
