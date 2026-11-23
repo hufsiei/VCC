@@ -80,6 +80,31 @@ function mockInterview(m, p) {
   return { done: false, section: next, question: template.replaceAll("{p}", short).replaceAll("{s}", next), progress, pendingQuestions: 0 };
 }
 
+// summarizeInterview append mock [v2 작업 90]: getMyNote(M-0001) 문장 뒤에 이번 요약 문장을 붙인 모양.
+// 새 공개 문장은 새 draftId(D-0002)의 lineId(L-D2-k)와 new: true. 기억하지 않는다(다시 불러도 같은 모양).
+function mockAppend(m, out) {
+  const old = m.getMyNote;
+  const draftId = "D-0002";
+  let k = 0;
+  const merge = (oldSecs, newSecs, mapNew) => {
+    const secs = oldSecs.map((s) => ({ name: s.name, lines: [...s.lines] }));
+    for (const s of newSecs) {
+      let sec = secs.find((x) => x.name === s.name);
+      if (!sec) secs.push((sec = { name: s.name, lines: [] }));
+      sec.lines.push(...s.lines.map((ln) => ({ ...mapNew(ln), new: true })));
+    }
+    return { sections: secs };
+  };
+  // getMyNote 칸 문장은 화면용 모양(publicText·shared 등)이라 내 경험노트 문장 모양으로 줄인다
+  const oldMine = old.sections.map((s) => ({ name: s.name, lines: s.lines.map(({ text, edited, answersQuestionId, asked }) =>
+    ({ text, ...(edited ? { edited } : {}), ...(answersQuestionId ? { answersQuestionId, asked } : {}) })) }));
+  return {
+    ...out, draftId, myNoteId: old.id,
+    myNote: merge(oldMine, out.myNote.sections, (ln) => ln),
+    publicDraft: merge(old.publicDraft.sections, out.publicDraft.sections, (ln) => ({ ...ln, lineId: `L-D2-${++k}` })),
+  };
+}
+
 // ── 선배 추천 열림 + 「궁금한 것 정리하기」 mock (functions/demand.py를 흉내 낸다, 11/22) ──
 // mock 기본값은 「열림」(지금 만드는 화면이 갑자기 잠기지 않게). 잠김 화면을 보려면 주소 끝에 ?locked=1.
 // ?locked=1이어도 mock saveDemand·saveConsent를 부르면 이 탭에서는 열린다(sessionStorage "mockUnlocked").
@@ -223,8 +248,10 @@ function pickMock(m, name, p) {
       return mockReady() ? m[name] : LOCKED();
     case "sendMessage":
       return mockReady() ? m.sendMessage : { ok: false, reason: "잠김", message: LOCKED().message, recommend: mockStatus() };
-    case "summarizeInterview":
-      return { ...m.summarizeInterview, program: p.program || m.summarizeInterview.program, answered: countInterview(p.transcript), need: NEED };
+    case "summarizeInterview": {
+      const out = { ...m.summarizeInterview, program: p.program || m.summarizeInterview.program, answered: countInterview(p.transcript), need: NEED };
+      return p.append === true ? mockAppend(m, out) : out;
+    }
     case "saveConsent": {
       const before = mockReady();
       sessionStorage.setItem("mockUnlocked", "1"); // mock은 답변 수를 기억하지 않으므로 공유하면 열린다고 본다
@@ -306,7 +333,10 @@ export const logout = () => {
 export const getMe = () => call("getMe");
 export const askBoo = (question, history = []) => call("askBoo", { question, history }); // [v2] history = 최근 4턴 [{question, status, program?}]
 export const interviewNext = (program, answers) => call("interviewNext", { program, answers });
-export const summarizeInterview = (program, transcript) => call("summarizeInterview", { program, transcript });
+// [v2 작업 90] append = true: 이어 쓰기 — 기존 내 경험노트·공개 초안 뒤에 새 문장을 덧붙인다(새 문장 new: true, 응답은 합친 전체).
+//   「더 들려주기」(../talk/?mode=tell&program=…)와 질문이 끝난 뒤 「이어서 쓰기」는 append로 부른다
+export const summarizeInterview = (program, transcript, append = false) =>
+  call("summarizeInterview", append ? { program, transcript, append: true } : { program, transcript });
 export const saveConsent = (draftId, edits) => call("saveConsent", { draftId, edits, consent: true });
 export const listNotes = (filter) => call("listNotes", { filter });
 export const getNote = (id) => call("getNote", { id });
