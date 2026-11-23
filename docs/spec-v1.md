@@ -347,11 +347,13 @@ payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명
 - 목록에서 밀려난 선배는 보관함에 남기지 않는다. **쪽지를 주고받은 선배만** 「닮은선배 · 내 쪽지」에 남는다(**[11/23]** 쪽지 목록은 내 보관함이 아니라 닮은선배 안)(「선배 저장」 최대 9명은 P1).
 - 글자는 `nicknames.json`에 만난 순서대로 따로 기억하므로, 목록에서 빠졌다가 다시 나타나도 같은 사람은 같은 글자다(I 다음은 J, K…).
 - 받는 한도: 선배의 수락 대기(`waiting`) 요청이 **5건**이면 그 선배 카드에 `requestsFull: true`. 화면은 「지금은 요청이 많아요」를 보이고 쪽지 버튼 대신 「질문함으로 묻기」를 둔다(sendMessage 요청 한도 참고).
+- **[11/24 retryAt]** 내가 쪽지 요청을 **취소한** 선배이고 아직 7일이 지나지 않았으면 그 카드에 `retryAt`(다시 보낼 수 있는 시각, ISO KST `+09:00`, 취소 시각 + 7일)이 붙는다. 7일이 지났거나 취소한 적이 없으면 필드가 없다. 화면은 쪽지 버튼을 비활성으로 두고 「11월 30일부터 다시 보낼 수 있어요」처럼 날짜를 보인다. 거절(`declined`)·만료(`expired`)에는 붙지 않는다 — 거절은 다시 보낼 수 없고, 만료는 바로 다시 보낼 수 있다.
 ```json
 { "seniors": [ { "studentId": "H0469", "nickname": "독일어과 선배 A", "score": 14, "requestsFull": false,
                  "reasons": ["희망 프로그램을 경험했어요", "같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음", "한국외국어대학교 직무탐색 집중교육 함께 이수"] },
                { "studentId": "H0241", "nickname": "독일어과 선배 B", "score": 12, "requestsFull": false,
-                 "reasons": ["희망 프로그램을 경험했어요", "같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음"] } ],
+                 "reasons": ["희망 프로그램을 경험했어요", "같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음"],
+                 "retryAt": "2026-11-30T09:00:00+09:00" } ],
   "shown": 2, "hasMore": false, "newCount": 0 }
 ```
 `hasMore: true`일 때만 화면에 「선배 더 보기」를 두고, `false`면 「비슷한 선배를 모두 보여드렸어요」를 보인다. 시연 mock은 후보가 2명이므로 첫 화면부터 `hasMore: false`다.
@@ -370,7 +372,7 @@ payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청�
 **[11/23 차단]** 차단된 대화(누가 차단했든)에는 양쪽 모두 `{ "ok": false, "reason": "차단", "message": "더 이어 갈 수 없는 대화예요" }`. 한 쌍에 대화는 하나이므로 차단당한 사람이 새 요청을 보내도 같은 응답이다.
 **[11/20] 받는 한도:** 받는 선배의 수락 대기 요청이 이미 **5건**이면 `{ "ok": false, "reason": "선배한도", "message": "지금은 이 선배에게 요청이 많아요. 질문함에 남기면 선배 인터뷰 때 함께 물어볼게요." }`. 인기 선배에게 쪽지가 몰리지 않게 하고, 같은 질문은 질문함 → 인터뷰(작업 74) → 해봤노트로 한 번에 답하게 한다. 「당분간 쪽지 쉬기」 스위치는 P1.
 막힘 방지(응답 없는 선배 3명에게 갇히지 않게) 두 가지:
-- **보낸 사람이 취소(P0)**: `respondRequest(threadId, cancel: true)`로 기다리는 요청을 거둔다 → `status: "cancelled"`, 한도에서 빠진다. 취소한 선배에게는 7일 동안 다시 요청하지 못한다(반복 요청 방지). 선배 화면에서는 그 요청이 조용히 사라진다(알림 없음).
+- **보낸 사람이 취소(P0)**: `respondRequest(threadId, cancel: true)`로 기다리는 요청을 거둔다 → `status: "cancelled"`, 한도에서 빠진다. 취소한 선배에게는 7일 동안 다시 요청하지 못한다(반복 요청 방지). 선배 화면에서는 그 요청이 조용히 사라진다(알림 없음). 7일 안에 다시 보내면 `{ "ok": false, "reason": "취소", "message": "요청을 취소한 선배에게는 7일 뒤에 다시 보낼 수 있어요.", "retryAt": "2026-11-30T09:00:00+09:00" }`(**[11/24]** `retryAt` = 취소 시각 + 7일, ISO KST).
 - **자동 만료(P1)**: 보낸 뒤 **7일** 안에 선배가 수락·거절하지 않으면 서버가 `status: "expired"`로 바꾸고 한도에서 뺀다. 보낸 사람에게 알림 「선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?」(`alerts.json`). 만료 판정은 `getMessages`·`sendMessage` 호출 때 `requestedAt` 기준으로 한다(별도 스케줄러 없음). 시연에서는 7일이 지나지 않으므로 문구로만 설명한다.
 **[11/23 추천] 추천 제외:** 추천받기를 끈 선배에게 **새 요청·다시 요청**을 보내면 `{ "ok": false, "reason": "추천 제외", "message": "이 선배는 지금 쪽지 요청을 받지 않아요." }`. 이미 수락한 대화는 막지 않는다.
 **[11/22 열림] 잠김:** 선배 추천이 잠긴 사람의 **새 요청·다시 요청**은 `{ "ok": false, "reason": "잠김", "message": "경험을 들려주거나 궁금한 것을 정리하면 선배 추천이 열려요", "recommend": {…} }`. 이미 열린 대화에 이어 쓰기와 받은 선배의 답장은 막지 않는다.
@@ -401,6 +403,7 @@ payload `{to}`. 이 선배에게 보낼 대화의 내 닉네임을 정해 돌려
   "waitingCount": 1, "waitingLimit": 3 }
 ```
 `waitingCount`는 내가 asker로 보낸 `waiting` 요청 수. 화면은 `waitingCount >= waitingLimit`이면 「쪽지 요청」 버튼 대신 안내를 보인다(디자인 규칙 ④·⑤). `cancelled`·`expired` 대화는 asker에게만 보이고(선배 목록에서는 사라짐), 보낸 글은 남는다.
+**[11/24 retryAt]** asker의 `cancelled` 대화에 취소 뒤 7일이 지나지 않았으면 `retryAt`(다시 보낼 수 있는 시각, ISO KST, 취소 시각 + 7일)이 붙는다. 7일이 지나면 필드가 없어지고 바로 다시 요청할 수 있다(같은 대화가 `waiting`으로 다시 열림). 닮은선배 카드의 `retryAt`(recommendSeniors)과 같은 값이다.
 **[11/23 차단]** `status: "blocked"`인 대화는 양쪽 목록에 남고 `blockedByMe`(내가 차단했는지)가 붙는다. 화면은 입력창 대신 차단한 쪽에 「차단한 대화예요」, 차단당한 쪽에 「더 이어 갈 수 없는 대화예요」를 보인다(누가 차단했는지 상대에게 말하지 않음).
 
 ### respondRequest(threadId, accept | cancel)
@@ -409,8 +412,9 @@ payload `{threadId, accept: true|false}` 또는 `{threadId, cancel: true}`.
 - `cancel`: 보낸 사람이 기다리는 요청을 거둔다(`waiting` → `cancelled`). 자기 대화가 아니거나 `waiting`이 아니면 `{ "ok": false, "reason": "상태" }`.
 ```json
 { "ok": true, "status": "accepted" }
-{ "ok": true, "status": "cancelled" }
+{ "ok": true, "status": "cancelled", "retryAt": "2026-11-30T09:00:00+09:00" }
 ```
+**[11/24]** 취소 응답의 `retryAt`은 그 선배에게 다시 보낼 수 있는 시각(취소 시각 + 7일, ISO KST)이다.
 **[작업 85]** 서버는 화면 호환을 위해 옛 필드 `accepted: true|false`도 함께 보낸다(`respondRequest` 수락·거절 응답, `getMessages`의 각 대화). 새 화면은 `status`만 쓴다. 11/20 이전 기록의 `status: "requested"`는 `waiting`으로 읽는다.
 
 ### reportThread(threadId, reason, block) [11/23 차단]

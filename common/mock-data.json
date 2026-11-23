@@ -784,7 +784,8 @@
           "같은 서양어대학",
           "같은 독일어과",
           "이중전공 경영학 같음"
-        ]
+        ],
+        "retryAt": "2026-11-30T09:00:00+09:00"
       }
     ],
     "shown": 2,
@@ -817,7 +818,8 @@
   },
   "cancelRequest": {
     "ok": true,
-    "status": "cancelled"
+    "status": "cancelled",
+    "retryAt": "2026-11-30T09:00:00+09:00"
   },
   "getMessages": {
     "threads": [
@@ -866,6 +868,25 @@
             "at": "2026-11-20T11:30:00+09:00"
           }
         ]
+      },
+      {
+        "threadId": "T-0003",
+        "role": "asker",
+        "withId": "H0241",
+        "nickname": "독일어과 선배 B",
+        "myNickname": "느긋한 판다",
+        "status": "cancelled",
+        "requestedAt": "2026-11-23T08:30:00+09:00",
+        "accepted": false,
+        "unread": 0,
+        "messages": [
+          {
+            "from": "me",
+            "text": "안녕하세요, 마르부르크 기숙사 신청 시기가 궁금해서 쪽지 드려요.",
+            "at": "2026-11-23T08:30:00+09:00"
+          }
+        ],
+        "retryAt": "2026-11-30T09:00:00+09:00"
       }
     ],
     "waitingCount": 0,

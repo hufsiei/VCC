@@ -383,6 +383,7 @@ export const sendMessage = (to, text) => call("sendMessage", { to, text });
 export const getMessages = (read) => call("getMessages", read ? { read } : {});
 export const respondRequest = (threadId, accept) => call("respondRequest", { threadId, accept });
 // 보낸 사람이 수락 대기(waiting) 요청을 거둔다 → status "cancelled". 서버 함수는 respondRequest 하나(spec 4장)
+// [11/24] 응답·getMessages(취소한 대화)·recommendSeniors(그 선배 카드)에 retryAt = 다시 보낼 수 있는 시각(ISO KST, 취소 + 7일)
 export const cancelRequest = (threadId) => call("respondRequest", { threadId, cancel: true });
 // [11/23] 쪽지 대화 ⋮ 메뉴 신고·차단. reason만 → 신고, block: true → 차단(양쪽 다 더 못 보냄, 상대에게 알림 없음). 둘 다 가능
 export const reportThread = (threadId, reason, block = false) => call("reportThread", { threadId, reason, block });
