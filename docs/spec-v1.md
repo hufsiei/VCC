@@ -312,9 +312,10 @@ mock은 기억하지 않는다(받은 값을 그대로 돌려주고, 목록·노
 ### getNote(id)
 칸 순서와 이름은 `data/frames.json`을 따른다. 빈 칸도 `lines: []`로 보낸다. `interviewOnly`가 true인 칸은 선배 인터뷰로만 채워진다.
 **[11/19] 노트가 만들어지는 규칙(작업 26, PRD 4-2)**: 노트 = `data/notes.json`(사전 생성) + `runtime/noteLines.json`(동의 통과 인터뷰 문장)의 합집합.
-- `tools/build_notes.py`(원우)가 `evidence.json`을 프로그램별·칸별로 묶어 `notes.json`을 만든다. 칸 문장 = 근거 문단 **원문 그대로 1:1**(`text` = `evidence.text`, `sourceId` = `evidence.id`, AI 변환 없음). `official`은 학점·장학·선발·자격 키워드 정규식. `forWhom`은 템플릿(`"{국가}권 {분야}를 생각하는 1~2학년"` / 인턴 `"{직군} 분야 현장실습을 생각하는 2~3학년"`), `oneLine`은 근거가 가장 많은 칸의 첫 문장(P1-여건 78: 칸별 AI 한 줄 요약 `sectionSummary`), `evidenceCount` = 보고서 문단 + 동의 인터뷰 문장, `lastSemester` = 최대 학기. 현장실습 노트의 자동 분류 문장은 `autoClassified: true`(화면 「자동 분류」 라벨).
+- `tools/build_notes.py`(원우)가 `evidence.json`을 프로그램별·칸별로 묶어 `notes.json`을 만든다. 칸 문장 = 근거 문단 **원문 그대로 1:1**(`text` = `evidence.text`, `sourceId` = `evidence.id`, AI 변환 없음). `official`은 학점·장학·선발·자격 키워드 정규식. `forWhom`은 템플릿(`"{국가}권 {분야}를 생각하는 1~2학년"` / 인턴 `"{직군} 분야 현장실습을 생각하는 2~3학년"`), `oneLine`은 근거가 가장 많은 칸의 첫 문장(작업 78은 칸별 요약 문단 `summary`로 재정의 — 아래 [v2]), `evidenceCount` = 보고서 문단 + 동의 인터뷰 문장, `lastSemester` = 최대 학기. 현장실습 노트의 자동 분류 문장은 `autoClassified: true`(화면 「자동 분류」 라벨).
 - 서버는 응답할 때 `noteLines.json`의 같은 `noteId` 문장을 해당 칸 뒤에 붙인다(`docType: "인터뷰"`). **[v2] 「후배 질문」 칸은 없다.** 후배 질문에 답한 문장은 질문의 칸에 일반 문장으로 들어가며 `answersQuestionId`·`asked`를 유지한다 → 화면은 그 문장에 중립 라벨 「후배 질문에 답한 문장」만 붙인다(Q는 보이지 않음). Q·A 쌍은 질문자의 내 보관함 질문 상세에서만 본다. 같은 질문에 선배 여럿이 답하면 그 칸에 문장이 여럿 쌓인다.
 - **[v2, P1-여건 78·C 단계] 칸별 요약 문단 `summary`**: `tools/build_notes.py`(원우)가 칸마다 askBoo ⑤ 「답 쓰기」 프롬프트를 질문 없이 돌려 만든다. `summary: [{text, sources: ["R213-6", …], years: [2023, 2026]}]`, 문장마다 `sources` 1개 이상, 코드 검증(askBoo ⑥과 같음)을 통과한 문장만. 같은 뜻 문장은 하나로 합치고 연도를 묶는다. **배운점은 만들지 않는다**(선배별 원문 인용 유지). 인터뷰로 새 문장이 들어와도 문단은 다시 만들지 않는다(화면: 문단 아래 「새로 더해진 선배 이야기 N건」 원문). 없으면 필드 생략 → 화면은 지금처럼 원문 목록. 마르부르크 1개로 먼저 시험한 뒤 11/29에 전체 적용을 정한다.
+  - **[11/23 작업 78, P0] 서버가 넘기는 규칙**(`functions/notes.py`, AI 없음): `notes.json`의 칸 `summary`를 그대로 보내고, 같은 칸에 **`newLines`**(요약을 만든 뒤 인터뷰로 붙은 문장 수 = `runtime/noteLines.json`에서 온 문장 수)를 붙인다. 인터뷰 문장은 늘 칸 `lines` **끝**에 붙으므로 화면은 `lines`의 마지막 `newLines`개를 「새로 더해진 선배 이야기 N건」으로, 나머지를 「원문 N건 보기」 접기로 보여 준다(`newLines` 0이면 새 이야기 줄 없음). 배운점 칸은 `summary`가 있어도 보내지 않는다. 신고로 숨긴 문장을 `sources`에 든 요약 문장은 뺀다. 요약 문장이 하나도 안 남으면 `summary`·`newLines` 둘 다 생략. `summary`가 없는 칸에는 `newLines`도 없다.
 - **[11/22] 배운점 `senior`**: 배운점 칸 문장마다 `"senior": "선배 A"`. 글자는 **이 노트 안에서만** 쓰는 것으로, 칸에 처음 나온 선배부터 A·B·C(같은 선배는 같은 글자). 학과는 넣지 않는다 — PRD 9-1(노트가 프로그램 단위라 학과까지 보이면 소수 학과에서 특정됨). 닮은선배 `nickname`과도 같은 글자를 쓰지 않는다(이으면 학과가 드러남). 화면은 「선배 A · 2025」(senior + 출처 연도). 쓴 사람을 모르면 `senior`가 없다 → 출처만.
 - `sources[*].semester`는 그대로 보내고 화면이 연도만 표시한다(0장). 근거 1~2건인 칸은 화면이 「선배 1명의 경험이에요」 라벨(`lines.length`로 판단, 서버 필드 없음).
 ```json
@@ -325,7 +326,8 @@ mock은 기억하지 않는다(받은 값을 그대로 돌려주고, 목록·노
   "sections": [ { "name": "지원", "interviewOnly": false,
                   "lines": [ { "text": "...", "sourceId": "R03-1-1", "lineId": "L-R03-1-1", "official": false } ] },
                 { "name": "생활", "interviewOnly": false,
-                  "summary": [ { "text": "기숙사는 합격 직후 신청해야 하고 월 300~680유로 사이였어요.", "sources": ["R03-2-4", "R149-2-4"], "years": [2025, 2026] } ],   // [v2] P1-여건, 없으면 생략
+                  "summary": [ { "text": "기숙사는 합격 직후 신청해야 하고 월 300~680유로 사이였어요.", "sources": ["R03-2-4", "R149-2-4"], "years": [2025, 2026] } ],   // [v2] 작업 78(11/23 P0), 없으면 생략
+                  "newLines": 1,   // [11/23] summary 있을 때만: lines 끝 1개가 요약 뒤 인터뷰로 붙은 문장
                   "lines": [ { "text": "...", "sourceId": "R03-2-4", "lineId": "L-R03-2-4", "official": false },
                              { "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?", "answersQuestionId": "Q-0001",
                                "text": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.", "sourceId": "I-0003", "lineId": "L-I-0003", "official": false } ] } ],
@@ -568,7 +570,7 @@ currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이
 - `getNote["N-kotra"]`도 하나: 현장실습 노트(`KOTRA 해외무역관(유럽 권역)`, 데이터에서 후기가 가장 많은 기관), 칸은 5개 [`지원동기`, `업무내용`, `배운점`, `지원·선발`, `근무조건`]. 마지막 두 칸은 `interviewOnly: true`이고 비어 있음. (`지원·선발`은 한 칸의 이름이다)
 - 출처 학기는 선배1(H0469)의 보고서 `2025-1`, H0745의 보고서 `2025-2`. 노트의 `lastSemester`는 마르부르크 보고서 중 최근인 `2026-1`.
 - recommendSeniors는 선배1(H0469, 14점: 학과 5+이중전공 4+단과대 3+공통 비교과 `한국외국어대학교 직무탐색 집중교육` 2), 선배2(H0241, 12점: 학과·이중전공·단과대, 공통 비교과 없음) 두 명(11/20 가중치 기준. 실제 데이터의 3~5위 H0751·H0995·H0745는 8점), reasons 맨 앞은 「희망 프로그램을 경험했어요」. 가상 문장만 쓰고 실제 후기 원문을 옮기지 않는다.
-- ~~**[11/19]** `getNote["N-marburg"]`에 7번째 칸 `후배 질문`~~ → **[v2]** 「후배 질문」 칸을 뺀다. `getNote["N-marburg"]`는 6칸이고 생활 칸에 `answersQuestionId: "Q-0001"`·`asked`가 붙은 인터뷰 문장 1개. `interviewNext.byProgram["마르부르크필립스대학교"].steps[0]`은 `junior: true`·`section: "생활"`(questionId·asked·pendingQuestions 1), `steps[1..]`은 기존 칸, `total` 6, 모든 step에 `covered`. `summarizeInterview.publicDraft` 생활 칸에 `answersQuestionId` 문장 1개. `saveConsent`에 `answered: ["Q-0001"]`. `getInbox.questions[1]`은 `answered`, `alerts[0]`은 「내 질문에 선배가 답했어요」. `getNote["N-kotra"]`는 칸 5개(…`근무조건`)이고 자동 분류 문장에 `autoClassified: true`. **[v2]** `askBoo.chat` 하나(「아까는 KOTRA 해외무역관 이야기였어요…」 + 칩 2개), `askBoo.exchange` 문장마다 `cites`.
+- ~~**[11/19]** `getNote["N-marburg"]`에 7번째 칸 `후배 질문`~~ → **[v2]** 「후배 질문」 칸을 뺀다. `getNote["N-marburg"]`는 6칸이고 생활 칸에 `answersQuestionId: "Q-0001"`·`asked`가 붙은 인터뷰 문장 1개. `interviewNext.byProgram["마르부르크필립스대학교"].steps[0]`은 `junior: true`·`section: "생활"`(questionId·asked·pendingQuestions 1), `steps[1..]`은 기존 칸, `total` 6, 모든 step에 `covered`. `summarizeInterview.publicDraft` 생활 칸에 `answersQuestionId` 문장 1개. `saveConsent`에 `answered: ["Q-0001"]`. `getInbox.questions[1]`은 `answered`, `alerts[0]`은 「내 질문에 선배가 답했어요」. `getNote["N-kotra"]`는 칸 5개(…`근무조건`)이고 자동 분류 문장에 `autoClassified: true`. **[v2]** `askBoo.chat` 하나(「아까는 KOTRA 해외무역관 이야기였어요…」 + 칩 2개), `askBoo.exchange` 문장마다 `cites`. **[11/23 작업 78]** `getNote["N-marburg"]` 비용 칸에 `summary` 2문장·`newLines: 0`, 생활 칸에 `summary` 1문장·`newLines: 2`(끝 두 문장이 인터뷰). 나머지 칸은 `summary` 없음(원문 목록), 배운점은 늘 없음.
 
 ## 7. data/frames.json (이번에 함께 생성)
 
