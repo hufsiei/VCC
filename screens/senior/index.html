@@ -31,6 +31,52 @@
   .busy-note { display: flex; flex-direction: column; gap: var(--space-sm); }
   .busy-note .status-label { align-self: flex-start; }
 
+  /* 쪽지 요청 버튼 자리의 안내(대기 3건·요청 보냄) */
+  .request-note { flex: 1; display: flex; flex-direction: column; gap: var(--space-xs); }
+  .senior-card .btn-row { align-items: flex-start; } /* 안내 문구가 붙어도 「프로필 보기」가 늘어나지 않게 */
+  .request-note .btn-reason { margin-top: 0; }
+  .request-note .link-more { min-height: 44px; }
+
+  /* ---------- 2단계: 선배 프로필 ---------- */
+  .profile-page { padding-bottom: calc(var(--button-height) + 64px); } /* 하단 고정 버튼에 가리지 않게 */
+  .profile-detail { display: flex; flex-direction: column; gap: var(--space-md); }
+  .profile-head { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-md) 0; text-align: center; }
+  .profile-head .avatar { width: 64px; height: 64px; }
+  .profile-head .avatar .icon { width: 32px; height: 32px; }
+  .profile-reasons { display: flex; flex-direction: column; gap: var(--space-sm); }
+  .profile-reasons li { display: flex; align-items: flex-start; gap: var(--space-sm); font-size: var(--font-size-secondary); }
+
+  /* 「내 쪽지」 버튼의 새 소식 수 */
+  .count-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--status-error-fg); color: var(--color-on-primary); font-size: var(--font-size-caption); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---------- 2단계: 내 쪽지 목록 ---------- */
+  .detail { display: flex; flex-direction: column; gap: var(--space-md); }
+  .msg-group { display: flex; flex-direction: column; gap: 12px; }
+  .thread-row { display: flex; align-items: flex-start; gap: 12px; color: inherit; text-decoration: none; cursor: pointer; }
+  .thread-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-xs); }
+  .thread-row__name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); font-weight: 600; color: var(--color-heading); }
+  .thread-row__last { overflow: hidden; color: var(--color-text-muted); font-size: var(--font-size-secondary); white-space: nowrap; text-overflow: ellipsis; }
+  .thread-row__time { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+  .request-card { display: flex; flex-direction: column; gap: 12px; }
+  .request-card__who { font-weight: 600; color: var(--color-heading); }
+  .request-card__text { padding: var(--space-sm) 12px; border-radius: var(--radius-card); background: var(--color-neutral-bg); }
+  .thread-row--muted .thread-row__name { color: var(--color-text-muted); }
+
+  /* ---------- 3단계: 대화 ---------- */
+  .thread-page { padding-bottom: calc(var(--button-height) + 88px); }
+  .thread-top { display: flex; flex-direction: column; gap: var(--space-sm); margin-bottom: var(--space-md); }
+  .thread-top .status-label { align-self: flex-start; }
+  .msg--them .msg__body { max-width: calc(100% - 48px); }
+  .dock .composer .input { flex: 1; }
+  .dock-note { display: flex; flex-direction: column; gap: var(--space-sm); }
+  .dock-note .btn-reason { justify-content: center; margin-top: 0; }
+
+  /* ---------- 쪽지 요청 시트 ---------- */
+  textarea.request-text { height: auto; min-height: 112px; padding: 12px var(--space-md); line-height: 1.5; resize: vertical; }
+  .field__help { font-size: var(--font-size-secondary); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+  .request-guide { display: flex; align-items: flex-start; gap: var(--space-xs); }
+  .request-guide .icon { width: 16px; height: 16px; margin-top: 2px; }
+
   .state-box { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-lg) 0; text-align: center; }
   .state-box__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
   .state-box .boo-illust { width: 80px; height: 80px; }
@@ -84,6 +130,85 @@
       <a class="tabbar__item" href="../questions/"><i data-lucide="archive" class="icon"></i>내 보관함</a>
     </nav>
   </section>
+
+  <!-- ===== 2단계: 선배 프로필 (상세 헤더 + 하단 탭 숨김 + 하단 고정 「쪽지 요청」, 8절) ===== -->
+  <section id="viewProfile" hidden>
+    <header class="header">
+      <button class="icon-btn" id="profileBack" type="button" aria-label="뒤로"><i data-lucide="arrow-left" class="icon"></i></button>
+      <h2 class="header__title" id="profileTitle">선배 프로필</h2>
+      <span class="icon-btn" aria-hidden="true"></span>
+    </header>
+    <main class="page profile-page">
+      <div class="profile-detail" id="profileBody"></div>
+    </main>
+    <div class="dock dock--bottom" id="profileDock"></div>
+  </section>
+
+  <!-- ===== 2단계: 내 쪽지 목록 (11/23 미리님 결정: 닮은선배 · 내 쪽지 — 받은 요청·대화·보낸 요청) ===== -->
+  <section id="viewMessages" hidden>
+    <header class="header">
+      <button class="icon-btn" data-back type="button" aria-label="뒤로"><i data-lucide="arrow-left" class="icon"></i></button>
+      <h2 class="header__title">내 쪽지</h2>
+      <span class="icon-btn" aria-hidden="true"></span>
+    </header>
+    <main class="page">
+      <div class="detail" id="messagesBody" aria-busy="true"></div>
+    </main>
+  </section>
+
+  <!-- ===== 3단계: 익명 쪽지 대화 (상세 헤더 + 채팅, 8절) ===== -->
+  <section id="viewThread" hidden>
+    <header class="header">
+      <button class="icon-btn" data-back type="button" aria-label="뒤로"><i data-lucide="arrow-left" class="icon"></i></button>
+      <h2 class="header__title" id="threadTitle">쪽지</h2>
+      <span class="icon-btn" aria-hidden="true"></span>
+    </header>
+    <main class="page thread-page">
+      <div id="threadTop"></div>
+      <div class="chat" id="threadChat" aria-live="polite"></div>
+    </main>
+    <div class="dock dock--bottom" id="threadDock"></div>
+  </section>
+
+  <!-- ===== 확인 바텀시트 (5-10) — 요청 취소처럼 되돌리기 어려운 동작 ===== -->
+  <div class="sheet-layer" id="confirmSheet" hidden>
+    <div class="sheet-scrim"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" tabindex="-1">
+      <div class="sheet__handle" aria-hidden="true"></div>
+      <h2 class="sheet__title" id="confirmTitle">확인</h2>
+      <div class="sheet__body"><p id="confirmText"></p></div>
+      <div class="sheet__footer">
+        <button class="btn btn--primary btn--block" id="confirmOk" type="button">확인</button>
+        <button class="btn btn--text" id="confirmCancel" type="button">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 쪽지 요청 바텀시트 (8절 「익명 쪽지 요청 (보내는 쪽)」, 5-10) ===== -->
+  <div class="sheet-layer" id="requestSheet" hidden>
+    <div class="sheet-scrim"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="requestTitle" tabindex="-1">
+      <div class="sheet__handle" aria-hidden="true"></div>
+      <h2 class="sheet__title" id="requestTitle">쪽지 요청</h2>
+      <div class="sheet__body">
+        <!-- 내 익명 이름(previewNickname) — 시트를 여는 순간 서버가 정한 값 -->
+        <div id="requestNick"></div>
+        <div class="field">
+          <label class="field__label" for="requestText">선배에게 보낼 첫 쪽지</label>
+          <textarea class="input request-text" id="requestText" rows="4" maxlength="300" aria-describedby="requestHelp" placeholder="예: 마르부르크 학점 인정은 어떻게 받으셨는지 궁금해요."></textarea>
+          <!-- 입력 안내: 몇 자부터 보낼 수 있는지 + 지금 글자 수 -->
+          <p class="field__help" id="requestHelp" aria-live="polite">5자 이상 적어 주세요 · 0/300자</p>
+          <p class="field__error" id="requestError" role="alert" hidden></p>
+        </div>
+        <p class="sub request-guide"><i data-lucide="info" class="icon"></i><span>선배가 수락하면 대화가 열려요. 전화번호·SNS 아이디·학번은 보낼 수 없어요.</span></p>
+      </div>
+      <div class="sheet__footer">
+        <button class="btn btn--primary btn--block" id="requestSubmit" type="button" disabled>쪽지 요청</button>
+        <p class="btn-reason" id="requestReason"><i data-lucide="info" class="icon"></i><span>보낼 내용을 적어 주세요</span></p>
+        <button class="btn btn--text" id="requestCancel" type="button">취소</button>
+      </div>
+    </div>
+  </div>
 
   <div class="toast-host" id="toastHost" role="status" aria-live="polite"></div>
 </div>
