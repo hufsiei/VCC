@@ -13,7 +13,7 @@
 #         그 칸에 넣고 autoClassified: true, 없으면 노트의 'unclassified' 목록에 둔다(화면은 쓰지 않음, evidenceCount엔 셈).
 #
 # [v2 작업 78, P1-여건] 칸별 요약 문단 summary — spec 4장 getNote, HCX 원칙 v3
-#   python tools/build_notes.py --summary N-marburg[,N-…]  → 그 노트의 칸마다 AI를 불러 data/note-summaries.json에 보존 후 재생성
+#   python tools/build_notes.py --summary N-marburg[,N-…] | all  → 그 노트의 칸마다 AI를 불러 data/note-summaries.json에 보존 후 재생성
 #   - 칸 문단을 문장으로 쪼개 번호를 붙이고 askBoo ⑤ 「답쓰기」 프롬프트를 질문 없이(「칸 정리」) 돌린다 → ⑥ 검증(askboo.compose 그대로:
 #     근거 번호 없는 문장·반말 버림, 숫자·영문·고유명사·수량 코드 검사, 문장마다 답검사(Opus)). 다 버려진 칸은 summary 없음.
 #   - 배운점·인터뷰로만 칸은 만들지 않는다(선배별 원문 인용 유지). 문단은 칸 원문이 바뀌어도 자동으로 다시 만들지 않는다.
@@ -35,7 +35,7 @@ SUMMARY_PATH = DATA / "note-summaries.json"   # 작업 78: {noteId: {칸: [{text
 NO_SUMMARY = {"배운점"}                          # 요약 문단을 만들지 않는 칸(선배별 원문 인용)
 SUMMARY_Q = "(질문 없음) {program}의 「{section}」 칸에 선배들이 남긴 이야기를 고루 정리해 주세요. 문장은 {cap}개 이내로."
 SMALL_SECTION = 5      # 작업 78: 근거(칸 문단) 5건 이하 칸은 요약 3문장, 그보다 많으면 5문장까지
-DUP_OVERLAP = 0.6      # 작업 78: 앞 칸 요약 문장과 두 글자 묶음이 이만큼(짧은 쪽 기준) 겹치면 뒤 칸에서 뺀다(마르부르크 실제 중복 0.84, 다른 문장 ≤ 0.34)
+DUP_OVERLAP = 0.45     # 작업 78: 앞 칸 요약 문장과 두 글자 묶음이 이만큼(짧은 쪽 기준) 겹치면 뒤 칸에서 뺀다(마르부르크 실제 중복 0.84·0.56, 다른 문장 ≤ 0.34)
 _STOCK_END = re.compile(r"(다|라)?(는|고)\s*(선배도|선배가)?\s*(있었어요|많았어요|해요)[.]?$|(했|였|었|았)?어요[.]?$")
 FIXED_IDS = {"마르부르크필립스대학교": "N-marburg"}          # spec 4장·mock-data와 같은 id
 _TERM = {"1": 1, "여름": 2, "2": 3, "겨울": 4}
@@ -347,17 +347,22 @@ def summarize(note):
 
 def run_summary(ids):
     notes = {n["id"]: n for n in build()}
+    if ids == ["all"]:   # 작업 78 전체 적용: 요약 칸이 하나라도 있는 노트 전부
+        ids = [i for i, n in notes.items()
+               if any(s["lines"] and not s["interviewOnly"] and s["name"] not in NO_SUMMARY for s in n["sections"])]
     unknown = [i for i in ids if i not in notes]
     if unknown:
         sys.exit(f"없는 노트 id: {unknown}")
     saved = json.loads(SUMMARY_PATH.read_text(encoding="utf-8")) if SUMMARY_PATH.exists() else {}
-    for i in ids:
+    for k, i in enumerate(ids, 1):
         got = summarize(notes[i])
         if got:
             saved[i] = got
         else:
             saved.pop(i, None)
-    SUMMARY_PATH.write_text(json.dumps(saved, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        # 노트마다 저장 — 중간에 끊겨도 앞 노트 결과는 남는다
+        SUMMARY_PATH.write_text(json.dumps(saved, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(f"[{k}/{len(ids)}] {i} 저장", flush=True)
     print(f"저장: {SUMMARY_PATH.relative_to(ROOT)}")
 
 
@@ -374,7 +379,7 @@ def main():
     if "--summary" in sys.argv:   # 작업 78: AI 호출 → note-summaries.json, 이어서 아래 생성·점검
         k = sys.argv.index("--summary")
         if k + 1 >= len(sys.argv):
-            sys.exit("사용: python tools/build_notes.py --summary N-marburg[,N-…]")
+            sys.exit("사용: python tools/build_notes.py --summary N-marburg[,N-…] 또는 --summary all")
         run_summary([i for i in sys.argv[k + 1].split(",") if i])
     if "--check" in sys.argv:
         notes = json.loads(OUT.read_text(encoding="utf-8"))
