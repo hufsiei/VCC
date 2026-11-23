@@ -2,11 +2,93 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>senior</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>닮은선배 · 외대人사이드</title>
 <link rel="stylesheet" href="../../common/style.css">
+<style>
+  /* 닮은선배 화면 배치용. 색은 style.css 변수만 쓴다. */
+  .senior-top { display: flex; flex-direction: column; gap: var(--space-md); }
+  .senior-top__actions { display: flex; justify-content: flex-end; }
+  .senior-top__actions .btn { min-height: 44px; font-size: var(--font-size-secondary); }
+
+  /* 「나의 프로필 요약」 — SOFT BLUE 카드(7-④) */
+  .profile-card { display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-md); border-radius: var(--radius-card); background: var(--color-soft-blue); }
+  .profile-card__title { font-size: var(--font-size-caption); font-weight: 600; color: var(--color-text-muted); }
+  .profile-card__line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
+  .profile-card__dept { font-weight: 600; color: var(--color-heading); }
+
+  /* 기준 노트(프로그램) 칩 — 후보가 여럿일 때만 */
+  .base-chips { display: flex; gap: var(--space-sm); margin: 0 calc(-1 * var(--page-gutter)); padding: 0 var(--page-gutter); overflow-x: auto; scrollbar-width: none; }
+  .base-chips::-webkit-scrollbar { display: none; }
+  .base-chips .choice-chip { flex: none; font-size: var(--font-size-secondary); cursor: pointer; }
+
+  .list-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-top: var(--space-lg); }
+  .senior-list { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+  .senior-skeleton { height: 220px; }
+  .list-end { margin-top: var(--space-md); text-align: center; font-size: var(--font-size-secondary); color: var(--color-text-muted); }
+  .list-more { margin-top: var(--space-md); }
+  .senior-card .btn-row .btn { font-size: var(--font-size-secondary); }
+  .busy-note { display: flex; flex-direction: column; gap: var(--space-sm); }
+  .busy-note .status-label { align-self: flex-start; }
+
+  .state-box { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-lg) 0; text-align: center; }
+  .state-box__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
+  .state-box .boo-illust { width: 80px; height: 80px; }
+  .state-box > .icon { width: 48px; height: 48px; color: var(--color-text-muted); }
+  .state-box .detail-actions { display: flex; flex-direction: column; gap: var(--space-sm); width: 100%; margin-top: var(--space-sm); }
+</style>
 </head>
 <body>
-<div class="app"></div>
+<div class="app">
+
+  <!-- ===== 1단계: 닮은선배 (메인 헤더 + 하단 탭) ===== -->
+  <section id="viewSenior" class="has-tabbar">
+    <header class="header">
+      <button class="icon-btn" type="button" aria-label="메뉴"><i data-lucide="menu" class="icon"></i></button>
+      <a class="header__brand" href="../talk/">
+        <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
+        외대人사이드
+      </a>
+      <div class="header__actions">
+        <!-- 직원 계정일 때만 보임(5-1): PC 관리자 콘솔을 새 탭으로 -->
+        <a class="icon-btn" id="consoleBtn" href="../admin/" target="_blank" rel="noopener" aria-label="관리자 콘솔" hidden><i data-lucide="chart-column" class="icon"></i></a>
+        <a class="icon-btn" href="../questions/#alerts" aria-label="알림"><i data-lucide="bell" class="icon"></i></a>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="senior-top">
+        <div class="page-intro">
+          <div class="page-intro__text">
+            <h1 class="page-title">닮은선배</h1>
+            <p class="sub">내가 궁금한 경험을 해본 선배 중, 출발점이 비슷한 선배를 추천해요.</p>
+          </div>
+          <img class="boo-illust" src="../../assets/boo-portrait.png" alt="BOO">
+        </div>
+        <!-- 쪽지 목록(보낸 요청·받은 요청·대화)으로 — 11/23 미리님 결정: 닮은선배 · 내 쪽지 -->
+        <div class="senior-top__actions">
+          <button class="btn btn--outline" id="myMessagesBtn" type="button"><i data-lucide="mail" class="icon"></i>내 쪽지</button>
+        </div>
+        <div id="profileBox"></div>
+        <div class="base-chips" id="baseChips" role="group" aria-label="기준 프로그램" hidden></div>
+      </div>
+
+      <div id="listArea" aria-busy="true"></div>
+    </main>
+
+    <!-- 하단 탭(5-3) -->
+    <nav class="tabbar" aria-label="주 메뉴">
+      <a class="tabbar__item" href="../talk/"><i data-lucide="message-circle" class="icon"></i>인터BOO</a>
+      <a class="tabbar__item" href="../note/"><i data-lucide="notebook-text" class="icon"></i>해봤노트</a>
+      <a class="tabbar__item" href="../senior/" aria-current="page"><i data-lucide="users" class="icon"></i>닮은선배</a>
+      <a class="tabbar__item" href="../questions/"><i data-lucide="archive" class="icon"></i>내 보관함</a>
+    </nav>
+  </section>
+
+  <div class="toast-host" id="toastHost" role="status" aria-live="polite"></div>
+</div>
+
+<script src="../../assets/lucide/lucide.min.js"></script>
+<script type="module" src="./senior.js"></script>
 </body>
 </html>
