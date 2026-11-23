@@ -484,6 +484,9 @@ def save_my_note(me, program, draft_id, my_note, public_draft, answered=0):
         return mid
 
 
+MAX_EDIT_CHARS = 300   # [11/23] 선배가 고친 공개 문장 한 줄의 글자 수 상한(화면 consent.js와 같음)
+
+
 def saveConsent(me, p):
     if not p.get("consent"):
         return {"error": "공개 동의가 필요해요"}
@@ -494,9 +497,17 @@ def saveConsent(me, p):
     # 걸린 문장만 공개에서 빼고(removed에 더함) 나머지는 그대로 저장한다. 내 경험노트에는 남는다.
     changed, rejected = [], []
     for ch in edits.get("changed") or []:
-        r = check_public_text(ch.get("text", ""))
+        text = str(ch.get("text") or "").strip()
+        if not text:          # 빈 문장은 고침으로 보지 않는다(공개하지 않으려면 removed — 화면은 스위치를 끈다)
+            continue
+        if len(text) > MAX_EDIT_CHARS:
+            removed.add(ch.get("lineId"))
+            rejected.append({"lineId": ch.get("lineId"), "reason": "길이",
+                             "message": f"문장이 너무 길어요. {MAX_EDIT_CHARS}자 안으로 적어 주세요."})
+            continue
+        r = check_public_text(text)
         if r["ok"]:
-            changed.append({"lineId": ch.get("lineId"), "text": ch.get("text", ""),
+            changed.append({"lineId": ch.get("lineId"), "text": text,
                             "identifying": r["identifying"], "official": r["official"]})
         else:
             removed.add(ch.get("lineId"))
@@ -508,6 +519,15 @@ def saveConsent(me, p):
         if note is None:   # 남의 초안이거나 없는 초안(spec 2-1)
             return {"error": "볼 수 없는 기록이에요"}
         new_text = {c["lineId"]: c for c in changed}
+        # [11/23] 고친 문장은 공개 초안에도 남긴다 → 「공유 범위 바꾸기」로 다시 열어도 고친 문장이 보이고,
+        # 다시 공유해도 AI 원래 문장으로 돌아가지 않는다. 내 경험노트 문장(myNote)은 그대로 둔다(따로 고침).
+        for sec in note.get("publicDraft", {}).get("sections", []):
+            for ln in sec.get("lines", []):
+                c = new_text.get(ln.get("lineId"))
+                if c and c["text"] != ln.get("text"):
+                    ln.setdefault("aiText", ln.get("text", ""))   # 처음 AI가 만든 문장(되돌리기·검토용)
+                    ln.update(text=c["text"], edited=True, identifying=c["identifying"])
+                    ln.pop("match", None)     # 선배가 직접 쓴 문장 — 원문 일치 검사 대상이 아니다
         passing = []
         for sec in note.get("publicDraft", {}).get("sections", []):
             for ln in sec.get("lines", []):
