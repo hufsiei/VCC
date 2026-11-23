@@ -141,7 +141,7 @@
 | 로그인 정보 | 화면이 `sessionStorage`의 `"me"`에 저장한다. 함수는 따로 받지 않는다 |
 | docType | `귀국보고서` · `현장실습후기` · `인터뷰` |
 
-## 함수 15개
+## 함수 15개 (+ 11/22 추가 5개)
 
 | 함수 | 보내는 값 |
 |---|---|
@@ -153,6 +153,8 @@
 | saveConsent(draftId, edits) | `{draftId, edits:{removed:[lineId], changed:[{lineId, text}]}, consent:true}` |
 | listNotes(filter) | `{filter:{type?, q?}}` (type: 교환·파견·인턴·비교과) |
 | getNote(id) | `{id}` |
+| scrapNote(noteId, scrap) [11/22] | `{noteId, scrap?}` (생략 = 켜기, `false` = 끄기, 다시 불러도 같은 결과) |
+| saveQuestion(noteId, section) [11/22] | `{noteId, section}` (「질문함에 담기」, 그 칸을 질문함에 `hold`로) |
 | recommendSeniors(noteId) | `{noteId}` |
 | checkMessage(text) | `{text}` |
 | previewNickname(to) | `{to}` (쪽지 요청 시트를 열 때, 이 대화에서 쓸 내 닉네임) |
@@ -160,6 +162,9 @@
 | getMessages() | 없음 |
 | respondRequest(threadId, accept) | `{threadId, accept}` (받은 선배의 수락·거절) |
 | getInbox() | 없음 |
+| getMyNote(id) [11/22] | `{id}` (내 경험노트 상세, 본인 것만) |
+| demandNext(state) [11/22] | `{state}` (「궁금한 것 정리하기」 다음 단계, AI 없음) |
+| saveDemand(state) [11/22] | `{state, consent:true}` |
 | reportStatement(lineId, reason) | `{lineId, reason?}` |
 | getDeptReport(dept) | `{dept}` (직원 전용) |
 
@@ -241,7 +246,9 @@
 | notes[].oneLine / forWhom | 글자 | 한 줄 요약, 추천 대상 |
 | notes[].evidenceCount | 숫자 | 근거 개수 |
 | notes[].lastSemester | 글자 | 가장 최근 학기 |
-| notes[].satisfaction | 숫자 | 만족도 |
+| notes[].satisfaction / completedCount | 숫자 | 만족도, 이수 인원(비교과만, 나머지는 `null`) |
+| notes[].country [11/22] | 글자 | 국제교류(교환·파견)는 `programs.json`의 `세부` 국가, 인턴·비교과는 `null` |
+| notes[].scrapped [11/22] | 참/거짓 | 부른 사람이 스크랩했는지 |
 
 ### getNote
 
@@ -250,12 +257,14 @@
 | 필드 | 형식 | 뜻 |
 |---|---|---|
 | id / program / type / oneLine / forWhom | 글자 | listNotes와 같음 |
-| evidenceCount / lastSemester / satisfaction | 숫자·글자 | listNotes와 같음 |
+| evidenceCount / lastSemester / satisfaction / completedCount | 숫자·글자 | listNotes와 같음 |
+| country / scrapped [11/22] | 글자·참거짓 | listNotes와 같음 |
 | officialUrl | 글자 | 공식 안내 주소. 프로그램의 `운영부서코드`로 `departments.json`의 `공식안내URL`을 찾아 넣음(프로그램 목록에는 URL 없음) |
 | sections[].name | 글자 | 칸 이름 |
 | sections[].interviewOnly | 참/거짓 | true면 선배 인터뷰로만 채워지는 칸 |
 | sections[].lines[].text / sourceId / lineId | 글자 | 문장, 출처, 문장 번호 |
 | sections[].lines[].official | 참/거짓 | true면 규정성 진술. "개인 경험이에요" 표시와 `officialUrl` 링크를 붙인다 |
+| sections[].lines[].senior [11/22] | 글자 | 배운점 칸만. 「선배 A」처럼 이 노트 안에서만 쓰는 글자, 학과 없음(PRD 9-1). 닮은 선배 `nickname`과 다른 글자. 쓴 사람을 모르면 없음 |
 | sources | 객체 | sourceId별 `{docType, program, semester}` |
 
 ### recommendSeniors
@@ -308,12 +317,39 @@
 
 | 필드 | 형식 | 뜻 |
 |---|---|---|
-| myNotes[].id / program | 글자 | 내 경험 노트 |
+| myNotes[].id / noteId | 글자 | 내 경험노트 번호(`M-…`), 공유되는 해봤노트 번호 |
+| myNotes[].program / type | 글자 | 프로그램, 종류 |
+| myNotes[].share [11/22] | 글자 | `private`(나만 보기) · `partial`(일부 공유) · `shared`(공유됨). 「반영 중」은 없음 |
+| myNotes[].filled / total [11/22] | 숫자 | 내 문장이 있는 칸 수 / 노트 틀 전체 칸 수(「노트 틀 4/7」) |
+| myNotes[].sharedLines [11/22] | 숫자 | 지금 해봤노트에 보이는 내 문장 수(신고로 숨긴 것 제외) |
+| myNotes[].updatedAt | 글자 | 최근 요약 시각, 최근 것이 위 |
 | questions[].questionId / text | 글자 | 질문 번호, 내용 |
-| questions[].status | 글자 | `waiting` 또는 `answered` |
-| questions[].askedAt / noteId | 글자 | 질문 시각(waiting) / 답이 된 노트(answered) |
-| scraps[].noteId / program | 글자 | 스크랩한 노트 |
-| alerts[].text / noteId / at | 글자 | 알림 문구, 관련 노트, 시각 |
+| questions[].status | 글자 | `hold`(미답변) 또는 `answered` |
+| questions[].askedAt / noteId / answeredAt | 글자 | 질문 시각 / 답이 된 노트·답한 시각(answered) |
+| scraps[].noteId / program | 글자 | scrapNote로 켠 노트, 최근 것이 위 |
+| alerts[].text / questionId / noteId / at | 글자 | 알림 문구, 관련 질문·노트, 시각 |
+
+### scrapNote [11/22]
+
+| 필드 | 형식 | 뜻 |
+|---|---|---|
+| ok / noteId / scrapped | 참거짓·글자·참거짓 | 바뀐 뒤 상태. 버튼은 `scrapped`로 바꾼다 |
+| error | 글자 | 노트가 없을 때 「노트를 찾지 못했어요」 |
+
+### saveQuestion [11/22]
+
+| 필드 | 형식 | 뜻 |
+|---|---|---|
+| ok / questionId | 참거짓·글자 | 질문함에 담긴 질문 번호 |
+| already | 참/거짓 | 같은 사람·노트·칸의 `hold` 질문이 이미 있으면 true(새로 만들지 않음) |
+| message | 글자 | 토스트 문구 |
+| error | 글자 | 「담을 수 없는 칸이에요」(`후배 질문` 칸·없는 칸) 또는 「노트를 찾지 못했어요」 |
+
+질문 글은 서버가 정한 글(`"{칸} 이야기를 최근 경험으로 듣고 싶어요."`)이다. 질문함 집계·측정에서 askBoo 질문과 나눌 때는 `noteId`·칸이 채워진 행으로 본다.
+
+### getMyNote · demandNext · saveDemand [11/22]
+
+응답 모양은 `docs/spec-v1.md` 4장 원본을 따른다. getMyNote는 getInbox 카드 값 + 칸별 `lines[].text / publicText / lineId / shared` + `draftId`·`publicDraft`. demandNext는 `{done, step, question, options|examples, retry?, progress:{answered, need}, state}`, 끝나면 `summary`. saveDemand는 `{ok, demandId, questionIds, recommend, unlocked}`.
 
 ### reportStatement
 
