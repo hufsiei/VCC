@@ -472,19 +472,55 @@ def add_question(me, text, program=None, section=None, status="hold", note_id=No
         return qid
 
 
-def save_my_note(me, program, draft_id, my_note, public_draft, answered=0):
+def find_my_note(me, program):
+    """[v2 작업 90] 같은 사람·같은 프로그램의 내 경험노트 (myNoteId, 기록 사본). 없으면 (None, None)."""
+    with store.lock():
+        for k, v in store.load("myNotes", {}).items():
+            if v["owner"] == me and v["program"] == program:
+                return k, json.loads(json.dumps(v))
+    return None, None
+
+
+def _merge_sections(old, new, order):
+    """[v2 이어 쓰기] 기존 칸 문장 뒤에 새 문장을 붙인다. 칸 순서는 노트 틀(order) → 그 밖의 칸은 나온 순서.
+    기존 문장(edited·aiText·identifying 등)은 그대로 둔다."""
+    lines, names = {}, []
+    for sec in (old or {}).get("sections", []) + (new or {}).get("sections", []):
+        if sec["name"] not in lines:
+            names.append(sec["name"])
+            lines[sec["name"]] = []
+        lines[sec["name"]] += sec.get("lines", [])
+    names.sort(key=lambda n: order.index(n) if n in order else len(order))   # 안정 정렬
+    return {"sections": [{"name": n, "lines": lines[n]} for n in names]}
+
+
+def save_my_note(me, program, draft_id, my_note, public_draft, answered=0, asked=None, append=False):
     """summarizeInterview(작업 21)가 부른다. 같은 사람·같은 프로그램이면 같은 myNoteId를 갱신.
-    answered = 이번 인터뷰의 유효 답변 수(demand.count_interview_answers) — 이어 쓰면 큰 값을 남긴다(추천 열림)."""
+    answered = 이번 인터뷰의 유효 답변 수(demand.count_interview_answers) — 이어 쓰면 큰 값을 남긴다(추천 열림).
+    [v2 작업 90] asked = 이번 인터뷰에서 물은 질문 글(interviewNext가 깊이 질문을 다시 묻지 않게).
+    append=True면 기존 myNote·publicDraft를 지우지 않고 칸 뒤에 덧붙이고(asked도 합침), 아니면 통째로 바꾼다.
+    돌려주는 값: myNoteId. 합친 결과는 find_my_note로 읽는다."""
     with store.lock():
         notes = store.load("myNotes", {})
         mid = next((k for k, v in notes.items() if v["owner"] == me and v["program"] == program), None)
         mid = mid or store.next_id("M")
         old = notes.get(mid, {})
+        asked = list(asked or [])
+        if append and old:
+            order = notes_frame(program)
+            my_note = _merge_sections(old.get("myNote"), my_note, order)
+            public_draft = _merge_sections(old.get("publicDraft"), public_draft, order)
+            asked = list(dict.fromkeys(list(old.get("asked") or []) + asked))
         notes[mid] = {"owner": me, "program": program, "draftId": draft_id, "myNote": my_note,
                       "publicDraft": public_draft, "share": old.get("share", "private"), "updatedAt": now(),
-                      "answered": max(int(old.get("answered", 0)), int(answered))}
+                      "answered": max(int(old.get("answered", 0)), int(answered)), "asked": asked}
         store.save("myNotes")
         return mid
+
+
+def notes_frame(program):
+    """그 프로그램의 노트 틀 칸(「후배 질문」 빼고)."""
+    return notes.frame_sections(notes._kind(program))
 
 
 MAX_EDIT_CHARS = 300   # [11/23] 선배가 고친 공개 문장 한 줄의 글자 수 상한(화면 consent.js와 같음)
