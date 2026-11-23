@@ -447,6 +447,7 @@
         "satisfaction": null,
         "completedCount": null,
         "country": "독일",
+        "kind": null,
         "scrapped": true
       },
       {
@@ -460,6 +461,7 @@
         "satisfaction": null,
         "completedCount": null,
         "country": null,
+        "kind": "KOTRA 해외무역관",
         "scrapped": false
       },
       {
@@ -473,9 +475,136 @@
         "satisfaction": 4.2,
         "completedCount": 150,
         "country": null,
+        "kind": null,
         "scrapped": false
       }
-    ]
+    ],
+    "groups": {
+      "country": [
+        {
+          "name": "프랑스",
+          "count": 18
+        },
+        {
+          "name": "독일",
+          "count": 11
+        },
+        {
+          "name": "스페인",
+          "count": 8
+        },
+        {
+          "name": "러시아",
+          "count": 6
+        },
+        {
+          "name": "이탈리아",
+          "count": 5
+        },
+        {
+          "name": "벨기에",
+          "count": 4
+        },
+        {
+          "name": "브라질",
+          "count": 3
+        },
+        {
+          "name": "스웨덴",
+          "count": 3
+        },
+        {
+          "name": "네덜란드",
+          "count": 2
+        },
+        {
+          "name": "미국",
+          "count": 2
+        },
+        {
+          "name": "일본",
+          "count": 2
+        },
+        {
+          "name": "포르투갈",
+          "count": 2
+        },
+        {
+          "name": "덴마크",
+          "count": 1
+        },
+        {
+          "name": "싱가포르",
+          "count": 1
+        },
+        {
+          "name": "아일랜드",
+          "count": 1
+        },
+        {
+          "name": "체코",
+          "count": 1
+        },
+        {
+          "name": "홍콩",
+          "count": 1
+        }
+      ],
+      "kind": [
+        {
+          "name": "중소 무역회사",
+          "count": 5
+        },
+        {
+          "name": "공공기관",
+          "count": 4
+        },
+        {
+          "name": "국제기구 한국사무소",
+          "count": 4
+        },
+        {
+          "name": "스타트업",
+          "count": 4
+        },
+        {
+          "name": "언론사",
+          "count": 4
+        },
+        {
+          "name": "외국계 기업 한국지사",
+          "count": 4
+        },
+        {
+          "name": "중견기업",
+          "count": 4
+        },
+        {
+          "name": "중견기업 해외영업팀",
+          "count": 4
+        },
+        {
+          "name": "통번역 전문회사",
+          "count": 4
+        },
+        {
+          "name": "현지 협력기관(온라인)",
+          "count": 4
+        },
+        {
+          "name": "KOTRA 해외무역관",
+          "count": 3
+        },
+        {
+          "name": "여행·관광 기업",
+          "count": 3
+        },
+        {
+          "name": "온라인 현장실습(국내 기관)",
+          "count": 3
+        }
+      ]
+    }
   },
   "getNote": {
     "N-marburg": {
@@ -489,6 +618,7 @@
       "satisfaction": null,
       "completedCount": null,
       "country": "독일",
+      "kind": null,
       "scrapped": true,
       "officialUrl": "https://example.com/hufs/exchange",
       "sections": [
@@ -667,6 +797,7 @@
       "satisfaction": null,
       "completedCount": null,
       "country": null,
+      "kind": "KOTRA 해외무역관",
       "scrapped": false,
       "officialUrl": "https://example.com/hufs/intern",
       "sections": [
@@ -750,6 +881,7 @@
       "satisfaction": 4.2,
       "completedCount": 150,
       "country": null,
+      "kind": null,
       "scrapped": false,
       "officialUrl": "https://job.hufs.ac.kr/job/main/index.do",
       "sections": [

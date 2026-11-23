@@ -11,6 +11,8 @@
 #   scrapNote(me, {noteId, scrap}) — 스크랩 켜기·끄기(runtime/scraps.json). 카드·노트의 scrapped, getInbox.scraps
 #   saveQuestion(me, {noteId, section}) — [11/22] 「질문함에 담기」: 그 칸을 질문함에 hold로(다음 인터뷰가 먼저 묻는다)
 #   카드·노트의 country = 국제교류 프로그램의 programs.json 「세부」(국가). 인턴·비교과는 null
+#   [11/23 주제별] 카드·노트의 kind = 인턴 프로그램의 「세부」(기관유형). listNotes는 groups(나라·기관유형 칩)와
+#   filter.country·filter.kind를 받고, 비교과 카드는 이수 인원(completedCount) 많은 순
 #   getNote 배운점 문장의 senior = 「선배 A」(노트 안에서만 쓰는 글자, 학과 없음 — PRD 9-1)
 #
 # 원문 인용만 한다: 선배가 동의한 문장 그대로 붙이고, 여러 선배의 답을 합치거나 요약하지 않는다(HCX 원칙 v2). AI 없음.
@@ -143,6 +145,21 @@ def _country(program):
     return info.get("세부") if info.get("분야") == "국제교류" else None
 
 
+def _org_kind(program):
+    """[11/23 주제별] 인턴(현장실습) 프로그램의 기관유형(programs.json 「세부」). 묶음 칩 「공공기관」용. 국제교류·비교과는 None."""
+    info = PROGRAMS.get(program, {})
+    return info.get("세부") if info.get("분야") == "현장실습" else None
+
+
+def _groups(cards, key):
+    """묶음 칩 목록: 값별 노트 수, 많은 순(같으면 가나다순). 값이 없는 카드는 뺀다."""
+    count = {}
+    for c in cards:
+        if c.get(key):
+            count[c[key]] = count.get(c[key], 0) + 1
+    return [{"name": k, "count": v} for k, v in sorted(count.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+
 def _my_scraps(me):
     """내가 스크랩한 노트 id 목록(스크랩한 순서)."""
     with store.lock():
@@ -228,6 +245,7 @@ def getNote(me, p):
         return {"error": "노트를 찾지 못했어요"}
     _label_lesson_seniors(note, rows)
     note["country"] = _country(note["program"])
+    note["kind"] = _org_kind(note["program"])
     note["scrapped"] = nid in _my_scraps(me)
     return note
 
@@ -263,9 +281,17 @@ def listNotes(me, p):
             if not any(q in _norm(w) for w in words if w):
                 continue
         card["country"] = _country(card["program"])
+        card["kind"] = _org_kind(card["program"])
         card["scrapped"] = nid in scrapped
         out.append(card)
-    return {"notes": out}
+    # [11/23 주제별] 비교과는 이수 인원 많은 순(없으면 뒤). 다른 종류 카드의 자리·순서는 그대로
+    extra = iter(sorted((c for c in out if c["type"] == "비교과"), key=lambda c: -(c["completedCount"] or -1)))
+    out = [next(extra) if c["type"] == "비교과" else c for c in out]
+    # 묶음 칩은 type·q로 거른 뒤, country·kind로 거르기 전 카드로 센다(칩을 눌러도 다른 칩이 사라지지 않게)
+    groups = {"country": _groups(out, "country"), "kind": _groups(out, "kind")}
+    country, org = (f.get("country") or "").strip(), (f.get("kind") or "").strip()
+    out = [c for c in out if (not country or c["country"] == country) and (not org or c["kind"] == org)]
+    return {"notes": out, "groups": groups}
 
 
 def _note_exists(nid):

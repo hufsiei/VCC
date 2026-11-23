@@ -151,6 +151,31 @@ expect("국가: 마르부르크 = 독일", cards["N-marburg"]["country"] == "독
 expect("국가: 비교과는 null", cards["N-3ca17d"]["country"] is None and cards["N-3ca17d"]["completedCount"] == 150)
 expect("국가: 인턴은 null", all(c["country"] is None for c in cards.values() if c["type"] == "인턴"))
 
+# 12-1) [11/23 주제별] 인턴 kind(기관유형)·나라/기관유형 묶음 칩·필터·비교과 이수 인원순
+all_res = notes.listNotes(JUNIOR, {})
+expect("kind: 인턴만 기관유형, 나머지 null",
+       all((c["kind"] is not None) == (c["type"] == "인턴") for c in all_res["notes"])
+       and notes.getNote(JUNIOR, {"id": "N-marburg"})["kind"] is None)
+intern = notes.listNotes(JUNIOR, {"filter": {"type": "인턴"}})
+kinds = intern["groups"]["kind"]
+expect("인턴 묶음 칩: 기관유형별 수 합 = 카드 수, 많은 순",
+       sum(g["count"] for g in kinds) == len(intern["notes"]) and kinds == sorted(kinds, key=lambda g: (-g["count"], g["name"]))
+       and intern["groups"]["country"] == [])
+k0 = kinds[0]
+by_kind = notes.listNotes(JUNIOR, {"filter": {"type": "인턴", "kind": k0["name"]}})
+expect("kind 필터 → 그 기관유형만, 칩은 그대로", len(by_kind["notes"]) == k0["count"]
+       and all(c["kind"] == k0["name"] for c in by_kind["notes"]) and by_kind["groups"] == intern["groups"])
+ex = notes.listNotes(JUNIOR, {"filter": {"type": "교환"}})
+de = notes.listNotes(JUNIOR, {"filter": {"type": "교환", "country": "독일"}})
+expect("country 필터 → 독일 교환만(마르부르크 포함)", de["notes"] and all(c["country"] == "독일" for c in de["notes"])
+       and "N-marburg" in [c["id"] for c in de["notes"]]
+       and next(g for g in ex["groups"]["country"] if g["name"] == "독일")["count"] == len(de["notes"]))
+done = [c["completedCount"] for c in notes.listNotes(JUNIOR, {"filter": {"type": "비교과"}})["notes"]]
+expect("비교과는 이수 인원 많은 순", done == sorted(done, key=lambda n: -(n or -1)) and done[0] == max(n or 0 for n in done))
+expect("전체 목록에서 비교과 아닌 카드 순서는 그대로",
+       [c["id"] for c in all_res["notes"] if c["type"] != "비교과" and c["id"] in notes.NOTES]
+       == [i for i, n in notes.NOTES.items() if n["type"] != "비교과"])
+
 # 13) 스크랩 켜기·끄기 → 카드·노트 scrapped, 내 보관함 scraps(최근이 위), 사람마다 따로
 expect("스크랩 처음엔 꺼짐", cards["N-marburg"]["scrapped"] is False and getInbox(JUNIOR, {})["scraps"] == [])
 s1 = notes.scrapNote(JUNIOR, {"noteId": "N-marburg"})

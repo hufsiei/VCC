@@ -271,7 +271,7 @@ payload `{draftId, edits:{removed:[lineId], changed:[{lineId, text}]}, consent:t
 - 화면: 문장 아래 Text 버튼 「문장 고치기」 → 입력창(라벨 「해봤노트에 보일 문장」, 안내 「내 경험노트 문장은 그대로예요. 연락처·메일·링크는 넣을 수 없어요.」) + Secondary 「저장」 / Text 「취소」. 고친 문장(이번에 고친 것·`edited: true`)에는 중립 라벨 「내가 고친 문장」, 「원문과 다를 수 있어요」는 붙이지 않는다. 고치는 중에는 「동의하고 공유」 비활성 + 「고치는 중인 문장을 저장하거나 취소해 주세요」.
 
 ### listNotes(filter)
-payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"}}`
+payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어", country?: "독일", kind?: "공공기관"}}`   // country·kind [11/23 주제별]
 ```json
 { "notes": [ { "id": "N-marburg", "program": "마르부르크필립스대학교", "type": "교환",
   "oneLine": "TestDaF는 3학기 전부터, 기숙사는 합격 직후 신청", "forWhom": "독일어권 교환을 생각하는 1~2학년",
@@ -280,6 +280,17 @@ payload `{filter:{type?: "교환"|"파견"|"인턴"|"비교과", q?: "검색어"
   "oneLine": "", "forWhom": "2학년이 많이 이수한 비교과", "evidenceCount": 0, "lastSemester": "2026-1", "satisfaction": 4.2, "completedCount": 150, "country": null, "scrapped": false } ] }
 ```
 **[11/22]** `country`는 국제교류(교환·파견) 노트만 `programs.json`의 `세부`(국가) 글자 그대로, 인턴·비교과는 `null` → 카드 띠는 「교환학생 · 독일」, `null`이면 종류만. `scrapped`는 부른 사람(토큰) 기준 스크랩 여부. `oneLine`이 `""`이면 화면은 「–」(6-2).
+
+**[11/23 주제별 묶기]** 해봤노트 목록을 주제별로 묶어 보여 주기 위한 값. AI 없음.
+- 카드 `kind`(기관유형): **인턴 노트만** `programs.json`의 `세부` 글자 그대로(예: `"공공기관"`, `"KOTRA 해외무역관"`), 교환·파견·비교과는 `null`. `getNote`에도 같은 값.
+- payload에 `filter.country?`(국가, 교환·파견), `filter.kind?`(기관유형, 인턴)를 더 받는다. 글자가 같은 카드만 남긴다. `type`·`q`와 함께 쓸 수 있다.
+- 응답에 `groups: { country: [{name, count}], kind: [{name, count}] }` — 묶음 칩용. **`type`·`q`로 거른 뒤, `country`·`kind`로 거르기 전** 카드로 센다(칩 하나를 눌러도 다른 칩이 그대로 보이게). 노트 수 많은 순, 같으면 가나다순. 값이 `null`인 카드는 세지 않는다 → `type: "인턴"`이면 `country`는 `[]`, `type: "비교과"`면 둘 다 `[]`.
+- 순서: **비교과 카드는 `completedCount`(이수 인원) 많은 순**(`null`은 뒤). 교환·파견·인턴 카드의 순서는 지금과 같다(`notes.json` 순서). 전체 목록에서 비교과 카드끼리만 자리를 바꾼다.
+```json
+{ "notes": [ { "id": "N-kotra", "program": "KOTRA 해외무역관(유럽 권역)", "type": "인턴", "country": null, "kind": "KOTRA 해외무역관", "...": "..." } ],
+  "groups": { "country": [], "kind": [ { "name": "중소 무역회사", "count": 5 }, { "name": "공공기관", "count": 4 } ] } }
+```
+mock은 거르지 않는다(카드 3개 고정, `groups`는 실제 서버 전체 목록 값). 화면은 `type`을 고르면 그 종류에 맞는 칩 줄(교환·파견 = 나라, 인턴 = 기관유형, 비교과 = 칩 없음)을 보여 준다.
 
 ### scrapNote(noteId, scrap) [11/22]
 payload `{noteId, scrap?: true|false}`(생략 = 켜기). 같은 상태로 다시 불러도 `ok`(멱등). 기록은 `runtime/scraps.json`(사람별 노트 id 목록). AI 없음.
