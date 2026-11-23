@@ -54,8 +54,10 @@ function loadMock() {
 // - interviewNext.byProgram에 있는 프로그램(마르부르크 시연 대본)은 답한 수대로 steps를 그대로 낸다.
 // - 그 밖의 프로그램은 programs.json 분야 → frames.json 칸 순서로 아직 답하지 않은 칸을 묻고, 「배운점」은 마지막.
 //   후배 질문은 mock 질문함에 없으므로 묻지 않는다(pendingQuestions 0).
+// - [v2 작업 89] 「후배 질문」 칸은 없다. 마르부르크 대본 steps[0]은 junior: true·section 「생활」(질문의 칸)이고,
+//   total은 「후배 질문」을 뺀 칸 수다. frames.json에 아직 남아 있어도 걸러 낸다.
 const KIND_BY_FIELD = { 국제교류: "교환", 현장실습: "인턴", 비교과: "비교과" };
-const QUESTION_SECTION = "후배 질문";
+const QUESTION_SECTION = "후배 질문"; // 없어진 칸(frames.json에서 원우가 지우기 전까지 걸러 내는 용도)
 const LAST_SECTION = "배운점";
 
 function mockInterview(m, p) {
@@ -68,7 +70,8 @@ function mockInterview(m, p) {
   const frame = (m._frames || {})[KIND_BY_FIELD[info["분야"]] || "교환"] || { 칸: [] };
   const sections = frame["칸"].filter((s) => s !== QUESTION_SECTION);
   const answered = new Set(answers.filter((a) => !a.skipped && a.answer).map((a) => a.section));
-  const progress = { filled: sections.filter((s) => answered.has(s)).length, total: frame["칸"].length };
+  const filled = sections.filter((s) => answered.has(s)).length;
+  const progress = { filled, mine: filled, total: sections.length };
   const order = [...sections.filter((s) => s !== LAST_SECTION), ...sections.filter((s) => s === LAST_SECTION)];
   const next = order.find((s) => !answered.has(s));
   if (!next) return { done: true, progress };

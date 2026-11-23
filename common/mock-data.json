@@ -198,13 +198,15 @@
         "steps": [
           {
             "done": false,
-            "section": "후배 질문",
+            "junior": true,
+            "section": "생활",
             "questionId": "Q-0001",
             "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
             "question": "후배가 이렇게 물었어요 — \"마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?\" 경험이 있으면 들려주세요.",
             "progress": {
               "filled": 0,
-              "total": 7
+              "mine": 0,
+              "total": 6
             },
             "pendingQuestions": 1,
             "covered": [
@@ -221,7 +223,8 @@
             "question": "후배들이 마르부르크에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?",
             "progress": {
               "filled": 1,
-              "total": 7
+              "mine": 1,
+              "total": 6
             },
             "pendingQuestions": 0,
             "covered": [
@@ -239,7 +242,8 @@
             "question": "다시 준비 과정을 거친다면 무엇부터 하실 것 같아요?",
             "progress": {
               "filled": 2,
-              "total": 7
+              "mine": 2,
+              "total": 6
             },
             "pendingQuestions": 0,
             "covered": [
@@ -262,7 +266,8 @@
             "question": "출국 전에 걱정했던 것과 실제로 달랐던 게 있었나요?",
             "progress": {
               "filled": 3,
-              "total": 7
+              "mine": 3,
+              "total": 6
             },
             "pendingQuestions": 0,
             "covered": [
@@ -279,8 +284,9 @@
             "section": "배운점",
             "question": "이 경험에서 배운 점을 한 문장으로 들려주세요.",
             "progress": {
-              "filled": 4,
-              "total": 7
+              "filled": 3,
+              "mine": 3,
+              "total": 6
             },
             "pendingQuestions": 0,
             "covered": [
@@ -295,8 +301,9 @@
         "done": {
           "done": true,
           "progress": {
-            "filled": 5,
-            "total": 7
+            "filled": 4,
+            "mine": 4,
+            "total": 6
           },
           "covered": [
             "지원",
@@ -349,12 +356,7 @@
           "lines": [
             {
               "text": "나는 합격 직후 기숙사를 신청했고, 첫 학기에는 생활에 적응하느라 바빴다."
-            }
-          ]
-        },
-        {
-          "name": "후배 질문",
-          "lines": [
+            },
             {
               "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
               "answersQuestionId": "Q-0001",
@@ -399,12 +401,7 @@
               "lineId": "L-D1-3",
               "text": "첫 학기에는 생활에 적응하느라 바빴어요.",
               "match": true
-            }
-          ]
-        },
-        {
-          "name": "후배 질문",
-          "lines": [
+            },
             {
               "lineId": "L-D1-7",
               "answersQuestionId": "Q-0001",
@@ -555,6 +552,14 @@
               "sourceId": "I05-1-1",
               "lineId": "L-I05-1-1",
               "official": false
+            },
+            {
+              "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+              "answersQuestionId": "Q-0001",
+              "text": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.",
+              "sourceId": "I-0003",
+              "lineId": "L-I-0003",
+              "official": false
             }
           ]
         },
@@ -580,20 +585,6 @@
               "lineId": "L-I05-1-2",
               "official": false,
               "senior": "선배 A"
-            }
-          ]
-        },
-        {
-          "name": "후배 질문",
-          "interviewOnly": true,
-          "lines": [
-            {
-              "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
-              "answersQuestionId": "Q-0001",
-              "text": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.",
-              "sourceId": "I-0003",
-              "lineId": "L-I-0003",
-              "official": false
             }
           ]
         }
@@ -719,11 +710,6 @@
           "name": "근무조건",
           "interviewOnly": true,
           "lines": []
-        },
-        {
-          "name": "후배 질문",
-          "interviewOnly": true,
-          "lines": []
         }
       ],
       "sources": {
@@ -766,11 +752,6 @@
         {
           "name": "배운점",
           "interviewOnly": false,
-          "lines": []
-        },
-        {
-          "name": "후배 질문",
-          "interviewOnly": true,
           "lines": []
         }
       ],
@@ -897,8 +878,8 @@
         "type": "교환",
         "noteId": "N-marburg",
         "share": "partial",
-        "filled": 4,
-        "total": 7,
+        "filled": 3,
+        "total": 6,
         "sharedLines": 3,
         "editedLines": 0,
         "updatedAt": "2026-11-19T14:00:00+09:00"
@@ -2277,8 +2258,8 @@
     "type": "교환",
     "noteId": "N-marburg",
     "share": "partial",
-    "filled": 4,
-    "total": 7,
+    "filled": 3,
+    "total": 6,
     "sharedLines": 3,
     "editedLines": 0,
     "updatedAt": "2026-11-19T14:00:00+09:00",
@@ -2318,6 +2299,14 @@
             "publicText": "합격 직후 기숙사를 신청했어요.",
             "lineId": "L-D1-2",
             "shared": true
+          },
+          {
+            "text": "나는 학기 중에는 수업이 많아 인턴을 못 했고, 방학에 단기 인턴을 했다.",
+            "publicText": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.",
+            "lineId": "L-D1-7",
+            "shared": true,
+            "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
+            "answersQuestionId": "Q-0001"
           }
         ]
       },
@@ -2328,19 +2317,6 @@
       {
         "name": "배운점",
         "lines": []
-      },
-      {
-        "name": "후배 질문",
-        "lines": [
-          {
-            "text": "나는 학기 중에는 수업이 많아 인턴을 못 했고, 방학에 단기 인턴을 했다.",
-            "publicText": "학기 중에는 수업이 많아 인턴은 어렵고, 방학에 단기 인턴을 했어요.",
-            "lineId": "L-D1-7",
-            "shared": true,
-            "asked": "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?",
-            "answersQuestionId": "Q-0001"
-          }
-        ]
       }
     ],
     "publicDraft": {
@@ -2378,12 +2354,7 @@
               "lineId": "L-D1-3",
               "text": "첫 학기에는 생활에 적응하느라 바빴어요.",
               "match": true
-            }
-          ]
-        },
-        {
-          "name": "후배 질문",
-          "lines": [
+            },
             {
               "lineId": "L-D1-7",
               "answersQuestionId": "Q-0001",

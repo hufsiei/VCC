@@ -18,7 +18,7 @@
 #        실패하면 data/intern-keywords.json(작업 81, 있을 때만)으로 업체 1~3개. 그래도 없으면 hold
 #   ②  코드: 근거 추출 — 질문 주제어 → 보고서 문항으로 좁히고, 문단을 문장으로 쪼개 같은 문장은 하나만
 #        근거 풀 = evidence.json + 공개 동의를 통과한 인터뷰 문장(notes.interview_lines, 작업 26·74).
-#        인터뷰 문장은 주제어의 칸과 같은 칸 문장, 그리고 「후배 질문」 칸의 A 문장(주제어가 없어도 후보)
+#        인터뷰 문장은 주제어의 칸과 같은 칸 문장. [v2 작업 89] 후배 질문에 답한 문장도 질문의 칸에 든 일반 문장이다
 #        후보가 없거나 인터뷰로만 채우는 칸(근무조건 등)에 인터뷰 문장도 없으면 AI 없이 hold
 #   ③  AI(고르기): 관련 문장 번호 {"관련":[..]} — 빈 목록이면 hold
 #   ④  AI(변환): 고른 문장 하나씩 해요체 한 문장 {"1":"..."}
@@ -448,12 +448,11 @@ def extract(question, programs, section_hint=None):
     for name in programs:
         ev = EVIDENCE.get(name, [])
         iv = notes.interview_lines(name)            # 최근 동의 먼저. 후보 상한(30)에 밀리지 않게 앞에 둔다
-        answers = [r for r in iv if r["칸"] == notes.QUESTION_SECTION]   # 후배 질문의 A 문장
         if not ev and not iv:
             continue
         if PROGRAMS.get(name, {}).get("분야") == "현장실습":
             if INTERVIEW_ONLY_INTERN.search(question):
-                only = [r for r in iv if r["칸"] in ("근무조건", "지원·선발", notes.QUESTION_SECTION)]
+                only = [r for r in iv if r["칸"] in ("근무조건", "지원·선발")]
                 if not only:
                     return [], "근무조건", "인터뷰로만 채우는 칸(근무조건)"
                 section = section or "근무조건"
@@ -468,15 +467,14 @@ def extract(question, programs, section_hint=None):
             if not items and section_hint:   # [v2] 주제어는 없지만 질문정리가 칸을 알면 그 칸의 문항으로
                 items = [i for i, s in SECTION_BY_ITEM.items() if s == section_hint]
             if not items:
-                rows += answers   # 후배 질문 답은 먼저 후보로
                 # [11/23 원우 #151 ③] 주제어가 없어도 바로 보류하지 않는다. 그 프로그램 근거 중 질문과 겹치는 말이 있는
                 # 문장을 고르기 AI에 넘기고, 관련 없으면 AI가 비운다(→ 보류). 겹치는 말이 하나도 없으면 지금처럼 보류.
-                loose += [r for r in iv if r["칸"] != notes.QUESTION_SECTION] + ev
+                loose += iv + ev   # [v2 작업 89] 후배 질문 답도 그 칸의 일반 문장
                 loose_names.add(name)
                 continue
             section = section or SECTION_BY_ITEM.get(items[0])
             sections = {SECTION_BY_ITEM.get(i) for i in items}
-            rows += [r for r in iv if r["칸"] in sections or r["칸"] == notes.QUESTION_SECTION]
+            rows += [r for r in iv if r["칸"] in sections]
             rows += [e for e in ev if e["문항"].split(".")[0] in items]
     cands, keys = [], set()
 

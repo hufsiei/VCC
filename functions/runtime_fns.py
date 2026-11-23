@@ -562,7 +562,9 @@ def publish_lines(me, program, my_note_id, passing):
     """동의 통과 문장을 runtime/noteLines.json에 쌓는다(작업 26·74, spec 4장 saveConsent).
     같은 내 경험노트로 다시 동의하면 그 노트의 문장을 이번 범위로 바꾼다(sourceId는 문장마다 유지).
     answersQuestionId가 붙은 문장이 통과했을 때만 그 질문을 answered로 바꾸고 질문자에게 알린다.
-    칸 이름이 「후배 질문」이라는 이유만으로는 알리지 않는다. 돌려주는 값: (noteId, 이번에 알린 질문 id 목록)"""
+    칸 이름이 「후배 질문」이라는 이유만으로는 알리지 않는다. 돌려주는 값: (noteId, 이번에 알린 질문 id 목록)
+    [v2 작업 89] 「후배 질문」 칸은 없다. 문장은 질문의 칸에 쌓인다(11/23 이전 초안이 「후배 질문」 칸으로 오면 질문 행의 칸,
+    없으면 notes.fallback_section). 삭제됐거나 믿을 수 없는 질문에 답한 문장은 칸 문장으로만 싣는다(answered·알림·asked 없음)."""
     nid = notes.note_id(program)
     semester = notes.experience_semester(me, program)
     with store.lock():
@@ -581,13 +583,17 @@ def publish_lines(me, program, my_note_id, passing):
         at = now()
         fresh = []
         for ln in passing:
-            row = {"noteId": nid, "program": program, "section": ln["section"], "text": ln["text"],
+            qid = ln.get("answersQuestionId")
+            section = ln["section"]
+            if section == notes.QUESTION_SECTION:   # 옛 초안 → 질문의 칸
+                section = notes.section_for_question(program, questions.get(qid)) or notes.fallback_section(program)
+            row = {"noteId": nid, "program": program, "section": section, "text": ln["text"],
                    "sourceId": prev_sid.get(ln["draftLineId"]) or store.next_id("I"), "semester": semester,
                    "official": ln["official"], "owner": me, "myNoteId": my_note_id, "draftLineId": ln["draftLineId"], "at": at}
-            if ln.get("asked"):
-                row["asked"] = ln["asked"]
-            if ln.get("answersQuestionId") and real_question(ln["answersQuestionId"]):
-                row["answersQuestionId"] = ln["answersQuestionId"]
+            if qid and real_question(qid):
+                row["answersQuestionId"] = qid
+                if ln.get("asked"):
+                    row["asked"] = ln["asked"]
             fresh.append(row)
         rows[:] = [r for r in rows if r.get("myNoteId") != my_note_id] + fresh
         store.save("noteLines")
@@ -623,7 +629,7 @@ def reportStatement(me, p):
 def _my_note_view(mid, v, detail=False):
     program = v["program"]
     kind = notes._kind(program)
-    frame = list((notes.FRAMES.get(kind) or {}).get("칸", []))
+    frame = notes.frame_sections(kind)   # [v2] 「후배 질문」 칸 빼고 → total
     hidden = set(store.load("reported", {}))
     shared_ids = {r.get("draftLineId") for r in store.load("noteLines", [])
                   if r.get("myNoteId") == mid and "L-" + r.get("sourceId", "") not in hidden}
