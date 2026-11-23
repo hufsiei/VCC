@@ -230,7 +230,7 @@ function updateComposer() {
   const enabled = mode === "ask" ? !ask.busy : tellReady;
   composerInput.disabled = !enabled;
   composerInput.placeholder = mode === "ask"
-    ? "예: 마르부르크 파견은 어학을 언제부터 준비해요?"
+    ? "예: 마르부르크 어학은 언제부터 준비해요?" // 360px 휴대폰에서도 잘리지 않게 짧게(14px, 11/23)
     : tell.step && tell.step.done
       ? (tell.extra ? `「${tell.extra}」에 이어서 쓰기` : "위 칸을 골라 이어서 써 주세요")
       : "경험을 들려주세요";
@@ -291,7 +291,7 @@ function renderAnswer(res, question) {
     const { msg, body } = booMessage({ wide: true });
     body.append(
       el("div", { className: "hold-box" }, [
-        el("p", { className: "hold-box__text", text: res.message || "이 부분은 아직 들은 선배가 없어요. 질문함에 담아 두었어요." }),
+        el("p", { className: "hold-box__text", text: res.message || "이 부분은 아직 경험한 선배가 없어요. 질문함에 담아 두었어요." }),
         emptyEvidence(),
         res.suggestSenior !== false
           ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } })

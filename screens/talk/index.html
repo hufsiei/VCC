@@ -9,6 +9,8 @@
   /* 인터BOO 화면 배치용. 색은 style.css 변수만 쓴다. */
   .talk-top { display: flex; flex-direction: column; gap: var(--space-md); }
   .talk-panel { display: flex; flex-direction: column; gap: var(--space-md); margin-top: var(--space-lg); }
+  /* 입력칸 예시 문장: 휴대폰(360~390px)에서 끝까지 보이게 14px(11/23). 입력한 글자는 16px 그대로 */
+  #composerInput::placeholder { font-size: var(--font-size-secondary); }
   /* 고정 입력줄(dock)에 마지막 말풍선이 가리지 않게: 높이는 talk.js가 잰다 */
   #viewMain .page { padding-bottom: calc(var(--dock-h, 120px) + var(--space-md)); }
   #viewSummary .page { padding-bottom: calc(var(--dock-h, 180px) + var(--space-md)); }
