@@ -808,17 +808,20 @@ function renderDock(t) {
     const send = el("button", { className: "send-btn", attrs: { type: "submit", "aria-label": "보내기", disabled: "" } }, [icon("arrow-up")]);
     const err = el("p", { className: "field__error", attrs: { role: "alert" } });
     err.hidden = true;
+    const warn = el("div", { className: "check-warn", attrs: { role: "alert" } }); // 연락처·학번·비방 주의 라벨 자리(입력창 위)
+    warn.hidden = true;
     const form = el("form", { className: "composer" }, [input, send]);
     input.addEventListener("input", () => {
       send.disabled = input.value.trim() === "";
       err.hidden = true;
+      warn.hidden = true;
       input.removeAttribute("aria-invalid");
     });
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      sendInThread(t, input, send, err);
+      sendInThread(t, input, send, err, warn);
     });
-    threadDock.replaceChildren(err, form);
+    threadDock.replaceChildren(warn, err, form);
   } else if (t.status === "blocked") {
     threadDock.replaceChildren(el("div", { className: "dock-note" }, [
       el("p", { className: "btn-reason" }, [icon("ban"), el("span", { text: t.blockedByMe ? "차단한 대화예요" : "더 이어 갈 수 없는 대화예요" })]),
@@ -901,7 +904,19 @@ async function openThread(threadId, { reuse = false } = {}) {
   }, POLL_MS);
 }
 
-async function sendInThread(t, input, send, err) {
+// 쪽지 검사(checkMessage)에 걸렸을 때: 주의 라벨(짧은 이유) + 그 아래 서버 문구. 전송은 하지 않는다.
+// 한도 초과·네트워크 실패 같은 진짜 오류는 지금처럼 빨간 오류 문구(field__error)로 둔다.
+const CHECK_LABEL = { 연락처: "연락처가 있어요", 학번: "학번이 있어요", 비방: "보낼 수 없는 표현이 있어요" };
+function showCheckWarning(box, check) {
+  box.replaceChildren(
+    statusLabel("warning", "triangle-alert", CHECK_LABEL[check.reason] || "보낼 수 없는 내용이 있어요"),
+    el("p", { className: "check-warn__text", text: check.message || "이 내용은 쪽지로 보낼 수 없어요. 고쳐서 다시 보내 주세요." }),
+  );
+  box.hidden = false;
+  drawIcons();
+}
+
+async function sendInThread(t, input, send, err, warn) {
   const text = input.value.trim();
   if (!text) return;
   send.disabled = true;
@@ -915,7 +930,7 @@ async function sendInThread(t, input, send, err) {
   try {
     const check = await checkMessage(text);
     if (check && check.ok === false) {
-      fail(check.message || "보낼 수 없는 내용이 있어요.");
+      showCheckWarning(warn, check); // 입력창 위 주의 라벨 + 문구(8절 익명 쪽지 대화)
       return;
     }
     const res = await sendMessage(t.withId, text);
@@ -957,6 +972,8 @@ let targetNick = "";
 let sending = false;
 let lastFocus = null;
 
+const warnLine = document.getElementById("requestWarn");
+
 function showError(message) {
   errorLine.replaceChildren(icon("circle-alert"), el("span", { text: message }));
   errorLine.hidden = false;
@@ -966,6 +983,8 @@ function showError(message) {
 function clearError() {
   errorLine.hidden = true;
   errorLine.replaceChildren();
+  warnLine.hidden = true;
+  warnLine.replaceChildren();
   textBox.removeAttribute("aria-invalid");
 }
 
@@ -1037,7 +1056,7 @@ submitBtn.addEventListener("click", async () => {
     // ① 연락처·학번·비방 검사(코드 정규식 — spec checkMessage). 걸리면 보내지 않고 이유를 보여 준다
     const check = await checkMessage(text);
     if (check && check.ok === false) {
-      showError(check.message || "보낼 수 없는 내용이 있어요.");
+      showCheckWarning(warnLine, check); // 입력칸 위 주의 라벨 + 문구(3-4·8절, 작업 28 완료 기준)
       return;
     }
     // ② 보내기 — 서버가 한도·잠김·차단을 다시 막는다
