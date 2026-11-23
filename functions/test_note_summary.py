@@ -38,6 +38,7 @@ sec(base, "비용")["summary"] = [
 sec(base, "생활")["summary"] = [{"text": "기숙사는 합격 직후 신청해야 해요.", "sources": life_ids[:1], "years": [2025]}]
 sec(base, "배운점")["summary"] = [{"text": "합친 배운점", "sources": ["R149-1-1"], "years": [2025]}]
 sec(base, "팁")["summary"] = [{"text": "근거 없는 문장", "sources": [], "years": []}]
+sec(base, "지원").pop("summary", None)  # #188 이후 notes.json에 지원 summary가 있어 시험 안에서 뺀다
 
 # 1) 인터뷰 문장이 없을 때
 n = notes.getNote(ME, {"id": NID})

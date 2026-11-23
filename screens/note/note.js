@@ -378,6 +378,101 @@ function questionCards(lines, sources) {
 }
 
 // ---------------------------------------------------------------------------
+// 5-1. 칸별 요약 문단(작업 78, spec getNote [v2] summary·[11/23] newLines)
+//   소제목 → 요약 문단(문장 끝 출처 연도) → 「원문 N건 보기」 접기 → 「새로 더해진 선배 이야기 N건」.
+//   summary가 없으면 이 부분을 안 쓰고 원문 목록 그대로. 배운점은 서버가 summary를 보내지 않는다.
+// ---------------------------------------------------------------------------
+
+const hasSummary = (section) =>
+  section.name !== LEARN_SECTION && Array.isArray(section.summary) && section.summary.length > 0;
+
+// lines 끝 newLines개가 요약 뒤 인터뷰로 붙은 문장. 0~lines.length 안으로만
+function newLineCount(section) {
+  const n = Number(section.newLines);
+  const total = (section.lines || []).length;
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), total) : 0;
+}
+
+// 문장 끝 출처: 「결과보고서 2025, 2026」, 인터뷰가 섞이면 「결과보고서 2025 · 선배 인터뷰 2026」
+function summarySourceText(item, sources, reportName) {
+  const byKind = new Map();
+  for (const id of item.sources || []) {
+    const src = sources[id];
+    if (!src) continue;
+    const kind = src.docType === "인터뷰" ? DOC_LABEL.인터뷰 : reportName;
+    const year = Number(yearOf(src.semester));
+    if (!byKind.has(kind)) byKind.set(kind, new Set());
+    if (Number.isFinite(year)) byKind.get(kind).add(year);
+  }
+  // sources에서 학기를 못 찾으면 서버가 준 years로
+  if (![...byKind.values()].some((s) => s.size) && Array.isArray(item.years) && item.years.length) {
+    byKind.clear();
+    byKind.set(reportName, new Set(item.years.map(Number).filter(Number.isFinite)));
+  }
+  return [...byKind.entries()]
+    .map(([kind, years]) => [kind, ...(years.size ? [[...years].sort((a, b) => a - b).join(", ")] : [])].join(" "))
+    .join(" · ");
+}
+
+function summaryParagraph(section, sources, reportName) {
+  const parts = [];
+  section.summary.forEach((item, i) => {
+    if (i) parts.push(" ");
+    parts.push(el("span", { className: "summary__sentence", text: item.text }));
+    const from = summarySourceText(item, sources, reportName);
+    if (from) parts.push(" ", el("span", { className: "summary__from", text: from }));
+  });
+  return el("p", { className: "summary__text" }, parts);
+}
+
+// 「원문 N건 보기」 접기: 요약을 만든 원문(새 이야기 제외)
+function originalFold(lines, sources) {
+  return el("details", { className: "summary-fold" }, [
+    el("summary", { className: "summary-fold__head" }, [
+      el("span", { className: "summary-fold__closed", text: `원문 ${lines.length}건 보기` }),
+      el("span", { className: "summary-fold__open", text: "원문 접기" }),
+      icon("chevron-down"),
+    ]),
+    el("div", { className: "summary-fold__body" }, lines.map((l) => lineCard(l, sources[l.sourceId] || {}))),
+  ]);
+}
+
+function summaryBlock(section, sources, reportName) {
+  const lines = section.lines || [];
+  const fresh = newLineCount(section);
+  const original = lines.slice(0, lines.length - fresh);
+  const added = lines.slice(lines.length - fresh);
+  const out = [
+    el("div", { className: "summary" }, [
+      el("h3", { className: "summary__title", text: section.name }),
+      summaryParagraph(section, sources, reportName),
+      original.length ? originalFold(original, sources) : null,
+    ]),
+  ];
+  if (added.length) {
+    out.push(el("h4", { className: "summary-new__title" }, [icon("message-circle-plus"), el("span", { text: `새로 더해진 선배 이야기 ${added.length}건` })]));
+    out.push(...added.map((l) => lineCard(l, sources[l.sourceId] || {})));
+  }
+  return out;
+}
+
+// 신고로 숨긴 문장을 요약·newLines에도 맞춘다(서버 규칙과 같게: 그 문장을 sources에 든 요약 문장은 뺀다)
+function hideLineInSection(section, line) {
+  const lines = section.lines || [];
+  const idx = lines.findIndex((l) => l.lineId === line.lineId);
+  if (idx < 0) return;
+  const fresh = newLineCount(section);
+  section.lines = lines.filter((l) => l.lineId !== line.lineId);
+  if (!Array.isArray(section.summary)) return;
+  if (idx >= lines.length - fresh) section.newLines = fresh - 1;
+  section.summary = section.summary.filter((s) => !(s.sources || []).includes(line.sourceId));
+  if (!section.summary.length) {
+    delete section.summary;
+    delete section.newLines;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 6. 상세 화면 — 커버 → 노트 틀 탭 → 칸 문장 + 근거 블록 → 닮은선배
 // ---------------------------------------------------------------------------
 
@@ -408,6 +503,7 @@ function renderSection(panel) {
     children.push(emptyEvidence(msg, askBtn()));
   } else {
     if (section.name === QUESTION_SECTION) children.push(...questionCards(lines, sources));
+    else if (hasSummary(section)) children.push(...summaryBlock(section, sources, reportName));
     else children.push(...lines.map((l) => lineCard(l, sources[l.sourceId] || {}, { quote: section.name === LEARN_SECTION })));
     children.push(evidenceBlock(lines, sources, reportName));
 
@@ -604,7 +700,7 @@ submitBtn.addEventListener("click", async () => {
     const res = await reportStatement(reportTarget.lineId, reportChoice);
     if (!res || !res.ok) throw new Error((res && res.error) || "신고 실패");
     // 신고한 문장은 바로 숨긴다(spec: 즉시 숨김)
-    for (const s of detailNote.sections) s.lines = (s.lines || []).filter((l) => l.lineId !== reportTarget.lineId);
+    for (const s of detailNote.sections) hideLineInSection(s, reportTarget);
     closeReportSheet();
     renderSection(document.getElementById("sectionPanel"));
     toast("신고했어요. 이 문장은 숨겼어요");

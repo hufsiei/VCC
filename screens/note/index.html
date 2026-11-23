@@ -74,6 +74,48 @@
   .qa__a { display: flex; gap: var(--space-sm); }
   .qa__a-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-sm); }
   .detail-skeleton { height: 120px; }
+  /* 칸별 요약 문단(작업 78): 소제목 → 문단(문장 끝 출처 연도) → 원문 접기 */
+  .summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+  .summary__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
+  .summary__text { line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; }
+  .summary__from { font-size: var(--font-size-caption); color: var(--color-text-muted); white-space: nowrap; }
+  .summary-fold__head {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-height: 44px;
+    font-size: var(--font-size-secondary);
+    font-weight: 600;
+    color: var(--color-hufs-navy);
+    cursor: pointer;
+    list-style: none;
+  }
+  .summary-fold__head::-webkit-details-marker { display: none; }
+  .summary-fold__head .icon { width: 16px; height: 16px; transition: transform .15s; }
+  .summary-fold[open] .summary-fold__head .icon { transform: rotate(180deg); }
+  .summary-fold__open { display: none; }
+  .summary-fold[open] .summary-fold__open { display: inline; }
+  .summary-fold[open] .summary-fold__closed { display: none; }
+  .summary-fold__body { display: flex; flex-direction: column; gap: 12px; }
+  .summary-new__title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: var(--space-sm);
+    font-size: var(--font-size-secondary);
+    font-weight: 600;
+    color: var(--color-heading);
+  }
+  .summary-new__title .icon { width: 16px; height: 16px; color: var(--color-ai); }
+  @media (prefers-reduced-motion: reduce) { .summary-fold__head .icon { transition: none; } }
 </style>
 </head>
 <body>
