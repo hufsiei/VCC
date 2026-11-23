@@ -6,11 +6,11 @@
 // 규칙: 데이터는 common/data.js 함수로만, 화면 글은 textContent로만(innerHTML 금지), 색은 style.css 변수만.
 // 학번(studentId·withId)은 화면과 주소에 쓰지 않는다 — 주소의 선배는 표시명 글자(A, B…), 대화는 threadId.
 // 주소: ?senior=B(프로필) · ?view=messages(내 쪽지) · ?thread=T-0001(대화)
-// 다음 단계: 4단계 신고·차단(reportThread, 대화 ⋮ 메뉴).
+// 4단계: 대화 ⋮ 메뉴 → 신고·차단 시트(reportThread, spec 4장 [11/23 차단]) → 차단이면 확인 시트를 한 번 더.
 
 import {
   currentUser, getMe, getInbox, listNotes, recommendSeniors,
-  getMessages, previewNickname, checkMessage, sendMessage, respondRequest, cancelRequest,
+  getMessages, previewNickname, checkMessage, sendMessage, respondRequest, cancelRequest, reportThread,
 } from "../../common/data.js";
 
 // ---------------------------------------------------------------------------
@@ -192,7 +192,9 @@ const localStatus = new Map(); // threadId → status
 // 서버 목록에 이 화면에서 보낸 쪽지·바꾼 상태를 합친다(서버에 이미 보이면 지역 사본은 버린다)
 function mergeLocal(t) {
   const changed = localStatus.get(t.threadId);
-  if (changed && t.status === "waiting") t = { ...t, status: changed };
+  // 차단은 수락된 대화에도 걸린다 — 서버가 아직 blocked로 안 주면(mock) 이 화면에서 한 차단을 쓴다
+  if (changed === "blocked" && t.status !== "blocked") t = { ...t, status: "blocked", blockedByMe: true };
+  else if (changed && t.status === "waiting") t = { ...t, status: changed };
   else if (changed) localStatus.delete(t.threadId);
   const extra = localSent.get(t.threadId);
   if (!extra || !extra.length) return t;
@@ -857,6 +859,7 @@ function renderDock(t) {
 function renderThread(t, { keepDock = false } = {}) {
   document.getElementById("threadTitle").textContent = t.nickname || "쪽지";
   document.title = `${t.nickname || "쪽지"} · 내 쪽지`;
+  setThreadMenu(t);
   renderThreadTop(t);
   const key = `${t.status}|${(t.messages || []).length}|${(lastMessage(t) || {}).at || ""}`;
   if (key !== lastRenderedKey) {
@@ -874,6 +877,7 @@ async function openThread(threadId, { reuse = false } = {}) {
   currentThreadId = threadId;
   if (firstOpen) {
     lastRenderedKey = "";
+    setThreadMenu(null); // 대화를 받기 전에는 ⋮을 숨긴다
     threadTop.replaceChildren();
     threadDock.replaceChildren();
     threadChat.replaceChildren(...skeletons(2, "detail-skeleton"));
@@ -903,6 +907,116 @@ async function openThread(threadId, { reuse = false } = {}) {
     }
   }, POLL_MS);
 }
+
+// ---------------------------------------------------------------------------
+// 10-1. 대화 ⋮ 메뉴 → 신고·차단(spec reportThread [11/23 차단])
+//   사유(선택) + 「차단도 하기」(선택) — 둘 중 하나는 있어야 보낸다. 차단은 되돌릴 수 없어서 확인 시트를 한 번 더(5-10).
+//   신고만 하면 대화는 그대로 이어지고, 차단하면 입력줄이 「차단한 대화예요」로 바뀐다. 상대에게는 알리지 않는다.
+//   취소함·응답 없음 대화는 ⋮을 두지 않는다(선배 쪽은 서버가 「볼 수 없는 기록」으로 막음).
+// ---------------------------------------------------------------------------
+
+const THREAD_REASONS = ["불쾌한 표현이 있어요", "연락처·개인 정보를 물어요", "광고·홍보예요", "기타"];
+const threadMenu = document.getElementById("threadMenu");
+const threadMenuSpacer = document.getElementById("threadMenuSpacer");
+const reportSheet = document.getElementById("reportSheet");
+const reportReasons = document.getElementById("reportReasons");
+const reportBlock = document.getElementById("reportBlock");
+const reportBlockRow = document.getElementById("reportBlockRow");
+const reportSubmit = document.getElementById("reportSubmit");
+const reportHint = document.getElementById("reportHint");
+let reportTarget = null;
+let reportChoice = null;
+let reportFocus = null;
+
+function setThreadMenu(t) {
+  const show = !!t && !["cancelled", "expired"].includes(t.status);
+  threadMenu.hidden = !show;
+  threadMenuSpacer.hidden = show; // 제목이 가운데에 있게 빈 자리와 번갈아 보인다
+}
+
+function updateReportSubmit() {
+  const block = reportBlock.checked;
+  reportSubmit.disabled = !reportChoice && !block;
+  reportSubmit.textContent = reportChoice && block ? "신고하고 차단하기" : block ? "차단하기" : "신고하기";
+  reportHint.hidden = !reportSubmit.disabled;
+}
+
+function openReportSheet() {
+  const t = threads.find((x) => x.threadId === currentThreadId);
+  if (!t) return;
+  reportTarget = t;
+  reportChoice = null;
+  reportFocus = document.activeElement;
+  reportReasons.replaceChildren(...THREAD_REASONS.map((r) => {
+    const chip = el("button", { className: "choice-chip", text: r, attrs: { type: "button", "aria-pressed": "false" } });
+    chip.addEventListener("click", () => {
+      reportChoice = reportChoice === r ? null : r; // 한 번 더 누르면 고른 것을 푼다
+      for (const c of reportReasons.children) c.setAttribute("aria-pressed", String(c === chip && reportChoice === r));
+      updateReportSubmit();
+    });
+    return chip;
+  }));
+  reportBlock.checked = false;
+  reportBlockRow.hidden = t.status === "blocked"; // 이미 차단된 대화는 신고만
+  updateReportSubmit();
+  reportSheet.hidden = false;
+  document.body.classList.add("sheet-open");
+  reportSheet.querySelector(".sheet").focus();
+}
+
+function closeReportSheet({ keepTarget = false } = {}) {
+  reportSheet.hidden = true;
+  document.body.classList.remove("sheet-open");
+  if (!keepTarget) {
+    reportTarget = null;
+    if (reportFocus && reportFocus.isConnected) reportFocus.focus();
+  }
+}
+
+async function sendReport(t, reason, block) {
+  try {
+    const res = await reportThread(t.threadId, reason || undefined, block);
+    if (!res || res.error || res.ok === false) throw new Error((res && (res.message || res.error)) || "신고 실패");
+    if (block) {
+      if (t.status === "waiting" && t.role === "asker") waitingCount = Math.max(0, waitingCount - 1); // 서버도 한도에서 뺀다
+      t.status = "blocked";
+      t.blockedByMe = true;
+      localStatus.set(t.threadId, "blocked");
+    }
+    toast(reason && block ? "신고하고 차단했어요" : block ? "차단했어요" : "신고했어요. 담당자가 확인해요");
+    if (currentThreadId === t.threadId) renderThread(t);
+  } catch (err) {
+    console.error(err);
+    toast(block ? "차단하지 못했어요. 다시 시도해 주세요" : "신고하지 못했어요. 다시 시도해 주세요", "circle-alert");
+  }
+}
+
+reportSubmit.addEventListener("click", async () => {
+  const t = reportTarget;
+  if (!t || reportSubmit.disabled) return;
+  const reason = reportChoice;
+  const block = reportBlock.checked && t.status !== "blocked";
+  if (!block) {
+    reportSubmit.disabled = true;
+    await sendReport(t, reason, false);
+    closeReportSheet();
+    return;
+  }
+  // 차단은 되돌릴 수 없다 → 확인 시트(5-10). 신고 시트는 닫고 확인 시트만 띄운다
+  closeReportSheet({ keepTarget: true });
+  openConfirm({
+    title: "이 대화를 차단할까요?",
+    text: "차단하면 두 사람 모두 이 대화에서 더 쪽지를 보낼 수 없어요. 차단은 풀 수 없어요.",
+    okText: reason ? "신고하고 차단하기" : "차단하기",
+    danger: true,
+    onOk: () => sendReport(t, reason, true),
+  });
+});
+threadMenu.addEventListener("click", openReportSheet);
+document.getElementById("reportCancel").addEventListener("click", () => closeReportSheet());
+reportSheet.querySelector(".sheet-scrim").addEventListener("click", () => closeReportSheet());
+reportSheet.addEventListener("keydown", (e) => { if (e.key === "Escape") closeReportSheet(); });
+reportBlock.addEventListener("change", updateReportSubmit);
 
 // 쪽지 검사(checkMessage)에 걸렸을 때: 주의 라벨(짧은 이유) + 그 아래 서버 문구. 전송은 하지 않는다.
 // 한도 초과·네트워크 실패 같은 진짜 오류는 지금처럼 빨간 오류 문구(field__error)로 둔다.
