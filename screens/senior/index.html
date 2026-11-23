@@ -74,6 +74,10 @@
   /* ---------- 쪽지 요청 시트 ---------- */
   textarea.request-text { height: auto; min-height: 112px; padding: 12px var(--space-md); line-height: 1.5; resize: vertical; }
   .field__help { font-size: var(--font-size-secondary); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+  /* 쪽지 검사 주의: 라벨(한 줄) + 그 아래 14px 문구 — 긴 문장은 라벨 밖에서 줄바꿈 */
+  .check-warn { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); }
+  .check-warn[hidden] { display: none; }
+  .check-warn__text { font-size: var(--font-size-secondary); }
   .request-guide { display: flex; align-items: flex-start; gap: var(--space-xs); }
   .request-guide .icon { width: 16px; height: 16px; margin-top: 2px; }
 
@@ -195,6 +199,8 @@
         <div id="requestNick"></div>
         <div class="field">
           <label class="field__label" for="requestText">선배에게 보낼 첫 쪽지</label>
+          <!-- 연락처·학번·비방 검사(checkMessage)에 걸리면 입력칸 위에 주의 라벨 + 문구 -->
+          <div class="check-warn" id="requestWarn" role="alert" hidden></div>
           <textarea class="input request-text" id="requestText" rows="4" maxlength="300" aria-describedby="requestHelp" placeholder="예: 마르부르크 학점 인정은 어떻게 받으셨는지 궁금해요."></textarea>
           <!-- 입력 안내: 몇 자부터 보낼 수 있는지 + 지금 글자 수 -->
           <p class="field__help" id="requestHelp" aria-live="polite">5자 이상 적어 주세요 · 0/300자</p>
