@@ -1,6 +1,18 @@
-# askboo.py — askBoo(question) 4+1단계 (작업 18, 작성: 미리)
+# askboo.py — askBoo(question, history) v2 6단계 (작업 18·87, 작성: 미리)
 #
-# 기준: docs/spec-v1.md 4장 askBoo · docs/HCX-원칙-v2.md 3~5절 · 작업내역 18번 세부
+# 기준: docs/spec-v1.md 4장 askBoo [v2] · docs/HCX-원칙-v3.md 3~5절 · docs/askBoo-v2 반영 검토안 2장
+#
+# [v2, 11/24 작업 87] 지금 4+1단계 위에 두 단계를 더했다. 가드레일(프로그램 범위 안 근거·사후 검증·보류→질문함)은 그대로.
+#   ①  AI(질문정리, Sonnet): 최근 대화(history 4턴) + 이번 질문 → {의도, 분야, 나라, 프로그램후보, 제외, 칸, 정리된질문}.
+#        코드가 프로그램 이름을 programs.json과 대조해 없는 이름은 버린다. 실패하면 아래 v1 경로(정규식 대조) 그대로.
+#   ②  코드: 의도별 분기 — 대화 → status "chat"(고정 문구 + 칩, AI 없음, 질문함 저장 없음) / 탐색·사람찾기 → "notes" /
+#        규정 → "official" / 경험질문 → 아래 ③. 「제외」 프로그램은 후보에서 뺀다.
+#   ⑤  AI(답쓰기, Sonnet): 정리된 질문 + 고른 문장(번호·출처·연도·선배 표시) → {"답":[{"text","근거":[번호]}]} 2~4문장.
+#   ⑥  코드 + AI(일치검사, Opus): 문장마다 인용한 근거 원문과 대조(숫자·영문·고유명사·수량 + 일치검사). 근거 번호 없는 문장·
+#        걸린 문장은 버린다. 다 버려지면 v1 방식(고른 문장 원문 인용, fallback)으로 돌려준다 → v1의 답이 최악의 경우.
+#   응답: lines[].cites(인용 sourceId), singleSenior(근거가 한 사람뿐), 새 status "chat"(message·chips), notes에 oneLine·kinds.
+#
+# v1(작업 18) 4+1단계 — 질문정리가 실패했을 때의 경로이자 ⑥의 폴백:
 #   ①′ 코드: 규정 질문 판별 → status "official" (AI 없음, spec 4장 판별 표현)
 #   ①  코드: 프로그램명·별칭 대조 (tools/check_alias_match.py와 같은 규칙, 긴 이름 우선)
 #        실패하면 data/intern-keywords.json(작업 81, 있을 때만)으로 업체 1~3개. 그래도 없으면 hold
@@ -24,7 +36,12 @@ from ai import callAI, load_prompt
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 
-MAX_LINES = 3        # 답변 문장 수 상한 (spec 8장: 출처 달린 문장 3개)
+MAX_LINES = 3        # 폴백(원문 인용) 문장 수 상한 (spec 8장: 출처 달린 문장 3개)
+MAX_PICK = 8         # [v2] 고르기가 고르는 문장 수 상한 — 답쓰기에 넣는 근거
+MAX_ANSWER_LINES = 4 # [v2] 답쓰기 문장 수 상한
+MAX_HISTORY = 4      # [v2] 질문정리에 넣는 이전 대화 수
+INTENTS = ("경험질문", "탐색", "대화", "규정", "사람찾기")
+FIELDS = ("국제교류", "현장실습", "비교과")
 MAX_CANDIDATES = 30  # 고르기에 넣는 문장 수 상한 (최근 학기 순)
 
 HOLD_MESSAGE = "이 부분은 아직 경험한 선배가 없어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?"
@@ -150,60 +167,203 @@ PROPER_NOUNS = sorted({w for name, p in PROGRAMS.items() for w in [name, *p.get(
 
 # ── 공개 함수 ─────────────────────────────────────────────────────────
 def askBoo(me, payload, save=True):
-    """local_fn.py가 부른다. save=False면 질문함에 저장하지 않는다(평가 스크립트용)."""
+    """local_fn.py가 부른다. save=False면 질문함에 저장하지 않는다(평가 스크립트용).
+    payload: {question, history?: [{question, status, program?}], force?: "hold"}"""
     question = (payload.get("question") or "").strip()
     if not question:
         return {"error": "질문을 입력해 주세요"}
     if len(question) > 300:
         return {"error": "질문은 300자 안으로 적어 주세요"}
+    history = clean_history(payload.get("history"))
+
+    # [v2] chat 칩 「질문함에 담기」: 답을 찾지 않고 바로 질문함에 hold로
+    if payload.get("force") == "hold":
+        return _hold(me, question, None, None, save, why="담기")
 
     programs = match_programs(question)
     country = None
     if not programs:                       # [11/23] 프로그램명이 없으면 나라 이름으로(근거 많은 순)
         country, programs = match_country(question)
 
-    # ①′ 규정 질문 → 공식 안내
+    # ①′ 규정 질문 → 공식 안내 (정규식이 먼저 — 보수 규칙, HCX 원칙 v3 5절)
     if is_official(question):
         return _official(me, question, programs, save)
+
+    # ① [v2] 질문 정리(AI). 실패하면 plan=None → 아래는 v1 경로 그대로
+    plan = clarify(question, history)
+    effective = question
+    if plan:
+        if plan["의도"] == "규정":
+            return _official(me, question, programs, save)
+        effective = plan["정리된질문"] or question
+        # 프로그램: 정리 결과(대조 통과분)가 있으면 그것, 없으면 정규식 결과. 「제외」는 뺀다
+        if plan["프로그램후보"]:
+            programs, country = plan["프로그램후보"], None
+        else:
+            if plan["분야"]:   # 정리 결과의 분야와 다른 프로그램(「독일 인턴」에 나라 대조로 잡힌 독일 교환 등)은 뺀다
+                programs = [p for p in programs if PROGRAMS.get(p, {}).get("분야") == plan["분야"]]
+            if not programs and plan["나라"]:
+                country, programs = match_country(plan["나라"])
+                programs = [p for p in programs if not plan["분야"] or PROGRAMS.get(p, {}).get("분야") == plan["분야"]]
+        if plan["제외"]:
+            programs = [p for p in programs if p not in plan["제외"]]
+        if plan["의도"] == "대화":
+            return _chat(plan, history)
+        if plan["의도"] in ("탐색", "사람찾기"):
+            found = _explore(plan, programs, country or plan["나라"])
+            if found:
+                return found
+            return _hold(me, question, programs[0] if programs else None, plan["칸"], save, why="탐색 결과 없음")
+        if not programs and plan["분야"] and plan["제외"]:
+            # 「코트라 말고 무역 인턴」처럼 제외하고 남는 프로그램이 없으면 그 분야 노트 목록으로
+            found = _explore(plan, [], country or plan["나라"])
+            if found:
+                return found
 
     # ① 프로그램이 없으면 보류
     if not programs:
         return _hold(me, question, None, None, save, why="프로그램 없음")
 
     # ①″ [11/23] 사람을 찾는 질문이나 나라만 말한 질문인데 주제어가 없으면 → 해봤노트 카드로 안내(AI 없음)
-    if not has_topic(question) and (PERSON_RE.search(question) or country):
+    if not plan and not has_topic(question) and (PERSON_RE.search(question) or country):
         found = _notes(programs, country)
         if found:
             return found
 
-    # ② 근거 추출
-    cands, section, why = extract(question, programs)
+    # ②/③ 근거 추출 (정리된 질문 + 원래 질문의 주제어·겹침을 모두 본다)
+    cands, section, why = extract(effective if effective == question else f"{question} {effective}", programs,
+                                  section_hint=plan["칸"] if plan else None)
     if not cands:
         return _hold(me, question, programs[0], section, save, why=why)
 
-    # ③ 고르기
-    picked, why = pick(question, cands)
+    # ④ 고르기 (HCX)
+    picked, why = pick(effective, cands)
     if not picked:
         return _hold(me, question, programs[0], section, save, why=why)
 
-    # ④ 변환 + ⑤ 사후 검증
+    # ⑤ 답쓰기 + ⑥ 검증 (v2) → 다 버려지면 v1 원문 인용
+    out = compose(effective, picked)
+    if out is None:
+        out = fallback_lines(picked)
+    out["noteId"] = notes.note_id(picked[0]["program"])
+    out["suggestSenior"] = False
+    return out
+
+
+def fallback_lines(picked):
+    """v1 ④ 변환 + ⑤ 사후 검증: 고른 문장을 하나씩 해요체로(검증에 걸리면 원문 인용). v2의 폴백."""
     lines, sources, seen, texts = [], {}, {}, set()
-    for c in picked:
+    for c in picked[:MAX_LINES]:
         text, fallback = convert(c["text"])
         if _norm(text) in texts:   # 다른 보고서의 같은 문장은 한 번만
             continue
         texts.add(_norm(text))
         sid = c["sourceId"]
         seen[sid] = seen.get(sid, 0) + 1
-        line = {"text": text, "sourceId": sid, "lineId": f"L-{sid}" if seen[sid] == 1 else f"L-{sid}.{seen[sid]}"}
+        line = {"text": text, "sourceId": sid, "cites": [sid],
+                "lineId": f"L-{sid}" if seen[sid] == 1 else f"L-{sid}.{seen[sid]}"}
         if fallback:
             line["fallback"] = True   # AI 문장을 버리고 근거 원문을 그대로 보여 준 줄(화면: 「근거 원문 보기」)
         lines.append(line)
         sources[sid] = {"docType": c["docType"], "program": c["program"], "semester": c["semester"]}
+    return {"status": "ok", "lines": lines, "sources": sources, "singleSenior": _single_senior([c["sourceId"] for c in picked[:MAX_LINES]])}
 
-    main_program = picked[0]["program"]
-    return {"status": "ok", "lines": lines, "sources": sources,
-            "noteId": notes.note_id(main_program), "suggestSenior": False}
+
+# ── ① [v2] 질문 정리 ──────────────────────────────────────────────────
+STATUS_WORD = {"ok": "답함", "hold": "보류", "official": "공식 안내", "notes": "노트 안내", "chat": "대화"}
+
+
+def clean_history(items):
+    """화면이 보낸 최근 대화. 글자만 남기고 최근 MAX_HISTORY개."""
+    out = []
+    for h in items if isinstance(items, list) else []:
+        if not isinstance(h, dict) or not isinstance(h.get("question"), str) or not h["question"].strip():
+            continue
+        out.append({"question": h["question"].strip()[:300],
+                    "status": h.get("status") if isinstance(h.get("status"), str) else "",
+                    "program": h.get("program") if isinstance(h.get("program"), str) else ""})
+    return out[-MAX_HISTORY:]
+
+
+def clarify(question, history):
+    """AI(질문정리). 돌려주는 값: 대조를 거친 plan 또는 None(실패·형식 오류 → v1 경로)."""
+    if history:
+        lines = [f"{i}. 후배: {h['question']} → BOO: {STATUS_WORD.get(h['status'], h['status'] or '?')}"
+                 + (f" ({h['program']})" if h["program"] else "") for i, h in enumerate(history, 1)]
+        prev = "\n".join(lines)
+    else:
+        prev = "(없음)"
+    try:
+        r = _call("질문정리", f"이전 대화:\n{prev}\n이번 말: {question}\n출력:")
+    except Exception:   # 시험용 가짜 callAI가 모르는 작업이어도 v1 경로로
+        return None
+    j = r.get("json") if r.get("ok") else None
+    if not isinstance(j, dict) or j.get("의도") not in INTENTS:
+        return None
+
+    def names(key):
+        found = []
+        for s in j.get(key) if isinstance(j.get(key), list) else []:
+            if isinstance(s, str):
+                for n in match_programs(s) or ([s] if s in PROGRAMS else []):
+                    if n not in found:
+                        found.append(n)
+        return found[:3]
+
+    country = j.get("나라") if isinstance(j.get("나라"), str) and j.get("나라") in COUNTRIES else None
+    section = j.get("칸") if isinstance(j.get("칸"), str) and j.get("칸") in ALL_SECTIONS else None
+    asked = j.get("정리된질문") if isinstance(j.get("정리된질문"), str) else ""
+    asked = asked.strip()[:300] or question
+    return {"의도": j["의도"], "분야": j.get("분야") if j.get("분야") in FIELDS else None, "나라": country,
+            "프로그램후보": names("프로그램후보"), "제외": names("제외"), "칸": section, "정리된질문": asked}
+
+
+ALL_SECTIONS = {s for f in notes.FRAMES.values() for s in f.get("칸", [])} | set(SECTION_BY_ITEM.values())
+
+
+# ── ② [v2] 대화·탐색 ──────────────────────────────────────────────────
+FIELD_NOUN = {"국제교류": "교환·파견 해봤노트", "현장실습": "현장실습 해봤노트", "비교과": "비교과 해봤노트"}
+
+
+def _chat(plan, history):
+    """status "chat": AI가 쓰지 않는 고정 문구 + 칩. 질문함에 저장하지 않는다(답할 질문이 아님)."""
+    last = history[-1] if history else None
+    program = (plan["제외"] or [None])[0] or (last["program"] if last and last["program"] else None)
+    field = plan["분야"] or (PROGRAMS.get(program, {}).get("분야") if program else None)
+    chips = []
+    if program:
+        message = f"아까는 {program} 이야기였어요. 다른 {FIELD_NOUN.get(field, '해봤노트')}를 찾아볼까요?"
+        chips.append({"label": "다른 노트 보기", "action": "notes", "payload": {"field": field, "exclude": [program]}})
+    elif last and last["status"] == "hold":
+        message = "아직 그 내용을 들려준 선배가 없어서 질문함에 담아 두었어요. 선배가 답하면 알림으로 알려 드릴게요."
+        chips.append({"label": "닮은선배 보기", "action": "ask", "payload": {}})
+    else:
+        message = "무엇이 궁금한지 조금 더 구체적으로 물어봐 주세요. 예: 「마르부르크 기숙사 어땠어요?」"
+        chips.append({"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field}})
+    chips.append({"label": "질문함에 담기", "action": "save", "payload": {"question": plan["정리된질문"]}})
+    return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "message": message, "chips": chips}
+
+
+def _kinds():
+    return sorted({p["세부"] for p in PROGRAMS.values() if p.get("분야") == "현장실습" and p.get("세부")})
+
+
+def _explore(plan, programs, country):
+    """탐색·사람찾기: 답을 만들지 않고 노트 카드(최대 5, 근거 많은 순)로 안내한다. 현장실습을 나라로 물으면 기관 유형 칩."""
+    field = plan["분야"]
+    if field == "현장실습" and country and not programs:
+        return {"status": "notes", "lines": [], "sources": {}, "suggestSenior": True, "notes": [], "kinds": _kinds(),
+                "message": "현장실습 노트는 나라가 아니라 기관 유형으로 나뉘어요. 궁금한 유형을 골라 보세요."}
+    if not programs and field:
+        pool = [n for n, p in PROGRAMS.items() if p.get("분야") == field and n not in plan["제외"]
+                and (not country or p.get("세부") == country) and evidence_count(n)]
+        programs = sorted(pool, key=evidence_count, reverse=True)[:MAX_NOTES]
+    if not programs:
+        return None
+    found = _notes(programs, country)
+    if found and plan["제외"] and len(found["notes"]) > 1:
+        found["message"] = f"{', '.join(plan['제외'])}을(를) 뺀 {FIELD_NOUN.get(field, '해봤노트')}가 {len(found['notes'])}개 있어요. 궁금한 노트를 골라 보세요."
+    return found
 
 
 # ── ① 프로그램 대조 ───────────────────────────────────────────────────
@@ -265,7 +425,8 @@ def has_topic(question):
 def _notes(programs, country):
     """status "notes": 답을 만들지 않고 해봤노트 카드로 안내한다(질문함에 저장하지 않음 — 답할 질문이 아니라 길 안내)."""
     cards = [{"noteId": notes.note_id(n), "program": n, "country": PROGRAMS.get(n, {}).get("세부") if
-              PROGRAMS.get(n, {}).get("분야") == "국제교류" else None, "evidenceCount": evidence_count(n)}
+              PROGRAMS.get(n, {}).get("분야") == "국제교류" else None, "evidenceCount": evidence_count(n),
+              "oneLine": (notes.NOTES.get(notes.note_id(n)) or {}).get("oneLine", "")}   # [v2] 카드 한 줄(사전 생성 노트 커버)
              for n in programs if evidence_count(n)][:MAX_NOTES]
     if not cards:
         return None
@@ -277,8 +438,8 @@ def _notes(programs, country):
 
 
 # ── ② 근거 추출 ───────────────────────────────────────────────────────
-def extract(question, programs):
-    """돌려주는 값: (후보 문장 목록, 대표 칸, 보류 이유)"""
+def extract(question, programs, section_hint=None):
+    """돌려주는 값: (후보 문장 목록, 대표 칸, 보류 이유). section_hint: [v2] 질문정리가 고른 칸(주제어가 없을 때 문항으로 쓴다)"""
     rows, section = [], None
     loose, loose_names = [], set()   # 주제어 없는 국제교류 질문의 후보 문단(겹치는 말로 고른다)
     for name in programs:
@@ -301,6 +462,8 @@ def extract(question, programs):
             for pattern, nums in TOPICS_EXCHANGE:
                 if re.search(pattern, question):
                     items += [n for n in nums if n not in items]
+            if not items and section_hint:   # [v2] 주제어는 없지만 질문정리가 칸을 알면 그 칸의 문항으로
+                items = [i for i, s in SECTION_BY_ITEM.items() if s == section_hint]
             if not items:
                 rows += answers   # 후배 질문 답은 먼저 후보로
                 # [11/23 원우 #151 ③] 주제어가 없어도 바로 보류하지 않는다. 그 프로그램 근거 중 질문과 겹치는 말이 있는
@@ -417,7 +580,90 @@ def pick(question, cands):
             nums.append(n)
     if not nums:
         return [], "AI가 고른 근거 없음"
-    return [cands[n - 1] for n in nums[:MAX_LINES]], ""
+    return [cands[n - 1] for n in nums[:MAX_PICK]], ""
+
+
+# ── ⑤ [v2] 답쓰기 + ⑥ 검증 ───────────────────────────────────────────
+DOC_WORD = {"귀국보고서": "결과보고서", "현장실습후기": "현장실습후기", "인터뷰": "선배 인터뷰"}
+
+
+def _person_of(source_id):
+    """근거 문장을 쓴 사람의 열쇠(화면에 안 나감). 보고서·후기는 문서 번호(R149-1-1 → R149), 인터뷰 문장은 문장마다."""
+    m = re.match(r"([RI]\d+)-", source_id or "")
+    return m.group(1) if m else source_id
+
+
+def _single_senior(source_ids):
+    return len({_person_of(s) for s in source_ids}) <= 1
+
+
+def _call_plain(작업명, content):
+    system, shots = load_prompt(작업명)   # docs/prompts/일치검사.txt (인터뷰와 같은 프롬프트)
+    return callAI(작업명, shots + [{"role": "user", "content": content}], system=system)
+
+
+def verify_facts(sentence, source):
+    """답쓰기 문장용 검증: 숫자·영문·고유명사·수량만 본다(「새 낱말」·길이는 바꿔 쓰기를 허용하므로 일치검사가 대신 본다)."""
+    return [p for p in verify(sentence, source) if not p.startswith(("새 낱말", "원문보다"))]
+
+
+def match_check(source, sentence):
+    try:
+        r = _call_plain("일치검사", f"원문: {source}\n요약: {sentence}\n출력:")
+    except Exception:
+        return False
+    j = r.get("json")
+    return bool(r.get("ok") and isinstance(j, dict) and j.get("일치") is True)
+
+
+def compose(question, picked):
+    """AI(답쓰기) → 문장마다 인용 근거와 대조. 돌려주는 값: {"status","lines","sources","singleSenior"} 또는 None(다 버려짐·실패)."""
+    letters, numbered = {}, []
+    for i, c in enumerate(picked, 1):
+        who = _person_of(c["sourceId"])
+        if who not in letters:
+            letters[who] = chr(ord("A") + len(letters)) if len(letters) < 26 else str(len(letters) + 1)
+        year = str(c.get("semester") or "")[:4] or "–"
+        numbered.append(f"[{i}] {DOC_WORD.get(c['docType'], c['docType'])} · {year} · 선배{letters[who]}: {c['text']}")
+    try:
+        r = _call("답쓰기", f"질문: {question}\n근거:\n" + "\n".join(numbered) + "\n출력:")
+    except Exception:
+        return None
+    j = r.get("json") if r.get("ok") else None
+    answers = j.get("답") if isinstance(j, dict) else None
+    if not isinstance(answers, list):
+        return None
+    lines, sources, used = [], {}, set()
+    for a in answers:
+        if not isinstance(a, dict) or not isinstance(a.get("text"), str):
+            continue
+        text = a["text"].strip()
+        nums = []
+        for n in a.get("근거") if isinstance(a.get("근거"), list) else []:
+            try:
+                n = int(n)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= n <= len(picked) and n not in nums:
+                nums.append(n)
+        if not text or not nums or not POLITE_END.search(text):   # 근거 번호 없는 문장·반말은 버린다
+            continue
+        cited = [picked[n - 1] for n in nums]
+        source = " ".join(c["text"] for c in cited)
+        if verify_facts(text, source) or not match_check(source, text):
+            continue
+        cites = []
+        for c in cited:
+            if c["sourceId"] not in cites:
+                cites.append(c["sourceId"])
+            sources[c["sourceId"]] = {"docType": c["docType"], "program": c["program"], "semester": c["semester"]}
+        lines.append({"text": text, "sourceId": cites[0], "cites": cites, "lineId": f"L-A1-{len(lines) + 1}"})
+        used.update(cites)
+        if len(lines) >= MAX_ANSWER_LINES:
+            break
+    if not lines:
+        return None
+    return {"status": "ok", "lines": lines, "sources": sources, "singleSenior": _single_senior(used)}
 
 
 # ── ④ 변환 + ⑤ 사후 검증 ─────────────────────────────────────────────
