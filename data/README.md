@@ -58,7 +58,14 @@
 
 **현장실습 업체 약칭 (11/22, 작업 81)**: 현장실습 업체는 `㈜`·`(유)`·`(온라인)`·` 해외영업팀`·` 한국사무소`·` 서울사무소`를 뗀 이름을 별칭에 자동으로 넣는다(`sheet_to_json.py`의 `short_name`, 예: `㈜글로벌랭스` → `글로벌랭스`, `두레텍스㈜ 해외영업팀` → `두레텍스`). KOTRA는 권역별로 `KOTRA 유럽`·`KOTRA CIS`·`KOTRA 중남미` 모양.
 
-한 별칭이 두 프로그램에 걸리면 변환 스크립트가 오류를 낸다. 그래서 `리옹`(리옹2·리옹3)·`소르본`(파리 제4·제13)·단독 `KOTRA`는 넣지 않는다. 가짜 이름(함정 질문)도 넣지 않는다. 점검: `python tools/check_alias_match.py` → 답변 기대 25개 + 함정 3개 대조.
+**국제교류 학교 줄임 이름 (11/23, 미리 요청)**: 손으로 넣은 별칭이 없는 국제교류 학교는 끝의 `대학교`·`대학`(과 괄호)을 뗀 앞부분을 별칭으로 자동으로 넣는다(`sheet_to_json.py`의 `exchange_short`, 예: `레이던 대학교` → `레이던`, `토리노대학` → `토리노`) — 「레이던 다녀온 선배」가 보류되던 문제. 60곳.
+- 빼는 곳(`EXCHANGE_SKIP`): `리스본종합대학교`(「리스본」이 함정 「리스본신대학교」·인턴 「리스본 협력기관」에 걸림), `본대학교`(한 글자).
+- 바꿔 넣는 곳(`EXCHANGE_RENAME`): 상트페테르부르크(+「상트페테르부르크국립」)·미나스제라이스. **같은 도시·이름의 다른 학교와 헷갈리는 곳은 그 학교만 가리키는 이름으로**(11/23 미리 메모): 캘리포니아주립대학교(샌프란시스코) → `샌프란시스코주립`·`캘리포니아주립대 샌프란시스코`(「캘리포니아주립대 LA」 등 다른 캠퍼스는 안 걸림), 외국인을 위한 시에나 → `시에나 외국인`(「시에나대학교」는 다른 학교), 폴발레리 몽펠리에 제3 → `폴발레리`·`몽펠리에 제3`·`몽펠리에 3`(「몽펠리에 대학교」는 다른 학교), 나가사키외국어 → `나가사키외대`(「나가사키대학교」는 다른 학교). 더 넣는 곳(`EXCHANGE_EXTRA`): 그르노블·뒤스부르크.
+- 손으로 넣은 별칭(마르부르크·밀라노 등 6곳)은 그대로 — **별칭 첫 항목이 화면의 짧은 이름**(BOO 인터뷰 질문 「레이던 파견은…」, 콘솔 제안 제목)이라서.
+- 「남스웨덴공과대학교」(함정 53)처럼 별칭 바로 뒤에 학교 종류 말이 붙으면 다른 학교로 보고 걸지 않는다(위 대조 규칙). **[11/23]** 종류 말에 `왕립`·`교황청립`을 더하고, 종류 말이 이어져도(「스톡홀름 **왕립공과**대학」) 다른 학교로 본다 — 기준 구현 `tools/check_alias_match.py`, askBoo(`functions/askboo.py` `SCHOOL_KIND`·`SCHOOL_TAIL`)도 같게 맞춰야 함.
+- 점검(11/23): 개발 70·사용 로그 1,200·관계없는 질문 30의 askBoo 결과 변화 0, 별칭 겹침 오류 0.
+
+한 별칭이 두 프로그램에 걸리면 변환 스크립트가 오류를 낸다. 그래서 `리옹`(리옹2·리옹3)·`소르본`(파리 제4·제13)·단독 `KOTRA`는 넣지 않는다. 겹침을 일부러 둔 것은 `밀라노`·`스톡홀름`(긴 이름 「○○ 협력기관」이 있으면 그쪽이 이김) 두 개뿐이다. 가짜 이름(함정 질문)도 넣지 않는다. 점검: `python tools/check_alias_match.py` → 답변 기대 25개 + 함정 3개 대조.
 
 ### intern-keywords.json (작업 81 — `tools/build_intern_keywords.py`가 생성)
 
@@ -93,6 +100,16 @@
 | 팁 | `4. 후배들에게 남기고픈 한마디` |
 | 배운점 | (없음 — 선배 인터뷰로만 채움, `frames.json`의 `인터뷰로만`) |
 | (제목 칸, 비어 있음) | `1. 출국 전 준비사항` `2. 파견대학 관련` |
+
+### frames.json `예시` (작업 84, P1-여건 — 11/23 원우)
+
+틀마다 `"예시": {"칸": ["…", "…", "…"]}`. `interviewNext`가 그 칸의 질문에 `examples`로 2~3개를 붙이고, 화면은 질문 아래 칩으로 보여 준다(탭하면 입력창에 채우고 **바로 보내지 않음**, 디자인 규칙 5-7).
+- 두 종류만 쓴다. 칩을 고치지 않고 보내도 **지어낸 사실이 노트에 들어가지 않게** 하려는 것이다.
+  - **고르는 보기**(시기·금액·절차): 그대로 보내도 본인의 사실이 되는 것. 예: 비용 `월 150만 원 이하였어요` · `월 150~200만 원 들었어요` · `월 200만 원 넘게 들었어요`(귀국보고서 「월 N만 원」 211건 분포 66·81·64건으로 나눔)
+  - **말머리**(서술 칸): `…`로 끝나며 이어 써야 완성되는 것. 예: `가장 크게 배운 건 …`
+- 칸 이름은 `칸` 목록과 같아야 하고 `후배 질문`에는 넣지 않는다(질문이 매번 달라서). 칩 하나는 20자 이하, 프로그램 이름·사람·숫자 성적은 넣지 않는다.
+- 교환·파견은 같은 예시를 쓴다. **[11/23 #139] 칩이 붙는 질문**: 기본 질문(근거가 비었거나 오래된 칸)·배운점은 이 `예시`, 깊이 질문은 질문마다 정한 예시(`functions/interview.py` `DEPTH_QUESTIONS` 세 번째 값, 미리). 후배 질문·꼬리 질문에는 없다.
+- 말머리 칩만 보낸 답(「가장 크게 배운 건 …」, `…`를 지워도 같음)은 서버가 없던 답으로 치고 같은 질문을 「조금만 더 이어서 써 주세요. 」를 붙여 다시 묻는다(`retry: true`). 요약에도 들어가지 않는다 — 말머리가 노트 문장이 되지 않게.
 
 현장실습후기는 `후기` 한 칸 자유 서술입니다. **[11/20] 문장마다 한 건**으로 쪼개고(`id` = `I{후기 번호}-{후기 안 문장 순번}`, 예: `I001-1`, `I001-2`) `칸`은 비워 두면 작업 50(문장 자동 분류)이 `지원동기`·`업무내용`·`배운점` 중 하나를 채웁니다. 한 문단에 업무·배운점이 섞여 있어 문단 단위로는 칸 하나로 나눌 수 없기 때문입니다(spec 9장). 원래 문단 번호는 `문단` 키에 남깁니다. **작업 50 자동 분류 결과는 `data/intern-sections.json`(`{sourceId: 칸}`)에 따로 두고**, `sheet_to_json.py`가 변환할 때마다 `칸`과 `autoClassified: true`를 다시 입힙니다(evidence.json에만 써 두면 다시 변환할 때 지워지므로). 분류를 다시 돌렸으면 이 파일을 갈아 끼우고 `sheet_to_json.py` → `build_notes.py` 순서로 돌립니다. 11/20 전의 `I001-1`은 '1번 후기의 1번째 문단'이었고 지금은 '1번째 문장'이라, 옛 번호를 그대로 쓰면 다른 글을 가리킵니다. `지원·선발`, `근무조건` 칸은 선배 인터뷰로만 채웁니다. 국제교류 노트는 `frames.json`의 `교환` 틀, 현장실습 노트는 `인턴` 틀을 씁니다.
 
@@ -141,12 +158,13 @@
 | 로그인 정보 | 화면이 `sessionStorage`의 `"me"`에 저장한다. 함수는 따로 받지 않는다 |
 | docType | `귀국보고서` · `현장실습후기` · `인터뷰` |
 
-## 함수 15개 (+ 11/22 추가 5개, 11/23 추가 1개)
+## 함수 15개 (+ 11/22 추가 5개, 11/23 추가 3개)
 
 | 함수 | 보내는 값 |
 |---|---|
 | login(id, pw) | `{id, pw}` |
 | getMe() | 없음 |
+| setRecommendable(on) [11/23] | `{on: true\|false}` (닮은선배로 추천받기 켜기·끄기) |
 | askBoo(question) | `{question}` |
 | interviewNext(program, answers) | `{program, answers:[{section, question, answer}]}` |
 | summarizeInterview(program, transcript) | `{program, transcript:[{section, question, answer}]}` |
@@ -164,6 +182,7 @@
 | reportThread(threadId, reason, block) [11/23] | `{threadId, reason?, block?}` (쪽지 대화 ⋮ 메뉴의 신고·차단, reason은 신고 사유 최대 100자) |
 | getInbox() | 없음 |
 | getMyNote(id) [11/22] | `{id}` (내 경험노트 상세, 본인 것만) |
+| updateMyNote(id, changed) [11/23] | `{id, changed:[{section, index, text}]}` (내 경험노트 문장 고치기, index는 getMyNote 그 칸 lines 순서 0부터) |
 | demandNext(state) [11/22] | `{state}` (「궁금한 것 정리하기」 다음 단계, AI 없음) |
 | saveDemand(state) [11/22] | `{state, consent:true}` |
 | reportStatement(lineId, reason) | `{lineId, reason?}` |
@@ -193,22 +212,34 @@
 | 비교과이수내역 | 목록 | `extracurricular.json`의 내 행들(키 그대로, `번호`·`가상학번` 제외) |
 | 귀국보고서 | 목록 | 내 귀국보고서의 `학년도` `학기` `국가` `대학명` |
 | 현장실습후기 | 목록 | 내 현장실습후기의 `학년도` `학기` `업체명` `직군` |
+| recommend [11/22] | 객체 | 선배 추천 열림 상태 `{ready, by, need, talk, ask}` (spec 4장) |
+| recommendable [11/23] | 참/거짓 | 닮은선배로 추천받기(기본 true, 끈 사람만 false) |
 
 선배·후배 구분 필드는 없습니다. 어떤 프로그램에 답할 수 있는지는 위 이수 기록으로 정해집니다.
+
+### setRecommendable [11/23]
+
+| 필드 | 형식 | 뜻 |
+|---|---|---|
+| ok / recommendable | 참/거짓 | 바뀐 뒤 상태. 같은 값으로 다시 불러도 ok |
+| error | 글자 | `on`이 참/거짓이 아닐 때 |
+
+끄면 `recommendSeniors` 후보에서 빠지고, 새 쪽지 요청은 `sendMessage`가 `reason: "추천 제외"`. 이미 수락한 대화는 이어지고, 귀국보고서·현장실습후기 문장은 계속 해봤노트 근거로 쓰인다.
 
 ### askBoo
 
 | 필드 | 형식 | 뜻 |
 |---|---|---|
-| status | 글자 | `ok`(근거 있음), `hold`(근거 없음), `official`(규정 질문, 공식 안내로 연결) |
+| status | 글자 | `ok`(근거 있음), `hold`(근거 없음), `official`(규정 질문, 공식 안내로 연결), **[11/23] `notes`**(사람·나라만 묻고 주제가 없을 때 답 대신 해봤노트 카드로 안내 — 질문함에 저장 안 함) |
 | lines[].text / sourceId / lineId | 글자 | 답변 문장과 출처, 문장 번호 |
 | lines[].fallback | 참/거짓 | AI 문장이 검증에 걸려 근거 원문을 그대로 보여 준 줄이면 true. 없으면 거짓 |
 | sources | 객체 | sourceId별 `{docType, program, semester}` |
-| noteId | 글자 | `ok`일 때. 관련 노트 |
+| noteId | 글자 | `ok`일 때 관련 노트. **[11/23]** `hold`도 노트는 있는데 이 내용이 없을 때 그 노트 |
 | suggestSenior | 참/거짓 | 닮은 선배 추천을 권할지 |
 | questionId | 글자 | `hold`·`official`일 때. 질문함에 자동 저장된 질문 번호 |
 | officialUrl | 글자 | `official`일 때. 담당 부서의 공식 안내 주소 |
-| message | 글자 | `hold`·`official`일 때. 안내 문구 |
+| message | 글자 | `hold`·`official`·`notes`일 때. 안내 문구(**[11/23]** `hold` 문구는 이유별 세 가지 — spec 4장) |
+| notes[].noteId / program / country / evidenceCount [11/23] | 글자·숫자 | `notes`일 때. 해봤노트 카드 최대 5개(근거 있는 것만, 근거 많은 순). 근거 블록은 두지 않는다 |
 
 ### interviewNext
 
@@ -217,6 +248,8 @@
 | done | 참/거짓 | 인터뷰가 끝났는지 |
 | section, question | 글자 | `done`이 false일 때. 다음 질문 한 개 |
 | progress.filled / total | 숫자 | 채운 칸 수 / 전체 칸 수 |
+| examples [11/23] | 목록 | (P1-여건, 작업 84) 예시 칩 2~3개 — 기본 질문·배운점은 `frames.json` 칸 예시, 깊이 질문은 질문별 예시. 후배 질문·꼬리 질문은 생략. `…`로 끝나는 것은 말머리 |
+| retry [11/23] | 참/거짓 | 말머리만 보낸 답을 다시 묻는 질문이면 true(질문 앞에 「조금만 더 이어서 써 주세요. 」, 같은 `examples`) |
 
 ### summarizeInterview
 
@@ -238,6 +271,8 @@
 | ok | 참/거짓 | 저장 성공 여부 |
 | noteId | 글자 | 반영된 노트 |
 | added | 숫자 | 추가된 문장 수 |
+
+**[11/23]** `edits.changed`(공개 동의 시트의 「문장 고치기」): 앞뒤 공백 제거, 빈 문장은 고침 아님, 300자를 넘으면 그 문장만 `rejected`(`reason: "길이"`). 통과한 문장은 해봤노트와 내 경험노트의 공개 초안에 `edited: true`·`aiText`(처음 AI 문장)로 남고, 원문 일치 검사 대상에서 빠지며 본인 식별 여부는 다시 검사한다. 내 경험노트 문장은 바뀌지 않는다.
 
 ### listNotes
 
@@ -293,7 +328,7 @@
 | threadId | 글자 | 대화 번호. 첫 메시지는 쪽지 신청이 된다 |
 | myNickname | 글자 | 이 대화에서 선배에게 보이는 내 이름(형용사 + 동물, 대화마다 새로) |
 | at | 글자 | 보낸 시각 |
-| reason / message | 글자 | 실패일 때만. `연락처`·`학번`·`비방`(검사) · `한도`·`선배한도` · `잠김` · **[11/23] `차단`**(차단된 대화 — 누가 차단했든 양쪽 모두, 「더 이어 갈 수 없는 대화예요」) |
+| reason / message | 글자 | 실패일 때만. `연락처`·`학번`·`비방`(검사) · `한도`·`선배한도` · `잠김` · **[11/23] `차단`**(차단된 대화 — 누가 차단했든 양쪽 모두, 「더 이어 갈 수 없는 대화예요」) · **[11/23] `추천 제외`**(추천받기를 끈 선배에게 새 요청, 「이 선배는 지금 쪽지 요청을 받지 않아요.」) |
 
 ### previewNickname
 
@@ -363,9 +398,13 @@
 
 질문 글은 서버가 정한 글(`"{칸} 이야기를 최근 경험으로 듣고 싶어요."`)이다. 질문함 집계·측정에서 askBoo 질문과 나눌 때는 `noteId`·칸이 채워진 행으로 본다.
 
+### updateMyNote [11/23]
+
+응답은 getMyNote와 같은 모양 + `ok: true`. 고친 줄은 `edited: true`(화면 「내가 고친 문장」)·`aiText`(처음 AI 문장). 오류: 빈 문장 「문장을 적어 주세요」, 300자 초과 「300자 안으로 적어 주세요」(둘 다 `section`·`index` 함께), 없는 칸·순서 「고칠 문장을 찾지 못했어요」, 남의 것 「볼 수 없는 기록이에요」 — **하나라도 틀리면 아무것도 바꾸지 않는다.** 해봤노트 공개 문장은 바뀌지 않는다(공개 문장은 saveConsent `changed`로 따로).
+
 ### getMyNote · demandNext · saveDemand [11/22]
 
-응답 모양은 `docs/spec-v1.md` 4장 원본을 따른다. getMyNote는 getInbox 카드 값 + 칸별 `lines[].text / publicText / lineId / shared` + `draftId`·`publicDraft`. demandNext는 `{done, step, question, options|examples, retry?, progress:{answered, need}, state}`, 끝나면 `summary`. saveDemand는 `{ok, demandId, questionIds, recommend, unlocked}`.
+응답 모양은 `docs/spec-v1.md` 4장 원본을 따른다. getMyNote는 getInbox 카드 값 + 칸별 `lines[].text / publicText / lineId / shared` (**[11/23]** 고친 문장은 `edited: true`) + `draftId`·`publicDraft`. demandNext는 `{done, step, question, options|examples, retry?, progress:{answered, need}, state}`, 끝나면 `summary`. saveDemand는 `{ok, demandId, questionIds, recommend, unlocked}`.
 
 ### reportStatement
 

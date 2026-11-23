@@ -8,16 +8,20 @@
 // 규칙: 데이터는 common/data.js 함수로만, 화면 글은 textContent로만(innerHTML 금지), 색은 style.css 변수만.
 //
 // 흐름: 화면이 document에 "open-consent"(detail = {draftId, program, publicDraft, …})를 보낸다
-//   → 시트를 연다 → 「동의하고 공유」 → saveConsent(draftId, {removed:[끈 lineId]})
+//   → 시트를 연다 → (문장마다 「문장 고치기」로 해봤노트에 보일 문장을 고칠 수 있다, 11/23)
+//   → 「동의하고 공유」 → saveConsent(draftId, {removed:[끈 lineId], changed:[{lineId, text}]})
 //   → 성공하면 시트를 닫고 document에 "consent-saved"(detail = {draftId, result, shared, removed})를 보낸다(토스트는 연 화면이 띄움).
 //   → 응답에 rejected(서버가 거절한 문장)가 있으면 시트를 닫지 않고 그 문장 아래에 message를 보여 준 뒤 「확인」으로 닫는다.
 // 끈 문장은 removed로만 보낸다. 내 경험노트(myNote)는 서버가 이미 저장했으므로 끈 문장도 거기에는 남는다.
+// [11/23] 고친 문장은 changed로 보낸다. 서버가 다시 검사하고(check_public_text) 공개 초안에도 남긴다(edited: true).
+//   내 경험노트 문장은 따로 고친다 — 여기서 고쳐도 바뀌지 않는다(두 노트는 읽는 사람이 달라 표현이 다를 수 있음).
 
 import { saveConsent, listNotes } from "./data.js";
 
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };
 const QUESTION_SECTION = "후배 질문";
+const MAX_EDIT_CHARS = 300; // 서버 runtime_fns.MAX_EDIT_CHARS와 같게
 
 // ---------------------------------------------------------------------------
 // 도우미 — 요소 만들기(글은 textContent로만), 아이콘
@@ -100,11 +104,14 @@ const state = {
   busy: false,
   done: false,        // 공유는 됐지만 서버가 일부 문장을 거절해 결과를 보여 주는 중
   rejected: new Map(), // lineId → 서버가 준 message (saveConsent.rejected, spec 4장 [11/20])
+  edits: new Map(),   // [11/23] lineId → 고친 문장(이번에 고친 것, 아직 공유 전)
+  editing: null,      // 지금 고치는 중인 lineId(한 번에 하나)
   lastFocus: null,
 };
 // 같은 요약 초안을 다시 열면 고른 상태를 그대로 보여 준다(공유 범위 바꾸기)
 const remembered = new Map(); // draftId → Map(lineId → bool)
 const rememberedRejected = new Map(); // draftId → Map(lineId → message)
+const rememberedEdits = new Map(); // draftId → Map(lineId → 고친 문장) — 공유하지 않고 닫았다가 다시 열 때
 
 document.addEventListener("open-consent", (event) => openSheet(event.detail));
 export const openConsent = (draft) => openSheet(draft);
@@ -124,6 +131,8 @@ function openSheet(draft) {
   state.done = false;
   state.lastFocus = document.activeElement;
   state.rejected = new Map(rememberedRejected.get(draft.draftId) || []);
+  state.edits = new Map(rememberedEdits.get(draft.draftId) || []);
+  state.editing = null;
 
   const prev = remembered.get(draft.draftId);
   const sharedNow = currentlyShared(draft); // 「공유 범위 바꾸기」: 지금 상태에서 시작
@@ -159,7 +168,11 @@ function openSheet(draft) {
 
 function closeSheet() {
   if (state.busy) return;
-  if (state.draft) remembered.set(state.draft.draftId, new Map(state.on));
+  if (state.draft) {
+    remembered.set(state.draft.draftId, new Map(state.on));
+    rememberedEdits.set(state.draft.draftId, new Map(state.edits));
+  }
+  state.editing = null;
   root.hidden = true;
   document.body.classList.remove("sheet-open");
   if (state.lastFocus && state.lastFocus.focus) state.lastFocus.focus();
@@ -276,11 +289,33 @@ function lineRow(sectionName, line) {
   sw.disabled = Boolean(rejectNote) || state.done;
   showNotes(sw.checked);
 
+  // [11/23] 고친 문장: 이번에 고친 것(state.edits) 또는 전에 고쳐 공유한 것(서버 edited)
+  const shown = state.edits.has(line.lineId) ? state.edits.get(line.lineId) : line.text;
+  const edited = state.edits.has(line.lineId) || line.edited === true;
+  const canEdit = !rejectNote && !state.done;
+
   const text = el("label", { className: "consent-line__text", attrs: { for: id } }, [
     // 후배 질문 칸: Q(후배 질문 원문, 인용) + A(내 답)
     sectionName === QUESTION_SECTION && line.asked ? el("span", { className: "msg__quote", text: `Q. ${line.asked}` }) : null,
-    el("span", { text: sectionName === QUESTION_SECTION ? `A. ${line.text}` : line.text }),
+    el("span", { text: sectionName === QUESTION_SECTION ? `A. ${shown}` : shown }),
   ]);
+
+  if (state.editing === line.lineId) {
+    return el("div", { className: "consent-line", attrs: { "data-line": line.lineId } }, [
+      el("div", { className: "consent-line__main" }, [
+        sectionName === QUESTION_SECTION && line.asked ? el("span", { className: "msg__quote", text: `Q. ${line.asked}` }) : null,
+        editor(line, shown),
+      ]),
+    ]);
+  }
+
+  const editBtn = canEdit
+    ? el("button", {
+        className: "btn btn--text",
+        attrs: { type: "button", "data-edit": line.lineId, disabled: state.editing !== null || state.busy },
+        on: { click: () => startEdit(line.lineId) },
+      }, [icon("pencil"), "문장 고치기"])
+    : null;
 
   const row = el("div", {
     className: `consent-line${sw.checked ? "" : " consent-line--off"}${rejectNote ? " consent-line--rejected" : ""}`,
@@ -288,15 +323,84 @@ function lineRow(sectionName, line) {
     el("div", { className: "consent-line__main" }, [
       line.identifying === true ? statusLabel("warning", "triangle-alert", "나를 알아볼 수 있는 내용이에요") : null,
       text,
+      edited ? statusLabel("neutral", "pencil", "내가 고친 문장") : null,
       rejectNote,
-      // AI 원문 일치 검사에 걸린 문장(spec summarizeInterview.match)
-      line.match === false ? statusLabel("neutral", "info", "원문과 다를 수 있어요") : null,
+      // AI 원문 일치 검사에 걸린 문장(spec summarizeInterview.match). 선배가 고친 문장에는 붙이지 않는다
+      line.match === false && !edited ? statusLabel("neutral", "info", "원문과 다를 수 있어요") : null,
       offNote,
       riskNote,
+      editBtn,
     ]),
     sw,
   ]);
+  row.setAttribute("data-line", line.lineId);
   return row;
+}
+
+// [11/23] 문장 고치기 — 입력창(5-9) + 「저장」(Secondary) / 「취소」(Text). Primary는 시트의 「동의하고 공유」 하나
+let editorSeq = 0;
+function editor(line, current) {
+  const id = `consent-edit-${++editorSeq}`;
+  const errId = `${id}-err`;
+  const box = el("textarea", {
+    className: "input",
+    // .input은 한 줄 높이라 여러 줄 입력에 맞게 높이만 푼다(색은 그대로 변수)
+    attrs: { id, rows: 3, maxlength: MAX_EDIT_CHARS, "aria-describedby": `${id}-hint ${errId}`,
+             style: "height: auto; min-height: 96px; padding: 12px 16px; line-height: 1.5; resize: vertical;" },
+  });
+  box.value = current;
+  const err = el("p", { className: "field__error", attrs: { id: errId, role: "alert", hidden: true } }, [icon("circle-alert"), el("span")]);
+
+  const save = () => {
+    const value = box.value.trim();
+    let problem = "";
+    if (!value) problem = "문장을 적어 주세요. 공개하지 않으려면 스위치를 꺼 주세요.";
+    else if (value.length > MAX_EDIT_CHARS) problem = `${MAX_EDIT_CHARS}자 안으로 적어 주세요.`;
+    if (problem) {
+      err.lastChild.textContent = problem;
+      err.hidden = false;
+      box.setAttribute("aria-invalid", "true");
+      drawIcons();
+      box.focus();
+      return;
+    }
+    if (value === line.text) state.edits.delete(line.lineId); // 처음 문장으로 돌아옴 → 고침 아님
+    else state.edits.set(line.lineId, value);
+    state.rejected.delete(line.lineId);
+    finishEdit(line.lineId);
+  };
+
+  const field = el("div", { className: "field", attrs: { style: "width: 100%;" } }, [
+    el("label", { className: "field__label", text: "해봤노트에 보일 문장", attrs: { for: id } }),
+    box,
+    el("p", { className: "sub", attrs: { id: `${id}-hint` }, text: "내 경험노트 문장은 그대로예요. 연락처·메일·링크는 넣을 수 없어요." }),
+    err,
+    el("div", { className: "btn-row", attrs: { style: "width: 100%;" } }, [
+      el("button", { className: "btn btn--secondary", text: "저장", attrs: { type: "button" }, on: { click: save } }),
+      el("button", { className: "btn btn--text", text: "취소", attrs: { type: "button" }, on: { click: () => finishEdit(line.lineId) } }),
+    ]),
+  ]);
+  return field;
+}
+
+function startEdit(lineId) {
+  state.editing = lineId;
+  renderLines();
+  update();
+  drawIcons();
+  const box = linesBox.querySelector(`[data-line="${CSS.escape(lineId)}"] textarea`);
+  if (box) {
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
+  }
+}
+
+function finishEdit(lineId) {
+  state.editing = null;
+  renderLines();
+  update();
+  drawIcons();
+  linesBox.querySelector(`[data-edit="${CSS.escape(lineId)}"]`)?.focus();
 }
 
 // ---------------------------------------------------------------------------
@@ -329,11 +433,12 @@ function update() {
     return;
   }
   const on = onCount();
-  const ready = on > 0 && agreeBox.checked && !state.busy;
+  const ready = on > 0 && agreeBox.checked && !state.busy && state.editing === null;
   submitBtn.disabled = !ready;
   // 비활성이면 이유를 버튼 아래 14px로(5-4)
   let reason = "";
-  if (on === 0) reason = "공개할 문장을 하나 이상 켜 주세요";
+  if (state.editing !== null) reason = "고치는 중인 문장을 저장하거나 취소해 주세요";
+  else if (on === 0) reason = "공개할 문장을 하나 이상 켜 주세요";
   else if (!agreeBox.checked) reason = "동의에 체크하면 공유할 수 있어요";
   submitReason.hidden = !reason || state.busy;
   submitReason.lastChild.textContent = reason;
@@ -348,13 +453,14 @@ submitBtn.addEventListener("click", async () => {
   }
   if (submitBtn.disabled || !state.draft) return;
   const removed = [...state.on].filter(([, v]) => !v).map(([id]) => id);
+  const changed = [...state.edits].map(([lineId, text]) => ({ lineId, text }));
 
   state.busy = true;
   submitBtn.disabled = true;
   submitBtn.textContent = "공유하는 중…";
   agreeError.replaceChildren();
 
-  const res = await saveConsent(state.draft.draftId, { removed });
+  const res = await saveConsent(state.draft.draftId, changed.length ? { removed, changed } : { removed });
 
   state.busy = false;
   submitBtn.textContent = "동의하고 공유";
@@ -373,6 +479,18 @@ submitBtn.addEventListener("click", async () => {
   }
 
   const draftId = state.draft.draftId;
+  // 서버가 받아들인 고친 문장은 공개 초안에도 남는다(spec saveConsent [11/23 고치기]) → 이 화면이 들고 있는 초안에도 반영해
+  // 다시 열면(공유 범위 바꾸기) 고친 문장이 보이게 한다. 거절된 문장은 고친 글을 그대로 두고 message를 보여 준다
+  const rejectedIds = new Set((Array.isArray(res.rejected) ? res.rejected : []).map((r) => r && r.lineId));
+  for (const line of allLines(state.draft)) {
+    if (state.edits.has(line.lineId) && !rejectedIds.has(line.lineId)) {
+      line.text = state.edits.get(line.lineId);
+      line.edited = true;
+      delete line.match;
+      state.edits.delete(line.lineId);
+    }
+  }
+  rememberedEdits.set(draftId, new Map(state.edits));
   // 서버가 고친 문장 중 일부를 거절한 경우(spec 4장 saveConsent [11/20]):
   // 그 문장만 해봤노트에서 빠지고 나머지는 저장됐다 → 시트를 닫지 않고 문장마다 message를 보여 준다
   const rejected = (Array.isArray(res.rejected) ? res.rejected : []).filter((r) => r && state.on.has(r.lineId));
@@ -425,11 +543,12 @@ root.querySelector(".sheet-scrim").addEventListener("click", closeSheet);
 root.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     e.preventDefault();
+    if (state.editing !== null) { finishEdit(state.editing); return; } // 고치는 중이면 고치기만 취소
     closeSheet();
     return;
   }
   if (e.key !== "Tab") return;
-  const focusables = [...panel.querySelectorAll("button, input, a[href], [tabindex]:not([tabindex='-1'])")]
+  const focusables = [...panel.querySelectorAll("button, input, textarea, a[href], [tabindex]:not([tabindex='-1'])")]
     .filter((n) => !n.disabled && n.offsetParent !== null);
   if (focusables.length === 0) return;
   const first = focusables[0];

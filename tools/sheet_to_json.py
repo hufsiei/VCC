@@ -55,9 +55,45 @@ SHORT_TAIL = re.compile(r"\s*(?:해외영업팀|한국사무소|서울사무소)
 def short_name(name):
     s = SHORT_TAIL.sub("", SHORT_DROP.sub("", name)).strip()
     return s if s != name and len(s.replace(" ", "")) >= 3 else None
+
+
+# 11/23 미리 요청: 국제교류 학교는 끝의 「대학교·대학」(과 괄호)을 뗀 앞부분도 별칭으로(「레이던 다녀온 선배」가 보류되던 문제).
+#   ALIASES에 손으로 넣은 학교(마르부르크·밀라노 등 6곳)는 건드리지 않는다 — 별칭 첫 항목이 화면의 짧은 이름이라.
+#   예) 레이던 대학교 → 레이던, 흐로닝언대학교 → 흐로닝언, 토리노대학 → 토리노
+EXCHANGE_TAIL = re.compile(r"\s*(?:\([^)]*\))?\s*(?:종합대학교|대학교|대학)\s*(?:\([^)]*\))?$")
+EXCHANGE_SKIP = {
+    "리스본종합대학교",   # 「리스본」은 함정 「리스본신대학교」(가짜 학교)와 인턴 업체 「리스본 협력기관」에 걸림
+    "본대학교",           # 「본」 한 글자 — 다른 이름(리스본·소르본) 안에도 들어 있음
+}
+EXCHANGE_RENAME = {     # 규칙으로 뗀 이름보다 실제로 부르는 이름
+    "상트페테르부르크국립대학교": ["상트페테르부르크", "상트페테르부르크국립"],   # 「…국립대」도(국립은 학교 종류 말)
+    "미나스제라이스연방대학교": ["미나스제라이스"],
+    # 11/23 미리 메모: 도시 이름만 남기면 같은 도시의 다른 학교·캠퍼스까지 잡힌다 → 그 학교만 가리키는 이름으로
+    "폴발레리 몽펠리에 제3대학교": ["폴발레리", "몽펠리에 제3", "몽펠리에 3"],   # 「몽펠리에 대학교」는 다른 학교
+    "외국인을 위한 시에나대학교": ["시에나 외국인", "외국인을 위한 시에나"],      # 「시에나대학교」는 다른 학교
+    "캘리포니아주립대학교(샌프란시스코)": ["샌프란시스코주립", "캘리포니아주립대 샌프란시스코",
+                                         "캘리포니아주립대학교 샌프란시스코"],   # 「캘리포니아주립대 LA」 등 다른 캠퍼스
+    "나가사키외국어대학교": ["나가사키외국어", "나가사키외대"],                 # 「나가사키대학교」는 다른 학교
+}
+EXCHANGE_EXTRA = {      # 규칙 이름에 더해 자주 부르는 이름
+    "그르노블 알프스 대학교": ["그르노블"],
+    "뒤스부르크-에센대학교": ["뒤스부르크"],      # 하이픈 없이 「뒤스부르크 에센」으로 물어도
+}
+
+
+def exchange_short(name):
+    if name in EXCHANGE_SKIP:
+        return []
+    if name in EXCHANGE_RENAME:
+        base = list(EXCHANGE_RENAME[name])
+    else:
+        b = EXCHANGE_TAIL.sub("", name).strip()
+        base = [b] if b != name and len(b.replace(" ", "")) >= 2 else []
+    return base + EXCHANGE_EXTRA.get(name, []) if base else []
 # 긴 이름 우선으로 풀리는 겹침(의도한 것만). (별칭, 겹치는 다른 프로그램명)
 ALIAS_OVERLAP_OK = {
     ("밀라노", "밀라노 협력기관(온라인)"),  # "밀라노 협력기관"이 있으면 긴 이름이 이김. "밀라노"만 쓰면 교환(대학교)
+    ("스톡홀름", "스톡홀름 협력기관(온라인)"),  # 11/23 같은 모양. "스톡홀름"만 쓰면 스톡홀름대학교
 }
 REPORT_SECTIONS = {  # 문항 헤더 -> 칸 (spec 9장)
     "1-1. 입학허가서 신청시 유의사항": "지원", "1-2. 비자 취득, 항공권 및 유학생 보험 구입": "지원",
@@ -191,6 +227,11 @@ def main():
         short = short_name(p["프로그램명"]) if p["분야"] == "현장실습" else None
         if short and short not in ALIASES.get(p["프로그램명"], []):
             ALIASES.setdefault(p["프로그램명"], []).append(short)
+    for p in programs:   # 11/23 국제교류 줄임 이름 — 손으로 넣은 별칭이 없는 학교만
+        if p["분야"] == "국제교류" and p["프로그램명"] not in ALIASES:
+            short = exchange_short(p["프로그램명"])
+            if short:
+                ALIASES[p["프로그램명"]] = short
     for p in programs:
         if p["프로그램명"] in ALIASES:
             p["별칭"] = ALIASES[p["프로그램명"]]

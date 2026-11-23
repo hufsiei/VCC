@@ -7,6 +7,7 @@
 #        본인이 한 질문·이미 answered·이번 인터뷰에서 답했거나 건너뛴 질문은 뺀다.
 #   ② 코드: [11/22] 그 뒤 근거가 0건이거나 모두 2년 넘은 칸만 기본 질문(근거 적은 칸 순). 근거가 충분한 칸은
 #        묻지 않고 covered로 알린다 → 깊이 질문(교환·파견 3, 인턴·비교과 2 — DEPTH_QUESTIONS, 판단·비교·후회·오해) → 「배운점」 마지막.
+#        [11/23 작업 84] 기본·깊이·배운점 질문에 예시답 칩(examples). 말머리 칩만 보낸 답은 빼고 같은 질문을 다시 묻는다(retry).
 #   ③ AI(충분판정, HCX): 칸의 첫 답이 들어오면 충분한지 본다. 부족하면
 #      AI(꼬리질문, HCX): 꼬리 질문 하나 — 칸당 1회. 형식이 틀리거나 답에 없는 숫자·고유명사가 있으면 버리고 다음 칸.
 #
@@ -60,20 +61,29 @@ GENERIC = "{s}에 대해 기억나는 경험을 들려주세요."
 # [11/22] 깊이 질문 — 보고서가 이미 답한 사실(서류·학점·금액)은 다시 묻지 않고, 보고서에 잘 안 쓰는
 # 판단·비교·후회·오해를 묻는다(PRD 1:10 「보고서가 답하지 못한 질문만 묻는다」). (칸, 질문) — 답은 그 칸에 담긴다.
 # 유도 질문·본인 식별 답(성적·사람 이름·날짜)을 부르는 질문은 넣지 않는다. 문장은 미리가 정했다(AI가 만들지 않음).
+# [11/23 작업 84] 세 번째 값 = 예시답 칩(원우 PR #133 제안 문구). 질문마다 뜻이 달라 칸 단위 frames.json 예시 대신 여기 둔다.
 DEPTH_QUESTIONS = {
     "교환": [
-        ("생활", "출국 전에 걱정했던 것과 실제로 달랐던 게 있었나요?"),
-        ("지원", "다시 준비 과정을 거친다면 무엇부터 하실 것 같아요?"),
-        ("팁", "후배들이 {p}에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?"),
+        ("생활", "출국 전에 걱정했던 것과 실제로 달랐던 게 있었나요?",
+         ["걱정보다 수월했던 건 …", "생각보다 힘들었던 건 …", "예상과 달랐던 건 …"]),
+        ("지원", "다시 준비 과정을 거친다면 무엇부터 하실 것 같아요?",
+         ["어학 점수부터 준비할 거예요", "서류 일정부터 확인할 거예요", "다시 한다면 먼저 …"]),
+        ("팁", "후배들이 {p}에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?",
+         ["생각보다 많아요. 예를 들면 …", "의외로 잘 모르는 건 …", "잘못 알려진 건 …"]),
     ],
     "인턴": [
-        ("업무내용", "시작 전에 상상했던 일과 실제 업무가 어떻게 달랐나요?"),
-        ("배운점", "이 인턴이 맞는 사람과 안 맞는 사람은 어떤 사람일까요?"),
+        ("업무내용", "시작 전에 상상했던 일과 실제 업무가 어떻게 달랐나요?",
+         ["생각보다 많았던 일은 …", "상상과 달랐던 건 …", "예상과 비슷했던 건 …"]),
+        ("배운점", "이 인턴이 맞는 사람과 안 맞는 사람은 어떤 사람일까요?",
+         ["이런 사람에게 맞아요: …", "이런 사람은 힘들 수 있어요: …", "꼭 필요한 건 …"]),
     ],
     "비교과": [
-        ("배운점", "신청할 때 기대한 것과 실제로 얻은 게 같았나요?"),
-        ("활동내용", "이 프로그램을 몇 학년 때 듣는 게 가장 좋을까요? 왜요?"),
-        ("활동내용", "끝까지 하려면 어떤 점을 각오해야 하나요?"),
+        ("배운점", "신청할 때 기대한 것과 실제로 얻은 게 같았나요?",
+         ["기대한 만큼 얻었어요", "기대와 달랐던 건 …", "기대보다 좋았던 건 …"]),
+        ("활동내용", "이 프로그램을 몇 학년 때 듣는 게 가장 좋을까요? 왜요?",
+         ["1학년 때가 좋아요", "2~3학년 때가 좋아요", "학년보다 중요한 건 …"]),
+        ("활동내용", "끝까지 하려면 어떤 점을 각오해야 하나요?",
+         ["시간을 꽤 들여야 해요", "과제가 많은 편이에요", "꼭 각오할 건 …"]),
     ],
 }
 # 한 인터뷰에 묻는 깊이 질문 수(종류별, 없으면 기본). 근거가 적은 칸에 담기는 질문부터(시연 순서가 매번 같게).
@@ -81,6 +91,9 @@ DEPTH_QUESTIONS = {
 DEPTH_PER_INTERVIEW = {"교환": 3, "*": 2}
 OLD_YEARS = 2             # 칸의 근거가 모두 이보다 오래되면 '오래된 칸'(디자인 규칙 6-2 「최근 경험이 없어요」와 같은 기준)
 STALE_PREFIX = "{s} 칸은 최근 경험이 없어요. "
+# [11/23 작업 84] 말머리 칩(「가장 크게 배운 건 …」)을 고치지 않고 보내면 내용 없는 답이 노트에 남는다.
+# 그 답은 없던 것으로 치고 같은 질문을 이 말을 붙여 다시 묻는다. 화면이 「…」를 지우고 보내도 잡는다.
+RETRY_PREFIX = "조금만 더 이어서 써 주세요. "
 
 
 # ── 공통 ──────────────────────────────────────────────────────────────
@@ -117,8 +130,47 @@ def _clean_answers(items):
         a = dict(a)
         if isinstance(a.get("answer"), str):
             a["answer"] = a["answer"].strip()[:MAX_ANSWER]
+        if isinstance(a.get("question"), str) and a["question"].startswith(RETRY_PREFIX):
+            a["question"] = a["question"][len(RETRY_PREFIX):]   # 다시 물은 질문도 원래 질문으로 센다
         out.append(a)
     return out
+
+
+# ── 예시답 칩(작업 84) ────────────────────────────────────────────────
+def _stem(s):
+    return re.sub(r"[\s.…:·,!?~]+", "", s or "")
+
+
+def _all_stems():
+    """말머리 칩(…로 끝남)의 앞부분 모음. 틀 예시 + 깊이 질문 예시."""
+    chips = [c for f in FRAMES.values() for cs in (f.get("예시") or {}).values() for c in cs]
+    chips += [c for qs in DEPTH_QUESTIONS.values() for _, _, cs in qs for c in cs]
+    return {_stem(c) for c in chips if isinstance(c, str) and c.rstrip().endswith("…")} - {""}
+
+
+STEMS = _all_stems()
+
+
+def bare_stem(answer):
+    """답이 말머리 칩 앞부분뿐이면(이어 쓴 내용 없음) True."""
+    return bool(answer) and _stem(answer) in STEMS
+
+
+def _chips(lst):
+    return [str(x) for x in lst[:3]] if isinstance(lst, list) and lst else None
+
+
+def chips_for(program, section, question):
+    """그 질문에 붙일 예시답 칩. 깊이 질문이면 질문별 예시, 아니면 frames.json 칸 예시. 후배 질문은 없음."""
+    if section == QUESTION_SECTION:
+        return None
+    p = short_name(program)
+    for s, q, ex in DEPTH_QUESTIONS.get(kind_of(program), []):
+        if s == section and askboo._norm(q.format(p=p)) == askboo._norm(question):
+            return _chips(ex)
+    if askboo._norm(question).endswith(askboo._norm(base_question(program, section))):   # 기본 질문·배운점(꼬리 질문은 없음)
+        return _chips((frame_of(program).get("예시") or {}).get(section))
+    return None
 
 
 # ── interviewNext ─────────────────────────────────────────────────────
@@ -127,6 +179,10 @@ def interviewNext(me, payload):
     if not program:
         return {"error": "들려줄 경험을 먼저 골라 주세요"}
     answers = _clean_answers(payload.get("answers"))
+    # [11/23 작업 84] 말머리 칩만 보낸 답은 빼고 센다. 방금 그랬으면 같은 질문을 다시 묻는다(아래).
+    last_raw = answers[-1] if answers else None
+    retry = last_raw if last_raw and not last_raw.get("skipped") and bare_stem(last_raw.get("answer")) else None
+    answers = [a for a in answers if a.get("skipped") or not bare_stem(a.get("answer"))]
     frame = frame_of(program)
     sections = [s for s in frame["칸"] if s != QUESTION_SECTION]
     total = len(frame["칸"])
@@ -144,6 +200,14 @@ def interviewNext(me, payload):
         return {"done": False, "section": QUESTION_SECTION, "questionId": q["id"], "asked": q["질문"],
                 "question": f"후배가 이렇게 물었어요 — \"{q['질문']}\" 경험이 있으면 들려주세요.",
                 "progress": progress, "pendingQuestions": len(waiting)}
+
+    if retry and retry.get("section") in sections and retry.get("question"):
+        step = {"done": False, "section": retry["section"], "question": RETRY_PREFIX + retry["question"],
+                "progress": progress, "pendingQuestions": 0, "retry": True}
+        ex = chips_for(program, retry["section"], retry["question"])
+        if ex:
+            step["examples"] = ex
+        return step
 
     # ③ 방금 들어온 답이 그 칸의 첫 답이면 충분한지 보고, 부족하면 꼬리 질문(칸당 1회)
     last = answers[-1] if answers else None
@@ -166,20 +230,27 @@ def interviewNext(me, payload):
             if stats.get(s):   # 근거가 있는데 오래된 칸
                 q = STALE_PREFIX.format(s=s) + q
             step = {**base, "section": s, "question": q}
-            examples = (frame.get("예시") or {}).get(s)   # P1-여건(작업 84): frames.json에 있으면
-            if isinstance(examples, list) and examples:
-                step["examples"] = [str(x) for x in examples[:3]]
+            ex = _chips((frame.get("예시") or {}).get(s))   # P1-여건(작업 84): frames.json에 있으면
+            if ex:
+                step["examples"] = ex
             return step
 
     # ③′ 깊이 질문(보고서에 잘 안 쓰는 판단·비교) — 이번 인터뷰에서 아직 안 한 것
     asked = {askboo._norm(a.get("question")) for a in answers}
-    for s, q in depth_questions(program, sections, stats):
+    for s, q, ex in depth_questions(program, sections, stats):
         if askboo._norm(q) not in asked:
-            return {**base, "section": s, "question": q, "depth": True}
+            step = {**base, "section": s, "question": q, "depth": True}
+            if _chips(ex):
+                step["examples"] = _chips(ex)   # [11/23 작업 84] 깊이 질문 예시답
+            return step
 
     # ④ 배운점은 마지막(교환·파견은 인터뷰로만 받는 칸)
     if LAST_SECTION in sections and LAST_SECTION not in answered:
-        return {**base, "section": LAST_SECTION, "question": base_question(program, LAST_SECTION)}
+        step = {**base, "section": LAST_SECTION, "question": base_question(program, LAST_SECTION)}
+        ex = _chips((frame.get("예시") or {}).get(LAST_SECTION))   # [11/23 작업 84] 배운점에도 칩
+        if ex:
+            step["examples"] = ex
+        return step
     return {"done": True, "progress": progress, "covered": covered}
 
 
@@ -227,10 +298,10 @@ def depth_questions(program, sections, stats=None):
     """이번 인터뷰의 깊이 질문(종류별 DEPTH_PER_INTERVIEW개). 근거가 적은 칸에 담기는 것부터(같으면 목록 순서)."""
     stats = evidence_stats(program) if stats is None else stats
     kind = kind_of(program)
-    pool = [(s, q) for s, q in DEPTH_QUESTIONS.get(kind, []) if s in sections]
-    pool.sort(key=lambda sq: len(stats.get(sq[0]) or []))
+    pool = [d for d in DEPTH_QUESTIONS.get(kind, []) if d[0] in sections]
+    pool.sort(key=lambda d: len(stats.get(d[0]) or []))
     n = DEPTH_PER_INTERVIEW.get(kind, DEPTH_PER_INTERVIEW["*"])
-    return [(s, q.format(p=short_name(program))) for s, q in pool[:n]]
+    return [(s, q.format(p=short_name(program)), ex) for s, q, ex in pool[:n]]
 
 
 def base_question(program, section):
@@ -260,7 +331,7 @@ def summarizeInterview(me, payload):
     if not program:
         return {"error": "들려줄 경험을 먼저 골라 주세요"}
     transcript = [a for a in _clean_answers(payload.get("transcript"))
-                  if a.get("answer") and not a.get("skipped")][:MAX_TRANSCRIPT]
+                  if a.get("answer") and not a.get("skipped") and not bare_stem(a.get("answer"))][:MAX_TRANSCRIPT]
     if not transcript:
         return {"error": "요약할 답이 아직 없어요. 질문에 하나 이상 답해 주세요"}
 

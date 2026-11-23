@@ -267,7 +267,9 @@ def sendMessage(me, p):
 
 
 def getMessages(me, p):
-    """내 대화 목록. 부르면 안 읽은 메시지를 읽음으로 바꾼다(unread는 이번 응답에만 보임)."""
+    """내 대화 목록. [11/23] 목록만 볼 때(닮은선배 버튼 상태·내 쪽지 목록)는 읽음으로 바꾸지 않는다.
+    payload {read: threadId}면 그 대화만 읽음으로 바꾼다(대화창을 열 때). unread는 읽음 처리 전 수."""
+    read = p.get("read")
     with store.lock():
         out = []
         threads = _threads()
@@ -297,7 +299,8 @@ def getMessages(me, p):
                 item["declined"] = True
             if t["status"] == "blocked":
                 item["blockedByMe"] = t.get("blockedBy") == me
-            t["lastRead"][me] = now()
+            if read and tid == read:
+                t["lastRead"][me] = now()
             out.append(item)
         store.save("messages")
         return {"threads": out, "waitingCount": _waiting(asker=me), "waitingLimit": WAIT_LIMIT}
@@ -484,6 +487,9 @@ def save_my_note(me, program, draft_id, my_note, public_draft, answered=0):
         return mid
 
 
+MAX_EDIT_CHARS = 300   # [11/23] 선배가 고친 공개 문장 한 줄의 글자 수 상한(화면 consent.js와 같음)
+
+
 def saveConsent(me, p):
     if not p.get("consent"):
         return {"error": "공개 동의가 필요해요"}
@@ -494,9 +500,17 @@ def saveConsent(me, p):
     # 걸린 문장만 공개에서 빼고(removed에 더함) 나머지는 그대로 저장한다. 내 경험노트에는 남는다.
     changed, rejected = [], []
     for ch in edits.get("changed") or []:
-        r = check_public_text(ch.get("text", ""))
+        text = str(ch.get("text") or "").strip()
+        if not text:          # 빈 문장은 고침으로 보지 않는다(공개하지 않으려면 removed — 화면은 스위치를 끈다)
+            continue
+        if len(text) > MAX_EDIT_CHARS:
+            removed.add(ch.get("lineId"))
+            rejected.append({"lineId": ch.get("lineId"), "reason": "길이",
+                             "message": f"문장이 너무 길어요. {MAX_EDIT_CHARS}자 안으로 적어 주세요."})
+            continue
+        r = check_public_text(text)
         if r["ok"]:
-            changed.append({"lineId": ch.get("lineId"), "text": ch.get("text", ""),
+            changed.append({"lineId": ch.get("lineId"), "text": text,
                             "identifying": r["identifying"], "official": r["official"]})
         else:
             removed.add(ch.get("lineId"))
@@ -508,6 +522,15 @@ def saveConsent(me, p):
         if note is None:   # 남의 초안이거나 없는 초안(spec 2-1)
             return {"error": "볼 수 없는 기록이에요"}
         new_text = {c["lineId"]: c for c in changed}
+        # [11/23] 고친 문장은 공개 초안에도 남긴다 → 「공유 범위 바꾸기」로 다시 열어도 고친 문장이 보이고,
+        # 다시 공유해도 AI 원래 문장으로 돌아가지 않는다. 내 경험노트 문장(myNote)은 그대로 둔다(따로 고침).
+        for sec in note.get("publicDraft", {}).get("sections", []):
+            for ln in sec.get("lines", []):
+                c = new_text.get(ln.get("lineId"))
+                if c and c["text"] != ln.get("text"):
+                    ln.setdefault("aiText", ln.get("text", ""))   # 처음 AI가 만든 문장(되돌리기·검토용)
+                    ln.update(text=c["text"], edited=True, identifying=c["identifying"])
+                    ln.pop("match", None)     # 선배가 직접 쓴 문장 — 원문 일치 검사 대상이 아니다
         passing = []
         for sec in note.get("publicDraft", {}).get("sections", []):
             for ln in sec.get("lines", []):
@@ -611,6 +634,9 @@ def _my_note_view(mid, v, detail=False):
             "share": v.get("share", "private"),
             "filled": sum(1 for n in frame if mine.get(n)), "total": len(frame),
             "sharedLines": len(shared_ids & {ln.get("lineId") for ls in pub.values() for ln in ls}),
+            # [11/23] 선배가 고친 문장 수(내 경험노트 updateMyNote + 공개 문장 saveConsent changed).
+            # 다시 「AI 요약」을 하면 summarizeInterview가 두 초안을 새 AI 문장으로 바꾸므로 화면이 먼저 경고한다
+            "editedLines": sum(1 for ls in [*mine.values(), *pub.values()] for ln in ls if ln.get("edited")),
             "updatedAt": v.get("updatedAt")}
     if not detail:
         return view
@@ -621,12 +647,49 @@ def _my_note_view(mid, v, detail=False):
             p_ln = (pub.get(name) or [])[i] if i < len(pub.get(name) or []) else {}   # 요약 때 같은 순서로 만들어짐
             row = {"text": ln.get("text", ""), "publicText": p_ln.get("text"), "lineId": p_ln.get("lineId"),
                    "shared": p_ln.get("lineId") in shared_ids}
+            if ln.get("edited"):          # [11/23] 내가 고친 내 경험노트 문장(updateMyNote)
+                row["edited"] = True
             for k in ("asked", "answersQuestionId"):
                 if ln.get(k):
                     row[k] = ln[k]
             lines.append(row)
         sections.append({"name": name, "lines": lines})
     return {**view, "draftId": v.get("draftId"), "sections": sections, "publicDraft": v.get("publicDraft")}
+
+
+def updateMyNote(me, p):
+    """[11/23] 내 경험노트 문장 고치기. payload {id, changed:[{section, index, text}]} — index는 getMyNote 그 칸 lines의 순서.
+    내 경험노트는 본인만 보므로 공개 문장 검사(check_public_text)는 하지 않는다. 해봤노트 공개 문장(publicDraft·noteLines)은
+    바꾸지 않는다 — 두 노트는 따로 고친다(해봤노트 문장은 공개 동의 시트의 「문장 고치기」, saveConsent changed)."""
+    mid = (p.get("id") or "").strip()
+    changed = p.get("changed")
+    if not isinstance(changed, list) or not changed:
+        return {"error": "고칠 문장을 골라 주세요"}
+    with store.lock():
+        v = store.load("myNotes", {}).get(mid)
+        if not v or v.get("owner") != me:
+            return {"error": "볼 수 없는 기록이에요"}
+        lines_of = {s.get("name"): s.get("lines", []) for s in (v.get("myNote") or {}).get("sections", [])}
+        plan = []
+        for ch in changed:
+            ch = ch if isinstance(ch, dict) else {}
+            lines = lines_of.get(ch.get("section"))
+            i = ch.get("index")
+            if lines is None or not isinstance(i, int) or isinstance(i, bool) or not 0 <= i < len(lines):
+                return {"error": "고칠 문장을 찾지 못했어요"}
+            text = str(ch.get("text") or "").strip()
+            if not text:
+                return {"error": "문장을 적어 주세요", "section": ch.get("section"), "index": i}
+            if len(text) > MAX_EDIT_CHARS:
+                return {"error": f"{MAX_EDIT_CHARS}자 안으로 적어 주세요", "section": ch.get("section"), "index": i}
+            plan.append((lines[i], text))
+        for ln, text in plan:              # 모두 맞을 때만 바꾼다(하나라도 틀리면 아무것도 안 바꿈)
+            if text != ln.get("text"):
+                ln.setdefault("aiText", ln.get("text", ""))   # 처음 AI가 만든 문장
+                ln.update(text=text, edited=True)
+        v["updatedAt"] = now()
+        store.save("myNotes")
+        return {"ok": True, **_my_note_view(mid, v, detail=True)}
 
 
 def getMyNote(me, p):
@@ -665,6 +728,7 @@ ROUTES = {
     "setRecommendable": setRecommendable,   # [11/23] 닮은선배 추천받기 켜기·끄기 (AI 없음)
     "saveConsent": saveConsent,
     "getMyNote": getMyNote,   # [11/22] 내 경험노트 상세
+    "updateMyNote": updateMyNote,   # [11/23] 내 경험노트 문장 고치기 (AI 없음)
     "reportStatement": reportStatement,
     "getInbox": getInbox,
     **demand.ROUTES,     # [11/22] demandNext·saveDemand (궁금한 것 정리하기, AI 없음)

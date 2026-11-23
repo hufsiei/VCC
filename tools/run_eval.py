@@ -16,6 +16,7 @@
 # - 지표(PRD 1-2): 근거 없는 답변 0건 · 범위밖·함정 100% 보류 · 동의어 80% 이상 답변 · 규정오해 100% 공식 안내.
 #   근거 없는 답변 = 답한 줄 중 askboo.verify에 걸린 줄(숫자·고유명사·새 낱말)이 하나라도 있는 답, 또는 보류·공식안내여야 하는데 답한 것.
 #   보류·답변·공식안내 비율은 '유형'이 아니라 '기대결과'로 센다(함정 중에도 답해야 하는 질문이 있음).
+#   [11/23] askBoo의 notes(해봤노트 카드 안내)는 '답하지 않음' — 기대 보류면 맞음, 근거 없는 답 아님(위 NOT_ANSWER).
 #   근거 적중 = 답변 기대 질문에서 답한 줄의 출처 중 하나라도 '기대 근거ID'에 들어 있음(참고 지표).
 # 결과: <out>/eval_<질문파일>_<모델>_<시각>.csv (질문별) + eval_요약_<시각>.csv (모델별)
 #   --why면 + eval_폴백_<질문파일>_<모델>_<시각>.csv (폴백 줄별: 번호·원문·AI출력·원인). askBoo 동작은 바꾸지 않고,
@@ -30,6 +31,14 @@ sys.path.insert(0, str(ROOT / "functions"))
 import paths  # noqa: E402
 
 EXPECT = {"답변": "ok", "보류": "hold", "공식안내": "official"}
+# [11/23] askBoo 새 상태 notes(spec 4장 [11/23 노트]): 사람·나라만 묻고 주제가 없으면 답 대신 해봤노트 카드로 안내.
+#   답을 만들지 않으므로 근거 없는 답이 아니고, '답하지 않음' 쪽이라 기대가 보류면 맞은 것으로 센다(보류율에도 넣음).
+#   기대가 답변·공식안내면 틀림(답하거나 공식 안내로 보내야 했음). notes 건수는 요약에 따로 적는다.
+NOT_ANSWER = ("hold", "notes")
+
+
+def matches(want, got):
+    return got == want or (want == "hold" and got in NOT_ANSWER)
 TASKS = ("고르기", "변환")   # askBoo가 부르는 AI 작업
 
 
@@ -141,7 +150,7 @@ def run(rows, model, askboo, pause=0.0, why=None):
             used = {ln["sourceId"] for ln in lines}
             out.append({
                 "번호": r["번호"], "모델": model, "유형": r.get("유형", ""), "기대결과": r["기대결과"], "결과": got,
-                "일치": "O" if got == want else "X",
+                "일치": "O" if matches(want, got) else "X",
                 "근거없는답": "O" if got == "ok" and (bad or want != "ok") else "",
                 "근거적중": ("O" if used & expect_ids else "X") if want == "ok" and got == "ok" and expect_ids else "",
                 "줄수": len(lines), "폴백줄": sum(bool(ln.get("fallback")) for ln in lines),
@@ -173,10 +182,11 @@ def summary(model, out):
     s = {
         "모델": model, "질문수": len(out),
         "정답률": f(rate(out, lambda r: True, lambda r: r["일치"] == "O")),
-        "보류율": f(rate(out, lambda r: True, lambda r: r["결과"] == "hold")),
+        "보류율": f(rate(out, lambda r: True, lambda r: r["결과"] in NOT_ANSWER)),   # notes(노트 안내) 포함
+        "노트안내": sum(r["결과"] == "notes" for r in out),
         "근거없는답(0건)": sum(r["근거없는답"] == "O" for r in out),
         # 유형이 아니라 기대결과로 센다 — 함정 중에도 답해야 하는 별칭 질문이 있다(개발 35 '파리 제7대학교')
-        "범위밖·함정 보류(100%)": f(rate(out, lambda r: r["기대결과"] == "보류", lambda r: r["결과"] == "hold")),
+        "범위밖·함정 보류(100%)": f(rate(out, lambda r: r["기대결과"] == "보류", lambda r: r["결과"] in NOT_ANSWER)),
         "동의어 답변(80%)": f(rate(out, lambda r: r["기대결과"] == "답변", lambda r: r["결과"] == "ok")),
         "규정오해 공식안내(100%)": f(rate(out, lambda r: r["기대결과"] == "공식안내", lambda r: r["결과"] == "official")),
         "근거적중(참고)": f(rate(out, lambda r: r["근거적중"], lambda r: r["근거적중"] == "O")),

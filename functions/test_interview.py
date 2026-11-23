@@ -91,9 +91,28 @@ interview.evidence_stats = real_stats
 
 # 1-3) 인턴·비교과도 깊이 질문이 틀의 칸에 담긴다
 for kind, frame in (("인턴", interview.FRAMES["인턴"]["칸"]), ("비교과", interview.FRAMES["비교과"]["칸"])):
-    expect(f"{kind} 깊이 질문 칸은 틀 안에", all(s in frame for s, _ in interview.DEPTH_QUESTIONS[kind]))
+    expect(f"{kind} 깊이 질문 칸은 틀 안에", all(s in frame for s, *_ in interview.DEPTH_QUESTIONS[kind]))
 intern = next(p for p in interview.askboo.PROGRAMS if interview.kind_of(p) == "인턴")
 expect("인턴 깊이 질문은 2개", len(interview.depth_questions(intern, interview.FRAMES["인턴"]["칸"])) == 2)
+
+# 1-4) [11/23 작업 84] 예시답 칩: 깊이 질문·배운점에도 붙고, 말머리만 보내면 같은 질문을 다시 묻는다
+expect("깊이 질문(팁)에 칩 3개", s.get("examples") == depth[0][2] and len(s["examples"]) == 3)
+expect("깊이 질문 칩은 20자 이하", all(len(c) <= 20 for qs in interview.DEPTH_QUESTIONS.values() for *_, cs in qs for c in cs))
+last_step = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers + [
+    {"section": d[0], "question": d[1], "answer": "기숙사 인터넷을 직접 신청해야 했어요."} for d in depth]})
+expect("배운점 질문에도 칩", last_step.get("section") == "배운점" and last_step.get("examples") == interview.FRAMES["교환"]["예시"]["배운점"])
+expect("말머리 판별: 칩 그대로·…지운 것", interview.bare_stem("가장 크게 배운 건 …") and interview.bare_stem("가장 크게 배운 건"))
+expect("말머리 판별: 이어 쓴 답·고르는 보기는 답", not interview.bare_stem("가장 크게 배운 건 혼자 해내는 힘이에요.")
+       and not interview.bare_stem("출국 1년 전부터 준비했어요") and not interview.bare_stem("생각보다 많아요"))
+bare = answers + [{"section": first, "question": s["question"], "answer": "의외로 잘 모르는 건"}]
+r_ = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": bare})
+expect("말머리만 보내면 같은 질문 다시 + 머리말 + 칩", r_.get("retry") and r_.get("section") == first
+       and r_.get("question") == interview.RETRY_PREFIX + s["question"] and r_.get("examples") == depth[0][2])
+expect("다시 물은 뒤 말머리 답은 진행에 안 셈", r_["progress"] == s["progress"])
+bare2 = bare + [{"section": first, "question": r_["question"], "answer": "의외로 잘 모르는 건 기숙사 인터넷을 직접 신청해야 한다는 거예요."}]
+r2_ = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": bare2})
+expect("이어 쓰면 다음으로(같은 깊이 질문 반복 없음)", not r2_.get("retry") and r2_.get("question") != s["question"])
+expect("꼬리 질문엔 칸 칩 없음", interview.chips_for(PROGRAM, "팁", "어떤 점이 가장 기억에 남았어요?") is None)
 
 # 2) 부족한 답 → 꼬리 질문 1회, 다시 부족해도 다음 칸
 answers.append({"section": s["section"], "question": s["question"], "answer": "그냥 그랬어요."})
@@ -147,6 +166,8 @@ expect("fallback 묶음에서 짧은 답만 빠짐",
 s4 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers[:2]})
 expect("판정 실패면 다음 칸으로", not s4.get("followUp") and s4.get("section"))
 expect("빈 transcript는 오류", "error" in interview.summarizeInterview(SENIOR, {"program": PROGRAM, "transcript": []}))
+expect("말머리만 있는 transcript도 요약 안 함(작업 84)", "error" in interview.summarizeInterview(SENIOR, {"program": PROGRAM, "transcript": [
+    {"section": "배운점", "question": interview.base_question(PROGRAM, "배운점"), "answer": "가장 크게 배운 건 …"}]}))
 
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)
