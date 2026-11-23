@@ -48,6 +48,8 @@ HOLD_MESSAGE = "이 부분은 아직 경험한 선배가 없어요. 질문함에
 # [11/23] 보류 이유별 문구 — 노트가 있는데 「경험한 선배가 없어요」라고 하지 않는다(미리 실사용)
 HOLD_NO_PROGRAM = "질문에 맞는 해봤노트를 찾지 못했어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?"
 HOLD_NO_TOPIC = "{program} 해봤노트에는 아직 이 내용이 없어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?"
+# [11/23] chat 칩 「질문함에 담기」(force: "hold") — 학생이 직접 담은 것이라 「못 찾았어요」라고 하지 않는다
+HOLD_SAVED = "질문함에 담아 두었어요. 선배가 답하면 알려 드릴게요."
 MAX_NOTES = 5        # status "notes"로 보여 주는 노트 카드 수 상한
 
 # [11/23] 사람을 찾는 질문(「네덜란드 교환 다녀온 선배?」) — 주제어가 없으면 답 대신 해봤노트 카드로 안내한다
@@ -754,7 +756,9 @@ def _official(me, question, programs, save):
 
 def _hold(me, question, program, section, save, why=""):
     qid = _save(me, question, program, section, "hold", save)
-    if not program:
+    if why == "담기":
+        message = HOLD_SAVED
+    elif not program:
         message = HOLD_NO_PROGRAM
     elif evidence_count(program):     # 노트는 있는데 이 내용만 없다 → 그 노트로 갈 수 있게 noteId도 준다
         message = HOLD_NO_TOPIC.format(program=program)

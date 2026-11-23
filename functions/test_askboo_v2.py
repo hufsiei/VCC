@@ -130,6 +130,9 @@ res, calls = run("무역 관련 인턴 전반", [], plan=None)   # force 없이:
 askboo.callAI = make_fake(plan=None)
 res = askboo.askBoo("H0143", {"question": "무역 관련 인턴 전반", "force": "hold"}, save=False)
 expect("force hold는 AI 없이 바로 보류", res["status"] == "hold" and askboo.callAI.calls == [])
+expect("force hold 문구는 「담아 두었어요」(못 찾았어요 아님)", res["message"] == askboo.HOLD_SAVED, res["message"])
+res = askboo.askBoo("H0143", {"question": "마르부르크 기숙사 어땠어요?", "force": "hold"}, save=False)
+expect("force hold는 프로그램이 있어도 같은 문구", res["status"] == "hold" and res["message"] == askboo.HOLD_SAVED, res["message"])
 h = askboo.clean_history([{"question": " a ", "status": "ok", "program": "p"}, {"question": "", "status": "x"}, {"bad": 1},
                           {"question": "b", "status": 3}, {"question": "c"}, {"question": "d"}, {"question": "e"}])
 expect("history 정리: 글자만, 최근 4개", [x["question"] for x in h] == ["b", "c", "d", "e"] and h[0]["status"] == "" and h[0]["program"] == "", h)
