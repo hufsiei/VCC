@@ -618,8 +618,9 @@ def match_check(source, sentence):
     return bool(r.get("ok") and isinstance(j, dict) and j.get("일치") is True)
 
 
-def compose(question, picked):
-    """AI(답쓰기) → 문장마다 인용 근거와 대조. 돌려주는 값: {"status","lines","sources","singleSenior"} 또는 None(다 버려짐·실패)."""
+def compose(question, picked, max_lines=MAX_ANSWER_LINES):
+    """AI(답쓰기) → 문장마다 인용 근거와 대조. 돌려주는 값: {"status","lines","sources","singleSenior"} 또는 None(다 버려짐·실패).
+    max_lines: 일치검사로 보낼 문장 수 상한(작업 78 칸 요약은 칸 근거 수에 따라 3·5)."""
     letters, numbered = {}, []
     for i, c in enumerate(picked, 1):
         who = _person_of(c["sourceId"])
@@ -654,12 +655,12 @@ def compose(question, picked):
         if verify_facts(text, " ".join(c["text"] for c in cited)):
             continue
         todo.append((text, cited))
-        if len(todo) >= MAX_ANSWER_LINES:
+        if len(todo) >= max_lines:
             break
     if not todo:
         return None
     from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(MAX_ANSWER_LINES) as pool:   # 일치검사는 문장별로 동시에(인터뷰 요약과 같은 방식)
+    with ThreadPoolExecutor(max_lines) as pool:   # 일치검사는 문장별로 동시에(인터뷰 요약과 같은 방식)
         matched = list(pool.map(lambda tc: match_check(" ".join(c["text"] for c in tc[1]), tc[0]), todo))
     lines, sources, used = [], {}, set()
     for (text, cited), ok in zip(todo, matched):

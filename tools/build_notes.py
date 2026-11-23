@@ -13,11 +13,13 @@
 #         그 칸에 넣고 autoClassified: true, 없으면 노트의 'unclassified' 목록에 둔다(화면은 쓰지 않음, evidenceCount엔 셈).
 #
 # [v2 작업 78, P1-여건] 칸별 요약 문단 summary — spec 4장 getNote, HCX 원칙 v3
-#   python tools/build_notes.py --summary N-marburg[,N-…]  → 그 노트의 칸마다 AI를 불러 data/note-summaries.json에 보존 후 재생성
+#   python tools/build_notes.py --summary N-marburg[,N-…] | all  → 그 노트의 칸마다 AI를 불러 data/note-summaries.json에 보존 후 재생성
 #   - 칸 문단을 문장으로 쪼개 번호를 붙이고 askBoo ⑤ 「답쓰기」 프롬프트를 질문 없이(「칸 정리」) 돌린다 → ⑥ 검증(askboo.compose 그대로:
 #     근거 번호 없는 문장·반말 버림, 숫자·영문·고유명사·수량 코드 검사, 문장마다 답검사(Opus)). 다 버려진 칸은 summary 없음.
 #   - 배운점·인터뷰로만 칸은 만들지 않는다(선배별 원문 인용 유지). 문단은 칸 원문이 바뀌어도 자동으로 다시 만들지 않는다.
-#   - 결과 모양: sections[i].summary = [{text, sources: [sourceId…], years: [2023, 2026]}]. 없으면 필드 생략(화면은 원문 목록).
+#   - 결과 모양: sections[i].summary = [{text, sources: [sourceId…], years: [2023, 2026], official}]. 없으면 필드 생략(화면은 원문 목록).
+#   - [11/23] 칸 상한: 근거 5건 이하 칸 3문장·그 외 5문장(AI에 요청 + 생성 때 자름). 앞 칸과 같은 뜻 문장은 뒤 칸에서 코드로 뺀다.
+#     인용한 칸 문장에 official이 있으면 요약 문장도 official: true. 셋 다 apply_summaries(AI 없음)가 하고 --check가 다시 본다.
 #   - 생성(인자 없음)은 AI 없이 note-summaries.json을 입히기만 한다. --check는 출처가 그 칸 문장인지·연도·숫자 검사를 다시 본다.
 import hashlib
 import json
@@ -31,7 +33,10 @@ DATA = ROOT / "data"
 OUT = DATA / "notes.json"
 SUMMARY_PATH = DATA / "note-summaries.json"   # 작업 78: {noteId: {칸: [{text, sources, years}]}} — AI 결과 보존
 NO_SUMMARY = {"배운점"}                          # 요약 문단을 만들지 않는 칸(선배별 원문 인용)
-SUMMARY_Q = "(질문 없음) {program}의 「{section}」 칸에 선배들이 남긴 이야기를 고루 정리해 주세요."
+SUMMARY_Q = "(질문 없음) {program}의 「{section}」 칸에 선배들이 남긴 이야기를 고루 정리해 주세요. 문장은 {cap}개 이내로."
+SMALL_SECTION = 5      # 작업 78: 근거(칸 문단) 5건 이하 칸은 요약 3문장, 그보다 많으면 5문장까지
+DUP_OVERLAP = 0.45     # 작업 78: 앞 칸 요약 문장과 두 글자 묶음이 이만큼(짧은 쪽 기준) 겹치면 뒤 칸에서 뺀다(마르부르크 실제 중복 0.84·0.56, 다른 문장 ≤ 0.34)
+_STOCK_END = re.compile(r"(다|라)?(는|고)\s*(선배도|선배가)?\s*(있었어요|많았어요|해요)[.]?$|(했|였|었|았)?어요[.]?$")
 FIXED_IDS = {"마르부르크필립스대학교": "N-marburg"}          # spec 4장·mock-data와 같은 id
 _TERM = {"1": 1, "여름": 2, "2": 3, "겨울": 4}
 # 규정성 진술(학점 인정·장학금·자격 요건·선발 기준). '학점 걱정을 덜었다'처럼 경험만 말한 문장은 잡지 않게 좁힌다
@@ -140,10 +145,7 @@ def build():
             else:
                 unclassified.append(line)
         sections = [{"name": s, "interviewOnly": s in frame["인터뷰로만"], "lines": lines_by.get(s, [])} for s in frame["칸"]]
-        for s in sections:   # 작업 78: 보존된 요약 문단(배운점·인터뷰로만 칸은 넣지 않는다)
-            summ = summaries.get(note_id(name), {}).get(s["name"])
-            if summ and not s["interviewOnly"] and s["name"] not in NO_SUMMARY:
-                s["summary"] = summ
+        apply_summaries(sections, summaries.get(note_id(name), {}))
         biggest = max(sections, key=lambda s: len(s["lines"]))       # 같으면 틀 순서상 앞 칸
         one_src = biggest["lines"][0]["text"] if biggest["lines"] else (unclassified[0]["text"] if unclassified else "")
         sems = [e["semester"] for e in rows] or [r["semester"] for r in taken[name]]
@@ -247,18 +249,67 @@ def _years(note, ids):
     return sorted({int(note["sources"][i]["semester"][:4]) for i in ids})
 
 
+def summary_cap(section):
+    """작업 78 칸 상한: 근거(칸 문단) 5건 이하 3문장, 그 외 5문장."""
+    return 3 if len(section["lines"]) <= SMALL_SECTION else 5
+
+
+def _dup_key(text):
+    """중복 비교용 두 글자 묶음 — 「~다는 선배도 있었어요」 같은 전하는 말투 꼬리는 빼고 본다."""
+    t = _STOCK_END.sub("", text.strip())
+    t = re.sub(r"[^가-힣A-Za-z0-9]", "", t)
+    return {t[i:i + 2] for i in range(len(t) - 1)}
+
+
+def is_dup(a, b):
+    ka, kb = _dup_key(a), _dup_key(b)
+    return bool(ka and kb) and len(ka & kb) / min(len(ka), len(kb)) >= DUP_OVERLAP
+
+
+def apply_summaries(sections, saved):
+    """작업 78: 보존된 AI 요약(note-summaries.json)을 칸에 입힌다. AI 없음, 같은 입력이면 같은 결과.
+    - 배운점·인터뷰로만 칸은 넣지 않는다
+    - 칸 상한(summary_cap)을 넘는 문장은 뒤에서 자른다
+    - 앞 칸(틀 순서) 요약 문장과 같은 뜻(is_dup)인 문장은 뒤 칸에서 뺀다
+    - 인용한 칸 문장 중 official이 하나라도 있으면 그 요약 문장도 official: true(화면은 칸 문장과 같은 「공식 확인」 표시)"""
+    kept = []
+    for s in sections:
+        summ = saved.get(s["name"])
+        if not summ or s["interviewOnly"] or s["name"] in NO_SUMMARY:
+            continue
+        official = {l["sourceId"] for l in s["lines"] if l["official"]}
+        out = []
+        for it in summ:
+            if any(is_dup(it["text"], k) for k in kept):
+                continue
+            out.append({**it, "official": bool(official.intersection(it["sources"]))})
+            kept.append(it["text"])
+            if len(out) >= summary_cap(s):
+                break
+        if out:
+            s["summary"] = out
+
+
 def check_summary(n):
     """작업 78 요약 문단 점검(AI 없음): 칸 자격, 출처가 그 칸 문장인지, 연도, 해요체, 숫자·영문·고유명사·수량(askBoo ⑥ 코드 검사)."""
-    bad = []
+    bad, kept = [], []
     for s in n["sections"]:
         if "summary" not in s:
             continue
         if s["interviewOnly"] or s["name"] in NO_SUMMARY or not s["summary"]:
             bad.append(f"요약 문단을 만들면 안 되는 칸·빈 문단: {n['id']} {s['name']}")
             continue
+        if len(s["summary"]) > summary_cap(s):
+            bad.append(f"요약 문장이 칸 상한 {summary_cap(s)}개를 넘음: {n['id']} {s['name']}")
         texts = {l["sourceId"]: l["text"] for l in s["lines"]}
+        official = {l["sourceId"] for l in s["lines"] if l["official"]}
         ab = _askboo()
         for it in s["summary"]:
+            if any(is_dup(it.get("text", ""), k) for k in kept):
+                bad.append(f"앞 칸 요약과 같은 뜻 문장: {n['id']} {s['name']} {it.get('text')}")
+            kept.append(it.get("text", ""))
+            if it.get("official") is not bool(official.intersection(it.get("sources") or [])):
+                bad.append(f"요약 문장 official 틀림: {n['id']} {s['name']} {it.get('text')}")
             src = it.get("sources") or []
             if not src or any(i not in texts for i in src):
                 bad.append(f"요약 문장 출처가 그 칸 문장이 아님: {n['id']} {s['name']} {src}")
@@ -286,7 +337,8 @@ def summarize(note):
                     continue
                 seen.add(ab._norm(t))
                 cands.append({"text": t, "sourceId": l["sourceId"], **note["sources"][l["sourceId"]]})
-        r = ab.compose(SUMMARY_Q.format(program=note["program"], section=s["name"]), cands)
+        cap = summary_cap(s)
+        r = ab.compose(SUMMARY_Q.format(program=note["program"], section=s["name"], cap=cap), cands, max_lines=cap)
         if r:
             out[s["name"]] = [{"text": x["text"], "sources": x["cites"], "years": _years(note, x["cites"])} for x in r["lines"]]
         print(f"  {note['id']} {s['name']}: 문장 {len(cands)}개 → 요약 {len(out.get(s['name'], []))}문장")
@@ -295,17 +347,22 @@ def summarize(note):
 
 def run_summary(ids):
     notes = {n["id"]: n for n in build()}
+    if ids == ["all"]:   # 작업 78 전체 적용: 요약 칸이 하나라도 있는 노트 전부
+        ids = [i for i, n in notes.items()
+               if any(s["lines"] and not s["interviewOnly"] and s["name"] not in NO_SUMMARY for s in n["sections"])]
     unknown = [i for i in ids if i not in notes]
     if unknown:
         sys.exit(f"없는 노트 id: {unknown}")
     saved = json.loads(SUMMARY_PATH.read_text(encoding="utf-8")) if SUMMARY_PATH.exists() else {}
-    for i in ids:
+    for k, i in enumerate(ids, 1):
         got = summarize(notes[i])
         if got:
             saved[i] = got
         else:
             saved.pop(i, None)
-    SUMMARY_PATH.write_text(json.dumps(saved, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        # 노트마다 저장 — 중간에 끊겨도 앞 노트 결과는 남는다
+        SUMMARY_PATH.write_text(json.dumps(saved, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(f"[{k}/{len(ids)}] {i} 저장", flush=True)
     print(f"저장: {SUMMARY_PATH.relative_to(ROOT)}")
 
 
@@ -322,7 +379,7 @@ def main():
     if "--summary" in sys.argv:   # 작업 78: AI 호출 → note-summaries.json, 이어서 아래 생성·점검
         k = sys.argv.index("--summary")
         if k + 1 >= len(sys.argv):
-            sys.exit("사용: python tools/build_notes.py --summary N-marburg[,N-…]")
+            sys.exit("사용: python tools/build_notes.py --summary N-marburg[,N-…] 또는 --summary all")
         run_summary([i for i in sys.argv[k + 1].split(",") if i])
     if "--check" in sys.argv:
         notes = json.loads(OUT.read_text(encoding="utf-8"))
