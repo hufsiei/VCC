@@ -637,7 +637,7 @@ function renderChips() {
       attrs: canPick ? { type: "button", "aria-pressed": String(isCurrent), "aria-label": `${name}${isCovered ? "(보고서로 채워짐)" : ""}에 이어서 쓰기` } : null,
       on: canPick ? { click: () => pickExtra(name) } : null,
     }, [isFilled ? icon("check") : isCovered ? icon("file-text") : null, name,
-      isCovered ? el("span", { className: "progress-chip__note", text: "보고서로 채워짐" }) : null]);
+      isCovered ? el("span", { className: "progress-chip__note", text: "보고서" }) : null]);
     // 후배 질문을 묻는 중이면 지금 칩에 남은 후배 질문 수
     if (isCurrent && !picking && tell.step && tell.step.junior && tell.pending > 0) chip.append(el("span", { className: "progress-chip__badge", text: tell.pending }));
     if (isCurrent && !picking) chip.setAttribute("aria-current", "step");
