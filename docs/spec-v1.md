@@ -456,7 +456,7 @@ payload `{threadId, reason?, block?}`. 쪽지 대화 ⋮ 메뉴의 신고·차�
 **[11/19]** 질문 `status`는 `hold`(미답변) | `answered` | `official`. 화면은 `answered`에 「선배가 답했어요」 라벨 + 해봤노트 링크(**[v2]** 「후배 질문」 칸이 없으므로 질문 상세의 「선배의 답」 Q·A가 주 화면, 노트 링크는 보조). (이전 예시의 `waiting`은 쓰지 않는다.) **[v2]** `deleted`는 목록에 나오지 않는다. 카드·상세의 「더 들려주기」(`myNotes` 카드, `../talk/?mode=tell&program=…`)는 비활성 「자소서용 요약 보기」 자리에 둔다. `total`은 「후배 질문」 칸을 뺀 칸 수.
 
 ### deleteQuestion(questionId) · updateQuestion(questionId, text) [v2]
-내 보관함 질문 상세의 「질문 삭제」·「질문 고치기」. **본인 질문이고 `status: "hold"`일 때만**. `answered`·`official`은 `{ "error": "선배가 답한 질문은 지울 수 없어요" }` / `{ "error": "공식 안내 질문은 고칠 수 없어요" }`, 남의 것·없는 것은 `{ "error": "볼 수 없는 기록이에요" }`.
+내 보관함 질문 상세의 「질문 삭제」·「질문 고치기」. **본인 질문이고 `status: "hold"`일 때만**. `answered`는 `{ "error": "선배가 답한 질문은 지울 수 없어요" }`(deleteQuestion) / `{ "error": "선배가 답한 질문은 고칠 수 없어요" }`(updateQuestion), `official`은 `{ "error": "공식 안내 질문은 지울 수 없어요" }` / `{ "error": "공식 안내 질문은 고칠 수 없어요" }`, 남의 것·없는 것·이미 지운 것은 `{ "error": "볼 수 없는 기록이에요" }`.
 - `deleteQuestion`: **소프트 삭제** — `status: "deleted"`, `deletedAt`. 행은 남아 콘솔 통계(PRD 9-3 「학번 제거 후 통계 영구」)에만 쓰이고 `interviewNext`·`getInbox`·askBoo 근거·수요 집계의 「미답변」에서는 뺀다. 선배가 답하는 도중 삭제되면 saveConsent 참고.
 - `updateQuestion`: `text` 앞뒤 공백 제거, 빈 문장·**300자** 초과는 `{error}`. 선배 화면에 그대로 나가므로 `check_public_text`(학번·연락처·메일·링크·주소·금지어)를 거쳐 걸리면 `{ "error": "질문에 연락처·메일·링크를 넣을 수 없어요", "reason": "연락처" }`. 통과하면 `질문`을 덧쓰고 `editedAt`, 응답에 고친 질문. 프로그램·칸은 바꾸지 않는다(바꾸려면 삭제 후 다시 묻기). AI 없음.
 ```json
