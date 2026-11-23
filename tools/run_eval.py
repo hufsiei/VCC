@@ -7,6 +7,7 @@
 #   python tools/run_eval.py --dry                        # AI 없이 흐름만 시험(고르기=1번, 변환=폴백)
 #   python tools/run_eval.py --merge <질문별 csv 여러 개>         # 나눠 돌린 결과를 합쳐 요약(같은 모델끼리)
 #   python tools/run_eval.py --model hcx --only 1-15 --pause 4   # 번호 범위 + 문항 사이 4초(HCX 테스트 키 분당 60요청 ≈ 분당 15문항, HCX 원칙 8절)
+#   python tools/run_eval.py --model hcx --why                   # [11/23] 폴백 줄마다 원인(호출 실패·JSON 형식·말투·검증 종류)과 AI 원래 출력을 따로 저장
 #
 # - askBoo를 그대로 부른다(save=False, 질문함에 저장 안 함). 모델 비교는 실행 중에만 ai.PROVIDER의
 #   '고르기'·'변환'을 바꾼다 — functions/ 파일은 고치지 않는다. 키는 ai.py가 .env에서 읽는다.
@@ -17,6 +18,9 @@
 #   보류·답변·공식안내 비율은 '유형'이 아니라 '기대결과'로 센다(함정 중에도 답해야 하는 질문이 있음).
 #   근거 적중 = 답변 기대 질문에서 답한 줄의 출처 중 하나라도 '기대 근거ID'에 들어 있음(참고 지표).
 # 결과: <out>/eval_<질문파일>_<모델>_<시각>.csv (질문별) + eval_요약_<시각>.csv (모델별)
+#   --why면 + eval_폴백_<질문파일>_<모델>_<시각>.csv (폴백 줄별: 번호·원문·AI출력·원인). askBoo 동작은 바꾸지 않고,
+#   변환 호출의 응답을 옆에서 받아 askboo.convert와 같은 순서(응답 실패 → JSON → 해요체 끝 → verify)로 원인만 붙인다.
+#   사후 검증 규칙(askboo.verify)은 그대로 쓴다 — 약하게 만들지 않는다.
 import argparse, csv, json, sys, time
 from datetime import datetime
 from pathlib import Path
@@ -56,7 +60,62 @@ def dry_call(작업명, messages, system=None, **_):
     return {"ok": False, "text": "", "json": None, "model": "dry", "error": "dry"}
 
 
-def run(rows, model, askboo, pause=0.0):
+class WhyLog:
+    """[11/23] 폴백 원인 기록. askboo._call·convert를 감싸 응답과 결과만 엿본다(동작은 그대로)."""
+
+    def __init__(self, askboo):
+        self.a, self.items, self.last = askboo, [], None
+        orig_call, orig_convert = askboo._call, askboo.convert
+        self._orig = (orig_call, orig_convert)
+
+        def call(작업명, content):
+            r = orig_call(작업명, content)
+            if 작업명 == "변환":
+                self.last = r
+            return r
+
+        def convert(source):
+            self.last = None
+            text, fb = orig_convert(source)
+            if fb:
+                self.items.append({"원문": source, "AI출력": self.raw(), "원인": self.reason(source)})
+            return text, fb
+
+        askboo._call, askboo.convert = call, convert
+
+    def restore(self):
+        self.a._call, self.a.convert = self._orig
+
+    def raw(self):
+        r = self.last or {}
+        return (r.get("text") or r.get("error") or "")[:300]
+
+    def reason(self, source):
+        r, a = self.last, self.a
+        if not r or not r.get("ok"):
+            return "호출 실패"
+        j = r.get("json")
+        v = None
+        if isinstance(j, dict) and len(j) >= 1:
+            v = j.get("1", next(iter(j.values())))
+        if not isinstance(v, str) or not v.strip():
+            return "JSON 형식"
+        v = v.strip()
+        if not a.POLITE_END.search(v):
+            return "말투(해요체 끝 아님)"
+        probs = a.verify(v, source)
+        return "검증: " + " / ".join(probs) if probs else "알 수 없음"
+
+    @staticmethod
+    def kind(reason):
+        """원인 분류(요약용): 검증은 종류 이름만(숫자·영문·수량·고유명사·새 낱말·원문보다 많이 김)."""
+        if not reason.startswith("검증: "):
+            return [reason]
+        return sorted({p.split(" ")[0] if not p.startswith(("새 낱말", "원문보다")) else
+                       ("새 낱말" if p.startswith("새 낱말") else "원문보다 김") for p in reason[4:].split(" / ")})
+
+
+def run(rows, model, askboo, pause=0.0, why=None):
     import ai
     saved = {t: ai.PROVIDER[t] for t in TASKS}
     if model not in ("표", "dry"):
@@ -67,6 +126,7 @@ def run(rows, model, askboo, pause=0.0):
     try:
         for r in rows:
             t0 = time.time()
+            n_why = len(why.items) if why else 0
             res = askboo.askBoo("eval", {"question": r["질문"]}, save=False)
             sec = round(time.time() - t0, 1)
             got = res.get("status", "error")
@@ -89,6 +149,10 @@ def run(rows, model, askboo, pause=0.0):
                 "질문": r["질문"], "답": " / ".join(ln["text"] for ln in lines),
                 "출처": ", ".join(sorted(used)), "보류이유": res.get("_why", ""),
             })
+            if why:
+                for it in why.items[n_why:]:
+                    it["번호"] = r["번호"]
+                out[-1]["폴백원인"] = " / ".join(it["원인"] for it in why.items[n_why:])
             print(f"  {out[-1]['일치']} {r['번호']:>3} [{r['기대결과']}/{r.get('유형','')}] → {got} ({sec}초)"
                   + (f"  근거밖 {len(bad)}줄" if bad else ""))
             if pause:
@@ -139,6 +203,7 @@ def main():
     ap.add_argument("--only", default="", help="번호만 골라 실행(쉼표·범위: 1-15,23)")
     ap.add_argument("--pause", type=float, default=0.0, help="문항 사이 쉬는 초(호출 한도 대비)")
     ap.add_argument("--dry", action="store_true")
+    ap.add_argument("--why", action="store_true", help="폴백 줄 원인·AI 원래 출력을 eval_폴백_*.csv로 따로 저장")
     ap.add_argument("--merge", nargs="+", help="질문별 결과 csv들을 합쳐 요약만 출력·저장")
     a = ap.parse_args()
     if hasattr(sys.stdout, "reconfigure"):
@@ -200,9 +265,19 @@ def main():
     sums = []
     for m in models:
         print(f"[{m}] {qpath.name} {len(rows)}개")
-        out = run(rows, m, askboo, 0 if a.dry else a.pause)
+        why = WhyLog(askboo) if a.why else None
+        out = run(rows, m, askboo, 0 if a.dry else a.pause, why)
         write_csv(out_dir / f"eval_{qpath.stem}_{m}_{stamp}.csv", out)
-        sums.append(summary(m, out))
+        s = summary(m, out)
+        if why:
+            from collections import Counter
+            cnt = Counter(k for it in why.items for k in WhyLog.kind(it["원인"]))
+            s["폴백원인"] = " · ".join(f"{k} {n}" for k, n in cnt.most_common())
+            write_csv(out_dir / f"eval_폴백_{qpath.stem}_{m}_{stamp}.csv",
+                      [{"번호": it["번호"], "모델": m, "원인": it["원인"], "원문": it["원문"], "AI출력": it["AI출력"]}
+                       for it in why.items])
+            why.restore()   # 다음 모델에서 겹쳐 감싸지 않게
+        sums.append(s)
     write_csv(out_dir / f"eval_요약_{qpath.stem}_{stamp}.csv", sums)
     print()
     for s in sums:
