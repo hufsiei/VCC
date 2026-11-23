@@ -40,6 +40,9 @@ function el(tag, props = {}, children = []) {
   return node;
 }
 
+// node.append(null)은 「null」 글자를 붙이므로, 빈 자리(null·undefined·false)는 빼고 붙인다
+const appendAll = (parent, ...children) => parent.append(...children.filter(Boolean));
+
 const icon = (name) => el("i", { className: "icon", attrs: { "data-lucide": name } });
 const drawIcons = () => window.lucide && window.lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
 
@@ -262,7 +265,7 @@ function measureDock() {
 window.addEventListener("resize", measureDock);
 
 // ---------------------------------------------------------------------------
-// 5. 물어보기 — askBoo: ok / hold / official / error
+// 5. 물어보기 — askBoo: ok / hold / official / notes / error
 // ---------------------------------------------------------------------------
 
 const askChat = document.getElementById("askChat");
@@ -293,6 +296,12 @@ function renderAnswer(res, question) {
       el("div", { className: "hold-box" }, [
         el("p", { className: "hold-box__text", text: res.message || "이 부분은 아직 경험한 선배가 없어요. 질문함에 담아 두었어요." }),
         emptyEvidence(),
+        // [11/23 노트] 노트는 있는데 이 내용만 없으면 서버가 noteId를 준다 → 그 해봤노트로 가는 링크
+        res.noteId
+          ? el("div", { className: "evidence-after" }, [
+              el("a", { className: "link-more", text: "해봤노트 보기 ›", attrs: { href: noteHref(res.noteId) } }),
+            ])
+          : null,
         res.suggestSenior !== false
           ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } })
           : null,
@@ -317,6 +326,24 @@ function renderAnswer(res, question) {
     return msg;
   }
 
+  if (res.status === "notes") {
+    // [11/23 노트] 사람 찾기·나라만 말한 질문: 답이 아니라 해봤노트 길 안내(spec 4장).
+    // 답이 아니므로 근거 블록은 두지 않는다.
+    const { msg, body } = booMessage({ wide: true });
+    const cards = (res.notes || []).filter((n) => n && n.noteId);
+    // 카드가 없을 때(notes가 비었거나 없음) 「골라 보세요」라고 하지 않는다
+    const fallback = cards.length ? "궁금한 해봤노트를 골라 보세요." : "지금은 보여 드릴 해봤노트가 없어요. 궁금한 내용을 물어보셔도 돼요.";
+    appendAll(body,
+      el("p", { className: "msg__bubble", text: res.message || fallback }),
+      cards.length ? el("div", { className: "note-links" }, cards.map(noteLinkCard)) : null,
+      res.suggestSenior !== false
+        ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } })
+        : null,
+      el("span", { className: "msg__time", text: timeText() }),
+    );
+    return msg;
+  }
+
   // ok: 문장 + 근거 블록 + 관련 해봤노트 링크
   const { msg, body } = booMessage({ wide: true });
   const bubble = el("div", { className: "msg__bubble" });
@@ -327,7 +354,7 @@ function renderAnswer(res, question) {
     bubble.append(p);
   }
   const program = Object.values(res.sources || {})[0]?.program;
-  body.append(
+  appendAll(body,
     bubble,
     evidenceBlock(res.sources),
     res.noteId
@@ -335,13 +362,34 @@ function renderAnswer(res, question) {
           el("a", {
             className: "link-more",
             text: `${program ? program + " " : ""}해봤노트 보기 ›`,
-            attrs: { href: `../note/?id=${encodeURIComponent(res.noteId)}` },
+            attrs: { href: noteHref(res.noteId) },
           }),
         ])
       : null,
     el("span", { className: "msg__time", text: timeText() }),
   );
   return msg;
+}
+
+const noteHref = (noteId) => `../note/?id=${encodeURIComponent(noteId)}`;
+
+// notes 응답의 노트 카드(공통 부품 .note-card): 분야 띠 · 노트명 · 근거 N건, 누르면 해봤노트 상세.
+// 카드에 분야(type)가 없어서, country가 있으면(국제교류 노트만 값이 있음) 국제교류 띠, 없으면 띠를 짐작하지 않고 뺀다.
+function noteLinkCard(n) {
+  const count = Number.isFinite(n.evidenceCount) ? n.evidenceCount : 0;
+  const band = n.country
+    ? el("div", { className: "note-card__band" }, [
+        el("span", { className: "category-tag", text: CATEGORY_NAME.global }),
+        el("span", { className: "note-card__kind", text: n.country }),
+      ])
+    : null;
+  return el("article", { className: `note-card${n.country ? " cat-global" : ""}` }, [
+    band,
+    el("a", { className: "note-card__body", attrs: { href: noteHref(n.noteId) } }, [
+      el("span", { className: "note-card__title", text: n.program || "–" }),
+      el("span", { className: "note-card__meta", text: `근거 ${count}건` }),
+    ]),
+  ]);
 }
 
 // 화면 안 오류(6-5): 오류 라벨 + 문구 + 다시 시도(외곽선)

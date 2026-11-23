@@ -17,6 +17,9 @@
   /* 근거 블록이 들어가는 BOO 답변은 말풍선보다 넓게 */
   .msg__body--wide { flex: 1; max-width: calc(100% - 44px); }
   .msg__bubble p + p { margin-top: var(--space-sm); }
+  /* [11/23 노트] notes 응답의 해봤노트 카드 목록 */
+  .note-links { display: flex; flex-direction: column; gap: 12px; }
+  .note-links a.note-card__body { color: inherit; text-decoration: none; }
   .line-fallback { margin-left: var(--space-xs); vertical-align: middle; }
   .chip-row { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
   .chip-row .btn { min-height: 44px; font-size: var(--font-size-secondary); border-radius: var(--radius-pill); }
