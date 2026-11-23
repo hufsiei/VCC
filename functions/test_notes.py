@@ -69,8 +69,8 @@ expect("선배1 첫 질문 = 23번(junior, 칸 = 팁)", s.get("junior") and s.ge
 # 3) 요약. 옛 화면(「후배 질문」 칸)으로 온 질문함에 없는 질문(질문 id 없음), 다른 프로그램 질문 id를 붙인 답도 섞는다
 transcript = [
     {"section": s["section"], "question": s["question"], "questionId": qid, "answer": A23},
-    {"section": "후배 질문", "question": "질문함에 없는 질문이에요?", "answer": "그건 잘 모르겠어요."},
-    {"section": "후배 질문", "question": "다른 학교 질문이에요", "questionId": other_qid, "answer": "거기는 안 가 봤어요."},
+    {"section": "후배 질문", "question": "질문함에 없는 질문이에요?", "answer": "그건 잘 모르겠지만 국제처에 물어보면 알려 줘요."},
+    {"section": "후배 질문", "question": "다른 학교 질문이에요", "questionId": other_qid, "answer": "거기는 안 가 봤지만 친구는 기숙사가 좋았다고 했어요."},
     {"section": "지원", "question": "언제부터 준비하셨어요?", "answer": "출국 3학기 전부터 어학 시험을 준비했어요."},
 ]
 d = interview.summarizeInterview(SENIOR, {"program": PROGRAM, "transcript": transcript})
