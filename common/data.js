@@ -220,6 +220,19 @@ function pickMock(m, name, p) {
       return { ok: true, noteId: p.noteId, scrapped: p.scrap !== false }; // mock은 기억하지 않는다(목록·노트의 scrapped는 고정값)
     case "getMyNote":
       return { ...m.getMyNote, id: p.id || m.getMyNote.id }; // mock 경험노트는 하나뿐(M-0001)
+    case "deleteQuestion":
+    case "updateQuestion": { // [v2 작업 91] mock은 기억하지 않는다. answered·official 질문이면 서버와 같은 error
+      const verb = name === "deleteQuestion" ? "지울" : "고칠";
+      const q = (m.getInbox.questions || []).find((x) => x.questionId === p.questionId);
+      if (q && q.status === "answered") return { error: `선배가 답한 질문은 ${verb} 수 없어요` };
+      if (q && q.status === "official") return { error: `공식 안내 질문은 ${verb} 수 없어요` };
+      if (name === "deleteQuestion") return { ok: true, questionId: p.questionId, status: "deleted" };
+      const text = String(p.text || "").split(/\s+/).filter(Boolean).join(" ");
+      if (!text) return { error: "질문을 적어 주세요" };
+      if (text.length > 300) return { error: "질문은 300자까지 쓸 수 있어요" };
+      if (/\d{2,3}-?\d{3,4}-?\d{4}|@|https?:\/\/|www\./i.test(text)) return { error: "질문에 연락처·메일·링크를 넣을 수 없어요", reason: "연락처" };
+      return { ok: true, questionId: p.questionId, text, editedAt: new Date().toISOString() };
+    }
     case "updateMyNote": { // [11/23] mock은 기억하지 않는다 — 고친 결과 모양만 서버와 같게
       const note = structuredClone({ ...m.getMyNote, id: p.id || m.getMyNote.id });
       for (const ch of p.changed || []) {
@@ -358,6 +371,10 @@ export const cancelRequest = (threadId) => call("respondRequest", { threadId, ca
 // [11/23] 쪽지 대화 ⋮ 메뉴 신고·차단. reason만 → 신고, block: true → 차단(양쪽 다 더 못 보냄, 상대에게 알림 없음). 둘 다 가능
 export const reportThread = (threadId, reason, block = false) => call("reportThread", { threadId, reason, block });
 export const getInbox = () => call("getInbox");
+// [v2 작업 91] 내 보관함 질문 상세의 「질문 삭제」·「질문 고치기」. 본인 hold 질문만(answered·official·남의 것은 { error })
+//   deleteQuestion → { ok, questionId, status: "deleted" } (목록에서 빠짐) · updateQuestion → { ok, questionId, text, editedAt } | { error, reason? }
+export const deleteQuestion = (questionId) => call("deleteQuestion", { questionId });
+export const updateQuestion = (questionId, text) => call("updateQuestion", { questionId, text });
 // [11/23] 닮은선배 추천받기 켜기·끄기(기본 켬, getMe().recommendable). 끄면 추천 후보와 새 쪽지 요청에서 빠지고, 수락한 대화는 이어진다
 export const setRecommendable = (on) => call("setRecommendable", { on });
 // 내 경험노트 상세(본인만) → { id, program, type, noteId, share, filled, total, sharedLines, draftId, sections[{name, lines[{text, publicText, lineId, shared}]}], publicDraft } (spec 4장)
