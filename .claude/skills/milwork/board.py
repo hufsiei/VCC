@@ -7,10 +7,12 @@
 # 쓰는 법 (항상 python -X utf8 로):
 #   board.py list                                   표 + 폴더 없는 줄·상태판에 없는 worktree 표시
 #   board.py add <폴더> --branch B --who W --task T [--files a,b]
-#   board.py set <폴더> [--status S] [--files a,b] [--files-set a,b] [--handoff H] [--task T]
-#                                                   (--files는 추가, --files-set은 통째로 바꿈, --handoff는 덮어씀)
+#   board.py set <폴더> [--status S] [--files a,b] [--files-set a,b] [--handoff H] [--sent] [--task T]
+#                                                   (--files는 추가, --files-set은 통째로 바꿈, --handoff는 덮어씀=안 보냄,
+#                                                    --sent는 지금 답장을 「보냄 MM/DD HH:MM」으로 표시)
+#   board.py pending                                아직 안 보낸 답장만 사람별로(밀종료·밀시작이 본다)
 #   board.py check <파일...> [--me <폴더>]           다른 줄이 같은 파일(또는 그 폴더)을 건드리는지. 겹치면 종료코드 2
-#   board.py remove <폴더>
+#   board.py remove <폴더>                           안 보낸 답장이 있으면 지우지 않는다(--force로 무시)
 #   board.py prune                                  폴더가 없어진 줄을 지운다
 # <폴더>는 "VCC-xxx" 또는 "C:\dev\VCC-xxx" 어느 쪽이든 된다.
 import argparse
@@ -29,6 +31,12 @@ BOARD = DEV / "VCC-board.md"
 LOCK = DEV / "VCC-board.lock"
 COLS = ["폴더", "브랜치", "요청", "작업", "파일", "상태", "갱신", "전달 대기"]
 SEP = "; "
+SENT = "보냄 "          # 「전달 대기」 칸이 이 말로 시작하면 이미 보낸 답장
+
+
+def unsent(r):
+    h = r.get("전달 대기", "")
+    return h not in ("", "–") and not h.startswith(SENT)
 
 
 def now():
@@ -65,7 +73,8 @@ def read():
 def write(rows):
     head = [f"# VCC 상태판 — {socket.gethostname()} (이 PC의 대화창·작업 폴더, 갱신 {now()})", "",
             "작업 대화창은 `milwork`로 줄을 만들고 진행에 따라 「상태」「파일」「전달 대기」를 고친다. "
-            "총괄 대화창(`milend`)이 「전달 대기」를 모아 팀원에게 전하고, 병합된 줄과 폴더를 지운다.", "",
+            "팀원 답장은 그 대화창이 바로 쓰고 「전달 대기」에 요점을 적는다. 미리가 보내면 `--sent`로 「보냄」 표시. "
+            "총괄 대화창(`milend`)은 안 보낸 것만(`pending`) 확인하고, 병합된 줄과 폴더를 지운다.", "",
             "| " + " | ".join(COLS) + " |", "|" + "---|" * len(COLS)]
     body = ["| " + " | ".join(clean(r.get(c, "")) or "–" for c in COLS) + " |" for r in rows]
     tmp = BOARD.with_suffix(".tmp")
@@ -135,8 +144,10 @@ def cmd_list(args):
         flag = "" if (DEV / r["폴더"]).is_dir() else "  ← 폴더 없음(병합·삭제됐으면 remove/prune)"
         print(f"[{r['폴더']}] {r['브랜치']} · {r['요청']} · {r['작업']}{flag}")
         print(f"    상태: {r['상태']} ({r['갱신']}) · 파일: {r['파일']}")
-        if r["전달 대기"] not in ("", "–"):
-            print(f"    전달 대기: {r['전달 대기']}")
+        if unsent(r):
+            print(f"    전달 대기(안 보냄): {r['전달 대기']}")
+        elif r["전달 대기"] not in ("", "–"):
+            print(f"    전달: {r['전달 대기']}")
     for name, br in wts.items():
         if not find(rows, name):
             print(f"[{name}] {br}  ← 상태판에 없음(milwork 전에 만든 폴더. add로 적거나 지운다)")
@@ -178,6 +189,12 @@ def cmd_set(args):
             r["파일"] = SEP.join(have) or "–"
         if args.handoff is not None:
             r["전달 대기"] = args.handoff or "–"
+        if args.sent:
+            h = r["전달 대기"]
+            if h in ("", "–"):
+                raise SystemExit(f"보낼 답장이 없음: {r['폴더']} (--handoff로 먼저 적기)")
+            if not h.startswith(SENT):
+                r["전달 대기"] = f"{SENT}{now()} · {h}"
         r["갱신"] = now()
         write(rows)
     print(f"갱신: {r['폴더']} · 상태 {r['상태']} · 파일 {r['파일']}" +
@@ -205,23 +222,41 @@ def cmd_check(args):
         print("겹치는 파일 없음")
 
 
+def cmd_pending(args):
+    rows = [r for r in read() if unsent(r)]
+    if not rows:
+        print("안 보낸 답장 없음")
+        return
+    for r in rows:
+        print(f"[{r['폴더']}] {r['요청']} · {r['작업']} ({r['갱신']})")
+        print(f"    {r['전달 대기']}")
+    print(f"→ 안 보낸 답장 {len(rows)}건. 보냈으면 board.py set <폴더> --sent")
+
+
 def cmd_remove(args):
     with locked():
         rows = read()
         name = folder_name(args.folder)
-        new = [r for r in rows if r["폴더"] != name]
-        if len(new) == len(rows):
+        r = find(rows, name)
+        if not r:
             raise SystemExit(f"없음: {name}")
-        write(new)
+        if unsent(r) and not args.force:
+            raise SystemExit(f"안 보낸 답장이 있음: {name} — {r['전달 대기']}\n"
+                             "보냈으면 set --sent 뒤 다시, 버려도 되면 --force")
+        write([x for x in rows if x["폴더"] != name])
     print(f"지움: {name}")
 
 
 def cmd_prune(args):
     with locked():
         rows = read()
-        gone = [r["폴더"] for r in rows if not (DEV / r["폴더"]).is_dir()]
+        missing = [r for r in rows if not (DEV / r["폴더"]).is_dir()]
+        gone = [r["폴더"] for r in missing if not unsent(r)]
+        kept = [r["폴더"] for r in missing if unsent(r)]
         write([r for r in rows if r["폴더"] not in gone])
     print("지운 줄: " + (", ".join(gone) if gone else "없음"))
+    if kept:
+        print("남긴 줄(안 보낸 답장 있음): " + ", ".join(kept) + " — 보냈으면 set --sent 뒤 다시 prune")
 
 
 def main():
@@ -236,11 +271,15 @@ def main():
     s.add_argument("folder"); s.add_argument("--status"); s.add_argument("--files"); s.add_argument("--handoff")
     s.add_argument("--files-set", help="파일 목록을 통째로 바꿈(잘못 적은 것 고칠 때)")
     s.add_argument("--task"); s.add_argument("--branch")
+    s.add_argument("--sent", action="store_true", help="지금 「전달 대기」 답장을 보냄으로 표시")
     s.set_defaults(fn=cmd_set)
+    sp.add_parser("pending").set_defaults(fn=cmd_pending)
     c = sp.add_parser("check")
     c.add_argument("files", nargs="+"); c.add_argument("--me")
     c.set_defaults(fn=cmd_check)
-    r = sp.add_parser("remove"); r.add_argument("folder"); r.set_defaults(fn=cmd_remove)
+    r = sp.add_parser("remove"); r.add_argument("folder")
+    r.add_argument("--force", action="store_true", help="안 보낸 답장이 있어도 지움")
+    r.set_defaults(fn=cmd_remove)
     sp.add_parser("prune").set_defaults(fn=cmd_prune)
     args = p.parse_args()
     args.fn(args)

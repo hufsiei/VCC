@@ -9,7 +9,7 @@ description: 미리(VCC 총괄)의 업무 마무리 루틴. "밀종료", "업무
 
 ## 1. 세션 정리
 - 상태판: `python -X utf8 C:/dev/VCC/.claude/skills/milwork/board.py list`(아래 `board.py`). 줄마다 브랜치가 병합됐는지 `gh pr list --state merged --head <브랜치>`로 본다. 병합된 것은 폴더를 지우고(`cd /c/dev` 후 `git worktree remove`, 실패하면 `rm -rf`) `board.py remove <폴더>`. 병합 안 된 것은 상태·전달 대기를 알리고 미리에게 묻는다(내일 다른 PC에서 이어 한다면 브랜치를 push해 두라고 권한다). 상태판에 없는 `C:\dev\VCC-*` 폴더도 같은 기준으로 정리한다.
-- **전달 대기 모으기**: 상태판 「전달 대기」 열을 사람별(원우·민지)로 묶어 단톡에 붙일 **초안**을 만든다(보내지 않는다). 미리가 보냈다고 하면 `board.py set <폴더> --handoff ""`로 지운다.
+- **안 보낸 답장 확인**: 답장은 작업 대화창이 그때그때 쓴다(milwork 「팀원 메시지가 오면」). 여기서는 `board.py pending`으로 **아직 안 보낸 것만** 보고 "안 보낸 답장 N건"으로 알린다. 미리가 이미 보냈다고 하면 `board.py set <폴더> --sent`, 아직이면 그 요점으로 짧은 답장을 써 준다(보내지 않는다). 안 보낸 답장이 있는 줄은 `remove`가 막으므로 먼저 처리한다.
 - 오늘 연 내 PR 중 병합 안 된 것, 리뷰를 기다리는 팀원 PR 목록.
 - 켜 둔 서버: `netstat -ano | grep -E ":8787|:8000"`. 있으면 끌지 묻는다(local_fn.py, http.server).
 - `C:\dev\VCC`가 main이고 깨끗한지. 아니면 이유를 알린다.
@@ -44,4 +44,4 @@ description: 미리(VCC 총괄)의 업무 마무리 루틴. "밀종료", "업무
 - 오늘 AI 호출 비용: `C:\dev\VCC\functions\logs\ai-calls.jsonl`에서 오늘 줄의 작업·모델·토큰을 세어 한 줄로(추정 단가 명시).
 
 ## 작업 규칙
-milstart의 「작업 규칙」과 같다(pull 먼저, worktree에서만 수정, .env 비공개, heredoc 대신 Write, 폴더 삭제 시 `cd /c/dev`, 담당 폴더 존중, 팀원 메시지는 초안만).
+milstart의 「작업 규칙」과 같다(pull 먼저, worktree에서만 수정, .env 비공개, heredoc 대신 Write, 폴더 삭제 시 `cd /c/dev`, 담당 폴더 존중, 팀원 메시지는 써 주되 보내기는 미리가).
