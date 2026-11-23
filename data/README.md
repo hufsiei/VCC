@@ -324,8 +324,8 @@
 | myNotes[].sharedLines [11/22] | 숫자 | 지금 해봤노트에 보이는 내 문장 수(신고로 숨긴 것 제외) |
 | myNotes[].updatedAt | 글자 | 최근 요약 시각, 최근 것이 위 |
 | questions[].questionId / text | 글자 | 질문 번호, 내용 |
-| questions[].status | 글자 | `hold`(미답변) 또는 `answered` |
-| questions[].askedAt / noteId / answeredAt | 글자 | 질문 시각 / 답이 된 노트·답한 시각(answered) |
+| questions[].status | 글자 | `hold`(미답변) · `answered`(답변 도착) · `official`(규정 질문 → 화면 「공식 안내」) |
+| questions[].askedAt / noteId / answeredAt | 글자 | 질문 시각 / 답이 된 노트(answered) 또는 담은 노트(hold, 「질문함에 담기」) / 답한 시각(answered) |
 | scraps[].noteId / program | 글자 | scrapNote로 켠 노트, 최근 것이 위 |
 | alerts[].text / questionId / noteId / at | 글자 | 알림 문구, 관련 질문·노트, 시각 |
 
