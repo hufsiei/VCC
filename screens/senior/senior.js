@@ -194,6 +194,13 @@ function requestControl(s, { block = false } = {}) {
     b.addEventListener("click", () => toast("내 쪽지는 다음 단계에서 열려요", "info")); // 3단계에서 대화창으로
     return b;
   }
+  if (status === "declined") {
+    // 선배가 요청을 받지 않음: 다시 누를 수 없게 비활성 + 이유(5-4). 다시 요청할 수 있는 날(retryAt)은 서버 값이 정해지면 붙인다
+    return el("div", { className: "request-note" }, [
+      el("button", { className: cls, text: "쪽지 요청", attrs: { type: "button", disabled: "" } }),
+      el("p", { className: "btn-reason" }, [icon("info"), el("span", { text: "선배가 이번 요청은 받지 않았어요" })]),
+    ]);
+  }
   if (status === "blocked") {
     return el("div", { className: "request-note" }, [
       el("button", { className: cls, text: "쪽지 요청", attrs: { type: "button", disabled: "" } }),
@@ -230,17 +237,23 @@ function matchChips(reasons) {
   const chips = [];
   for (const r of reasons || []) {
     if (r.includes("희망 프로그램")) chips.push("관심 경험");
+    // 「한국외국어대학교 … 함께 이수」는 '대학'도 들어 있어 단과대 검사보다 먼저 본다
+    else if (r.includes("이수")) chips.push("비교과");
     else if (r.includes("이중전공")) chips.push("이중전공");
     else if (/과$|학부$|전공$/.test(r.replace(/^같은\s*/, ""))) chips.push("전공");
     else if (r.includes("대학")) chips.push("단과대");
-    else if (r.includes("이수")) chips.push("비교과");
   }
   // 순서는 디자인 규칙 7-④대로(관심 경험 · 전공 · 이중전공 · 단과대 · 비교과)
   const ORDER = ["관심 경험", "전공", "이중전공", "단과대", "비교과"];
   return ORDER.filter((c) => chips.includes(c));
 }
 
-const reasonText = (s) => ((s.reasons || []).length ? s.reasons.join(" · ") : "희망 프로그램을 경험했어요");
+// 카드의 추천 이유는 한 줄: 첫 이유 + 「외 N개」(아래 일치 칩과 겹치지 않게). 전체 이유는 프로필에서 목록으로
+function reasonText(s) {
+  const reasons = (s.reasons || []).filter(Boolean);
+  if (!reasons.length) return "희망 프로그램을 경험했어요";
+  return reasons.length > 1 ? `${reasons[0]} 외 ${reasons.length - 1}개` : reasons[0];
+}
 
 function experienceTags(note) {
   if (!note) return null;
@@ -336,9 +349,16 @@ function renderNoBase() {
   drawIcons();
 }
 
+// 요청마다 번호를 붙인다. 불러오는 중에 다른 프로그램 칩을 누르면 새 요청을 바로 보내고,
+// 늦게 도착한 옛 응답(번호가 다르거나 기준 노트가 바뀐 것)은 그리지 않고 버린다.
 let loading = false;
+let loadSeq = 0;
 async function loadSeniors(more, moreBtn) {
-  if (loading || !currentNoteId) return;
+  if (!currentNoteId) return;
+  if (more && loading) return; // 「선배 더 보기」는 불러오는 중에 다시 누르지 않게
+  const seq = ++loadSeq;
+  const noteId = currentNoteId;
+  const isStale = () => seq !== loadSeq || noteId !== currentNoteId;
   loading = true;
   if (more && moreBtn) {
     moreBtn.disabled = true;
@@ -348,11 +368,13 @@ async function loadSeniors(more, moreBtn) {
     listArea.replaceChildren(...skeletons(2));
   }
   try {
-    const res = await recommendSeniors(currentNoteId, more);
+    const res = await recommendSeniors(noteId, more);
+    if (isStale()) return; // 그 사이 다른 칩을 눌렀음 — 새 요청의 응답만 그린다
     if (res && res.locked) renderLocked(res.recommend);
     else if (!res || res.error || !Array.isArray(res.seniors)) throw new Error((res && res.error) || "추천 없음");
     else renderList(res);
   } catch (err) {
+    if (isStale()) return;
     console.error(err);
     if (more && moreBtn) {
       moreBtn.disabled = false;
@@ -364,8 +386,9 @@ async function loadSeniors(more, moreBtn) {
       drawIcons();
     }
   } finally {
-    loading = false;
+    if (seq === loadSeq) loading = false;
   }
+  if (isStale()) return;
   if (location.search.includes("senior=")) route(); // 프로필 주소로 바로 들어온 경우
 }
 
