@@ -760,6 +760,80 @@ def getInbox(me, p):
     return {"myNotes": my_notes, "questions": questions, "scraps": notes.inbox_scraps(me), "alerts": alerts}
 
 
+# ---------- 인터뷰 중간 저장 [v2 작업 79, spec 4장 saveInterviewDraft·getInterviewDraft] ----------
+# 들려주기 미완성 초안(answers = interviewNext payload와 같은 모양). 사람·프로그램별 하나, runtime/interviewDrafts.json.
+# 마스킹 전 원문이라 본인만 읽고, 7일 지나면 없는 것으로 본다(읽거나 쓸 때 지난 초안을 모두 지움 — 스케줄러 없음,
+# 0장 보관기간). summarizeInterview가 끝나면 interview.py가 drop_interview_draft로 지운다. AI 없음.
+DRAFT_DAYS = 7
+MAX_DRAFT_ANSWERS = 30     # interview.MAX_TRANSCRIPT와 같은 상한
+MAX_DRAFT_CHARS = 1000     # 답 하나(interview.MAX_ANSWER와 같음)
+DRAFT_KEYS = ("section", "question", "answer", "questionId", "asked", "junior", "skipped")
+
+
+def _draft_key(me, program):
+    return f"{me}|{program}"
+
+
+def _purge_drafts(drafts):
+    """7일 지난 초안을 지운다. 지운 게 있으면 True. store.lock() 안에서 부른다."""
+    old = [k for k, v in drafts.items() if _days_since(v.get("savedAt")) >= DRAFT_DAYS or not v.get("savedAt")]
+    for k in old:
+        del drafts[k]
+    return bool(old)
+
+
+def _clean_draft_answers(items):
+    out = []
+    for a in items if isinstance(items, list) else []:
+        if not isinstance(a, dict):
+            continue
+        a = {k: a[k] for k in DRAFT_KEYS if k in a}
+        for k in ("section", "question", "answer", "questionId", "asked"):
+            if k in a:
+                a[k] = str(a[k])[:MAX_DRAFT_CHARS]
+        out.append(a)
+    return out[:MAX_DRAFT_ANSWERS]
+
+
+def saveInterviewDraft(me, p):
+    program = (p.get("program") or "").strip()
+    if not program:
+        return {"error": "들려줄 경험을 먼저 골라 주세요"}
+    answers = _clean_draft_answers(p.get("answers"))
+    with store.lock():
+        drafts = store.load("interviewDrafts", {})
+        _purge_drafts(drafts)
+        if not answers:   # 빈 초안은 남기지 않는다(처음부터 다시)
+            drafts.pop(_draft_key(me, program), None)
+            store.save("interviewDrafts")
+            return {"ok": True, "savedAt": None, "expiresAt": None}
+        at = now()
+        drafts[_draft_key(me, program)] = {"owner": me, "program": program, "answers": answers, "savedAt": at}
+        store.save("interviewDrafts")
+    expires = (datetime.fromisoformat(at) + timedelta(days=DRAFT_DAYS)).isoformat(timespec="seconds")
+    return {"ok": True, "savedAt": at, "expiresAt": expires}
+
+
+def getInterviewDraft(me, p):
+    program = (p.get("program") or "").strip()
+    with store.lock():
+        drafts = store.load("interviewDrafts", {})
+        if _purge_drafts(drafts):
+            store.save("interviewDrafts")
+        d = drafts.get(_draft_key(me, program)) if program else None
+    if not d or d.get("owner") != me:
+        return {"answers": []}
+    return {"answers": json.loads(json.dumps(d["answers"])), "savedAt": d["savedAt"]}
+
+
+def drop_interview_draft(me, program):
+    """summarizeInterview가 끝나면 그 초안을 지운다(요약하면 삭제)."""
+    with store.lock():
+        drafts = store.load("interviewDrafts", {})
+        if drafts.pop(_draft_key(me, program), None) is not None:
+            store.save("interviewDrafts")
+
+
 # ---------- 내 질문 지우기·고치기 [v2 작업 91, spec 4장 deleteQuestion·updateQuestion] ----------
 # 본인 질문이고 hold일 때만. 지우기는 소프트 삭제(status "deleted" — 콘솔 통계에만 남고 interviewNext·getInbox·
 # 콘솔 제안의 미답변에서는 빠진다). 선배가 답하는 도중 지워지면 publish_lines가 칸 문장으로만 싣는다(알림 없음).
@@ -826,6 +900,8 @@ ROUTES = {
     "getInbox": getInbox,
     "deleteQuestion": deleteQuestion,   # [v2 작업 91]
     "updateQuestion": updateQuestion,
+    "saveInterviewDraft": saveInterviewDraft,   # [v2 작업 79]
+    "getInterviewDraft": getInterviewDraft,
     **demand.ROUTES,     # [11/22] demandNext·saveDemand (궁금한 것 정리하기, AI 없음)
     **notes.ROUTES,      # getNote·listNotes (AI 없음, 작업 26·74)
 }

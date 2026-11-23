@@ -38,7 +38,7 @@ import identify
 import notes
 import store
 from ai import callAI, load_prompt
-from runtime_fns import find_my_note, save_my_note
+from runtime_fns import drop_interview_draft, find_my_note, save_my_note
 
 QUESTION_SECTION = notes.QUESTION_SECTION   # [v2] 없어진 칸 — 옛 화면·옛 transcript가 보내면 질문의 칸으로 옮긴다
 LAST_SECTION = "배운점"
@@ -473,6 +473,7 @@ def summarizeInterview(me, payload):
         my_note_id = save_my_note(me, program, draft_id, my_note, public_draft,
                                   answered=answered, asked=asked, append=append)
         saved = True
+        drop_interview_draft(me, program)   # [v2 작업 79] 요약하면 미완성 초안은 지운다(0장 보관기간)
     except OSError:
         my_note_id, saved = None, False
     if append and saved:   # [v2 작업 90] 응답은 합친 전체, 이번에 만든 문장에 new: true
