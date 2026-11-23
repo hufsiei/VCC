@@ -4,12 +4,17 @@
 #
 # 목적: 후배는 "무역 쪽 인턴", "번역 직무"처럼 업체 이름 없이 묻는다. askBoo 1단계에서 프로그램명·별칭 대조가
 #   0건이면 이 사전으로 후보 업체 1~3개를 고른다(functions/askboo.py match_programs, 미리).
-# 파일 모양(spec 7장 + 문맥): {"문맥": ["인턴", ...], "직군": {"키워드": ["업체명", ...]}, "기관유형": {...}, "약칭": {}}
+# 파일 모양(spec 7장 + 문맥·약칭제외): {"문맥": ["인턴", ...], "약칭제외": ["권역", ...], "약칭": {"KOTRA": [...]},
+#   "직군": {"키워드": ["업체명", ...]}, "기관유형": {...}}
 #   값은 programs.json 현장실습 프로그램명과 글자 그대로 같다. [11/22] 키워드마다 해당 업체를 모두 담는다(3곳 상한은 읽는 쪽에서) — 후기가 적은 업체도 사전에 들어가게(50/50). 업체 약칭(㈜ 등을 뗀 이름)은 사전 대신
-#   programs.json 별칭으로 넣었다(sheet_to_json.py short_name) — 그래서 "약칭"은 비어 있다.
+#   programs.json 별칭으로 넣었다(sheet_to_json.py short_name). [11/23] "약칭"은 여러 업체를 묶어 부르는 말만
+#   (KOTRA·코트라 → 권역 3곳, 미리 요청). 별칭은 「KOTRA 유럽」처럼 권역까지 붙어 있어 「KOTRA」만으로는 안 걸렸다.
 # 읽는 규칙(askBoo 1단계, 이 파일의 match()가 기준 구현):
-#   1) 프로그램명·별칭 대조가 0건이고 2) 질문에 "문맥" 말이 하나라도 있을 때만
-#   3) 세 묶음에서 질문에 든 키워드를 모두 찾고, 다른 걸린 키워드 안에 들어 있는 짧은 키워드는 버린다
+#   1) 프로그램명·별칭 대조가 0건일 때
+#   2) "약칭"은 문맥 말 없이도 본다. 단 "약칭제외" 말(목록에 없는 권역·기업탐방)이 있으면 약칭은 보지 않는다
+#      — 함정 33 「KOTRA 해외무역관 아시아 권역」은 보류돼야 하고, 「KOTRA 기업탐방」은 비교과다.
+#      "직군"·"기관유형"은 지금처럼 질문에 "문맥" 말이 하나라도 있을 때만
+#   3) 걸린 묶음에서 질문에 든 키워드를 모두 찾고, 다른 걸린 키워드 안에 들어 있는 짧은 키워드는 버린다
 #      (긴 키워드 우선 — '여행사' 안의 '행사'). 남은 키워드를 긴 순서로 업체를 합쳐 3곳에서 자른다.
 #   문맥 조건이 없으면 "교환 가서 여행 많이 다녀요?"·"행정실 연락처"까지 인턴 업체가 걸린다(11/22 점검에서 30개 중 28개).
 # 업체 순서: ① 그 키워드를 후기에서 실제로 쓴 업체 먼저(언급 후기 수 순) ② 나머지는 기관 유형별 후기 많은 순으로 유형을 번갈아(한 유형만 나오지 않게).
@@ -37,8 +42,13 @@ def norm(s):
 CONTEXT = ["인턴", "현장실습", "직무", "회사", "기업", "업체", "근무", "일해", "일하", "입사"]
 
 # 키워드 → 고를 업체 조건. 직군(internships.json 직군)이나 기관유형(programs.json 세부)으로 적는다.
-# 넣지 않는 말: 'KOTRA'·'코트라'·'무역관' 단독(권역 3곳 — 함정 33 'KOTRA 아시아 권역'이 보류돼야 함),
+# 넣지 않는 말: 'KOTRA'·'코트라'는 직군·기관유형이 아니라 아래 ABBREV(약칭)로, '무역관' 단독은 넣지 않음,
 #   '재단'·'진흥'(함정 52 '국제언어교류진흥재단'), '수입'(돈 얘기와 헷갈림), '온라인' 단독, 'cs'.
+# [11/23] 약칭 — 여러 업체를 묶어 부르는 말. 문맥 말 없이도 보지만, ABBREV_BLOCK 말이 있으면 보지 않는다.
+ABBREV = {"KOTRA": "KOTRA 해외무역관(", "코트라": "KOTRA 해외무역관("}   # 값: 이 글자로 시작하는 현장실습 프로그램 전부
+ABBREV_BLOCK = ["권역", "아시아", "동남아", "서남아", "중국", "일본", "북미", "미국", "중동", "아프리카", "오세아니아",
+                "대양주", "인도", "탐방"]   # 목록에 없는 권역(함정 33) · 비교과 「…(KOTRA) 기업탐방」
+
 TRADE = {"기관유형": ["KOTRA 해외무역관", "중소 무역회사"]}
 TRANSLATE = {"직군": ["번역 검수 지원", "번역 프로젝트 지원", "자료조사·번역 지원"]}
 KEYWORDS = {
@@ -151,7 +161,11 @@ def companies_for(cond, programs, interns):
 
 
 def build(programs, interns):
-    out = {"문맥": CONTEXT, "직군": {}, "기관유형": {}, "약칭": {}}
+    out = {"문맥": CONTEXT, "약칭제외": ABBREV_BLOCK, "직군": {}, "기관유형": {}, "약칭": {}}
+    reviews = Counter(r["업체명"] for r in interns)
+    for word, prefix in ABBREV.items():   # 후기 많은 순(유럽 23·중남미 8·CIS 3)
+        names = [p["프로그램명"] for p in programs if p["분야"] == "현장실습" and p["프로그램명"].startswith(prefix)]
+        out["약칭"][word] = sorted(names, key=lambda n: (-reviews[n], n))
     for word in sorted(KEYWORDS, key=lambda w: (-len(norm(w)), w)):
         group = "직군" if "직군" in KEYWORDS[word] else "기관유형"
         names = companies_for(KEYWORDS[word], programs, interns)   # 전부(순서 = 답변 우선순위)
@@ -178,9 +192,14 @@ def match(question, terms, keywords):
     found = sorted({name for _, name in keep})
     if found:
         return found
-    if not keywords or not any(norm(c) in q for c in keywords.get("문맥", [])):
+    if not keywords:
         return []
-    hits = [(norm(w), names) for g in ("약칭", "직군", "기관유형") for w, names in keywords.get(g, {}).items()
+    groups = []
+    if not any(norm(b) and norm(b) in q for b in keywords.get("약칭제외", [])):
+        groups.append("약칭")                                    # [11/23] 약칭은 문맥 말 없이도
+    if any(norm(c) and norm(c) in q for c in keywords.get("문맥", [])):
+        groups += ["직군", "기관유형"]
+    hits = [(norm(w), names) for g in groups for w, names in keywords.get(g, {}).items()
             if norm(w) and norm(w) in q]
     hits = [(t, names) for t, names in hits if not any(t != t2 and t in t2 for t2, _ in hits)]   # 긴 키워드 우선
     for t, names in sorted(hits, key=lambda h: -len(h[0])):
@@ -212,6 +231,22 @@ def check(keywords, programs, interns):
     print(f"  {ok}/{len(TESTS)} 통과 (기준 {need})")
     if ok < need:
         errs.append(f"직군 질문 시험 {ok}/{len(TESTS)} — 기준 {need} 미달")
+
+    print("[약칭 시험 — 11/23]")
+    kotra = keywords.get("약칭", {}).get("KOTRA", [])
+    if len(kotra) != 3:
+        errs.append(f"약칭 KOTRA가 권역 3곳이 아님: {kotra}")
+    for q, want in [("KOTRA 어때요?", kotra), ("코트라 어때요?", kotra), ("KOTRA 인턴 어때요?", kotra),
+                    ("코트라 현장실습 해 본 선배 있어요?", kotra), ("kotra 무역관 지원 준비 어떻게 해요?", kotra),
+                    ("코트라 중남미 실습 해 보니 어땠어요?", ["KOTRA 해외무역관(중남미 권역)"]),   # 별칭이 먼저
+                    ("KOTRA 해외무역관 아시아 권역 인턴 어때요?", []),   # 함정 33 — 보류
+                    ("코트라 북미 쪽 인턴도 있어요?", []),
+                    ("KOTRA 기업탐방 어때요?", [])]:                   # 비교과 — 인턴 업체가 나오면 안 됨
+        got = match(q, terms, keywords)
+        good = got == list(want)
+        print(f"  {'O' if good else 'X'} {q} → {', '.join(got) or '(없음)'}")
+        if not good:
+            errs.append(f"약칭 시험: {q} → {got} (기대 {list(want)})")
 
     covered = {n for g in ("직군", "기관유형", "약칭") for v in keywords.get(g, {}).values() for n in v}
     miss = sorted(intern_names - covered)
