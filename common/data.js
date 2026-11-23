@@ -204,7 +204,7 @@ function pickMock(m, name, p) {
       if (p.id === "staff02") return m.login.staffDept; // 부서 담당자
       return /^H\d{4}$/.test(String(p.id || "")) ? m.login.student : m.login.fail;
     case "askBoo":
-      if (p.force === "hold") return m.askBoo.hold; // [v2] chat 칩 「질문함에 담기」 — 질문 내용과 상관없이 hold
+      if (p.force === "hold") return m.askBoo.holdSaved; // [v2] chat 칩 「질문함에 담기」 — 질문 내용과 상관없이 hold, 문구는 서버 HOLD_SAVED와 같게(작업 87)
       // [v2] 대화·메타(질문이 아님) → chat(고정 문구 + 칩). 질문함에 저장하지 않는다
       if (/아까|말고|그\s*말이\s*아니|그게\s*아니|데이터\s*(가|는)?\s*없|고마워/.test(p.question || "")) return m.askBoo.chat;
       if (/평점|장학금|몇\s*학점|선발\s*(인원|기준)|휴학|등록금|초과학기|인정\s*신청|인정받을 수/.test(p.question || "")) return m.askBoo.official; // 규정 질문 (명세 4장)
