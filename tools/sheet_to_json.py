@@ -81,6 +81,40 @@ EXCHANGE_EXTRA = {      # 규칙 이름에 더해 자주 부르는 이름
 }
 
 
+# 11/23 비교과: 앞의 [꾸밈]과 뒤의 (괄호)를 뗀 이름도 별칭으로 — 학생은 「[특교원] 이탈리아어과 탄뎀」을 「이탈리아어과 탄뎀」으로 묻는다.
+#   못 찾으면 콘솔의 프로그램별 수요 집계에서 빠진다(사용 로그 73건이 이 꼴). 확실한 것만: 줄임 이름이 하나뿐이고(기업만 다른
+#   「해외영업(사업) 현직자 온라인 직무 특강」 3개 등은 제외), 다른 프로그램 이름·별칭과 서로 포함 관계가 없고, 4글자 이상일 때.
+EXTRA_HEAD = re.compile(r"^\s*(?:\[[^\]]*\]\s*)+")
+EXTRA_TAIL = re.compile(r"\s*\([^)]*\)\s*$")
+
+
+def extra_short_all(programs, aliases):
+    def nrm(x):
+        return re.sub(r"\s+", "", x or "").lower()
+    cand = {}
+    for p in programs:
+        if p["분야"] != "비교과" or p["프로그램명"] in aliases:
+            continue
+        s = EXTRA_TAIL.sub("", EXTRA_TAIL.sub("", EXTRA_HEAD.sub("", p["프로그램명"])).strip()).strip()
+        if s != p["프로그램명"] and len(nrm(s)) >= 4:
+            cand[p["프로그램명"]] = s
+    counts = {}
+    for s in cand.values():
+        counts[nrm(s)] = counts.get(nrm(s), 0) + 1
+    others = [(nrm(p["프로그램명"]), p["프로그램명"]) for p in programs]
+    others += [(nrm(a), k) for k, v in aliases.items() for a in v]
+    others += [(nrm(s), k) for k, s in cand.items()]
+    out = {}
+    for name, s in cand.items():
+        t = nrm(s)
+        if counts[t] > 1:
+            continue
+        if any(owner != name and (t in o or o in t) for o, owner in others):
+            continue
+        out[name] = [s]
+    return out
+
+
 def exchange_short(name):
     if name in EXCHANGE_SKIP:
         return []
@@ -232,6 +266,7 @@ def main():
             short = exchange_short(p["프로그램명"])
             if short:
                 ALIASES[p["프로그램명"]] = short
+    ALIASES.update(extra_short_all(programs, ALIASES))   # 11/23 비교과 줄임 이름
     for p in programs:
         if p["프로그램명"] in ALIASES:
             p["별칭"] = ALIASES[p["프로그램명"]]
