@@ -137,7 +137,7 @@ payload `{question}`. 규정 질문이면 `official`, 근거가 있으면 `ok`, 
   "sources": { "R03-1-1": { "docType": "귀국보고서", "program": "마르부르크필립스대학교", "semester": "2025-1" } },
   "noteId": "N-marburg", "suggestSenior": false }
 { "status": "hold", "lines": [], "sources": {}, "questionId": "Q-0001", "suggestSenior": true,
-  "message": "이 부분은 아직 들은 선배가 없어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?" }
+  "message": "이 부분은 아직 경험한 선배가 없어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?" }
 { "status": "official", "lines": [], "sources": {}, "questionId": "Q-0002", "suggestSenior": false,
   "officialUrl": "https://oia.hufs.ac.kr",
   "message": "학교 규정에 관한 질문이라 국제교류팀 공식 안내에서 정확한 내용을 확인해 주세요." }
