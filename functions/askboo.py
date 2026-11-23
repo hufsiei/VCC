@@ -181,6 +181,7 @@ def askBoo(me, payload, save=True):
         return _hold(me, question, None, None, save, why="담기")
 
     programs = match_programs(question)
+    named = bool(match_names(question))    # [v2] 질문이 프로그램 이름·별칭을 콕 집어 말했는지(직군·기관유형 사전이나 나라로 찾은 게 아니라)
     country = None
     if not programs:                       # [11/23] 프로그램명이 없으면 나라 이름으로(근거 많은 순)
         country, programs = match_country(question)
@@ -201,7 +202,7 @@ def askBoo(me, payload, save=True):
             return _hold(me, question, None, None, save, why="프로그램 없음(정리 후보 대조 실패)")
         # 프로그램: 정리 결과(대조 통과분)가 있으면 그것, 없으면 정규식 결과. 「제외」는 뺀다
         if plan["프로그램후보"]:
-            programs, country = plan["프로그램후보"], None
+            programs, country, named = plan["프로그램후보"], None, True
         else:
             if plan["분야"]:   # 정리 결과의 분야와 다른 프로그램(「독일 인턴」에 나라 대조로 잡힌 독일 교환 등)은 뺀다
                 programs = [p for p in programs if PROGRAMS.get(p, {}).get("분야") == plan["분야"]]
@@ -212,7 +213,10 @@ def askBoo(me, payload, save=True):
             programs = [p for p in programs if p not in plan["제외"]]
         if plan["의도"] == "대화":
             return _chat(plan, history)
-        if plan["의도"] in ("탐색", "사람찾기"):
+        # 탐색·사람찾기는 프로그램을 콕 집지 않았을 때만 노트 목록으로. 「○○ 현장실습 해 보니 어땠어요?」처럼 이름을 댄 질문은
+        # 경험질문(v1 주제어 「어땠·후기·경험담」 → 팁 칸)으로 이어 간다 — 11/24 개발 17·21·22번이 notes로 빠지던 회귀.
+        # 이름을 댔어도 사람을 찾는 말(「마르부르크 다녀온 선배 있어요?」)은 v1 ①″ 규칙대로 아래에서 notes.
+        if plan["의도"] in ("탐색", "사람찾기") and not (named and not PERSON_RE.search(question)):
             found = _explore(plan, programs, country or plan["나라"])
             if found:
                 return found
@@ -233,7 +237,7 @@ def askBoo(me, payload, save=True):
         return _hold(me, question, programs[0], None, save, why="질문정리: 보고서 칸에 없는 주제")
 
     # ①″ [11/23] 사람을 찾는 질문이나 나라만 말한 질문인데 주제어가 없으면 → 해봤노트 카드로 안내(AI 없음)
-    if not plan and not has_topic(question) and (PERSON_RE.search(question) or country):
+    if not has_topic(question) and (PERSON_RE.search(question) or (not plan and country)):
         found = _notes(programs, country)
         if found:
             return found
@@ -383,12 +387,18 @@ def _explore(plan, programs, country):
 
 
 # ── ① 프로그램 대조 ───────────────────────────────────────────────────
-def match_programs(question, allow_abbr=True):
-    """allow_abbr=False면 인턴 사전의 약칭(KOTRA → 권역 3곳)으로 넓히지 않는다([v2] clarify가 질문의 약칭제외 문맥을 넘길 때)."""
+def match_names(question):
+    """programs.json의 프로그램명·별칭 글자 대조만(인턴 사전·나라 없음). [v2] 「콕 집어 말한 프로그램」 판정에도 쓴다."""
     q = _norm(question)
     hits = [(t, name) for t, name, is_alias in _TERMS if t in q and (not is_alias or _alias_ok(t, q))]
     keep = [(t, name) for t, name in hits if not any(t != t2 and t in t2 for t2, _ in hits)]
-    found = sorted({name for _, name in keep})
+    return sorted({name for _, name in keep})
+
+
+def match_programs(question, allow_abbr=True):
+    """allow_abbr=False면 인턴 사전의 약칭(KOTRA → 권역 3곳)으로 넓히지 않는다([v2] clarify가 질문의 약칭제외 문맥을 넘길 때)."""
+    q = _norm(question)
+    found = match_names(question)
     if found:
         return found
     # 작업 81: 인턴 사전 data/intern-keywords.json

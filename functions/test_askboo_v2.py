@@ -98,6 +98,13 @@ res, calls = run("마르부르크 기숙사 신청 언제 했어요?", [],
                  plan={"의도": "경험질문", "분야": "국제교류", "나라": None, "프로그램후보": [PROGRAM], "제외": [], "칸": None, "정리된질문": "x"}, answer=None)
 expect("칸 null이어도 주제어(기숙사)가 있으면 v1 주제어 경로로 답", res["status"] == "ok", res.get("status"))
 
+res, calls = run("KOTRA 해외무역관(유럽 권역) 인턴 경험담 있어요?", [],
+                 plan={"의도": "탐색", "분야": "현장실습", "나라": None, "프로그램후보": [KOTRA], "제외": [], "칸": None, "정리된질문": "x"}, answer=None)
+expect("이름을 콕 집은 「경험담 있어요?」는 탐색이라 해도 답(v1 주제어 경로)", res["status"] == "ok", res.get("status"))
+res, calls = run("마르부르크 다녀온 선배 있어요?", [],
+                 plan={"의도": "사람찾기", "분야": "국제교류", "나라": None, "프로그램후보": [PROGRAM], "제외": [], "칸": None, "정리된질문": "x"})
+expect("이름을 댔어도 사람 찾는 말이면 notes", res["status"] == "notes", res.get("status"))
+
 # ── ② 답쓰기 + 검증 ────────────────────────────────────────────────────
 def first_cands():
     cands, _, _ = askboo.extract("마르부르크 기숙사 어땠어요?", [PROGRAM])
