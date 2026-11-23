@@ -1193,6 +1193,16 @@ body.sheet-open { overflow: hidden; }
 .consent-line__text .msg__quote { margin: 0; }
 /* 끈 문장: 글자를 흐리게 + 「내 경험노트에만 남아요」 문구로도 알림(색만으로 알리지 않음) */
 .consent-line--off .consent-line__text { color: var(--color-text-muted); }
+/* 끈 문장(공개하지 않는 문장): 줄 전체를 회색 상자로 — 비활성처럼 보이게(11/23). 상태는 문구로도 알린다 */
+.consent-line--off {
+  margin: 4px 0;
+  padding: 12px;
+  border-top-color: transparent;
+  border-radius: var(--radius-card);
+  background: var(--color-neutral-bg);
+}
+.consent-line--off + .consent-line { border-top-color: transparent; }
+.consent-line--off .msg__quote { background: var(--color-surface); border-left-color: var(--color-border); color: var(--color-text-muted); }
 /* 끈 문장 안내: 진한 남색 + 자물쇠로 눈에 띄게 */
 .consent-line__off,
 .consent-line__risk {
