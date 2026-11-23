@@ -46,6 +46,31 @@
   .profile-reasons { display: flex; flex-direction: column; gap: var(--space-sm); }
   .profile-reasons li { display: flex; align-items: flex-start; gap: var(--space-sm); font-size: var(--font-size-secondary); }
 
+  /* 「내 쪽지」 버튼의 새 소식 수 */
+  .count-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--status-error-fg); color: var(--color-on-primary); font-size: var(--font-size-caption); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---------- 2단계: 내 쪽지 목록 ---------- */
+  .detail { display: flex; flex-direction: column; gap: var(--space-md); }
+  .msg-group { display: flex; flex-direction: column; gap: 12px; }
+  .thread-row { display: flex; align-items: flex-start; gap: 12px; color: inherit; text-decoration: none; cursor: pointer; }
+  .thread-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-xs); }
+  .thread-row__name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); font-weight: 600; color: var(--color-heading); }
+  .thread-row__last { overflow: hidden; color: var(--color-text-muted); font-size: var(--font-size-secondary); white-space: nowrap; text-overflow: ellipsis; }
+  .thread-row__time { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+  .request-card { display: flex; flex-direction: column; gap: 12px; }
+  .request-card__who { font-weight: 600; color: var(--color-heading); }
+  .request-card__text { padding: var(--space-sm) 12px; border-radius: var(--radius-card); background: var(--color-neutral-bg); }
+  .thread-row--muted .thread-row__name { color: var(--color-text-muted); }
+
+  /* ---------- 3단계: 대화 ---------- */
+  .thread-page { padding-bottom: calc(var(--button-height) + 88px); }
+  .thread-top { display: flex; flex-direction: column; gap: var(--space-sm); margin-bottom: var(--space-md); }
+  .thread-top .status-label { align-self: flex-start; }
+  .msg--them .msg__body { max-width: calc(100% - 48px); }
+  .dock .composer .input { flex: 1; }
+  .dock-note { display: flex; flex-direction: column; gap: var(--space-sm); }
+  .dock-note .btn-reason { justify-content: center; margin-top: 0; }
+
   /* ---------- 쪽지 요청 시트 ---------- */
   textarea.request-text { height: auto; min-height: 112px; padding: 12px var(--space-md); line-height: 1.5; resize: vertical; }
   .field__help { font-size: var(--font-size-secondary); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
@@ -118,6 +143,46 @@
     </main>
     <div class="dock dock--bottom" id="profileDock"></div>
   </section>
+
+  <!-- ===== 2단계: 내 쪽지 목록 (11/23 미리님 결정: 닮은선배 · 내 쪽지 — 받은 요청·대화·보낸 요청) ===== -->
+  <section id="viewMessages" hidden>
+    <header class="header">
+      <button class="icon-btn" data-back type="button" aria-label="뒤로"><i data-lucide="arrow-left" class="icon"></i></button>
+      <h2 class="header__title">내 쪽지</h2>
+      <span class="icon-btn" aria-hidden="true"></span>
+    </header>
+    <main class="page">
+      <div class="detail" id="messagesBody" aria-busy="true"></div>
+    </main>
+  </section>
+
+  <!-- ===== 3단계: 익명 쪽지 대화 (상세 헤더 + 채팅, 8절) ===== -->
+  <section id="viewThread" hidden>
+    <header class="header">
+      <button class="icon-btn" data-back type="button" aria-label="뒤로"><i data-lucide="arrow-left" class="icon"></i></button>
+      <h2 class="header__title" id="threadTitle">쪽지</h2>
+      <span class="icon-btn" aria-hidden="true"></span>
+    </header>
+    <main class="page thread-page">
+      <div id="threadTop"></div>
+      <div class="chat" id="threadChat" aria-live="polite"></div>
+    </main>
+    <div class="dock dock--bottom" id="threadDock"></div>
+  </section>
+
+  <!-- ===== 확인 바텀시트 (5-10) — 요청 취소처럼 되돌리기 어려운 동작 ===== -->
+  <div class="sheet-layer" id="confirmSheet" hidden>
+    <div class="sheet-scrim"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" tabindex="-1">
+      <div class="sheet__handle" aria-hidden="true"></div>
+      <h2 class="sheet__title" id="confirmTitle">확인</h2>
+      <div class="sheet__body"><p id="confirmText"></p></div>
+      <div class="sheet__footer">
+        <button class="btn btn--primary btn--block" id="confirmOk" type="button">확인</button>
+        <button class="btn btn--text" id="confirmCancel" type="button">닫기</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ===== 쪽지 요청 바텀시트 (8절 「익명 쪽지 요청 (보내는 쪽)」, 5-10) ===== -->
   <div class="sheet-layer" id="requestSheet" hidden>

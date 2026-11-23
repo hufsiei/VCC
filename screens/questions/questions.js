@@ -469,7 +469,7 @@ async function renderAlerts() {
     .map((a) => {
       const unread = isUnread(a);
       const inner = [
-        icon(a.questionId ? "message-circle" : "notebook-text"),
+        icon(a.threadId ? "mail" : a.questionId ? "message-circle" : "notebook-text"),
         el("div", { className: "alert-row__body" }, [
           el("p", { text: orDash(a.text) }),
           el("span", { className: "alert-row__time", text: unread ? `${timeText(a.at)} · 안 읽음` : timeText(a.at) }),
@@ -487,6 +487,10 @@ async function renderAlerts() {
           go(`question=${encodeURIComponent(a.questionId)}`);
         });
         return row;
+      }
+      // 쪽지 알림(「쪽지 요청이 왔어요」·「선배가 아직 못 봤어요…」)은 그 대화로 바로(11/23 미리님 결정, 작업 28)
+      if (a.threadId) {
+        return el("a", { className: cls, attrs: { href: `../senior/?thread=${encodeURIComponent(a.threadId)}` } }, inner);
       }
       return a.noteId
         ? el("a", { className: cls, attrs: { href: `../note/?id=${encodeURIComponent(a.noteId)}` } }, inner)
