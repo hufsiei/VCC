@@ -16,16 +16,15 @@ if (!me) location.replace("../login/");
 // 노트 틀 칸 이름. 원본은 data/frames.json — 화면은 data/를 직접 읽지 않으므로(fetch 금지) 같은 값을 둔다.
 // data.js에 칸 목록을 주는 함수가 생기면 이 표를 지우고 그 함수를 쓴다.
 const FRAMES = {
-  교환: ["지원", "학점", "비용", "생활", "팁", "배운점", "후배 질문"],
-  파견: ["지원", "학점", "비용", "생활", "팁", "배운점", "후배 질문"],
-  인턴: ["지원동기", "업무내용", "배운점", "지원·선발", "근무조건", "후배 질문"],
-  비교과: ["활동내용", "배운점", "후배 질문"],
+  교환: ["지원", "학점", "비용", "생활", "팁", "배운점"],
+  파견: ["지원", "학점", "비용", "생활", "팁", "배운점"],
+  인턴: ["지원동기", "업무내용", "배운점", "지원·선발", "근무조건"],
+  비교과: ["활동내용", "배운점"],
 };
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };
 const KIND_NAME = { 교환: "교환학생", 파견: "파견", 인턴: "인턴", 비교과: "" }; // note.js와 같은 값
 const FIELD_TYPE = { 국제교류: "교환", 현장실습: "인턴", 비교과: "비교과" }; // chat 칩 payload.field → 해봤노트 ?type=
-const QUESTION_SECTION = "후배 질문";
 
 // ---------------------------------------------------------------------------
 // 1. 작은 도우미 — 요소 만들기(글은 textContent로만), 아이콘, 토스트
@@ -532,6 +531,7 @@ const tell = {
   answers: [],     // spec: [{section, question, answer, questionId?, skipped?}]
   step: null,      // 마지막 interviewNext 응답
   pending: 0,      // pendingQuestions
+  covered: [],     // [v2] 보고서가 이미 채워 묻지 않은 칸(interviewNext covered)
   extra: null,     // 질문이 끝난 뒤 「이어서 쓰기」로 고른 칸 이름
 };
 const EXTRA_QUESTION = "더 들려주고 싶은 이야기";
@@ -611,31 +611,35 @@ function chooseProgram(exp) {
   askNext();
 }
 
-// 진행 칩(5-7): 채워짐(MINT ✓) / 지금 질문 중(NAVY) / 비어 있음 — 번호 없음
+// 진행 칩(5-7): 내 이야기로 채워짐(MINT ✓) / 보고서로 채워짐(중립색) / 지금 질문 중(NAVY) / 비어 있음 — 번호 없음
+// [v2] 「후배 질문」 칸은 없다 — 후배 질문의 답은 그 질문의 칸(section)에 담긴다(spec interviewNext junior)
 function filledSections() {
   const set = new Set();
   for (const a of tell.answers) if (!a.skipped && a.section) set.add(a.section);
-  // 「후배 질문」은 답하거나 건너뛰면 채워짐 처리(5-7)
-  if (tell.answers.some((a) => a.section === QUESTION_SECTION)) set.add(QUESTION_SECTION);
   return set;
 }
 
 function renderChips() {
   const frame = FRAMES[tell.program.kind] || FRAMES["교환"];
   const filled = filledSections();
+  const covered = new Set(tell.covered);
   const picking = Boolean(tell.step && tell.step.done); // 질문이 끝나면 칩을 눌러 칸을 골라 이어서 쓴다
   const current = picking ? tell.extra : tell.step ? tell.step.section : null;
   chipsBox.classList.toggle("progress-chips--pick", picking);
   chipsBox.replaceChildren(...frame.map((name) => {
     const isCurrent = name === current;
     const isFilled = !isCurrent && filled.has(name);
-    const canPick = picking && name !== QUESTION_SECTION; // 후배 질문은 질문이 있어야 답할 수 있음
+    const isCovered = !isCurrent && !isFilled && covered.has(name);
+    const canPick = picking;
+    const state = isCurrent ? " progress-chip--current" : isFilled ? " progress-chip--filled" : isCovered ? " progress-chip--covered" : "";
     const chip = el(canPick ? "button" : "span", {
-      className: `progress-chip${isCurrent ? " progress-chip--current" : isFilled ? " progress-chip--filled" : ""}`,
-      attrs: canPick ? { type: "button", "aria-pressed": String(isCurrent), "aria-label": `${name}에 이어서 쓰기` } : null,
+      className: `progress-chip${state}`,
+      attrs: canPick ? { type: "button", "aria-pressed": String(isCurrent), "aria-label": `${name}${isCovered ? "(보고서로 채워짐)" : ""}에 이어서 쓰기` } : null,
       on: canPick ? { click: () => pickExtra(name) } : null,
-    }, [isFilled ? icon("check") : null, name]);
-    if (name === QUESTION_SECTION && tell.pending > 0) chip.append(el("span", { className: "progress-chip__badge", text: tell.pending }));
+    }, [isFilled ? icon("check") : isCovered ? icon("file-text") : null, name,
+      isCovered ? el("span", { className: "progress-chip__note", text: "보고서" }) : null]);
+    // 후배 질문을 묻는 중이면 지금 칩에 남은 후배 질문 수
+    if (isCurrent && !picking && tell.step && tell.step.junior && tell.pending > 0) chip.append(el("span", { className: "progress-chip__badge", text: tell.pending }));
     if (isCurrent && !picking) chip.setAttribute("aria-current", "step");
     return chip;
   }));
@@ -644,10 +648,10 @@ function renderChips() {
   const currentChip = chipsBox.querySelector(".progress-chip--current");
   if (currentChip) chipsBox.scrollLeft = currentChip.offsetLeft - (chipsBox.clientWidth - currentChip.offsetWidth) / 2;
 
-  // AI 요약 바: 노트 틀(후배 질문 제외 칸) 채운 수 / 전체 칸
-  const content = frame.filter((n) => n !== QUESTION_SECTION);
-  const n = content.filter((name) => filled.has(name)).length + (filled.has(QUESTION_SECTION) && tell.answers.some((a) => a.section === QUESTION_SECTION && !a.skipped) ? 1 : 0);
-  summaryCount.textContent = `노트 틀 ${n}/${frame.length} 채움`;
+  // AI 요약 바(spec [v2] 진행률): 「내 이야기 N칸 · 보고서 M칸」 — 보고서 칸은 내가 답하지 않은 covered 칸만
+  const n = frame.filter((name) => filled.has(name)).length;
+  const m = frame.filter((name) => !filled.has(name) && covered.has(name)).length;
+  summaryCount.textContent = `내 이야기 ${n}칸 · 보고서 ${m}칸`;
   summaryBtn.disabled = n === 0 || tell.busy;
   summaryReason.hidden = n > 0;
   measureDock();
@@ -671,11 +675,12 @@ async function askNext() {
   // 지나간 질문의 버튼(「경험이 없어요」·예시답 칩)은 끈다
   for (const b of tellChat.querySelectorAll(".msg__actions button, .chip-row button")) b.disabled = true;
   if (typeof res.pendingQuestions === "number") tell.pending = res.pendingQuestions;
+  if (Array.isArray(res.covered)) tell.covered = res.covered;
   renderNotice();
 
   if (res.done) {
-    addTo(tellChat, booText("고마워요. 노트 틀을 모두 채웠어요. 더 들려줄 이야기가 있으면 위 칸을 골라 이어서 써 주세요. 다 됐으면 아래 「AI 요약」을 눌러 정리해 보세요."));
-  } else if (res.section === QUESTION_SECTION) {
+    addTo(tellChat, booText("지금 물을 건 다 물었어요. 더 들려줄 칸을 고르거나 AI 요약을 눌러 주세요."));
+  } else if (res.junior) {
     addTo(tellChat, juniorQuestion(res));
   } else {
     addTo(tellChat, interviewQuestion(res));
@@ -709,7 +714,7 @@ function juniorQuestion(step) {
           e.currentTarget.disabled = true;
           addTo(tellChat, userText("경험이 없어요"));
           // 질문은 hold로 남아 다른 선배에게 다시 나간다(spec interviewNext)
-          tell.answers.push({ section: QUESTION_SECTION, question: step.asked, questionId: step.questionId, skipped: true });
+          tell.answers.push({ section: step.section, question: step.asked, questionId: step.questionId, skipped: true });
           askNext();
         },
       },
@@ -767,7 +772,7 @@ function sendAnswer(text) {
   }
 
   addTo(tellChat, userText(text));
-  const answer = { section: step.section, question: step.section === QUESTION_SECTION ? step.asked : step.question, answer: text };
+  const answer = { section: step.section, question: step.junior ? step.asked : step.question, answer: text };
   if (step.questionId) answer.questionId = step.questionId;
   tell.answers.push(answer);
   askNext();
@@ -854,9 +859,9 @@ function summaryCard(res) {
     const row = el("div", { className: "summary-row" }, [el("span", { className: "summary-row__name", text: name })]);
     if (lines.length === 0) row.append(el("p", { className: "summary-row__empty", text: "–" }));
     for (const line of lines) {
-      // 후배 질문 칸: Q(후배 질문 원문, 인용) + A(내 답)
-      if (name === QUESTION_SECTION && line.asked) row.append(el("span", { className: "msg__quote", text: `Q. ${line.asked}` }));
-      row.append(el("p", { text: name === QUESTION_SECTION ? `A. ${line.text}` : line.text }));
+      // 후배 질문에 답한 문장(asked가 붙음): Q(후배 질문 원문, 인용) + A(내 답) — 그 질문의 칸 안에
+      if (line.asked) row.append(el("span", { className: "msg__quote", text: `Q. ${line.asked}` }));
+      row.append(el("p", { text: line.asked ? `A. ${line.text}` : line.text }));
     }
     card.append(row);
   }
