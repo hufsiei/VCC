@@ -177,6 +177,8 @@ function pickMock(m, name, p) {
       return /^H\d{4}$/.test(String(p.id || "")) ? m.login.student : m.login.fail;
     case "askBoo":
       if (/평점|장학금|몇\s*학점|선발\s*(인원|기준)|휴학|등록금|초과학기|인정\s*신청|인정받을 수/.test(p.question || "")) return m.askBoo.official; // 규정 질문 (명세 4장)
+      // [11/23] 사람을 찾는 질문(주제어 없음) → 해봤노트 카드(status "notes")
+      if (/(다녀온|갔다\s*온|가\s*본|경험한)\s*(선배|사람|분)|선배\s*(있|계|없|\?|$)/.test(p.question || "") && !/기숙사|비용|수업|서류|학점|팁|조언|어땠/.test(p.question || "")) return m.askBoo.notes;
       return /교환|파견|독일|마르부르크/.test(p.question || "") ? m.askBoo.exchange : m.askBoo.hold;
     case "interviewNext":
       return mockInterview(m, p); // 고른 경험(program)에 맞는 노트 틀로 묻는다
@@ -192,7 +194,11 @@ function pickMock(m, name, p) {
       return /\d{8,}/.test(p.text || "") ? m.checkMessage.blocked : m.checkMessage.ok;
     // ── 선배 추천 열림(11/22) ──
     case "getMe":
-      return { ...m.getMe, recommend: mockStatus() };
+      return { ...m.getMe, recommend: mockStatus(), recommendable: sessionStorage.getItem("mockRecommendable") !== "0" };
+    case "setRecommendable": // [11/23] 이 탭에서만 기억(mock)
+      if (typeof p.on !== "boolean") return { error: "켜기·끄기를 골라 주세요" };
+      sessionStorage.setItem("mockRecommendable", p.on ? "1" : "0");
+      return { ok: true, recommendable: p.on };
     case "recommendSeniors":
     case "previewNickname":
       return mockReady() ? m[name] : LOCKED();
@@ -302,6 +308,8 @@ export const cancelRequest = (threadId) => call("respondRequest", { threadId, ca
 // [11/23] 쪽지 대화 ⋮ 메뉴 신고·차단. reason만 → 신고, block: true → 차단(양쪽 다 더 못 보냄, 상대에게 알림 없음). 둘 다 가능
 export const reportThread = (threadId, reason, block = false) => call("reportThread", { threadId, reason, block });
 export const getInbox = () => call("getInbox");
+// [11/23] 닮은선배 추천받기 켜기·끄기(기본 켬, getMe().recommendable). 끄면 추천 후보와 새 쪽지 요청에서 빠지고, 수락한 대화는 이어진다
+export const setRecommendable = (on) => call("setRecommendable", { on });
 // 내 경험노트 상세(본인만) → { id, program, type, noteId, share, filled, total, sharedLines, draftId, sections[{name, lines[{text, publicText, lineId, shared}]}], publicDraft } (spec 4장)
 export const getMyNote = (id) => call("getMyNote", { id });
 // ── 선배 추천 열림(11/22, spec 4장) ──
