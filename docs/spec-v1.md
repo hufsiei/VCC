@@ -12,6 +12,7 @@
 > **11/19 개정 ③(작업 18)**: askBoo `lines[]`에 **`fallback`**(사후 검증에 걸려 근거 원문을 보여 준 줄) 추가(4장). `noteId`는 `data/notes.json`이 생기기 전까지 프로그램 이름으로 나간다.
 > **11/22 개정(작업 23, 민지 요청)**: `listNotes`·`getNote`에 **`country`**(국제교류 = `programs.json` `세부` 국가, 인턴·비교과 `null`, 카드 띠 「교환학생 · 독일」)와 **`scrapped`**(내가 스크랩했는지) 추가. 새 함수 **`scrapNote(noteId, scrap)`**(켜기·끄기, 멱등) → `getInbox.scraps`가 실제로 채워진다(최근이 위). **[11/22 오후]** `getNote` 배운점 문장에 **`senior`**(「선배 A」, 노트 안에서만 쓰는 글자, 학과 없음 — PRD 9-1), 새 함수 **`saveQuestion(noteId, section)`**(「질문함에 담기」). **[11/22 저녁]** `getInbox.myNotes` 카드 값(`share`·`filled`/`total`·`sharedLines` 등), 새 함수 **`getMyNote(id)`**(내 경험노트 상세), 공유 상태는 셋뿐(「반영 중」 없음). 바뀐 곳은 **[11/22]** 표시.
 > **11/22 개정 ③(선배 추천 열림, 미리 결정)**: 닮은선배 추천은 **경험 나눔**(들려주기 유효 답변 3개 + 해봤노트 1문장 이상 공유) 또는 **수요 제공**(새 함수 **`demandNext`·`saveDemand`** — 「궁금한 것 정리하기」, 유효 답변 3개 + 전달 동의)을 한 뒤에 열린다. 한 번 열리면 모든 프로그램. `getMe.recommend`, 잠겼을 때 `recommendSeniors`·`previewNickname`의 `locked`와 `sendMessage`의 `reason: "잠김"`, `summarizeInterview`의 `answered`·`need`, `saveConsent`의 `recommend`·`unlocked`, `askerInfo.관심`을 「교환학생·독일」 형식으로 + `시기`. 서버 `functions/demand.py`. 바뀐 곳은 **[11/22 열림]** 표시.
+> **11/23 개정 ②(작업 29 실사용, 미리 결정)**: ① `askBoo`에 새 `status: "notes"` — 사람을 찾는 질문(「네덜란드 교환 다녀온 선배?」)이나 나라만 말한 질문에 주제어가 없으면 답 대신 해봤노트 카드(`notes[]`)로 안내한다. 프로그램명이 없으면 **나라 이름**(`programs.json` `세부`)으로 그 나라 프로그램을 찾는다. `hold` 문구를 이유별로 나누고(노트가 있는데 「경험한 선배가 없어요」라고 하지 않음), 노트가 있으면 `hold`에도 `noteId`. ② 닮은선배 **추천받기 끄기** — 새 함수 **`setRecommendable(on)`**, `getMe.recommendable`, `sendMessage`의 `reason: "추천 제외"`. 경험자는 기본으로 후보이고, 끈 선배는 추천·새 쪽지 요청에서 빠진다. 바뀐 곳은 **[11/23 노트]**·**[11/23 추천]** 표시.
 > **11/23 개정(작업 28, 민지 요청)**: 쪽지 대화 ⋮ 메뉴용 새 함수 **`reportThread(threadId, reason, block)`** — 신고(`threadReports.json`)·차단(`status: "blocked"`, 양쪽 다 더 못 보냄). `sendMessage`에 `reason: "차단"`, `getMessages`에 `blockedByMe`. 바뀐 곳은 **[11/23 차단]** 표시.
 > **11/22 개정 ②(작업 21, 미리)**: `interviewNext`가 보고서가 이미 답한 칸은 묻지 않고(빈 칸·오래된 칸만), **깊이 질문**(`depth`, 교환·파견 3개·인턴·비교과 2개)을 묻는다. 묻지 않은 칸은 **`covered`**로 알린다(4장).
 > **11/20 개정(닮은 선배 실제 데이터 기준)**: 시연 인물을 `가상데이터_1000명.xlsx` 실제 값에 맞췄다. 선배2를 H0745 → **H0241**(독일어과 3학년·경영학, 마르부르크 2026-1, 12점 2위)로 바꾸고, 선배1과 후배1의 공통 비교과를 `합격 면접 취업특강(커리어랩)` → **`한국외국어대학교 직무탐색 집중교육`**으로 바꿨다. H0241은 공통 비교과가 없다(12점 = 학과 5 + 이중전공 4 + 단과대 3). 후배1은 현장실습 이수가 없다. 선배1 보고서 학기 2024-1 → 2025-1(1·4·6장 예시 포함).
@@ -59,7 +60,7 @@
 
 - **지금(로컬):** `functions/local_fn.py`가 시작할 때 `data/runtime/*.json`을 읽어 메모리에 두고, 기록이 바뀔 때마다 그 파일을 다시 쓴다(임시 파일에 쓴 뒤 바꿔 끼워 반쯤 쓰인 파일이 남지 않게). 서버를 껐다 켜도 남는다.
 - **Cloud Functions 이사 후:** 같은 파일 이름을 NCP **Object Storage**의 객체로 둔다. 바꾸는 곳은 `functions/store.py`의 저장 방식 한 곳뿐이다(`STORE_BACKEND=file|ncp`). 다른 코드는 `store.load(이름)`·`store.save(이름)`만 쓰고 파일을 직접 열지 않는다.
-- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `demands.json`(**[11/22 열림]** 궁금한 것 정리하기 — 분야·세부·프로그램·칸·시기·상황·바라는 것, 선배 추천 열림 근거) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · **[11/23 차단]** `threadReports.json`(쪽지 대화 신고) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별 지금 추천 목록 최대 9명과 노트 버전) · `counters.json`(번호 매기기) · **[작업 85]** `noteVersions.json`(노트별 버전 — saveConsent가 +1, recommendSeniors가 비교) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(인터뷰 중간 저장, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 10개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·reportThread·recommendSeniors·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). **[작업 66]** 관리자 콘솔용 `reportSettings.json`(부서코드별 발행 설정) · `issuedReports.json`(발행 이력) · `reportHtml.json`(리포트 id → HTML, PRD 6-4의 `reports/{id}.html` 대신 한 파일) · `suggestionStatus.json`(제안 id → 상태). 코드: `functions/admin.py`.
+- **파일(기록 종류마다 하나):** `messages.json`(쪽지 대화) · `nicknames.json`(보는 사람별 선배 글자 A·B·C) · `questions.json`(질문함, 사용 로그와 같은 모양) · `demands.json`(**[11/22 열림]** 궁금한 것 정리하기 — 분야·세부·프로그램·칸·시기·상황·바라는 것, 선배 추천 열림 근거) · `consents.json`(공개 동의) · `myNotes.json`(내 경험노트) · `reported.json`(신고 문장) · **[11/23 차단]** `threadReports.json`(쪽지 대화 신고) · **[11/23 추천]** `recommendOptOut.json`(닮은선배 추천받기를 끈 사람) · `alerts.json`(알림) · `pendingNicknames.json`(요청 시트에서 미리 정한 동물 닉네임) · `shownSeniors.json`(보는 사람·노트별 지금 추천 목록 최대 9명과 노트 버전) · `counters.json`(번호 매기기) · **[작업 85]** `noteVersions.json`(노트별 버전 — saveConsent가 +1, recommendSeniors가 비교) · **[11/19]** `noteLines.json`(공개 동의를 통과한 인터뷰 문장, 노트별 — 사전 생성 `data/notes.json`과 합쳐 노트가 된다) · `aiUsage.json`(사용자별 AI 호출 수) · (P1-여건) `sessions.json`(로그인 토큰, 작업 73) · `interviewDrafts.json`(인터뷰 중간 저장, 작업 79). 코드: `functions/store.py`(저장) · `functions/runtime_fns.py`(쓰기 함수 11개: checkMessage·previewNickname·sendMessage·getMessages·respondRequest·reportThread·recommendSeniors·setRecommendable·saveConsent·reportStatement·getInbox, 그리고 askBoo·summarizeInterview·recommendSeniors가 쓸 도우미 `add_question`·`save_my_note`·`senior_label`). **[작업 66]** 관리자 콘솔용 `reportSettings.json`(부서코드별 발행 설정) · `issuedReports.json`(발행 이력) · `reportHtml.json`(리포트 id → HTML, PRD 6-4의 `reports/{id}.html` 대신 한 파일) · `suggestionStatus.json`(제안 id → 상태). 코드: `functions/admin.py`.
 - **누가 부르는지:** 서버는 헤더 `X-Token`을 `sessions.json`(`functions/sessions.py`, 토큰 24시간, 같은 계정 동시 로그인 허용)으로 풀어 사용자를 안다. 토큰이 없거나 만료·폐기면 `{ "error": "로그인이 필요해요" }`(`checkMessage`·`login`만 예외). `login`이 난수 토큰을 발급해 `user.token`으로 주고, `logout`이 폐기한다. 로그인 비번은 `data/`가 아니라 환경변수 `VCC_LOGIN_PW`(.env·NCP 기본 파라미터)에만 둔다. 표의 `"*"`는 가상학생 전원의 공용 비번(청중 체험용, 개별 항목이 우선, 직원에는 적용 안 됨). 순서: 토큰 확인 → 전역 상한 → 사용자별 한도 → 함수. **[11/19] 남의 기록은 서버가 막는다**: `getMessages`·`respondRequest`는 `me`가 그 대화의 asker·senior일 때만, 내 경험노트·`saveConsent`는 `owner == me`일 때만, 관리자 함수는 `권한`이 있을 때만 응답하고 그 외는 `{ "error": "볼 수 없는 기록이에요" }`. (작업 73)
 - **초기화:** 리허설 전 `python functions/reset_runtime.py` → runtime 파일을 비우고 시연 시작 상태로 돌린다.
 - `data/runtime/`은 커밋하지 않는다(`.gitignore`). 시연 중 쌓인 기록이 저장소에 섞이지 않게.
@@ -79,7 +80,8 @@ const FN_BASE = "http://localhost:8787";
 | 함수 | 규칙 |
 |---|---|
 | login | 비밀번호가 비어 있으면 `login.fail`. 아니면 `id`가 `"staff01"`이면 `login.staff`, `"staff02"`이면 `login.staffDept`, 학번 모양(`H` + 숫자 4자리)이면 `login.student`, 그 외 `login.fail`(비번은 대조하지 않는다 — 공개 코드에 비번을 두지 않음) |
-| askBoo | 4장의 규정 질문 표현이 있으면 `askBoo.official`, 아니면 질문에 `교환\|파견\|독일\|마르부르크`가 있으면 `askBoo.exchange`, 그 외 `askBoo.hold` |
+| askBoo | 4장의 규정 질문 표현이 있으면 `askBoo.official`, **[11/23 노트]** 사람을 찾는 표현(`다녀온 선배`·`선배 있어요?` 등)이 있고 주제어(기숙사·비용·수업·서류·학점·팁·조언·어땠)가 없으면 `askBoo.notes`, 아니면 질문에 `교환\|파견\|독일\|마르부르크`가 있으면 `askBoo.exchange`, 그 외 `askBoo.hold` |
+| setRecommendable [11/23 추천] | 이 탭에서만 기억(sessionStorage `mockRecommendable`). `getMe.recommendable`도 그 값 |
 | interviewNext | **[11/20]** `program`이 `interviewNext.byProgram`에 있으면(마르부르크 시연 대본) `answers.length`번째 `steps`, 다 쓰면 `done`(steps[0]은 「후배 질문」). 그 밖의 프로그램은 서버(`interview.py`)처럼 `data/programs.json`의 `분야` → `data/frames.json` 노트 틀을 고르고, 아직 답하지 않은 칸을 틀 순서대로(「배운점」은 마지막) `interviewNext.questions[칸]` 문장으로 묻는다(`{p}` = 별칭 첫째 또는 프로그램명). 꼬리 질문·후배 질문은 없다(`pendingQuestions: 0`) |
 | getNote | `getNote[id]`가 있으면 그것, 없으면 `getNote["N-marburg"]` |
 | getMyNote [11/22] | `getMyNote` 하나(M-0001, 일부 공유 예시). 받은 `id`를 그대로 넣어 돌려준다 |
@@ -117,6 +119,16 @@ payload `{id, pw}`
 ```json
 "recommend": { "ready": false, "by": null, "need": 3, "talk": { "answered": 2, "shared": 0 }, "ask": false }
 ```
+**[11/23 추천]** `recommendable` = 닮은선배로 추천받기(기본 `true`). `setRecommendable(false)`로 끈 사람만 `false`. 내 보관함 화면에 스위치 「닮은선배로 추천받기」를 둔다.
+
+### setRecommendable(on) [11/23 추천]
+payload `{on: true|false}`(불리언이 아니면 `{error}`). 켜기·끄기, 멱등. 기록은 `runtime/recommendOptOut.json`(`{colreg_no: {at}}`, 끈 사람만). AI 없음.
+- 끄면 `recommendSeniors` 후보에서 빠진다(이미 본 목록에서도 다음 호출부터 빠짐). **새 요청·다시 요청**은 `sendMessage`가 `{ "ok": false, "reason": "추천 제외", "message": "이 선배는 지금 쪽지 요청을 받지 않아요." }`.
+- 이미 수락한 대화는 그대로 이어진다(양쪽 모두 보낼 수 있음).
+- 귀국보고서·현장실습후기 문장은 계속 해봤노트 근거로 쓰인다(학교에 낸 자료 — 쪽지를 받는 것과는 다른 동의, PRD 4절 닮은선배 행 [11/23]).
+```json
+{ "ok": true, "recommendable": false }
+```
 `by` = `"talk"`(경험 나눔으로 열림) | `"ask"`(수요 제공으로 열림) | `null`. `talk`는 내 경험노트 중 가장 많이 한 것(유효 답변 수·지금 공유된 문장 수).
 
 귀국보고서 항목 예: `{ "학년도": 2024, "학기": 1, "국가": "독일", "대학명": "마르부르크필립스대학교" }` · 현장실습후기 항목 예: `{ "학년도": 2025, "학기": 2, "업체명": "KOTRA 해외무역관(유럽 권역)", "직군": "전시·행사 지원" }`(학기 2 = 여름방학). 학기 숫자를 화면에 낼 때는 9장의 학기 코드표로 바꾼다.
@@ -129,6 +141,18 @@ payload `{question}`. 규정 질문이면 `official`, 근거가 있으면 `ok`, 
 - `officialUrl`: 질문에서 프로그램을 찾으면 `운영부서코드` → `departments.json`의 `공식안내URL`(getNote와 같은 순서). 프로그램을 못 찾으면 `현장실습|인턴` → D02, `특교원|탄뎀` → D03, 그 외 D01.
 - 질문은 `questions.json`에 `status: "official"`로 저장한다. 내 보관함에는 「공식 안내」로 보이고, 콘솔 집계에 들어가며, `interviewNext`의 후배 질문으로는 쓰지 않는다.
 **[11/19] 1단계 보강(작업 81)**: 프로그램명 글자 대조가 실패하면 `data/intern-keywords.json`(직군·기관 유형·업체 약칭 → 업체명, 원우)으로 후보 업체를 1~3개 고른다("무역 쪽 인턴" → KOTRA 해외무역관…). 후보가 여럿이면 각 업체의 근거를 합쳐 2~5단계로 넘기고 `sources`의 `program`으로 구분한다. 사전으로도 못 잡으면 `hold`. (P1-여건, 58③) 경량 임베딩: 사전 계산한 후기 문장 임베딩과 질문 임베딩의 코사인 상위 10문장을 후보 근거로 — 벡터 DB 없이 함수 안에서.
+**[11/23 노트] 나라 이름·사람 찾기 질문**:
+- ① 프로그램명·별칭·인턴 사전으로 못 찾으면 질문의 **나라 이름**(`programs.json` 국제교류의 `세부`)으로 그 나라 프로그램 중 근거가 있는 것을 근거 많은 순으로 고른다. 「독일어」「일본어」처럼 바로 뒤에 `어`가 오면 언어 이름이라 나라로 보지 않는다.
+- 질문에 **주제어(②의 표)가 없고**, 사람을 찾는 표현(`다녀온|갔다 온|가 본|해 본|경험한` + `선배|사람|분`, `선배 있어요?`)이 있거나 나라 이름으로만 찾았으면 → **`status: "notes"`**: 답을 만들지 않고 그 해봤노트 카드(최대 5개, `evidenceCount` > 0인 것만)를 준다. AI 없음, 질문함에 저장하지 않는다(답할 질문이 아니라 길 안내). 주제어가 있으면(「네덜란드 교환 기숙사 어땠어요?」) 그 나라 프로그램들의 근거로 평소처럼 답한다.
+- 주제어 표에 `준비`(지원·출국 전 준비 문항)를 더했다(「레이던 대학교 가려면 뭘 준비해요?」).
+- `hold` 문구는 이유별: 프로그램을 못 찾음 → 「질문에 맞는 해봤노트를 찾지 못했어요. …」 / 노트는 있는데 이 내용이 없음 → 「{프로그램} 해봤노트에는 아직 이 내용이 없어요. …」 + **`noteId`**(화면이 노트 링크를 붙일 수 있음) / 근거가 하나도 없는 프로그램 → 기존 문구 「이 부분은 아직 경험한 선배가 없어요. …」. 세 문구 모두 「질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?」로 끝난다.
+```json
+{ "status": "notes", "lines": [], "sources": {}, "suggestSenior": true,
+  "message": "네덜란드 해봤노트가 2개 있어요. 궁금한 노트를 골라 보세요.",
+  "notes": [ { "noteId": "N-c158df", "program": "레이던 대학교", "country": "네덜란드", "evidenceCount": 36 },
+             { "noteId": "N-f03daf", "program": "흐로닝언대학교", "country": "네덜란드", "evidenceCount": 24 } ] }
+```
+화면(인터BOO 물어보기): `message` 말풍선 + 노트 카드(분야 띠·노트명·근거 N건, 누르면 `../note/?id=`) + 「닮은선배 보기」. 근거 블록은 두지 않는다(답이 아니므로). 노트가 1개면 `message`는 「{프로그램} 해봤노트에서 선배들의 경험을 볼 수 있어요. 궁금한 내용을 물어보셔도 돼요.」
 **[11/19] 근거 풀** = `data/notes.json`의 문장 + `runtime/noteLines.json`의 동의 통과 문장(「후배 질문」 칸의 A 문장 포함). 그래서 선배가 답한 후배 질문은 다음 후배의 근거가 된다.
 ```json
 { "status": "ok",
@@ -144,6 +168,7 @@ payload `{question}`. 규정 질문이면 `official`, 근거가 있으면 `ok`, 
 ```
 docType: `귀국보고서` | `현장실습후기` | `인터뷰`
 **[11/19] `lines[].fallback`(작업 18)**: AI가 바꾼 문장이 사후 검증(HCX 원칙 v2 3절 5단계: 원문에 없는 숫자·영문·고유명사·새 낱말, JSON 형식 오류, 반말)에 걸려 **근거 원문을 그대로 보여 준 줄**이면 `true`. 원문에서 앞머리 군말(「참고로」 등)과 「ㅎㅎ」·「!!」만 지우고 낱말은 바꾸지 않는다. AI 문장이면 이 필드를 넣지 않는다(없으면 거짓). 화면은 이 줄에 「근거 원문 보기」 표시를 붙일 수 있고, 무시해도 문장은 정상으로 보인다.
+**[11/23 작업 30]** 군말·꾸밈만 지우면 이미 해요체·합쇼체로 끝나는 근거는 **AI에 보내지 않고** 그 정리본을 그대로 쓴다. 이 줄은 검증에 걸린 것이 아니므로 `fallback`을 넣지 않는다. 변환(AI)은 반말·명사형 등으로 끝나는 근거만 받는다.
 
 ### interviewNext(program, answers)
 선배 인터뷰에서 다음 질문 하나. payload `{program, answers:[{section, question, answer, questionId?, skipped?}]}`
@@ -247,7 +272,7 @@ mock은 기억하지 않는다(받은 값을 그대로 돌려주고, 목록·노
 payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명 「학과 + 선배 + 영문 대문자」(예: `"독일어과 선배 A"`, 디자인 규칙 1-2절). 같은 선배는 닮은선배·프로필·쪽지창에서 같은 이름이다. **[11/22]** 해봤노트 배운점 인용은 이 이름을 쓰지 않고 노트 안에서만 쓰는 「선배 A」(getNote `senior`, PRD 9-1). 점수 계산은 `functions/score.py`(원우). AI 없음.
 
 **[11/20 개정] 후보·점수 규칙 (작업 22):**
-- 후보 = 그 노트(희망 프로그램)의 경험자 **전부**. 점수 하한은 없다(단과대가 달라도 그 경험을 한 선배는 추천한다). 직원 행·본인은 뺀다.
+- 후보 = 그 노트(희망 프로그램)의 경험자 **전부**. 점수 하한은 없다(단과대가 달라도 그 경험을 한 선배는 추천한다). 직원 행·본인은 뺀다. **[11/23 추천]** 추천받기를 끈 선배(`setRecommendable(false)`)도 뺀다 — `score.rank_seniors` 결과를 `runtime_fns.recommendSeniors`가 거른다.
 - 점수(순서용): **학과 일치 5 · 이중전공 일치 4 · 단과대 일치 3 · 공통 비교과 2**(공통 비교과가 여러 개여도 2점 한 번). 학과가 같으면 단과대도 같으므로 같은 학과 선배는 8점 이상이다.
 - 정렬: 점수 내림차순 → 동점이면 ① 수락 대기 요청이 적은 선배 ② 최근 학기에 다녀온 선배 순.
 - `reasons` 맨 앞은 항상 **「희망 프로그램을 경험했어요」**, 겹치는 점이 있으면 그 뒤에 더한다(0점 선배도 카드가 비지 않는다).
@@ -289,6 +314,7 @@ payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청�
 막힘 방지(응답 없는 선배 3명에게 갇히지 않게) 두 가지:
 - **보낸 사람이 취소(P0)**: `respondRequest(threadId, cancel: true)`로 기다리는 요청을 거둔다 → `status: "cancelled"`, 한도에서 빠진다. 취소한 선배에게는 7일 동안 다시 요청하지 못한다(반복 요청 방지). 선배 화면에서는 그 요청이 조용히 사라진다(알림 없음).
 - **자동 만료(P1)**: 보낸 뒤 **7일** 안에 선배가 수락·거절하지 않으면 서버가 `status: "expired"`로 바꾸고 한도에서 뺀다. 보낸 사람에게 알림 「선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?」(`alerts.json`). 만료 판정은 `getMessages`·`sendMessage` 호출 때 `requestedAt` 기준으로 한다(별도 스케줄러 없음). 시연에서는 7일이 지나지 않으므로 문구로만 설명한다.
+**[11/23 추천] 추천 제외:** 추천받기를 끈 선배에게 **새 요청·다시 요청**을 보내면 `{ "ok": false, "reason": "추천 제외", "message": "이 선배는 지금 쪽지 요청을 받지 않아요." }`. 이미 수락한 대화는 막지 않는다.
 **[11/22 열림] 잠김:** 선배 추천이 잠긴 사람의 **새 요청·다시 요청**은 `{ "ok": false, "reason": "잠김", "message": "경험을 들려주거나 궁금한 것을 정리하면 선배 추천이 열려요", "recommend": {…} }`. 이미 열린 대화에 이어 쓰기와 받은 선배의 답장은 막지 않는다.
 대화 상태 `status`: `waiting`(수락 대기) | `accepted` | `declined` | `cancelled` | `expired`. 한도에 세는 것은 `waiting`만이다. 기존 `accepted: true|false`는 `status`로 대신한다.
 첫 메시지일 때 서버가 이 대화에서 쓸 보낸 사람 닉네임(`myNickname`, 형용사 + 동물)을 만든다. 화면은 요청 시트를 열 때 `previewNickname(to)`로 같은 값을 미리 받아 「선배에게는 '용감한 수달'로 보여요」를 보여 준다.
@@ -413,7 +439,7 @@ payload `{lineId, reason?}`. 신고된 문장은 즉시 숨김, 부서 리포트
 ## 5. data.js에 둘 export (시그니처)
 
 ```js
-login(id, pw) · getMe() · askBoo(question)
+login(id, pw) · getMe() · askBoo(question) · setRecommendable(on)   // setRecommendable [11/23 추천]
 interviewNext(program, answers) · summarizeInterview(program, transcript) · saveConsent(draftId, edits)
 listNotes(filter) · getNote(id) · scrapNote(noteId, scrap = true) · saveQuestion(noteId, section) · reportStatement(lineId, reason)   // scrapNote·saveQuestion [11/22]
 recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages() · respondRequest(threadId, accept) · cancelRequest(threadId) · reportThread(threadId, reason, block = false)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85) · reportThread [11/23 차단]

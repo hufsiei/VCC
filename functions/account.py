@@ -102,6 +102,8 @@ def getMe(me, p):
     out["현장실습후기"] = _pick(_rows("internships"), "학번", me, INTERN_KEYS)
     import demand   # [11/22] 선배 추천 열림(닮은선배 잠김 화면·인터BOO 안내)
     out["recommend"] = demand.recommend_status(me)
+    import runtime_fns   # [11/23] 닮은선배 추천받기(기본 켬). 내 보관함에서 끌 수 있다
+    out["recommendable"] = runtime_fns.recommendable(me)
     return out
 
 
