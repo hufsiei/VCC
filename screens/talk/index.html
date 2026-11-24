@@ -59,7 +59,7 @@
       <div class="header__actions">
         <!-- 직원 계정일 때만 보임(5-1): PC 관리자 콘솔을 새 탭으로 -->
         <a class="icon-btn" id="consoleBtn" href="../admin/" target="_blank" rel="noopener" aria-label="관리자 콘솔" hidden><i data-lucide="chart-column" class="icon"></i></a>
-        <a class="icon-btn" href="../questions/#alerts" aria-label="알림"><i data-lucide="bell" class="icon"></i></a>
+        <a class="icon-btn" id="bellBtn" href="../questions/#alerts" aria-label="알림"><i data-lucide="bell" class="icon"></i><span class="icon-btn__dot" id="bellDot" hidden></span></a>
       </div>
     </header>
 
@@ -143,6 +143,8 @@
 
 <script src="../../assets/lucide/lucide.min.js"></script>
 <script type="module" src="./talk.js"></script>
+<!-- 헤더 종의 새 소식 점(안 읽은 알림·쪽지, 11/24) — 내 보관함 폴더의 공통 모듈 -->
+<script type="module" src="../questions/bell.js"></script>
 <script type="module" src="../../common/consent.js"></script>
 </body>
 </html>
