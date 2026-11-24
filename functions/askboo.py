@@ -37,7 +37,9 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 
 MAX_LINES = 3        # 폴백(원문 인용) 문장 수 상한 (spec 8장: 출처 달린 문장 3개)
-MAX_PICK = 8         # [v2] 고르기가 고르는 문장 수 상한 — 답쓰기에 넣는 근거
+MAX_PICK = 16        # [v2] 고르기가 고르는 문장 수 상한 — 답쓰기에 넣는 근거
+                     # [11/24 작업 87] 8 → 16: HCX가 「최대 3개」를 어기고 14개 넘게 고르다 max_tokens 30에 잘리면
+                     # 맞는 문장이 9번째라 빠졌다. 관련성은 답쓰기(Sonnet)가 다시 보므로 잘린 목록을 다 넘긴다.
 MAX_ANSWER_LINES = 4 # [v2] 답쓰기 문장 수 상한
 MAX_HISTORY = 4      # [v2] 질문정리에 넣는 이전 대화 수
 INTENTS = ("경험질문", "탐색", "대화", "규정", "사람찾기")
@@ -108,7 +110,9 @@ SECTION_BY_ITEM = {"1-1": "지원", "1-2": "지원", "1-3": "지원", "2-1": "�
 
 # 문장 앞의 군말 — 같은 문장 찾기(중복 제거)에만 쓴다. 원문은 바꾸지 않는다.
 FILLER_RE = re.compile(r"^(?:(?:참고로|경험상|사실|개인적으로|하나 꼽자면|미리 말해 두면|제 경우엔|지나고 보니|확실히|그리고|진짜|"
-                       r"솔직히 말하면|돌이켜 보면|지금 생각해도|그 시기엔|한국과 비교하면|날씨 얘기를 하자면|저는)\s*)+")
+                       r"솔직히 말하면|돌이켜 보면|지금 생각해도|그 시기엔|한국과 비교하면|날씨 얘기를 하자면|저는|"
+                       # [11/24 작업 87] 가상데이터 말머리 전수 확인으로 추가(덧붙이자면 137·저 같은 경우 31·체감상 22문장 등)
+                       r"덧붙이자면|저 같은 경우|체감상|사족이지만|하나 더,)\s*)+")
 
 
 # ── 데이터 (한 번만 읽는다) ───────────────────────────────────────────
@@ -244,7 +248,10 @@ def askBoo(me, payload, save=True):
         return _hold(me, question, programs[0], section, save, why=why)
 
     # ⑤ 답쓰기 + ⑥ 검증 (v2) → 다 버려지면 v1 원문 인용
-    out = compose(effective, picked)
+    # [11/24 작업 87] 답쓰기가 {"답":[]}(근거가 질문에 안 맞음)를 내면 원문을 답처럼 보여 주지 않고 보류한다
+    out = compose(effective, picked, on_empty=EMPTY_ANSWER)
+    if out is EMPTY_ANSWER:
+        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음")
     if out is None:
         out = fallback_lines(picked)
     out["noteId"] = notes.note_id(picked[0]["program"])
@@ -253,20 +260,19 @@ def askBoo(me, payload, save=True):
 
 
 def fallback_lines(picked):
-    """v1 ④ 변환 + ⑤ 사후 검증: 고른 문장을 하나씩 해요체로(검증에 걸리면 원문 인용). v2의 폴백."""
+    """v1 ④ 변환 + ⑤ 사후 검증: 고른 문장을 하나씩 해요체로(검증에 걸리면 원문 인용). v2의 폴백.
+    [11/24 작업 87] 답쓰기가 실패·탈락한 뒤의 줄이므로 모든 줄에 fallback을 붙인다(화면: 「근거 원문」).
+    이미 합쇼체라 변환을 건너뛴 원문도 BOO가 질문에 맞춰 쓴 답이 아니다."""
     lines, sources, seen, texts = [], {}, {}, set()
     for c in picked[:MAX_LINES]:
-        text, fallback = convert(c["text"])
+        text, _ = convert(c["text"])
         if _norm(text) in texts:   # 다른 보고서의 같은 문장은 한 번만
             continue
         texts.add(_norm(text))
         sid = c["sourceId"]
         seen[sid] = seen.get(sid, 0) + 1
-        line = {"text": text, "sourceId": sid, "cites": [sid],
-                "lineId": f"L-{sid}" if seen[sid] == 1 else f"L-{sid}.{seen[sid]}"}
-        if fallback:
-            line["fallback"] = True   # AI 문장을 버리고 근거 원문을 그대로 보여 준 줄(화면: 「근거 원문 보기」)
-        lines.append(line)
+        lines.append({"text": text, "sourceId": sid, "cites": [sid], "fallback": True,
+                      "lineId": f"L-{sid}" if seen[sid] == 1 else f"L-{sid}.{seen[sid]}"})
         sources[sid] = {"docType": c["docType"], "program": c["program"], "semester": c["semester"]}
     return {"status": "ok", "lines": lines, "sources": sources, "singleSenior": _single_senior([c["sourceId"] for c in picked[:MAX_LINES]])}
 
@@ -618,8 +624,12 @@ def match_check(source, sentence):
     return bool(r.get("ok") and isinstance(j, dict) and j.get("일치") is True)
 
 
-def compose(question, picked, max_lines=MAX_ANSWER_LINES):
+EMPTY_ANSWER = object()   # compose: 답쓰기가 {"답":[]}(근거가 질문에 안 맞음)를 낸 경우의 표지
+
+
+def compose(question, picked, max_lines=MAX_ANSWER_LINES, on_empty=None):
     """AI(답쓰기) → 문장마다 인용 근거와 대조. 돌려주는 값: {"status","lines","sources","singleSenior"} 또는 None(다 버려짐·실패).
+    답쓰기가 빈 목록을 내면 on_empty를 돌려준다(기본 None — tools/build_notes.py 칸 요약은 그대로 None).
     max_lines: 일치검사로 보낼 문장 수 상한(작업 78 칸 요약은 칸 근거 수에 따라 3·5)."""
     letters, numbered = {}, []
     for i, c in enumerate(picked, 1):
@@ -636,6 +646,8 @@ def compose(question, picked, max_lines=MAX_ANSWER_LINES):
     answers = j.get("답") if isinstance(j, dict) else None
     if not isinstance(answers, list):
         return None
+    if not answers:
+        return on_empty
     todo = []   # (문장, 인용 근거) — 코드 검증을 통과한 것만 일치검사로
     for a in answers:
         if not isinstance(a, dict) or not isinstance(a.get("text"), str):
