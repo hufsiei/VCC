@@ -146,6 +146,11 @@ expect("6문항 ③ KOTRA 없음", progs3 and not any(p in KOTRAS for p in progs
 expect("6문항 ⑤ 독일 노트 개수 문장", "독일에서 한 현장실습 해봤노트는 0개" in outs[4].get("message", ""), outs[4].get("message"))
 expect("6문항 ⑥ 유무 질문 → 독일 개수로 답(chat, 질문함 없음)",
        outs[5]["status"] == "chat" and "독일" in outs[5]["message"] and "0개" in outs[5]["message"] and "questionId" not in outs[5], outs[5])
+expect("6문항 ④ chat, 앞(③)이 노트 목록이면 「아까는 KOTRA 이야기」라고 하지 않음",
+       outs[3]["status"] == "chat" and not outs[3]["message"].startswith("아까는") and "KOTRA 해외무역관은 빼고 노트를 보여 드렸어요" in outs[3]["message"],
+       outs[3].get("message"))
+expect("6문항 ④ 칩: 다른 현장실습 노트 보기(KOTRA 제외)",
+       outs[3]["chips"][0]["label"] == "다른 현장실습 노트 보기" and set(outs[3]["chips"][0]["payload"]["exclude"]) >= {KOTRA}, outs[3]["chips"])
 expect("6문항 ⑥이 ④와 다른 답", outs[5].get("message") != outs[3].get("message"), (outs[3].get("message"), outs[5].get("message")))
 
 # 바로 앞이 chat이면 같은 「아까는 ○○ 이야기」 안내를 되풀이하지 않는다

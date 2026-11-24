@@ -381,24 +381,37 @@ FIELD_NOUN = {"국제교류": "교환·파견 해봤노트", "현장실습": "�
 
 def _chat(plan, history):
     """status "chat": AI가 쓰지 않는 고정 문구 + 칩. 질문함에 저장하지 않는다(답할 질문이 아님)."""
+    # [11/24] 문구는 바로 앞 턴이 실제로 보여 준 것을 따른다. 예전에는 「제외」를 먼저 봐서, ③이 이미 다른 노트 목록을
+    #   보여 준 뒤에도 ④가 「아까는 KOTRA … 이야기였어요」라고 했다(캡처 ④). 뺀 프로그램은 「빼고 보고 있어요」로만 말한다.
     last = history[-1] if history else None
-    program = (plan["제외"] or [None])[0] or (last["program"] if last and last["program"] else None)
-    field = plan["분야"] or (PROGRAMS.get(program, {}).get("분야") if program else None)
+    program = last["program"] if last and last["program"] else None    # 앞 답의 근거 프로그램
+    excl = plan["제외"]
+    field = plan["분야"] or (PROGRAMS.get(program, {}).get("분야") if program else None) \
+        or (PROGRAMS.get(excl[0], {}).get("분야") if excl else None)
+    lab = _label(excl) if excl else ""
+    noun = FIELD_NOUN.get(field, "해봤노트")
     chips = []
-    if program and last and last["status"] == "chat":
-        # [11/24] 바로 앞도 chat이면 같은 안내를 되풀이하지 않는다
-        message = (f"{_label(plan['제외'] or [program])}{_josa('은는', _label(plan['제외'] or [program]))} 빼고 볼게요. "
-                   f"궁금한 주제(업무·지원·배운 점 등)를 적어 주시거나 다른 노트를 둘러보세요.")
-        chips.append({"label": "다른 노트 보기", "action": "notes", "payload": {"field": field, "exclude": plan["제외"] or [program]}})
+    if last and last["status"] == "chat" and (program or excl):
+        # 바로 앞도 chat이면 같은 안내를 되풀이하지 않는다
+        lab = lab or program
+        message = f"{lab}{_josa('은는', lab)} 빼고 볼게요. 궁금한 주제(업무·지원·배운 점 등)를 적어 주시거나 다른 노트를 둘러보세요."
+        chips.append({"label": "다른 노트 보기", "action": "notes", "payload": {"field": field, "exclude": excl or [program]}})
+    elif last and last["status"] == "notes":
+        # 앞 턴이 노트 목록이었다 — 그 목록이 겹쳤거나 맞지 않았다는 말로 받는다
+        head = f"{lab}{_josa('은는', lab)} 빼고 노트를 보여 드렸어요. " if excl else ""
+        message = (f"{head}앞에서 본 노트와 겹쳤다면 궁금한 기관 유형이나 주제(업무·지원·배운 점 등)를 적어 주세요. "
+                   f"그 노트에서 선배 이야기를 찾아 답해 드릴게요.")
+        chips.append({"label": f"다른 {noun.replace(' 해봤노트', ' 노트')} 보기" if field else "해봤노트 둘러보기",
+                      "action": "notes", "payload": {"field": field, "exclude": excl}})
     elif program:
-        message = f"아까는 {program} 이야기였어요. 다른 {FIELD_NOUN.get(field, '해봤노트')}를 찾아볼까요?"
+        message = f"아까는 {program} 이야기였어요. 다른 {noun}를 찾아볼까요?"
         chips.append({"label": "다른 노트 보기", "action": "notes", "payload": {"field": field, "exclude": [program]}})
+    elif excl:
+        message = f"{lab}{_josa('은는', lab)} 빼고 볼게요. 다른 {noun}를 찾아볼까요?"
+        chips.append({"label": "다른 노트 보기", "action": "notes", "payload": {"field": field, "exclude": excl}})
     elif last and last["status"] == "hold":
         message = "아직 그 내용을 들려준 선배가 없어서 질문함에 담아 두었어요. 선배가 답하면 알림으로 알려 드릴게요."
         chips.append({"label": "닮은선배 보기", "action": "ask", "payload": {}})
-    elif last and last["status"] == "notes":
-        message = "방금 보여 드린 노트 목록이 맞지 않았나요? 궁금한 프로그램 이름이나 주제(기숙사·비용·업무 등)를 적어 주시면 그 노트로 답해 드릴게요."
-        chips.append({"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field}})
     else:
         message = "무엇이 궁금한지 조금 더 구체적으로 물어봐 주세요. 예: 「마르부르크 기숙사 어땠어요?」"
         chips.append({"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field}})
