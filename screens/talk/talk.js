@@ -227,20 +227,55 @@ function setMode(next) {
 tabTell.addEventListener("click", () => setMode("tell"));
 tabAsk.addEventListener("click", () => setMode("ask"));
 
+// 예시 문구(11/24): 입력창의 흐린 예시를 PC에서는 Tab으로 채운다. 휴대폰은 질문 아래 예시 칩을 누른다(Tab 키가 없음).
+// 「…」로 끝나는 말머리 예시(「가장 크게 배운 건 …」)는 「…」를 지우고 이어 쓰게 채운다 — 바로 보내지 않는다(디자인 규칙 5-7).
+const ASK_EXAMPLE = "마르부르크 생활비 얼마예요?"; // 360px 휴대폰에서도 잘리지 않게 짧게(14px, #132 생활비 질문)
+const canTab = !!(window.matchMedia && window.matchMedia("(pointer: fine)").matches); // 마우스·키보드 기기에서만 「Tab」 안내
+const exampleFill = (ex) => String(ex).replace(/\s*…\s*$/, " ");
+function currentExamples() {
+  if (mode === "ask") return [ASK_EXAMPLE];
+  const step = tell.step;
+  if (!step || step.done || !Array.isArray(step.examples)) return [];
+  return step.examples.slice(0, 3);
+}
+function fillExample(ex) {
+  composerInput.value = exampleFill(ex);
+  updateComposer();
+  composerInput.focus();
+  const end = composerInput.value.length;
+  composerInput.setSelectionRange(end, end); // 말머리 뒤에 바로 이어 쓰게
+}
+
 // 입력줄: 모드별 안내 문구, 보낼 수 있을 때만 전송 버튼 활성
 function updateComposer() {
   // 질문이 끝난 뒤에도 칸을 고르면 이어서 쓸 수 있다
   const tellReady = mode === "tell" && tell.step && !tell.busy && (!tell.step.done || tell.extra);
   const enabled = mode === "ask" ? !ask.busy : tellReady;
   composerInput.disabled = !enabled;
+  const examples = currentExamples();
+  const tabHint = canTab && examples.length ? " · Tab" : "";
   composerInput.placeholder = mode === "ask"
-    ? "예: 마르부르크 생활비 얼마예요?" // 360px 휴대폰에서도 잘리지 않게 짧게(14px, #132 생활비 질문)
+    ? `예: ${ASK_EXAMPLE}${tabHint}`
     : tell.step && tell.step.done
       ? (tell.extra ? `「${tell.extra}」에 이어서 쓰기` : "위 칸을 골라 이어서 써 주세요")
-      : "경험을 들려주세요";
+      : examples.length ? `예: ${exampleFill(examples[0]).trim()}${tabHint}` : "경험을 들려주세요";
   sendBtn.disabled = !enabled || composerInput.value.trim() === "";
 }
 composerInput.addEventListener("input", updateComposer);
+
+// PC: 입력창이 비었을 때 Tab → 첫 예시, 예시를 채운 상태에서 Tab → 다음 예시. 마지막 예시에서 Tab·Shift+Tab·직접 쓴 글이 있으면
+// 원래대로 다음 칸으로 넘어간다(키보드로 빠져나갈 수 있게). 한글 조합 중(isComposing)에는 건드리지 않는다
+composerInput.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey || e.isComposing || composerInput.disabled) return;
+  const list = currentExamples();
+  if (!list.length) return;
+  const now = composerInput.value;
+  const at = list.findIndex((ex) => exampleFill(ex) === now);
+  if (now.trim() !== "" && at < 0) return;       // 직접 쓴 글이 있으면 그대로
+  if (at === list.length - 1) return;             // 마지막 예시까지 채웠으면 다음 칸으로
+  e.preventDefault();
+  fillExample(list[at + 1]);
+});
 
 composer.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -741,7 +776,7 @@ function interviewQuestion(step) {
       className: "btn btn--secondary",
       text: ex,
       attrs: { type: "button" },
-      on: { click: () => { composerInput.value = ex; updateComposer(); composerInput.focus(); } },
+      on: { click: () => fillExample(ex) }, // 「…」 말머리는 「…」를 지우고 이어 쓰게(바로 보내지 않음)
     }))));
   }
   body.append(el("span", { className: "msg__time", text: timeText() }));
