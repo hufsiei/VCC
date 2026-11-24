@@ -79,8 +79,9 @@ def _cors(args):
 
 
 def _reply(args, out, status=200):
-    headers = _cors(args)
-    headers["Content-Type"] = "application/json; charset=utf-8"
+    # API Gateway(/{fn} 리소스)가 OPTIONS 응답과 CORS 헤더를 직접 붙인다. 여기서도 붙이면 Allow-Origin이 두 개가 되어
+    # 브라우저가 응답을 막는다(11/24 확인). 그래서 본 응답에는 붙이지 않는다. OPTIONS가 액션까지 오는 경우만 _cors.
+    headers = {"Content-Type": "application/json; charset=utf-8"}
     return {"statusCode": status, "headers": headers, "body": json.dumps(out, ensure_ascii=False)}
 
 

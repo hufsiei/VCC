@@ -48,8 +48,12 @@ r = main.main({**PARAMS, "__ow_method": "options", "__ow_headers": {"origin": OR
 check("OPTIONS 204 + 허용 origin", r["statusCode"] == 204 and r["headers"].get("Access-Control-Allow-Origin") == ORIGIN)
 check("X-Token 헤더 허용", "X-Token" in r["headers"]["Access-Control-Allow-Headers"])
 
-r, out = call("/getMe", origin="https://evil.example")
-check("다른 origin에는 Allow-Origin 없음", "Access-Control-Allow-Origin" not in r["headers"])
+r, out = call("/getMe")
+check("본 응답에는 CORS 헤더를 붙이지 않음(API Gateway가 붙임 — 두 개면 브라우저가 막음)",
+      not any(k.lower().startswith("access-control") for k in r["headers"]))
+r = main.main({**PARAMS, "__ow_method": "post", "__ow_path": "/", "__ow_query": "fn=getMe", "__ow_body": "{}",
+               "__ow_headers": {}})
+check("쿼리 fn= → 함수 이름(API Gateway는 경로를 / 로 넘김)", "로그인이 필요해요" in r["body"])
 
 r = main.main({**PARAMS, "__ow_method": "post", "__ow_path": "/login", "id": "H0143", "pw": "test-pw", "__ow_headers": {}})
 check("Raw HTTP 아니면 거절(본문이 파라미터를 덮지 못하게)", r["statusCode"] == 500 and "Raw HTTP" in json.loads(r["body"])["error"])

@@ -342,7 +342,8 @@ async function call(name, payload = {}) {
     const headers = { "Content-Type": "application/json" };
     const me = currentUser();
     if (me && me.token) headers["X-Token"] = me.token; // 서버가 토큰으로 누가 불렀는지 안다 (spec 2-1)
-    const res = await fetch(`${FN_BASE}/${name}`, {
+    // [작업 58] ?fn=: NCP API Gateway가 경로 {fn}을 액션에 넘기지 않아 쿼리로도 보낸다(local_fn은 쿼리를 무시)
+    const res = await fetch(`${FN_BASE}/${name}?fn=${encodeURIComponent(name)}`, {
       method: "POST",
       keepalive: true, // 로그아웃 직후 화면이 바뀌어도 요청이 끊기지 않게
       headers,
