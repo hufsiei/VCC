@@ -1,11 +1,14 @@
-// 내 보관함 화면 (작업 23) — 1단계: 내 경험노트 / 질문함 / 스크랩 탭
-//   2단계: 알림 목록(#alerts) · 내 경험노트 상세(?mynote=M-…) · 질문 상세(?question=Q-…)
+// 내 보관함 화면 (작업 23) — 1단계: 내 경험노트 / 질문함 / 쪽지 / 스크랩 탭
+//   2단계: 알림 목록(#alerts) · 내 경험노트 상세(?mynote=M-…) · 질문 상세(?question=Q-…) · 쪽지 대화(?tab=messages&thread=T-…)
+//   쪽지 탭과 대화는 messages.js(11/24 닮은선배 · 내 쪽지에서 옮김), 헤더 종의 점은 bell.js(네 화면 공통)
 // 기준: docs/design-rules.md 7-⑥·5-2·6-1~6-5·8절(내 경험노트 상세·질문 상세·알림 목록),
 //       docs/spec-v1.md 4장 getInbox·getMyNote·getNote·listNotes·scrapNote·saveConsent
 // 규칙: 데이터는 common/data.js 함수로만, 화면 글은 textContent로만(innerHTML 금지), 색은 style.css 변수만.
 // 공개 동의 시트는 common/consent.js(작업 70, 11/22 common으로 옮김)를 쓴다: "open-consent"로 열고 "consent-saved"로 끝을 받는다.
 
 import { currentUser, getInbox, getMyNote, getNote, listNotes, scrapNote } from "../../common/data.js";
+import { isUnread, markSeen, refreshBell, onBell, unreadOf, threadHasNews } from "./bell.js";
+import { setupMessages, renderMessagesTab, openThread, stopPolling, allThreads, loadThreads } from "./messages.js";
 
 // ---------------------------------------------------------------------------
 // 0. 로그인 확인
@@ -21,7 +24,7 @@ const KIND_NAME = { 교환: "교환학생", 파견: "파견", 인턴: "인턴", 
 const DOC_LABEL = { 귀국보고서: "결과보고서", 현장실습후기: "현장실습후기", 인터뷰: "선배 인터뷰" };
 const QUESTION_SECTION = "후배 질문";
 const DASH = "–";
-const TABS = ["notes", "questions", "scraps"];
+const TABS = ["notes", "questions", "messages", "scraps"];
 
 // ---------------------------------------------------------------------------
 // 1. 작은 도우미 — 요소 만들기(글은 textContent로만), 아이콘, 토스트, 날짜·학기
@@ -103,15 +106,7 @@ function errorBox(onRetry, message = "불러오지 못했어요") {
   ]);
 }
 
-// 안 읽은 알림: 이 탭에서 알림 목록을 마지막으로 연 시각보다 늦은 알림(getInbox에 읽음 표시가 없어서 탭마다 기억)
-const SEEN_KEY = "vccAlertsSeenAt";
-function seenAt() {
-  try { return sessionStorage.getItem(SEEN_KEY) || ""; } catch { return ""; }
-}
-function markSeen() {
-  try { sessionStorage.setItem(SEEN_KEY, new Date().toISOString()); } catch { /* 저장 못 해도 화면은 그대로 */ }
-}
-const isUnread = (a) => !seenAt() || new Date(a.at) > new Date(seenAt());
+// 안 읽은 알림·쪽지 판단(isUnread·unreadOf)과 종 점은 bell.js가 맡는다(네 화면 공통)
 
 // ---------------------------------------------------------------------------
 // 2. 화면 이동 — 주소로 정한다. 들어간 화면은 pushState라 브라우저 뒤로도 같이 동작
@@ -147,9 +142,11 @@ const views = {
   alerts: document.getElementById("viewAlerts"),
   myNote: document.getElementById("viewMyNote"),
   question: document.getElementById("viewQuestion"),
+  thread: document.getElementById("viewThread"),
 };
 function show(name) {
   for (const [k, v] of Object.entries(views)) v.hidden = k !== name;
+  if (name !== "thread") stopPolling();
 }
 
 function route() {
@@ -166,9 +163,14 @@ function route() {
     show("question");
     window.scrollTo(0, 0);
     renderQuestion(params.get("question"));
+  } else if (params.get("thread")) {
+    show("thread");
+    window.scrollTo(0, 0);
+    openThread(params.get("thread"));
   } else {
     show("inbox");
     document.title = "내 보관함 · 외대人사이드";
+    if (inbox && currentTab === "messages") renderPanel(); // 대화에서 돌아오면 상태·안 읽음이 바뀌었을 수 있음
     window.scrollTo(0, inboxScrollY);
   }
 }
@@ -223,19 +225,31 @@ function loadInbox() {
   return inboxReady;
 }
 
-// 탭 이름 옆 개수 + 새 소식 점, 헤더 종의 점
+// 탭 이름 옆 개수 + 새 소식 점, 헤더 종의 점(bell.js)
+// 쪽지 탭 점: 안 읽은 쪽지 또는 받은 수락 대기 요청. 쪽지 수는 getMessages를 받은 뒤에 채운다
+let threadsKnown = false;
 function renderTabsMeta() {
-  const counts = { notes: inbox.myNotes.length, questions: inbox.questions.length, scraps: inbox.scraps.length };
+  if (!inbox) return;
+  const threads = allThreads();
+  const counts = { notes: inbox.myNotes.length, questions: inbox.questions.length, messages: threadsKnown ? threads.length : "", scraps: inbox.scraps.length };
   const unread = inbox.alerts.filter(isUnread);
-  const news = { notes: false, questions: unread.some((a) => a.questionId), scraps: false };
+  const news = { notes: false, questions: unread.some((a) => a.questionId), messages: threads.some(threadHasNews), scraps: false };
   for (const t of TABS) {
     const btn = document.getElementById(`tab-${t}`);
     btn.querySelector(".top-tab__count").textContent = String(counts[t]);
     btn.querySelector(".top-tab__dot").hidden = !news[t];
   }
-  document.getElementById("bellDot").hidden = unread.length === 0;
-  document.getElementById("bellBtn").setAttribute("aria-label", unread.length ? `알림, 새 알림 ${unread.length}개` : "알림");
+  refreshBell({ alerts: inbox.alerts });
 }
+setupMessages({
+  go: (query) => go(query),
+  goBack: () => goBack(),
+  onChange: () => { threadsKnown = true; renderTabsMeta(); },
+});
+// 종(bell.js)이 15초마다 새로 받은 알림도 보관함 탭 점에 반영한다
+onBell(({ alerts }) => {
+  if (inbox && alerts) { inbox.alerts = alerts; renderTabsMeta(); }
+});
 
 // ---------------------------------------------------------------------------
 // 4. 1단계 탭 내용
@@ -426,6 +440,7 @@ function renderPanel() {
   panel.setAttribute("aria-busy", "false");
   panel.setAttribute("aria-labelledby", `tab-${currentTab}`);
   if (currentTab === "questions") renderQuestionsTab(panel);
+  else if (currentTab === "messages") renderMessagesTab(panel);
   else if (currentTab === "scraps") renderScrapsTab(panel);
   else renderNotesTab(panel);
   drawIcons();
@@ -458,16 +473,25 @@ async function renderAlerts() {
       return;
     }
   }
-  if (!inbox.alerts.length) {
-    body.replaceChildren(emptyBox("아직 알림이 없어요", "선배가 내 질문에 답하면 여기에 알려 드려요.", null));
+  // 대화 중 새 쪽지는 서버가 알림을 만들지 않으므로(unread만 옴) 안 읽은 대화를 「새 쪽지」 줄로 맨 위에 붙인다
+  // — 종 점이 쪽지 때문에 켜졌을 때 여기서 무엇이 왔는지 보이게(11/24). 대화를 열면 사라진다
+  if (!threadsKnown) await loadThreads();
+  // 서버가 이미 알림을 만든 대화(받은 요청 「쪽지 요청이 왔어요」 등)는 겹치지 않게 뺀다
+  const alerted = new Set(inbox.alerts.map((a) => a.threadId).filter(Boolean));
+  const noteRows = allThreads().filter((t) => unreadOf(t) > 0 && !alerted.has(t.threadId)).map((t) => {
+    const lastMsg = (t.messages || [])[(t.messages || []).length - 1];
+    return { text: `새 쪽지 ${unreadOf(t)}개 · ${t.nickname || "상대"}`, threadId: t.threadId, at: (lastMsg && lastMsg.at) || t.requestedAt, fresh: true };
+  });
+  if (!inbox.alerts.length && !noteRows.length) {
+    body.replaceChildren(emptyBox("아직 알림이 없어요", "선배가 내 질문에 답하거나 쪽지가 오면 여기에 알려 드려요.", null));
     drawIcons();
     return;
   }
-  const rows = inbox.alerts
+  const rows = [...noteRows, ...inbox.alerts
     .slice()
-    .sort((a, b) => String(b.at).localeCompare(String(a.at)))
+    .sort((a, b) => String(b.at).localeCompare(String(a.at)))]
     .map((a) => {
-      const unread = isUnread(a);
+      const unread = a.fresh || isUnread(a);
       const inner = [
         icon(a.threadId ? "mail" : a.questionId ? "message-circle" : "notebook-text"),
         el("div", { className: "alert-row__body" }, [
@@ -488,9 +512,17 @@ async function renderAlerts() {
         });
         return row;
       }
-      // 쪽지 알림(「쪽지 요청이 왔어요」·「선배가 아직 못 봤어요…」)은 그 대화로 바로(11/23 미리님 결정, 작업 28)
+      // 쪽지 알림(「쪽지 요청이 왔어요」·「선배가 아직 못 봤어요…」·새 쪽지)은 그 대화로 바로 — ← 하면 쪽지 탭으로(11/24)
       if (a.threadId) {
-        return el("a", { className: cls, attrs: { href: `../senior/?thread=${encodeURIComponent(a.threadId)}` } }, inner);
+        const row = el("a", { className: cls, attrs: { href: `?tab=messages&thread=${encodeURIComponent(a.threadId)}` } }, inner);
+        row.addEventListener("click", (e) => {
+          e.preventDefault();
+          selectTab("messages", { updateUrl: false });
+          history.replaceState(null, "", inboxUrl());
+          movedInside = false;
+          go(`thread=${encodeURIComponent(a.threadId)}`);
+        });
+        return row;
       }
       return a.noteId
         ? el("a", { className: cls, attrs: { href: `../note/?id=${encodeURIComponent(a.noteId)}` } }, inner)
@@ -739,12 +771,15 @@ async function renderQuestion(questionId) {
 const params = new URLSearchParams(location.search);
 const fromLater = params.get("from") === "later";
 // 상세 주소(?mynote=·?question=)로 바로 들어왔으면 주소는 그대로 두고 탭만 맞춘다
-const deepLink = params.has("mynote") || params.has("question");
-selectTab(params.get("tab") || (params.has("question") ? "questions" : "notes"), { updateUrl: !deepLink });
+// 다른 화면의 종(../questions/#alerts)으로 들어왔을 때도 주소를 그대로 둔다 — 탭 주소로 바꾸면 #alerts가 지워져 알림 목록이 안 열렸다(11/24 고침)
+const deepLink = params.has("mynote") || params.has("question") || params.has("thread") || location.hash === "#alerts";
+selectTab(params.get("tab") || (params.has("question") ? "questions" : params.has("thread") ? "messages" : "notes"), { updateUrl: !deepLink });
 drawIcons();
 if (me) {
   loadInbox().then(() => {
     if (fromLater) toast("내 경험노트에 저장해 두었어요. 언제든 해봤노트에 공유할 수 있어요");
+    // 쪽지 탭 숫자·점도 처음부터 보이게(쪽지 탭·대화로 바로 들어왔으면 그쪽에서 이미 부른다)
+    if (!threadsKnown && currentTab !== "messages") loadThreads();
   });
   route();
 }

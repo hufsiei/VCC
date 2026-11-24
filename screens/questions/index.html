@@ -19,7 +19,8 @@
   }
   .top-tab {
     position: relative;
-    flex: 1;
+    flex: 1 1 auto; /* 4탭(11/24 쪽지 추가): 글자 길이만큼 나눠 「내 경험노트」가 꺾이지 않게 */
+    white-space: nowrap;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -111,6 +112,35 @@
   .state-box { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-lg) 0; text-align: center; }
   .state-box__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
   .state-box .boo-illust { width: 80px; height: 80px; }
+
+  /* ---------- 쪽지 탭(11/24 닮은선배 · 내 쪽지에서 옮김) ---------- */
+  .count-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--status-error-fg); color: var(--color-on-primary); font-size: var(--font-size-caption); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tab-panel > .section-title { margin-top: var(--space-sm); }
+  .msg-group { display: flex; flex-direction: column; gap: 12px; }
+  .thread-row { display: flex; align-items: flex-start; gap: 12px; color: inherit; text-decoration: none; cursor: pointer; }
+  .thread-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-xs); }
+  .thread-row__name { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); font-weight: 600; color: var(--color-heading); }
+  .thread-row__last { overflow: hidden; color: var(--color-text-muted); font-size: var(--font-size-secondary); white-space: nowrap; text-overflow: ellipsis; }
+  .thread-row__time { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+  .thread-row--muted .thread-row__name { color: var(--color-text-muted); }
+  .request-card { display: flex; flex-direction: column; gap: 12px; }
+  .request-card__who { font-weight: 600; color: var(--color-heading); }
+  .request-card__text { padding: var(--space-sm) 12px; border-radius: var(--radius-card); background: var(--color-neutral-bg); }
+
+  /* ---------- 2단계: 쪽지 대화 ---------- */
+  .thread-page { padding-bottom: calc(var(--button-height) + 88px); }
+  .thread-top { display: flex; flex-direction: column; gap: var(--space-sm); margin-bottom: var(--space-md); }
+  .thread-top .status-label { align-self: flex-start; }
+  .msg--them .msg__body { max-width: calc(100% - 48px); }
+  .dock .composer .input { flex: 1; }
+  .dock-note { display: flex; flex-direction: column; gap: var(--space-sm); }
+  .dock-note .btn-reason { justify-content: center; margin-top: 0; }
+  #threadMenu[hidden], #threadMenuSpacer[hidden] { display: none; }
+  #reportBlockRow[hidden] { display: none; }
+  /* 쪽지 검사 주의: 라벨(한 줄) + 그 아래 14px 문구 */
+  .check-warn { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); }
+  .check-warn[hidden] { display: none; }
+  .check-warn__text { font-size: var(--font-size-secondary); }
 </style>
 </head>
 <body>
@@ -134,7 +164,7 @@
     <main class="page">
       <div class="inbox-top">
         <h1 class="page-title">내 보관함</h1>
-        <p class="sub">내 경험노트, 질문, 담아 둔 해봤노트를 모아 봐요.</p>
+        <p class="sub">내 경험노트, 질문, 쪽지, 담아 둔 해봤노트를 모아 봐요.</p>
         <span class="status-label status-label--info"><i data-lucide="lock" class="icon"></i>나만 보기</span>
       </div>
 
@@ -144,6 +174,9 @@
         </button>
         <button class="top-tab" type="button" role="tab" id="tab-questions" data-tab="questions" aria-controls="tabPanel" aria-selected="false">
           <span class="top-tab__label">질문함<span class="top-tab__dot" hidden></span></span><span class="top-tab__count"></span>
+        </button>
+        <button class="top-tab" type="button" role="tab" id="tab-messages" data-tab="messages" aria-controls="tabPanel" aria-selected="false">
+          <span class="top-tab__label">쪽지<span class="top-tab__dot" hidden></span></span><span class="top-tab__count"></span>
         </button>
         <button class="top-tab" type="button" role="tab" id="tab-scraps" data-tab="scraps" aria-controls="tabPanel" aria-selected="false">
           <span class="top-tab__label">스크랩<span class="top-tab__dot" hidden></span></span><span class="top-tab__count"></span>
@@ -197,6 +230,58 @@
       <div class="detail" id="questionBody" aria-busy="true"></div>
     </main>
   </section>
+
+  <!-- ===== 2단계: 익명 쪽지 대화 (상세 헤더 + 채팅, 8절 — 11/24 닮은선배에서 옮김) ===== -->
+  <section id="viewThread" hidden>
+    <header class="header">
+      <button class="icon-btn" data-back type="button" aria-label="뒤로"><i data-lucide="arrow-left" class="icon"></i></button>
+      <h2 class="header__title" id="threadTitle">쪽지</h2>
+      <!-- 쪽지 ⋮ 메뉴(5-2 보조 아이콘, 8절 익명 쪽지 대화): 신고·차단 -->
+      <button class="icon-btn" id="threadMenu" type="button" aria-label="신고·차단 메뉴" aria-haspopup="dialog" hidden><i data-lucide="ellipsis-vertical" class="icon"></i></button>
+      <span class="icon-btn" id="threadMenuSpacer" aria-hidden="true"></span>
+    </header>
+    <main class="page thread-page">
+      <div id="threadTop"></div>
+      <div class="chat" id="threadChat" aria-live="polite"></div>
+    </main>
+    <div class="dock dock--bottom" id="threadDock"></div>
+  </section>
+
+  <!-- ===== 확인 바텀시트 (5-10) — 요청 취소·차단처럼 되돌리기 어려운 동작 ===== -->
+  <div class="sheet-layer" id="confirmSheet" hidden>
+    <div class="sheet-scrim"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" tabindex="-1">
+      <div class="sheet__handle" aria-hidden="true"></div>
+      <h2 class="sheet__title" id="confirmTitle">확인</h2>
+      <div class="sheet__body"><p id="confirmText"></p></div>
+      <div class="sheet__footer">
+        <button class="btn btn--primary btn--block" id="confirmOk" type="button">확인</button>
+        <button class="btn btn--text" id="confirmCancel" type="button">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 신고·차단 바텀시트 (5-10 신고 사유 선택, 8절 익명 쪽지 대화 ⋮) — 차단은 확인 시트를 한 번 더 ===== -->
+  <div class="sheet-layer" id="reportSheet" hidden>
+    <div class="sheet-scrim"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="reportTitle" tabindex="-1">
+      <div class="sheet__handle" aria-hidden="true"></div>
+      <h2 class="sheet__title" id="reportTitle">이 대화를 신고할까요?</h2>
+      <div class="sheet__body">
+        <p class="sub">신고하면 담당자가 확인해요. 상대에게는 알리지 않아요.</p>
+        <div class="choice-list" id="reportReasons" role="group" aria-label="신고 사유"></div>
+        <label class="check-row" id="reportBlockRow">
+          <input class="checkbox" id="reportBlock" type="checkbox">
+          <span>차단도 하기 · 이 대화에서 두 사람 모두 더 쪽지를 보낼 수 없어요</span>
+        </label>
+      </div>
+      <div class="sheet__footer">
+        <button class="btn btn--danger btn--block" id="reportSubmit" type="button" disabled>신고하기</button>
+        <p class="btn-reason" id="reportHint"><i data-lucide="info" class="icon"></i><span>사유를 고르거나 차단을 선택해 주세요</span></p>
+        <button class="btn btn--text" id="reportCancel" type="button">취소</button>
+      </div>
+    </div>
+  </div>
 
   <div class="toast-host" id="toastHost" role="status" aria-live="polite"></div>
 </div>
