@@ -473,9 +473,9 @@ payload `{threadId, reason?, block?}`. 쪽지 대화 ⋮ 메뉴의 신고·차�
 ### saveInterviewDraft(program, answers) · getInterviewDraft(program) [v2, P1-여건 79]
 들려주기 미완성 초안. 답할 때마다 `saveInterviewDraft(program, answers)`(answers는 interviewNext payload와 같은 모양), 들어올 때 `getInterviewDraft(program)` → `{answers, savedAt}` 또는 `{answers: []}`. 사람·프로그램별 하나, `runtime/interviewDrafts.json`. **7일** 지나면 없는 것으로 보고, `summarizeInterview`가 끝나면 지운다(0장 보관기간). 마스킹 전 원문이므로 본인만(`owner == me`). AI 없음. 빈 `answers`로 저장하면 초안을 지운다(`savedAt: null`). 답은 30개·한 답 1000자까지 남기고, 읽거나 쓸 때 7일 지난 초안을 모두 지운다(스케줄러 없음).
 - **1단계(즉시, 서버 없음)**: 화면이 들려주기·물어보기 대화를 `sessionStorage`에 프로그램별로 저장·복원한다(탭마다 따로 — 두 창 시연). 돌아오면 BOO가 「아까 이야기를 이어서 할게요」 + 마지막 질문을 다시 보인다. 물어보기 저장분은 askBoo `history`로도 쓴다.
-  - **[11/24 구현]** 키 `talkKeep:<colreg_no>` 하나(사람별). 두 모드의 말풍선·`history`·들려주기 상태(고른 경험·`answers`·마지막 `interviewNext` 응답)를 담고, 주소에 `mode`가 없으면(하단 탭으로 돌아옴) 떠날 때 보던 모드로 연다. 지나간 말풍선의 버튼은 끄고 마지막 질문만 새로 보인다. 오류 답은 남기지 않는다. 로그아웃하면 지운다. 들려주기는 한 탭에 한 경험이므로 복원 말풍선에 Text 「다른 경험 들려주기」(이수 경험이 2개 이상일 때 — 이 탭의 들려주기 대화만 비움, 서버 초안은 남음).
+  - **[11/24 구현]** 키 `talkKeep:<colreg_no>` 하나(사람별). 두 모드의 말풍선·`history`·들려주기 상태(고른 경험·`answers`·마지막 `interviewNext` 응답)를 담고, 주소에 `mode`가 없으면(하단 탭으로 돌아옴) 떠날 때 보던 모드로 연다. 지나간 말풍선의 버튼은 끄고 마지막 질문만 새로 보인다. 오류 답은 남기지 않는다. 로그아웃하면 지운다. **`summarizeInterview`가 끝나면 들려주기 보존도 지운다**(돌아와서 다시 요약해 고친 내 경험노트를 덮어쓰지 않게 — 그 뒤 이어서 쓴 답도 이 탭·서버 초안에 남기지 않는다). 들려주기는 한 탭에 한 경험이므로 복원 말풍선에 Text 「다른 경험 들려주기」(이수 경험이 2개 이상일 때 — 이 탭의 들려주기 대화만 비움, 서버 초안은 남음).
 - **2단계(작업 79)**: 위 두 함수. 다른 기기·다음 날에도 이어 쓴다.
-  - **[11/24 구현]** 화면은 답할 때마다(「경험이 없어요」·이어서 쓰기 포함) `saveInterviewDraft`를 부르고 기다리지 않는다. 경험을 고르면 `getInterviewDraft` → 답이 있으면 BOO 「지난번에 이 경험을 N개 들려줬어요. 이어서 할까요?」 + Secondary 「이어서 하기」(지난 질문·답을 말풍선으로 다시 보이고 `interviewNext`) / Text 「처음부터 할게요」(빈 `answers`로 저장 = 초안 지움). 1단계 복원이 있으면 초안은 묻지 않는다.
+  - **[11/24 구현]** 화면은 답할 때마다(「경험이 없어요」·이어서 쓰기 포함) `saveInterviewDraft`를 부르고 기다리지 않는다. 경험을 고르면 `getInterviewDraft` → 답이 있으면 BOO 「지난번에 이 경험을 N개 들려줬어요. 이어서 할까요?」 + Secondary 「이어서 하기」(지난 질문·답을 말풍선으로 다시 보이고 `interviewNext`) / Text 「처음부터 할게요」(빈 `answers`로 저장 = 초안 지움). 1단계 복원이 있으면 초안은 묻지 않는다. 지난 답이 모두 「경험이 없어요」면 묻지 않고 바로 시작한다.
 ```json
 { "ok": true, "savedAt": "2026-11-23T16:00:00+09:00", "expiresAt": "2026-11-30T16:00:00+09:00" }
 { "answers": [ { "section": "팁", "question": "…", "answer": "…" } ], "savedAt": "..." }

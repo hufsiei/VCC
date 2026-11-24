@@ -584,6 +584,7 @@ const tell = {
   experiences: [], // 이수 기록에서 고를 수 있는 경험(9절 복원 때 선택 말풍선을 다시 그림)
   log: [],         // 화면에 그린 말풍선 [{t: "choose"|"user"|"boo"|"step", text?, step?, at}]
   waiting: false,  // interviewNext 응답을 아직 못 받음(돌아오면 다시 부른다)
+  summarized: false, // AI 요약이 끝남 — 노트에 저장됐으니 이 탭 보존·서버 초안을 더 남기지 않는다(9절)
 };
 const EXTRA_QUESTION = "더 들려주고 싶은 이야기";
 const DONE_TEXT = "지금 물을 건 다 물었어요. 더 들려줄 칸을 고르거나 AI 요약을 눌러 주세요.";
@@ -605,7 +606,7 @@ function stepMessage(step) {
 // 답이 바뀔 때마다: 이 탭(sessionStorage) + 미완성 초안 7일(서버, spec saveInterviewDraft — 기다리지 않음)
 function keepAnswers() {
   saveKeep();
-  saveInterviewDraft(tell.program.name, tell.answers);
+  if (!tell.summarized) saveInterviewDraft(tell.program.name, tell.answers);
 }
 
 // getMe의 이수 기록에서 들려줄 수 있는 경험 목록을 만든다(국제교류 → 현장실습 → 비교과)
@@ -697,7 +698,8 @@ async function continueTell() {
   const draft = tell.answers.length ? null : await getInterviewDraft(tell.program.name);
   tell.busy = false;
   const prev = (draft && Array.isArray(draft.answers) ? draft.answers : []).filter((a) => a && a.section);
-  if (prev.length) addTo(tellChat, draftOffer(prev));
+  // 지난 답이 모두 「경험이 없어요」면 묻지 않고 바로 시작한다(「0개 들려줬어요」가 되지 않게)
+  if (prev.some((a) => !a.skipped)) addTo(tellChat, draftOffer(prev));
   else askNext();
 }
 
@@ -976,6 +978,9 @@ async function runSummary() {
   }
 
   summaryResult = res;
+  // 요약이 끝나면 이 탭의 들려주기 보존을 지운다 — 돌아와서 같은 요약을 다시 눌러 노트(고친 문장 포함)를 덮어쓰지 않게
+  tell.summarized = true;
+  saveKeep();
   shareBtn.textContent = "해봤노트에 공유";
   // 요약이 끝나면 항상 내 경험노트에 저장됨(서버 saved: true)
   summaryStatus.replaceChildren(res.saved
@@ -1062,7 +1067,7 @@ let restoring = false;
 function saveKeep() {
   if (restoring) return;
   try {
-    const t = tell.program
+    const t = tell.program && !tell.summarized
       ? {
           program: tell.program, answers: tell.answers, step: tell.step, pending: tell.pending, covered: tell.covered,
           extra: tell.extra, experiences: tell.experiences, log: tell.log, waiting: tell.waiting,
@@ -1144,7 +1149,7 @@ function resumeMessage() {
 function restartTell() {
   if (tell.busy) return;
   Object.assign(tell, {
-    started: false, program: null, answers: [], step: null, pending: 0, covered: [], extra: null, log: [], waiting: false,
+    started: false, program: null, answers: [], step: null, pending: 0, covered: [], extra: null, log: [], waiting: false, summarized: false,
   });
   tellChat.replaceChildren();
   chipsBox.hidden = true;
