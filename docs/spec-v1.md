@@ -103,11 +103,12 @@ const FN_BASE = "http://localhost:8787";
 payload `{id, pw}`
 `status`는 시트 열이 아니라 서버가 정한다: `colreg_no`가 `staff`로 시작하면 `"직원"`, 그 외는 `"학생"`. 직원은 그 행의 `crs_nm`을 `부서명`으로 주고, `권한`을 정한다: `crs_nm`이 `"전체"`면 `"총괄"`(전 부서 조회, 리포트 설정·발행), 부서명이면 `"부서"`(자기 부서만 조회, 받은 리포트 확인 — 관리자 콘솔 함수는 `dept`를 무시하고 이 부서로 고정). 직원 행은 학생 집계·닮은 선배 후보·사용 로그 생성에서 뺀다.
 ```json
-{ "ok": true, "user": { "colreg_no": "H0143", "status": "학생" } }
-{ "ok": true, "user": { "colreg_no": "staff01", "status": "직원", "부서명": "전체", "권한": "총괄" } }
-{ "ok": true, "user": { "colreg_no": "staff02", "status": "직원", "부서명": "혁신지원팀", "부서코드": "D04", "권한": "부서" } }
+{ "ok": true, "user": { "colreg_no": "H0143", "status": "학생", "token": "…" } }
+{ "ok": true, "user": { "colreg_no": "staff01", "status": "직원", "부서명": "전체", "권한": "총괄", "token": "…" } }
+{ "ok": true, "user": { "colreg_no": "staff02", "status": "직원", "부서명": "혁신지원팀", "부서코드": "D04", "권한": "부서", "token": "…" } }
 { "ok": false, "reason": "아이디 또는 비밀번호가 맞지 않아요." }
 ```
+**[작업 85]** 서버 응답의 `user`에는 `token`(작업 73)이 있고, `data.js`가 이것을 `me.token`으로 저장해 `X-Token`에 쓴다. mock 응답에는 `token`이 없다(mock은 헤더를 쓰지 않음). `부서코드`는 부서 직원만(`전체`에는 없음).
 
 ### getMe()
 가상학생 한 줄(시트 헤더 그대로, `번호`·`비번` 제외) + 이수 기록. 이수 기록도 각 시트 헤더 그대로이고, 귀국보고서·현장실습후기는 본문 칸을 빼고 기본 정보만 담는다.
@@ -388,7 +389,8 @@ payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청�
 **[11/20] 받는 한도:** 받는 선배의 수락 대기 요청이 이미 **5건**이면 `{ "ok": false, "reason": "선배한도", "message": "지금은 이 선배에게 요청이 많아요. 질문함에 남기면 선배 인터뷰 때 함께 물어볼게요." }`. 인기 선배에게 쪽지가 몰리지 않게 하고, 같은 질문은 질문함 → 인터뷰(작업 74) → 해봤노트로 한 번에 답하게 한다. 「당분간 쪽지 쉬기」 스위치는 P1.
 막힘 방지(응답 없는 선배 3명에게 갇히지 않게) 두 가지:
 - **보낸 사람이 취소(P0)**: `respondRequest(threadId, cancel: true)`로 기다리는 요청을 거둔다 → `status: "cancelled"`, 한도에서 빠진다. 취소한 선배에게는 7일 동안 다시 요청하지 못한다(반복 요청 방지). 선배 화면에서는 그 요청이 조용히 사라진다(알림 없음). 7일 안에 다시 보내면 `{ "ok": false, "reason": "취소", "message": "요청을 취소한 선배에게는 7일 뒤에 다시 보낼 수 있어요.", "retryAt": "2026-11-30T09:00:00+09:00" }`(**[11/24]** `retryAt` = 취소 시각 + 7일, ISO KST).
-- **자동 만료(P1)**: 보낸 뒤 **7일** 안에 선배가 수락·거절하지 않으면 서버가 `status: "expired"`로 바꾸고 한도에서 뺀다. 보낸 사람에게 알림 「선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?」(`alerts.json`). 만료 판정은 `getMessages`·`sendMessage` 호출 때 `requestedAt` 기준으로 한다(별도 스케줄러 없음). 시연에서는 7일이 지나지 않으므로 문구로만 설명한다.
+- **자동 만료(P1)**: 보낸 뒤 **7일** 안에 선배가 수락·거절하지 않으면 서버가 `status: "expired"`로 바꾸고 한도에서 뺀다. 보낸 사람에게 알림 「선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?」(`alerts.json`). 만료 판정은 `getMessages`·`sendMessage` 호출 때 `requestedAt` 기준으로 한다(별도 스케줄러 없음). 시연에서는 7일이 지나지 않으므로 문구로만 설명한다. **[작업 85]** 서버는 `respondRequest`·`recommendSeniors`를 부를 때도 같은 판정을 먼저 한다(카드의 `requestsFull`·`retryAt`이 만료를 반영하도록).
+**[작업 85] 거절된 요청:** 선배가 거절(`declined`)한 대화에 다시 보내면 `{ "ok": false, "reason": "상태", "message": "선배가 이 요청을 받지 않았어요" }`. 만료와 달리 다시 열리지 않는다. 받은 선배가 수락 전(`waiting`)에 답하려 하면 `{ "ok": false, "reason": "상태", "message": "쪽지 요청을 먼저 수락해 주세요" }`.
 **[11/23 추천] 추천 제외:** 추천받기를 끈 선배에게 **새 요청·다시 요청**을 보내면 `{ "ok": false, "reason": "추천 제외", "message": "이 선배는 지금 쪽지 요청을 받지 않아요." }`. 이미 수락한 대화는 막지 않는다.
 **[11/22 열림] 잠김:** 선배 추천이 잠긴 사람의 **새 요청·다시 요청**은 `{ "ok": false, "reason": "잠김", "message": "경험을 들려주거나 궁금한 것을 정리하면 선배 추천이 열려요", "recommend": {…} }`. 이미 열린 대화에 이어 쓰기와 받은 선배의 답장은 막지 않는다.
 대화 상태 `status`: `waiting`(수락 대기) | `accepted` | `declined` | `cancelled` | `expired`. 한도에 세는 것은 `waiting`만이다. 기존 `accepted: true|false`는 `status`로 대신한다.
@@ -423,14 +425,15 @@ payload `{to}`. 이 선배에게 보낼 대화의 내 닉네임을 정해 돌려
 
 ### respondRequest(threadId, accept | cancel)
 payload `{threadId, accept: true|false}` 또는 `{threadId, cancel: true}`.
-- `accept`: 받은 선배가 수락·거절한다. `waiting`이 아닌 대화에는 `{ "ok": false, "reason": "상태" }`.
-- `cancel`: 보낸 사람이 기다리는 요청을 거둔다(`waiting` → `cancelled`). 자기 대화가 아니거나 `waiting`이 아니면 `{ "ok": false, "reason": "상태" }`.
+- `accept`: 받은 선배가 수락·거절한다. `waiting`이 아닌 대화에는 `{ "ok": false, "reason": "상태", "status": "<지금 상태>" }`.
+- `cancel`: 보낸 사람이 기다리는 요청을 거둔다(`waiting` → `cancelled`). `waiting`이 아니면 `{ "ok": false, "reason": "상태", "status": "<지금 상태>" }`.
+- **[작업 85]** 없는 대화, 내 대화가 아닌 것(남의 요청 취소, 보낸 사람이 수락·거절), 선배 쪽에서 사라진 취소·만료 요청을 선배가 부르면 `{ "error": "볼 수 없는 기록이에요" }`(남의 대화 상태를 알려 주지 않는다).
 ```json
 { "ok": true, "status": "accepted" }
 { "ok": true, "status": "cancelled", "retryAt": "2026-11-30T09:00:00+09:00" }
 ```
 **[11/24]** 취소 응답의 `retryAt`은 그 선배에게 다시 보낼 수 있는 시각(취소 시각 + 7일, ISO KST)이다.
-**[작업 85]** 서버는 화면 호환을 위해 옛 필드 `accepted: true|false`도 함께 보낸다(`respondRequest` 수락·거절 응답, `getMessages`의 각 대화). 새 화면은 `status`만 쓴다. 11/20 이전 기록의 `status: "requested"`는 `waiting`으로 읽는다.
+**[작업 85]** 서버는 화면 호환을 위해 옛 필드 `accepted: true|false`도 함께 보낸다(`respondRequest` 수락·거절 응답, `getMessages`의 각 대화 — 거절된 대화에는 `declined: true`도). 새 화면은 `status`만 쓴다. 11/20 이전 기록의 `status: "requested"`는 `waiting`으로 읽는다.
 
 ### reportThread(threadId, reason, block) [11/23 차단]
 payload `{threadId, reason?, block?}`. 쪽지 대화 ⋮ 메뉴의 신고·차단(디자인 규칙 8절 익명 쪽지 대화). AI 없음.
