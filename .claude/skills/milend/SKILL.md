@@ -19,7 +19,7 @@ milend를 치면 **다른 일보다 먼저** 오늘 보내지 않은 팀원 메�
 - 상태판: `python -X utf8 C:/dev/VCC/.claude/skills/milwork/board.py list`(아래 `board.py`). 줄마다 브랜치가 병합됐는지 `gh pr list --state merged --head <브랜치>`로 본다. 병합된 것은 폴더를 지우고(`cd /c/dev` 후 `git worktree remove`, 실패하면 `rm -rf`) `board.py remove <폴더>`. 병합 안 된 것은 상태·전달 대기를 알리고 미리에게 묻는다(내일 다른 PC에서 이어 한다면 브랜치를 push해 두라고 권한다). 상태판에 없는 `C:\dev\VCC-*` 폴더도 같은 기준으로 정리한다.
 - 안 보낸 메시지는 0단계에서 처리했다. 미리가 남기라고 한 줄은 `remove`가 막으므로 지우지 않고 「내일 보낼 것」으로 알린다.
 - 오늘 연 내 PR 중 병합 안 된 것, 리뷰를 기다리는 팀원 PR 목록.
-- 켜 둔 서버: `netstat -ano | grep -E ":8787|:8000"`. 있으면 끌지 묻는다(local_fn.py, http.server).
+- 켜 둔 서버: `netstat -ano | grep -E ":8787|:8000"`. 있으면 끌지 묻는다(local_fn.py, serve_screens.py).
 - `C:\dev\VCC`가 main이고 깨끗한지. 아니면 이유를 알린다.
 
 ## 2. 작업내역서 대조·갱신
