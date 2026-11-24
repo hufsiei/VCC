@@ -80,6 +80,28 @@ function mockInterview(m, p) {
   return { done: false, section: next, question: template.replaceAll("{p}", short).replaceAll("{s}", next), progress, pendingQuestions: 0 };
 }
 
+// summarizeInterview mock: 고정 요약(교환 칸: 지원·학점·생활)과 대화한 칸이 하나도 겹치지 않으면(인턴·비교과 등)
+// 그 칸이 모두 「–」로 보이므로, 대화한 답을 칸별로 그대로 옮겨 돌려준다(AI 요약 없음). 겹치면 {}(고정 요약 그대로).
+function mockSummaryFromTranscript(m, transcript) {
+  const answers = (transcript || []).filter((a) => a && a.section && typeof a.answer === "string" && a.answer.trim());
+  const fixed = new Set(m.summarizeInterview.myNote.sections.map((s) => s.name));
+  if (!answers.length || answers.some((a) => fixed.has(a.section))) return {};
+  const mine = [];
+  const pub = [];
+  let k = 0;
+  for (const a of answers) {
+    let i = mine.findIndex((s) => s.name === a.section);
+    if (i < 0) {
+      i = mine.push({ name: a.section, lines: [] }) - 1;
+      pub.push({ name: a.section, lines: [] });
+    }
+    k += 1;
+    mine[i].lines.push({ text: a.answer.trim() });
+    pub[i].lines.push({ lineId: `L-D1-${k}`, text: a.answer.trim(), match: true });
+  }
+  return { myNote: { sections: mine }, publicDraft: { sections: pub } };
+}
+
 // summarizeInterview append mock [v2 작업 90]: getMyNote(M-0001) 문장 뒤에 이번 요약 문장을 붙인 모양.
 // 새 공개 문장은 새 draftId(D-0002)의 lineId(L-D2-k)와 new: true. 기억하지 않는다(다시 불러도 같은 모양).
 function mockAppend(m, out) {
@@ -274,7 +296,7 @@ function pickMock(m, name, p) {
     case "sendMessage":
       return mockReady() ? m.sendMessage : { ok: false, reason: "잠김", message: LOCKED().message, recommend: mockStatus() };
     case "summarizeInterview": {
-      const out = { ...m.summarizeInterview, program: p.program || m.summarizeInterview.program, answered: countInterview(p.transcript), need: NEED };
+      const out = { ...m.summarizeInterview, ...mockSummaryFromTranscript(m, p.transcript), program: p.program || m.summarizeInterview.program, answered: countInterview(p.transcript), need: NEED };
       sessionStorage.removeItem(`mockDraft:${p.program}`); // [작업 79] 요약하면 미완성 초안을 지운다(서버와 같게)
       return p.append === true ? mockAppend(m, out) : out;
     }
