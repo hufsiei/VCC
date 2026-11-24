@@ -46,6 +46,15 @@ const icon = (name) => el("i", { className: "icon", attrs: { "data-lucide": name
 const drawIcons = () => window.lucide && window.lucide.createIcons({ attrs: { "stroke-width": 1.75 } });
 const statusLabel = (kind, iconName, text) =>
   el("span", { className: `status-label status-label--${kind}` }, [iconName ? icon(iconName) : null, el("span", { text })]);
+// retryAt(다시 보낼 수 있는 시각, ISO KST — spec sendMessage·recommendSeniors [11/24]) → 아직 그 시각 전이면 「11월 30일부터 다시 보낼 수 있어요」
+// 시각이 지났거나 값이 없으면 null(바로 다시 보낼 수 있음). 날짜는 기기 시간대와 상관없이 한국 시간으로 읽는다
+function retryText(iso) {
+  const at = iso ? new Date(iso) : null;
+  if (!at || Number.isNaN(at.getTime()) || at.getTime() <= Date.now()) return null;
+  const kst = new Date(at.getTime() + 9 * 3600 * 1000);
+  return `${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일부터 다시 보낼 수 있어요`;
+}
+const NO_REQUEST_TEXT = "쪽지 요청을 받지 않는 선배예요"; // sendMessage reason 「추천 제외」(spec 4장 [11/23 추천])
 const skeletons = (n, cls = "senior-skeleton") => Array.from({ length: n }, () => el("div", { className: `skeleton ${cls}`, attrs: { "aria-hidden": "true" } }));
 
 function toast(text, iconName = "check") {
@@ -188,6 +197,9 @@ function selectNote(id) {
 // 이 화면에서 바꾼 대화 상태(요청 취소·수락·거절). 서버가 아직 「수락 대기」로 주면 이 값을 쓴다
 // (진짜 서버는 바뀐 상태를 바로 돌려주지만 mock은 기억하지 않아서 필요)
 const localStatus = new Map(); // threadId → status
+const localRetry = new Map();  // threadId → retryAt(이 화면에서 취소한 요청 — mock 목록에는 없을 수 있음)
+const retryWith = new Map();   // 선배 studentId → retryAt(sendMessage가 「취소」로 막으며 알려 준 값)
+const optedOut = new Set();    // 선배 studentId — sendMessage가 「추천 제외」로 막은 선배(새로고침 전까지)
 
 // 서버 목록에 이 화면에서 보낸 쪽지·바꾼 상태를 합친다(서버에 이미 보이면 지역 사본은 버린다)
 function mergeLocal(t) {
@@ -196,6 +208,7 @@ function mergeLocal(t) {
   if (changed === "blocked" && t.status !== "blocked") t = { ...t, status: "blocked", blockedByMe: true };
   else if (changed && t.status === "waiting") t = { ...t, status: changed };
   else if (changed) localStatus.delete(t.threadId);
+  if (t.status === "cancelled" && !t.retryAt && localRetry.has(t.threadId)) t = { ...t, retryAt: localRetry.get(t.threadId) };
   const extra = localSent.get(t.threadId);
   if (!extra || !extra.length) return t;
   const seen = new Set((t.messages || []).filter((m) => m.from === "me").map((m) => m.text));
@@ -258,7 +271,7 @@ function requestControl(s, { block = false } = {}) {
     return b;
   }
   if (status === "declined") {
-    // 선배가 요청을 받지 않음: 다시 누를 수 없게 비활성 + 이유(5-4). 다시 요청할 수 있는 날(retryAt)은 서버 값이 정해지면 붙인다
+    // 선배가 요청을 받지 않음: 다시 누를 수 없게 비활성 + 이유(5-4). 거절은 다시 보낼 수 없어 retryAt이 없다(spec recommendSeniors)
     return el("div", { className: "request-note" }, [
       el("button", { className: cls, text: "쪽지 요청", attrs: { type: "button", disabled: "" } }),
       el("p", { className: "btn-reason" }, [icon("info"), el("span", { text: "선배가 요청을 수락하지 않았어요" })]),
@@ -268,6 +281,21 @@ function requestControl(s, { block = false } = {}) {
     return el("div", { className: "request-note" }, [
       el("button", { className: cls, text: "쪽지 요청", attrs: { type: "button", disabled: "" } }),
       el("p", { className: "btn-reason" }, [icon("ban"), el("span", { text: "더 이어 갈 수 없는 대화예요" })]),
+    ]);
+  }
+  if (optedOut.has(s.studentId)) {
+    // 추천받기를 끈 선배(보내 보니 서버가 「추천 제외」로 막음): 비활성 + 버튼 아래 이유(5-4). 주의 라벨은 요청 시트에서 보인다
+    return el("div", { className: "request-note" }, [
+      el("button", { className: cls, text: "쪽지 요청", attrs: { type: "button", disabled: "" } }),
+      el("p", { className: "btn-reason" }, [icon("triangle-alert"), el("span", { text: NO_REQUEST_TEXT })]),
+    ]);
+  }
+  // 내가 요청을 취소한 선배: 취소 + 7일까지 비활성 + 다시 보낼 수 있는 날(spec [11/24 retryAt]). 7일이 지나면 아래로 내려가 다시 요청할 수 있다
+  const retry = retryText(s.retryAt || (thread && thread.retryAt) || retryWith.get(s.studentId));
+  if (retry) {
+    return el("div", { className: "request-note" }, [
+      el("button", { className: cls, text: "쪽지 요청", attrs: { type: "button", disabled: "" } }),
+      el("p", { className: "btn-reason" }, [icon("clock"), el("span", { text: retry })]),
     ]);
   }
   if (s.requestsFull) {
@@ -749,6 +777,7 @@ function confirmCancel(t) {
         if (!res || res.error || res.ok === false) throw new Error((res && (res.message || res.error)) || "취소 실패");
         t.status = res.status || "cancelled";
         localStatus.set(t.threadId, t.status);
+        if (res.retryAt) { t.retryAt = res.retryAt; localRetry.set(t.threadId, res.retryAt); } // 카드·대화창에 바로 날짜가 보이게
         waitingCount = Math.max(0, waitingCount - 1);
         toast("요청을 취소했어요");
         if (!views.thread.hidden) openThread(t.threadId, { reuse: true });
@@ -842,7 +871,8 @@ function renderDock(t) {
     decline.addEventListener("click", () => respond(t, false, [accept, decline]));
     threadDock.replaceChildren(el("div", { className: "btn-row" }, [decline, accept]));
   } else {
-    const text = { cancelled: "취소한 요청이에요", expired: "선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?", declined: "선배가 이번에는 대화를 열지 않았어요" }[t.status] || "더 이어 갈 수 없는 대화예요";
+    const retry = t.status === "cancelled" ? retryText(t.retryAt) : null;
+    const text = { cancelled: retry ? `취소한 요청이에요. ${retry}` : "취소한 요청이에요", expired: "선배가 아직 못 봤어요. 다른 선배에게 보내 볼까요?", declined: "선배가 이번에는 대화를 열지 않았어요" }[t.status] || "더 이어 갈 수 없는 대화예요";
     const back = el("button", { className: "btn btn--outline btn--block", text: "닮은선배 보기", attrs: { type: "button" } });
     back.addEventListener("click", () => {
       const url = new URL(location.href);
@@ -1023,7 +1053,7 @@ reportBlock.addEventListener("change", updateReportSubmit);
 const CHECK_LABEL = { 연락처: "연락처가 있어요", 학번: "학번이 있어요", 비방: "보낼 수 없는 표현이 있어요" };
 function showCheckWarning(box, check) {
   box.replaceChildren(
-    statusLabel("warning", "triangle-alert", CHECK_LABEL[check.reason] || "보낼 수 없는 내용이 있어요"),
+    statusLabel("warning", "triangle-alert", check.label || CHECK_LABEL[check.reason] || "보낼 수 없는 내용이 있어요"),
     el("p", { className: "check-warn__text", text: check.message || "이 내용은 쪽지로 보낼 수 없어요. 고쳐서 다시 보내 주세요." }),
   );
   box.hidden = false;
@@ -1104,7 +1134,7 @@ function clearError() {
 
 function updateSubmit() {
   const len = textBox.value.trim().length;
-  submitBtn.disabled = sending || len < MIN_TEXT || !target;
+  submitBtn.disabled = sending || len < MIN_TEXT || !target || optedOut.has(target.studentId); // 추천 제외 선배는 다시 못 보냄
   // 입력칸 바로 아래 안내: 몇 자부터 보낼 수 있는지 + 지금 글자 수
   document.getElementById("requestHelp").textContent = len < MIN_TEXT
     ? `${MIN_TEXT}자 이상 적어 주세요 · 지금 ${len}자`
@@ -1175,9 +1205,23 @@ submitBtn.addEventListener("click", async () => {
     }
     // ② 보내기 — 서버가 한도·잠김·차단을 다시 막는다
     const res = await sendMessage(s.studentId, text);
+    if (res && res.reason === "추천 제외") {
+      // 추천받기를 끈 선배: 오류(빨강)가 아니라 주의 라벨 + 서버 문구, 보내기 버튼은 막고 뒤 카드도 비활성으로
+      optedOut.add(s.studentId);
+      showCheckWarning(warnLine, { label: NO_REQUEST_TEXT, message: "다른 선배에게 보내거나, 궁금한 것을 질문함에 남겨 주세요." });
+      if (seniorsRes) renderList(seniorsRes);
+      if (!views.profile.hidden) renderProfilePage(s);
+      return;
+    }
     if (!res || res.error || res.ok === false) {
       showError((res && (res.message || res.error)) || "쪽지를 보내지 못했어요. 잠시 뒤 다시 시도해 주세요.");
       if (res && res.reason === "한도") waitingCount = waitingLimit;
+      if (res && res.reason === "취소" && res.retryAt) {
+        // 취소한 선배에게 7일 안에 다시 보냄: 카드에 다시 보낼 수 있는 날을 붙인다
+        retryWith.set(s.studentId, res.retryAt);
+        if (seniorsRes) renderList(seniorsRes);
+        if (!views.profile.hidden) renderProfilePage(s);
+      }
       return;
     }
     // 성공: 이 선배는 「요청 보냄」, 대기 수 +1, 내 쪽지에도 바로 보이게
