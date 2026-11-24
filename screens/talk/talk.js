@@ -4,6 +4,7 @@
 
 import {
   currentUser, logout, getMe, askBoo, interviewNext, summarizeInterview,
+  saveInterviewDraft, getInterviewDraft,
 } from "../../common/data.js";
 
 // ---------------------------------------------------------------------------
@@ -60,7 +61,9 @@ function toast(text, iconName = "check") {
   toastTimer = setTimeout(() => toastHost.replaceChildren(), 3000);
 }
 
-const timeText = () => new Date().toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+// 대화 복원(9절) 중에는 그때 저장해 둔 시각을 쓴다
+let replayAt = null;
+const timeText = () => replayAt || new Date().toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
 
 // 학기 표기(1-2절): "2024-1" → "2024-1학기", "2025-여름" → "2025 하계방학"
 function semesterText(sem) {
@@ -221,6 +224,7 @@ function setMode(next) {
   history.replaceState(history.state, "", url);
   updateComposer();
   measureDock();
+  saveKeep(); // 돌아왔을 때 보던 모드로(9절)
   if (isTell) startTell();
 }
 
@@ -306,8 +310,10 @@ window.addEventListener("resize", measureDock);
 
 const askChat = document.getElementById("askChat");
 // turns: 서버에 보내는 최근 대화(spec 4장 [v2] history). 서버는 기억하지 않으므로 화면이 쌓아서 보낸다.
-const ask = { busy: false, turns: [] };
+// log: 화면에 그린 질문·답(9절 대화 보존 — 다른 메뉴에 갔다 와도 다시 그린다)
+const ask = { busy: false, turns: [], log: [] };
 const HISTORY_TURNS = 4;
+const MAX_ASK_LOG = 30;
 
 addTo(askChat, booText("궁금한 경험을 물어보세요. 선배들의 결과보고서와 인터뷰를 근거로 답해 드려요. 근거가 없으면 지어내지 않고 질문함에 담아 둘게요."));
 
@@ -315,6 +321,7 @@ addTo(askChat, booText("궁금한 경험을 물어보세요. 선배들의 결과
 async function sendQuestion(question, { withHistory = true } = {}) {
   ask.busy = true;
   updateComposer();
+  const at = timeText();
   addTo(askChat, userText(question));
   const typing = addTo(askChat, typingMessage());
   const res = await askBoo(question, withHistory ? ask.turns.slice(-HISTORY_TURNS) : []);
@@ -323,6 +330,12 @@ async function sendQuestion(question, { withHistory = true } = {}) {
   updateComposer();
   rememberTurn(question, res);
   addTo(askChat, renderAnswer(res, question));
+  // 오류 답은 남기지 않는다(돌아와서 「다시 시도」가 엉뚱하게 남지 않게)
+  if (res && !res.error) {
+    ask.log.push({ q: question, at, res, resAt: timeText() });
+    if (ask.log.length > MAX_ASK_LOG) ask.log.shift();
+    saveKeep();
+  }
 }
 
 // history 한 턴 = {question, status, program}. program은 답의 근거 프로그램.
@@ -345,7 +358,7 @@ function renderAnswer(res, question) {
 
   if (res.status === "hold") {
     // 근거 없음: 답을 지어내지 않는다(6-2) — 안내 + 0건 블록 + 닮은선배 보기 + 토스트
-    toast("질문함에 담았어요");
+    if (!replayAt) toast("질문함에 담았어요"); // 복원할 때는 다시 띄우지 않는다
     const { msg, body } = booMessage({ wide: true });
     body.append(
       el("div", { className: "hold-box" }, [
@@ -568,8 +581,33 @@ const tell = {
   pending: 0,      // pendingQuestions
   covered: [],     // [v2] 보고서가 이미 채워 묻지 않은 칸(interviewNext covered)
   extra: null,     // 질문이 끝난 뒤 「이어서 쓰기」로 고른 칸 이름
+  experiences: [], // 이수 기록에서 고를 수 있는 경험(9절 복원 때 선택 말풍선을 다시 그림)
+  log: [],         // 화면에 그린 말풍선 [{t: "choose"|"user"|"boo"|"step", text?, step?, at}]
+  waiting: false,  // interviewNext 응답을 아직 못 받음(돌아오면 다시 부른다)
+  summarized: false, // AI 요약이 끝남 — 노트에 저장됐으니 이 탭 보존·서버 초안을 더 남기지 않는다(9절)
 };
 const EXTRA_QUESTION = "더 들려주고 싶은 이야기";
+const DONE_TEXT = "지금 물을 건 다 물었어요. 더 들려줄 칸을 고르거나 AI 요약을 눌러 주세요.";
+
+// 들려주기 말풍선은 그리면서 log에 남긴다(9절)
+function tellUser(text) {
+  tell.log.push({ t: "user", text, at: timeText() });
+  return addTo(tellChat, userText(text));
+}
+function tellBoo(text) {
+  tell.log.push({ t: "boo", text, at: timeText() });
+  return addTo(tellChat, booText(text));
+}
+function stepMessage(step) {
+  if (step.done) return booText(DONE_TEXT);
+  return step.junior ? juniorQuestion(step) : interviewQuestion(step);
+}
+
+// 답이 바뀔 때마다: 이 탭(sessionStorage) + 미완성 초안 7일(서버, spec saveInterviewDraft — 기다리지 않음)
+function keepAnswers() {
+  saveKeep();
+  if (!tell.summarized) saveInterviewDraft(tell.program.name, tell.answers);
+}
 
 // getMe의 이수 기록에서 들려줄 수 있는 경험 목록을 만든다(국제교류 → 현장실습 → 비교과)
 function myExperiences(meInfo) {
@@ -613,8 +651,15 @@ async function startTell() {
     return;
   }
 
+  tell.experiences = experiences;
   if (experiences.length === 1) return chooseProgram(experiences[0]);
 
+  tell.log.push({ t: "choose", at: timeText() });
+  addTo(tellChat, chooserMessage(experiences, null));
+}
+
+// 경험 고르기 말풍선. picked가 있으면(복원) 고른 칩만 눌린 채 모두 끈다
+function chooserMessage(experiences, picked) {
   const { msg, body } = booMessage({ wide: true });
   body.append(el("p", { className: "msg__bubble", text: "어떤 경험을 들려줄까요? 이수 기록에 있는 경험이에요." }));
   const choices = el("div", { className: "choice-list" });
@@ -622,7 +667,7 @@ async function startTell() {
     const cat = CATEGORY[exp.kind];
     choices.append(el("button", {
       className: "choice-chip",
-      attrs: { type: "button", "aria-pressed": "false" },
+      attrs: { type: "button", "aria-pressed": String(!!picked && picked === exp.name), disabled: !!picked },
       on: {
         click: (e) => {
           if (tell.program) return;
@@ -634,16 +679,76 @@ async function startTell() {
     }, [el("span", { className: `category-tag cat-${cat}`, text: CATEGORY_NAME[cat] }), exp.name]));
   }
   body.append(choices, el("span", { className: "msg__time", text: timeText() }));
-  addTo(tellChat, msg);
+  return msg;
 }
 
 function chooseProgram(exp) {
   tell.program = exp;
-  addTo(tellChat, userText(exp.name));
+  tellUser(exp.name);
   chipsBox.hidden = false;
   summaryArea.hidden = false;
   renderChips();
-  askNext();
+  continueTell();
+}
+
+// 경험을 고른 직후(또는 그때 다른 메뉴로 갔다가 돌아온 때): 지난번 미완성 초안(7일)이 있으면 이어서 할지 묻는다
+async function continueTell() {
+  tell.busy = true;
+  updateComposer();
+  const draft = tell.answers.length ? null : await getInterviewDraft(tell.program.name);
+  tell.busy = false;
+  const prev = (draft && Array.isArray(draft.answers) ? draft.answers : []).filter((a) => a && a.section);
+  // 지난 답이 모두 「경험이 없어요」면 묻지 않고 바로 시작한다(「0개 들려줬어요」가 되지 않게)
+  if (prev.some((a) => !a.skipped)) addTo(tellChat, draftOffer(prev));
+  else askNext();
+}
+
+// 「지난번 이야기를 이어서 할까요?」 — 이어서 하기(답을 불러와 다시 보임) / 처음부터(초안을 지움)
+function draftOffer(prev) {
+  const { msg, body } = booMessage();
+  const told = prev.filter((a) => !a.skipped).length;
+  const done = () => { for (const b of actions.querySelectorAll("button")) b.disabled = true; };
+  const actions = el("div", { className: "msg__actions" }, [
+    el("button", {
+      className: "btn btn--secondary",
+      text: "이어서 하기",
+      attrs: { type: "button" },
+      on: {
+        click: () => {
+          if (tell.step || tell.busy) return;
+          done();
+          tellUser("이어서 할게요");
+          for (const a of prev) {
+            tellBoo(a.asked || a.question || `${a.section} 이야기`);
+            tellUser(a.skipped ? "경험이 없어요" : a.answer);
+          }
+          tell.answers = prev;
+          saveKeep();
+          askNext();
+        },
+      },
+    }),
+    el("button", {
+      className: "btn btn--text",
+      text: "처음부터 할게요",
+      attrs: { type: "button" },
+      on: {
+        click: () => {
+          if (tell.step || tell.busy) return;
+          done();
+          tellUser("처음부터 할게요");
+          saveInterviewDraft(tell.program.name, []); // 빈 answers = 초안 지우기(spec)
+          askNext();
+        },
+      },
+    }),
+  ]);
+  body.append(
+    el("p", { className: "msg__bubble", text: `지난번에 이 경험을 ${told}개 들려줬어요. 이어서 할까요?` }),
+    actions,
+    el("span", { className: "msg__time", text: timeText() }),
+  );
+  return msg;
 }
 
 // 진행 칩(5-7): 내 이야기로 채워짐(MINT ✓) / 보고서로 채워짐(중립색) / 지금 질문 중(NAVY) / 비어 있음 — 번호 없음
@@ -694,6 +799,8 @@ function renderChips() {
 
 async function askNext() {
   tell.busy = true;
+  tell.waiting = true;
+  saveKeep();
   updateComposer();
   const typing = addTo(tellChat, typingMessage());
   const res = await interviewNext(tell.program.name, tell.answers);
@@ -707,19 +814,16 @@ async function askNext() {
   }
 
   tell.step = res;
+  tell.waiting = false;
   // 지나간 질문의 버튼(「경험이 없어요」·예시답 칩)은 끈다
   for (const b of tellChat.querySelectorAll(".msg__actions button, .chip-row button")) b.disabled = true;
   if (typeof res.pendingQuestions === "number") tell.pending = res.pendingQuestions;
   if (Array.isArray(res.covered)) tell.covered = res.covered;
   renderNotice();
 
-  if (res.done) {
-    addTo(tellChat, booText("지금 물을 건 다 물었어요. 더 들려줄 칸을 고르거나 AI 요약을 눌러 주세요."));
-  } else if (res.junior) {
-    addTo(tellChat, juniorQuestion(res));
-  } else {
-    addTo(tellChat, interviewQuestion(res));
-  }
+  tell.log.push({ t: "step", step: res, at: timeText() });
+  addTo(tellChat, stepMessage(res));
+  saveKeep();
   renderChips();
   updateComposer();
   if (!res.done) composerInput.focus({ preventScroll: true });
@@ -747,9 +851,10 @@ function juniorQuestion(step) {
         click: (e) => {
           if (tell.busy || tell.step !== step) return;
           e.currentTarget.disabled = true;
-          addTo(tellChat, userText("경험이 없어요"));
+          tellUser("경험이 없어요");
           // 질문은 hold로 남아 다른 선배에게 다시 나간다(spec interviewNext)
           tell.answers.push({ section: step.section, question: step.asked, questionId: step.questionId, skipped: true });
+          keepAnswers();
           askNext();
         },
       },
@@ -787,6 +892,7 @@ function interviewQuestion(step) {
 function pickExtra(name) {
   if (tell.busy) return;
   tell.extra = name;
+  saveKeep();
   renderChips();
   updateComposer();
   composerInput.focus({ preventScroll: true });
@@ -799,17 +905,19 @@ function sendAnswer(text) {
   if (step.done) {
     // 이어서 쓰기: 고른 칸의 답으로 더한다(서버를 다시 부르지 않음 — 요약할 때 함께 보낸다)
     if (!tell.extra) return;
-    addTo(tellChat, userText(text));
+    tellUser(text);
     tell.answers.push({ section: tell.extra, question: EXTRA_QUESTION, answer: text });
-    addTo(tellChat, booText(`「${tell.extra}」에 더했어요.`));
+    tellBoo(`「${tell.extra}」에 더했어요.`);
+    keepAnswers();
     renderChips();
     return;
   }
 
-  addTo(tellChat, userText(text));
+  tellUser(text);
   const answer = { section: step.section, question: step.junior ? step.asked : step.question, answer: text };
   if (step.questionId) answer.questionId = step.questionId;
   tell.answers.push(answer);
+  keepAnswers();
   askNext();
 }
 
@@ -870,6 +978,9 @@ async function runSummary() {
   }
 
   summaryResult = res;
+  // 요약이 끝나면 이 탭의 들려주기 보존을 지운다 — 돌아와서 같은 요약을 다시 눌러 노트(고친 문장 포함)를 덮어쓰지 않게
+  tell.summarized = true;
+  saveKeep();
   shareBtn.textContent = "해봤노트에 공유";
   // 요약이 끝나면 항상 내 경험노트에 저장됨(서버 saved: true)
   summaryStatus.replaceChildren(res.saved
@@ -938,14 +1049,130 @@ laterBtn.addEventListener("click", () => {
 if (me && me.status === "직원") document.getElementById("consoleBtn").hidden = false;
 document.getElementById("menuBtn").addEventListener("click", () => {
   if (confirm("로그아웃할까요?")) {
+    try { sessionStorage.removeItem(KEEP_KEY); } catch { /* 보존 없이 */ }
     logout();
     location.replace("../login/");
   }
 });
 
 // ---------------------------------------------------------------------------
+// 9. 대화 보존 — 다른 메뉴에 갔다 와도 두 모드의 대화를 다시 그린다(spec 4장 saveInterviewDraft 1단계)
+//    이 탭의 sessionStorage에만(탭마다 따로 — 두 창 시연), 사람별 키. 탭을 닫으면 사라지고,
+//    들려주기 답은 서버 미완성 초안(7일, keepAnswers)으로 다시 이어 쓸 수 있다.
+// ---------------------------------------------------------------------------
+
+const KEEP_KEY = `talkKeep:${me ? me.colreg_no : ""}`;
+let restoring = false;
+
+function saveKeep() {
+  if (restoring) return;
+  try {
+    const t = tell.program && !tell.summarized
+      ? {
+          program: tell.program, answers: tell.answers, step: tell.step, pending: tell.pending, covered: tell.covered,
+          extra: tell.extra, experiences: tell.experiences, log: tell.log, waiting: tell.waiting,
+        }
+      : null;
+    sessionStorage.setItem(KEEP_KEY, JSON.stringify({ mode, ask: { turns: ask.turns, log: ask.log }, tell: t }));
+  } catch {
+    // 저장 공간이 없거나 막혀 있으면 보존 없이 그대로 쓴다
+  }
+}
+
+function loadKeep() {
+  try {
+    const kept = JSON.parse(sessionStorage.getItem(KEEP_KEY) || "null");
+    return kept && typeof kept === "object" ? kept : null;
+  } catch {
+    return null;
+  }
+}
+
+function restoreAsk(kept) {
+  ask.turns = Array.isArray(kept.turns) ? kept.turns.slice(-HISTORY_TURNS) : [];
+  ask.log = Array.isArray(kept.log) ? kept.log.slice(-MAX_ASK_LOG) : [];
+  for (const item of ask.log) {
+    replayAt = item.at;
+    addTo(askChat, userText(item.q));
+    replayAt = item.resAt;
+    addTo(askChat, renderAnswer(item.res, item.q));
+  }
+  replayAt = null;
+}
+
+function restoreTell(kept) {
+  if (!kept.program || !kept.program.name) return;
+  Object.assign(tell, {
+    started: true, program: kept.program, step: kept.step || null, pending: kept.pending || 0,
+    answers: Array.isArray(kept.answers) ? kept.answers : [], covered: Array.isArray(kept.covered) ? kept.covered : [],
+    extra: kept.extra || null, experiences: Array.isArray(kept.experiences) ? kept.experiences : [],
+    log: Array.isArray(kept.log) ? kept.log : [], waiting: !!kept.waiting,
+  });
+  for (const item of tell.log) {
+    replayAt = item.at;
+    if (item.t === "choose") addTo(tellChat, chooserMessage(tell.experiences, tell.program.name));
+    else if (item.t === "user") addTo(tellChat, userText(item.text));
+    else if (item.t === "boo") addTo(tellChat, booText(item.text));
+    else if (item.t === "step" && item.step) addTo(tellChat, stepMessage(item.step));
+  }
+  replayAt = null;
+  // 지나간 말풍선의 버튼은 모두 끄고, 이어서 할 자리는 아래에 새로 보인다
+  for (const b of tellChat.querySelectorAll(".msg__actions button, .chip-row button")) b.disabled = true;
+  chipsBox.hidden = false;
+  renderNotice();
+  renderChips();
+
+  if (tell.waiting) return askNext();           // 질문을 받기 전에 떠났다
+  if (!tell.step) return continueTell();        // 경험만 고르고 떠났다
+  addTo(tellChat, resumeMessage());
+  if (!tell.step.done) addTo(tellChat, stepMessage(tell.step)); // 마지막 질문을 다시(버튼·예시 칩이 살아 있게)
+  updateComposer();
+}
+
+// 「아까 이야기를 이어서 할게요」(spec) + 다른 경험으로 바꾸기
+function resumeMessage() {
+  const { msg, body } = booMessage();
+  body.append(el("p", {
+    className: "msg__bubble",
+    text: tell.step.done ? "아까 이야기를 이어서 할게요. 더 들려줄 칸을 고르거나 AI 요약을 눌러 주세요." : "아까 이야기를 이어서 할게요.",
+  }));
+  if (tell.experiences.length > 1) {
+    body.append(el("div", { className: "msg__actions" }, [
+      el("button", { className: "btn btn--text", text: "다른 경험 들려주기", attrs: { type: "button" }, on: { click: restartTell } }),
+    ]));
+  }
+  body.append(el("span", { className: "msg__time", text: timeText() }));
+  return msg;
+}
+
+// 다른 경험 고르기: 이 탭의 들려주기 대화만 비운다(지금 경험의 답은 서버 초안 7일에 남아 다시 고르면 이어서 할 수 있다)
+function restartTell() {
+  if (tell.busy) return;
+  Object.assign(tell, {
+    started: false, program: null, answers: [], step: null, pending: 0, covered: [], extra: null, log: [], waiting: false, summarized: false,
+  });
+  tellChat.replaceChildren();
+  chipsBox.hidden = true;
+  summaryArea.hidden = true;
+  renderNotice();
+  saveKeep();
+  updateComposer();
+  startTell();
+}
+
+// ---------------------------------------------------------------------------
 // 시작
 // ---------------------------------------------------------------------------
+
+const kept = loadKeep();
+if (kept) {
+  restoring = true;
+  if (kept.ask) restoreAsk(kept.ask);
+  restoring = false;
+  // 주소에 mode가 없으면(하단 탭으로 돌아옴) 떠날 때 보던 모드로
+  if (!new URLSearchParams(location.search).get("mode") && (kept.mode === "tell" || kept.mode === "ask")) mode = kept.mode;
+  if (kept.tell) restoreTell(kept.tell);
+}
 
 history.replaceState({ view: "main" }, "", location.href);
 setMode(mode);
