@@ -130,13 +130,13 @@ expect("빈 답이면 답검사·변환을 부르지 않음", [c[0] for c in cal
 expect("compose 기본값은 빈 답에도 None(칸 요약 build_notes용)",
        askboo.compose.__defaults__[-1] is None)
 
-# [11/24] 고르기가 잘려도(14개 넘게 고름) 9번째 이후 문장까지 답쓰기에 넘긴다
+# 고르기가 max_tokens에 잘리면(14개 넘게 고름) 앞 MAX_PICK(8)개만 답쓰기에 넘긴다
 many = [{"text": f"문장 {i}이에요."} for i in range(1, 21)]
 orig = askboo._call
 askboo._call = lambda n, c: {"ok": True, "text": '{"관련":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15', "json": None, "model": "fake"}
 got, _ = askboo.pick("q", many)
 askboo._call = orig
-expect("잘린 고르기 목록(15개): 마지막 숫자만 버리고 14개 모두, 9번째 포함", len(got) == 14 and got[8] is many[8], len(got))
+expect("잘린 고르기 목록(15개) → 앞 8개", askboo.MAX_PICK == 8 and got == many[:8], len(got))
 
 # [11/24] 말머리 「덧붙이자면」 등은 폴백 문장에서 지운다
 expect("덧붙이자면 제거", askboo.clean_source("덧붙이자면 일요일엔 상점이 닫아요.") == "일요일엔 상점이 닫아요.")
