@@ -185,6 +185,9 @@ def askBoo(me, payload, save=True):
     if payload.get("force") == "hold":
         return _hold(me, question, None, None, save, why="담기")
 
+    # [11/24 작업 87] 앞 턴(과 이번 말)에서 「○○ 말고」로 뺀 프로그램 — 이번 말이 그 이름을 다시 부르지 않으면 계속 뺀다
+    excluded = carried_exclusions(question, history)
+
     programs = match_programs(question)
     country = None
     if not programs:                       # [11/23] 프로그램명이 없으면 나라 이름으로(근거 많은 순)
@@ -195,11 +198,18 @@ def askBoo(me, payload, save=True):
         return _official(me, question, programs, save)
 
     # ① [v2] 질문 정리(AI). 실패하면 plan=None → 아래는 v1 경로 그대로
-    plan = clarify(question, history)
+    plan = clarify(question, history, excluded)
     effective = question
     if plan:
         if plan["의도"] == "규정":
             return _official(me, question, programs, save)
+        plan["제외"] += [p for p in excluded if p not in plan["제외"]]
+        # [11/24] 「아예 데이터가 없나요?」 — 있고 없음을 묻는 말은 앞 대화 주제의 노트 수로 답한다(코드가 센다, AI 없음)
+        if plan["의도"] in ("대화", "탐색") and EXIST_RE.search(question) and not match_programs(question) \
+                and not match_country(question)[0]:
+            found = _exists(plan, history)
+            if found:
+                return found
         effective = plan["정리된질문"] or question
         # 프로그램: 정리 결과(대조 통과분)가 있으면 그것, 없으면 정규식 결과. 「제외」는 뺀다
         if plan["프로그램후보"]:
@@ -224,6 +234,8 @@ def askBoo(me, payload, save=True):
             found = _explore(plan, [], country or plan["나라"])
             if found:
                 return found
+    elif excluded:   # 질문정리 실패(v1 경로)에도 앞에서 뺀 프로그램은 뺀다
+        programs = [p for p in programs if p not in excluded]
 
     # ① 프로그램이 없으면 보류
     if not programs:
@@ -292,7 +304,36 @@ def clean_history(items):
     return out[-MAX_HISTORY:]
 
 
-def clarify(question, history):
+EXCLUDE_RE = re.compile(r"([^,.?!~\n]{1,30}?)\s*(?:말고|말구|말곤|빼고|제외하고)")
+# 있고 없음을 묻는 말 — 「아예 데이터가 없나요?」「노트가 하나도 없어요?」
+EXIST_RE = re.compile(r"(데이터|자료|노트|근거|정보|후기|사례)\s*(가|이|는|도|조차)?\s*(아예|전혀|하나도|정말|진짜)?\s*(없|있)"
+                      r"|아예\s*없|하나도\s*없")
+
+
+def _named_programs(text):
+    """이름·별칭·약칭(KOTRA·코트라)으로 직접 부른 프로그램. 직군·기관유형(「무역 인턴」)은 보지 않는다."""
+    q = _norm(text)
+    found = {name for t, name, is_alias in _TERMS if t in q and (not is_alias or _alias_ok(t, q))}
+    kw = INTERN_KEYWORDS if isinstance(INTERN_KEYWORDS, dict) else {}
+    for w, names in (kw.get("약칭") or {}).items():
+        if _norm(w) and _norm(w) in q:
+            found |= set([names] if isinstance(names, str) else names)
+    return found
+
+
+def carried_exclusions(question, history):
+    """[11/24 작업 87] 이전 질문들과 이번 말의 「○○ 말고/빼고」에서 뺀 프로그램(코드 대조, AI 없음).
+    화면 history에는 제외 칸이 없으므로 이전 질문 글자에서 다시 찾는다(talk.js 변경 없음, 최근 4턴 동안 유지).
+    이번 말이 「말고」 밖에서 그 이름을 다시 부르면(「코트라는 어때요?」) 빼지 않는다."""
+    out = []
+    for text in [h["question"] for h in history] + [question]:
+        for m in EXCLUDE_RE.finditer(text):
+            out += [n for n in match_programs(m.group(1)) if n in PROGRAMS and n not in out]
+    again = _named_programs(EXCLUDE_RE.sub(" ", question))
+    return [n for n in out if n not in again]
+
+
+def clarify(question, history, excluded=()):
     """AI(질문정리). 돌려주는 값: 대조를 거친 plan 또는 None(실패·형식 오류 → v1 경로)."""
     if history:
         lines = [f"{i}. 후배: {h['question']} → BOO: {STATUS_WORD.get(h['status'], h['status'] or '?')}"
@@ -300,6 +341,8 @@ def clarify(question, history):
         prev = "\n".join(lines)
     else:
         prev = "(없음)"
+    if excluded:
+        prev += "\n앞에서 뺀 프로그램: " + ", ".join(excluded)
     try:
         r = _call("질문정리", f"이전 대화:\n{prev}\n이번 말: {question}\n출력:")
     except Exception:   # 시험용 가짜 callAI가 모르는 작업이어도 v1 경로로
@@ -321,7 +364,11 @@ def clarify(question, history):
     section = j.get("칸") if isinstance(j.get("칸"), str) and j.get("칸") in ALL_SECTIONS else None
     asked = j.get("정리된질문") if isinstance(j.get("정리된질문"), str) else ""
     asked = asked.strip()[:300] or question
+    # [11/24] 나라원문: 교환 나라 목록(COUNTRIES)에 없는 나라도 「0개」라고 답하려고 남긴다(한글 2~10자, 「…어」는 언어라 뺌)
+    raw = j.get("나라").strip() if isinstance(j.get("나라"), str) else ""
+    raw = raw if re.fullmatch(r"[가-힣]{2,10}", raw) and not raw.endswith("어") and raw in question else None
     return {"의도": j["의도"], "분야": j.get("분야") if j.get("분야") in FIELDS else None, "나라": country,
+            "나라원문": country or raw,
             "프로그램후보": names("프로그램후보"), "제외": names("제외"), "칸": section, "정리된질문": asked}
 
 
@@ -334,19 +381,37 @@ FIELD_NOUN = {"국제교류": "교환·파견 해봤노트", "현장실습": "�
 
 def _chat(plan, history):
     """status "chat": AI가 쓰지 않는 고정 문구 + 칩. 질문함에 저장하지 않는다(답할 질문이 아님)."""
+    # [11/24] 문구는 바로 앞 턴이 실제로 보여 준 것을 따른다. 예전에는 「제외」를 먼저 봐서, ③이 이미 다른 노트 목록을
+    #   보여 준 뒤에도 ④가 「아까는 KOTRA … 이야기였어요」라고 했다(캡처 ④). 뺀 프로그램은 「빼고 보고 있어요」로만 말한다.
     last = history[-1] if history else None
-    program = (plan["제외"] or [None])[0] or (last["program"] if last and last["program"] else None)
-    field = plan["분야"] or (PROGRAMS.get(program, {}).get("분야") if program else None)
+    program = last["program"] if last and last["program"] else None    # 앞 답의 근거 프로그램
+    excl = plan["제외"]
+    field = plan["분야"] or (PROGRAMS.get(program, {}).get("분야") if program else None) \
+        or (PROGRAMS.get(excl[0], {}).get("분야") if excl else None)
+    lab = _label(excl) if excl else ""
+    noun = FIELD_NOUN.get(field, "해봤노트")
     chips = []
-    if program:
-        message = f"아까는 {program} 이야기였어요. 다른 {FIELD_NOUN.get(field, '해봤노트')}를 찾아볼까요?"
+    if last and last["status"] == "chat" and (program or excl):
+        # 바로 앞도 chat이면 같은 안내를 되풀이하지 않는다
+        lab = lab or program
+        message = f"{lab}{_josa('은는', lab)} 빼고 볼게요. 궁금한 주제(업무·지원·배운 점 등)를 적어 주시거나 다른 노트를 둘러보세요."
+        chips.append({"label": "다른 노트 보기", "action": "notes", "payload": {"field": field, "exclude": excl or [program]}})
+    elif last and last["status"] == "notes":
+        # 앞 턴이 노트 목록이었다 — 그 목록이 겹쳤거나 맞지 않았다는 말로 받는다
+        head = f"{lab}{_josa('은는', lab)} 빼고 노트를 보여 드렸어요. " if excl else ""
+        message = (f"{head}앞에서 본 노트와 겹쳤다면 궁금한 기관 유형이나 주제(업무·지원·배운 점 등)를 적어 주세요. "
+                   f"그 노트에서 선배 이야기를 찾아 답해 드릴게요.")
+        chips.append({"label": f"다른 {noun.replace(' 해봤노트', ' 노트')} 보기" if field else "해봤노트 둘러보기",
+                      "action": "notes", "payload": {"field": field, "exclude": excl}})
+    elif program:
+        message = f"아까는 {program} 이야기였어요. 다른 {noun}를 찾아볼까요?"
         chips.append({"label": "다른 노트 보기", "action": "notes", "payload": {"field": field, "exclude": [program]}})
+    elif excl:
+        message = f"{lab}{_josa('은는', lab)} 빼고 볼게요. 다른 {noun}를 찾아볼까요?"
+        chips.append({"label": "다른 노트 보기", "action": "notes", "payload": {"field": field, "exclude": excl}})
     elif last and last["status"] == "hold":
         message = "아직 그 내용을 들려준 선배가 없어서 질문함에 담아 두었어요. 선배가 답하면 알림으로 알려 드릴게요."
         chips.append({"label": "닮은선배 보기", "action": "ask", "payload": {}})
-    elif last and last["status"] == "notes":
-        message = "방금 보여 드린 노트 목록이 맞지 않았나요? 궁금한 프로그램 이름이나 주제(기숙사·비용·업무 등)를 적어 주시면 그 노트로 답해 드릴게요."
-        chips.append({"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field}})
     else:
         message = "무엇이 궁금한지 조금 더 구체적으로 물어봐 주세요. 예: 「마르부르크 기숙사 어땠어요?」"
         chips.append({"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field}})
@@ -361,19 +426,113 @@ def _kinds():
 def _explore(plan, programs, country):
     """탐색·사람찾기: 답을 만들지 않고 노트 카드(최대 5, 근거 많은 순)로 안내한다. 현장실습을 나라로 물으면 기관 유형 칩."""
     field = plan["분야"]
-    if field == "현장실습" and country and not programs:
-        return {"status": "notes", "lines": [], "sources": {}, "suggestSenior": True, "notes": [], "kinds": _kinds(),
-                "message": "현장실습 노트는 나라가 아니라 기관 유형으로 나뉘어요. 궁금한 유형을 골라 보세요."}
+    place = country or plan.get("나라원문")
+    if field == "현장실습" and place and not programs:
+        # [11/24] 나라 노트 수를 먼저 말한다(코드가 셈). 근거에 그 나라가 나오는 인턴 노트가 있으면 카드로 함께
+        mentions = [n for n in intern_mentions(place) if n not in plan["제외"]]
+        found = _notes(mentions, place) or {"notes": []}
+        return {"status": "notes", "lines": [], "sources": {}, "suggestSenior": True, "notes": found["notes"], "kinds": _kinds(),
+                "message": country_counts(place, field) + " 현장실습 노트는 나라가 아니라 기관 유형으로 나뉘어요. 궁금한 유형을 골라 보세요."}
+    if not programs and place and not country and field in (None, "국제교류"):
+        # 교환 나라 목록에 없는 나라(「베트남 교환」) — 보류 대신 0개라고 답한다
+        return {"status": "notes", "lines": [], "sources": {}, "suggestSenior": True, "notes": [],
+                "message": country_counts(place, field) + " 궁금한 다른 나라나 프로그램을 물어봐 주세요."}
     if not programs and field:
         pool = [n for n, p in PROGRAMS.items() if p.get("분야") == field and n not in plan["제외"]
                 and (not country or p.get("세부") == country) and evidence_count(n)]
         programs = sorted(pool, key=evidence_count, reverse=True)[:MAX_NOTES]
+        total = len(pool)
+    else:
+        total = 0
     if not programs:
         return None
     found = _notes(programs, country)
     if found and plan["제외"] and len(found["notes"]) > 1:
-        found["message"] = f"{', '.join(plan['제외'])}을(를) 뺀 {FIELD_NOUN.get(field, '해봤노트')}가 {len(found['notes'])}개 있어요. 궁금한 노트를 골라 보세요."
+        lab = _label(plan["제외"])
+        n = len(found["notes"])
+        # [11/24] 카드는 5개까지라 「5개 있어요」는 틀린 수 — 전체 수를 말하고 근거 많은 것부터 보여 준다고 한다
+        count = f"{total}개 있어요. 근거가 많은 {n}개를 먼저 보여 드려요" if total > n else f"{n}개 있어요"
+        found["message"] = f"{lab}{_josa('을를', lab)} 뺀 {FIELD_NOUN.get(field, '해봤노트')}가 {count}. 궁금한 노트를 골라 보세요."
     return found
+
+
+# ── [11/24 작업 87] 나라·유무 질문: 개수는 코드가 programs.json·근거에서 센다(AI 없음 — 없는 근무지·나라를 지어내지 않게) ──
+def _josa(pair, word):
+    """pair: "이가"·"은는"·"을를". 받침을 모르면(영문·괄호 끝) 「을(를)」처럼 둘 다."""
+    ch = (word or " ")[-1]
+    if "가" <= ch <= "힣":
+        return pair[0] if (ord(ch) - 0xAC00) % 28 else pair[1]
+    return f"{pair[0]}({pair[1]})"
+
+
+def _label(names):
+    """뺀 프로그램 이름 — 같은 세부(「KOTRA 해외무역관」 권역 3곳)는 세부 하나로 줄인다."""
+    out = []
+    for n in names:
+        kind = PROGRAMS.get(n, {}).get("세부")
+        same = [m for m in names if kind and PROGRAMS.get(m, {}).get("세부") == kind]
+        w = kind if len(same) > 1 and PROGRAMS.get(n, {}).get("분야") == "현장실습" else n
+        if w not in out:
+            out.append(w)
+    return ", ".join(out)
+
+
+def intern_mentions(place):
+    """근거(보고서·동의 통과 인터뷰 문장)에 그 나라 이름이 나오는 현장실습 프로그램(근거 많은 순). 현장실습은 나라 칸이 없다."""
+    pat = re.compile(re.escape(place) + r"(?!어)")
+    hits = [n for n, p in PROGRAMS.items() if p.get("분야") == "현장실습"
+            and (any(pat.search(e.get("text", "")) for e in EVIDENCE.get(n, []))
+                 or any(pat.search(r.get("text", "")) for r in notes.interview_lines(n)))]
+    return sorted(hits, key=evidence_count, reverse=True)
+
+
+def country_counts(place, field):
+    """나라 노트 수 문장. field가 현장실습이면 인턴 수를 먼저, 그 나라 교환·파견 노트가 있으면 덧붙인다."""
+    ex = len([n for n in COUNTRIES.get(place, []) if evidence_count(n)])
+    ex_s = f"{place} 교환·파견 해봤노트는 {ex}개예요." if ex == 0 else f"{place} 교환·파견 해봤노트는 {ex}개 있어요."
+    if field == "국제교류":
+        return ex_s
+    k = len(intern_mentions(place))
+    in_s = (f"{place}에서 한 현장실습 해봤노트는 0개예요." if not k
+            else f"근거에 {place}{_josa('이가', place)} 나오는 현장실습 해봤노트가 {k}개 있어요.")
+    return in_s + (" " + ex_s if ex or field is None else "")
+
+
+FIELD_RE = (("현장실습", re.compile(r"인턴|실습|회사|기업|기관|근무")), ("국제교류", re.compile(r"교환|파견|유학|어학연수|대학")))
+
+
+def _exists(plan, history):
+    """status "chat": 「데이터가 없나요?」에 앞 대화 주제(나라 > 프로그램 > 분야)의 노트 수로 답한다."""
+    texts = [h["question"] for h in reversed(history)]
+    place = plan.get("나라원문")
+    if not place:
+        for t in texts:
+            c, _ = match_country(t)
+            if c:
+                place = c
+                break
+    field = plan["분야"]
+    for t in ([] if field else texts):
+        field = next((f for f, rx in FIELD_RE if rx.search(t)), None)
+        if field:
+            break
+    program = next((h["program"] for h in reversed(history) if h["program"] and h["program"] not in plan["제외"]), None)
+    chips = [{"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field, "exclude": plan["제외"]}}]
+    if place:
+        message = country_counts(place, field)
+        if field == "현장실습":
+            message += " 현장실습 노트는 기관 유형으로 나뉘어 있어요."   # chat은 유형 칩을 못 보여 줘서 「유형으로 찾아보세요」라고 하지 않는다
+    elif program:
+        message = f"{program} 해봤노트에는 선배 근거가 {evidence_count(program)}개 있어요. 궁금한 주제를 물어보시면 그 근거로 답해 드릴게요."
+    elif field:
+        pool = [n for n, p in PROGRAMS.items() if p.get("분야") == field and n not in plan["제외"] and evidence_count(n)]
+        lab = _label(plan["제외"])
+        head = f"{lab}{_josa('을를', lab)} 빼도 " if plan["제외"] else ""
+        message = f"{head}{FIELD_NOUN[field]}가 {len(pool)}개 있어요. 궁금한 노트를 둘러보세요."
+    else:
+        return None
+    chips.append({"label": "질문함에 담기", "action": "save", "payload": {"question": plan["정리된질문"]}})
+    return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "message": message, "chips": chips}
 
 
 # ── ① 프로그램 대조 ───────────────────────────────────────────────────

@@ -77,6 +77,15 @@ expect("제외가 별칭(코트라)으로 와도 프로그램명으로 대조", 
 res, calls = run("독일에서 인턴하고 싶은데 어디어디 있어요?", [],
                  plan={"의도": "탐색", "분야": "현장실습", "나라": "독일", "프로그램후보": [], "제외": [], "칸": None, "정리된질문": "독일에서 할 수 있는 인턴은 어디 있나요?"})
 expect("현장실습을 나라로 물으면 기관 유형 칩", res["status"] == "notes" and res.get("kinds") and res["notes"] == [] and "기관 유형" in res["message"], res)
+expect("독일 인턴 → 독일 노트 수(0개)를 먼저", res["message"].startswith("독일에서 한 현장실습 해봤노트는 0개예요."), res["message"])
+expect("독일 교환 노트 수도 코드가 센 값", f"독일 교환·파견 해봤노트는 {len([n for n in askboo.COUNTRIES['독일'] if askboo.evidence_count(n)])}개" in res["message"], res["message"])
+
+res, calls = run("베트남 교환 갈 수 있는 곳 있어요?", [],
+                 plan={"의도": "탐색", "분야": "국제교류", "나라": "베트남", "프로그램후보": [], "제외": [], "칸": None, "정리된질문": "베트남 교환은 어디 있나요?"})
+expect("교환 목록에 없는 나라 → 보류 대신 0개", res["status"] == "notes" and "베트남 교환·파견 해봤노트는 0개예요." in res["message"], res)
+res, calls = run("교환 어디 있어요?", [],
+                 plan={"의도": "탐색", "분야": "국제교류", "나라": "몰디브", "프로그램후보": [], "제외": [], "칸": None, "정리된질문": "x"})
+expect("질문에 없는 나라를 AI가 지어내면 쓰지 않음", "몰디브" not in (res.get("message") or ""), res.get("message"))
 
 res, calls = run("교환학생 선발 기준이 어떻게 돼요", [],
                  plan={"의도": "경험질문", "분야": "국제교류", "나라": None, "프로그램후보": [], "제외": [], "칸": None, "정리된질문": "x"})
@@ -85,6 +94,75 @@ expect("정규식 규정 판별이 질문정리보다 먼저(official)", res["st
 res, calls = run("마르부르크 기숙사 월세 얼마였어요?", [],
                  plan={"의도": "규정", "분야": None, "나라": None, "프로그램후보": [PROGRAM], "제외": [], "칸": None, "정리된질문": "x"})
 expect("질문정리가 규정이라고 하면 official", res["status"] == "official")
+
+# ── ①-2 [11/24] 제외 이어받기 · 유무 질문 · chat 되풀이 없음 ─────────────
+KOTRAS = [n for n in askboo.PROGRAMS if n.startswith("KOTRA")]
+H2 = H_KOTRA + [{"question": "아니 코트라 말고 전반적인 무역 관련 인턴이 어떤지 소개해주세요", "status": "notes", "program": ""}]
+expect("앞 턴 「코트라 말고」 → KOTRA 권역 모두 제외", set(askboo.carried_exclusions("좋은 인턴 추천해주세요", H2)) == set(KOTRAS),
+       askboo.carried_exclusions("좋은 인턴 추천해주세요", H2))
+expect("이번 말이 코트라를 다시 부르면 빼지 않음", askboo.carried_exclusions("코트라는 어땠어요?", H2) == [])
+expect("「말고」 없으면 제외 없음", askboo.carried_exclusions("좋은 인턴 추천해주세요", H_KOTRA) == [])
+
+# AI가 앞 대화의 KOTRA를 후보로 다시 넣어도 코드가 뺀다
+res, calls = run("좋은 인턴 어디 있나 추천해주세요", H2,
+                 plan={"의도": "탐색", "분야": "현장실습", "나라": None, "프로그램후보": [KOTRA], "제외": [], "칸": None, "정리된질문": "좋은 인턴 추천"})
+expect("③ 다음 턴에도 KOTRA 없음(AI가 제외를 잊어도)", res["status"] == "notes" and res["notes"] and not any(c["program"] in KOTRAS for c in res["notes"]), res)
+expect("질문정리 입력에 「앞에서 뺀 프로그램」", "앞에서 뺀 프로그램: " in calls[0][1], calls[0][1])
+expect("제외 안내는 「KOTRA 해외무역관」 하나로 줄임", res["message"].startswith("KOTRA 해외무역관을 뺀"), res["message"])
+expect("카드 5개여도 전체 수를 말함", f"{n_left}개 있어요. 근거가 많은 5개" in res["message"] if (n_left := len([n for n, p in askboo.PROGRAMS.items() if p.get("분야") == "현장실습" and n not in KOTRAS and askboo.evidence_count(n)])) > 5 else True, res["message"])
+res, calls = run("코트라 무역 인턴 추천해주세요", H2, plan=None)   # v1 경로: 정규식이면 KOTRA가 잡히지만 이번 말이 다시 불렀으니 유지
+expect("v1: 다시 부르면 KOTRA 유지", any(s["program"] in KOTRAS for s in res.get("sources", {}).values()), res)
+res, calls = run("무역 인턴 추천해주세요", H2, plan=None)
+expect("v1(질문정리 실패)에도 앞에서 뺀 KOTRA 없음", not any(s["program"] in KOTRAS for s in res.get("sources", {}).values()), res)
+
+
+def talk_sequence(steps):
+    """talk.js rememberTurn처럼 history를 쌓으며 차례로 묻는다. steps: [(질문, plan)]"""
+    turns, outs = [], []
+    for q, plan in steps:
+        res, _ = run(q, turns[-4:], plan=plan)
+        src = [s["program"] for s in res.get("sources", {}).values()]
+        prog = src[0] if src else (turns[-1]["program"] if res["status"] == "chat" and turns else "")
+        turns.append({"question": q, "status": res["status"], "program": prog})
+        outs.append(res)
+    return outs
+
+
+def P(의도, 분야=None, 나라=None, 후보=(), 제외=(), q="x"):
+    return {"의도": 의도, "분야": 분야, "나라": 나라, "프로그램후보": list(후보), "제외": list(제외), "칸": None, "정리된질문": q}
+
+
+# 11/23 캡처 6문항(같은 순서). 질문정리는 11/24 실제 결과처럼 ③에서 제외를 빠뜨리고 ⑥을 대화로 낸다고 둔다
+outs = talk_sequence([
+    ("무역 관련 인턴 어떤가요?", None),
+    ("아니 코트라 말고 전반적인 무역 관련 인턴이 어떤지 소개해주세요", P("탐색", "현장실습", 제외=["코트라"])),
+    ("좋은 인턴 어디 있나 추천해주세요", P("탐색", "현장실습")),
+    ("이건 아까도 한 얘기잖아", P("대화", "현장실습", 제외=[KOTRA])),
+    ("독일에서 인턴하고 싶은데 어디어디 있어요?", P("탐색", "현장실습", "독일")),
+    ("아예 데이터가 없나요?", P("대화", "현장실습")),
+])
+progs3 = [c["program"] for c in outs[2].get("notes", [])] + [s["program"] for s in outs[2].get("sources", {}).values()]
+expect("6문항 ③ KOTRA 없음", progs3 and not any(p in KOTRAS for p in progs3), progs3)
+expect("6문항 ⑤ 독일 노트 개수 문장", "독일에서 한 현장실습 해봤노트는 0개" in outs[4].get("message", ""), outs[4].get("message"))
+expect("6문항 ⑥ 유무 질문 → 독일 개수로 답(chat, 질문함 없음)",
+       outs[5]["status"] == "chat" and "독일" in outs[5]["message"] and "0개" in outs[5]["message"] and "questionId" not in outs[5], outs[5])
+expect("6문항 ④ chat, 앞(③)이 노트 목록이면 「아까는 KOTRA 이야기」라고 하지 않음",
+       outs[3]["status"] == "chat" and not outs[3]["message"].startswith("아까는") and "KOTRA 해외무역관은 빼고 노트를 보여 드렸어요" in outs[3]["message"],
+       outs[3].get("message"))
+expect("6문항 ④ 칩: 다른 현장실습 노트 보기(KOTRA 제외)",
+       outs[3]["chips"][0]["label"] == "다른 현장실습 노트 보기" and set(outs[3]["chips"][0]["payload"]["exclude"]) >= {KOTRA}, outs[3]["chips"])
+expect("6문항 ⑥이 ④와 다른 답", outs[5].get("message") != outs[3].get("message"), (outs[3].get("message"), outs[5].get("message")))
+
+# 바로 앞이 chat이면 같은 「아까는 ○○ 이야기」 안내를 되풀이하지 않는다
+hc = H_KOTRA + [{"question": "이건 아까도 한 얘기잖아", "status": "chat", "program": KOTRA}]
+res, _ = run("그러니까 그거 말고요", hc, plan=P("대화", "현장실습", 제외=[KOTRA]))
+expect("chat 두 번째는 다른 문구", res["status"] == "chat" and not res["message"].startswith("아까는"), res.get("message"))
+
+# 유무 질문: 나라가 없으면 분야 노트 수(제외 뺀 수)
+res, _ = run("노트가 하나도 없어요?", H2, plan=P("대화", "현장실습"))
+n_left = len([n for n, p in askboo.PROGRAMS.items() if p.get("분야") == "현장실습" and n not in KOTRAS and askboo.evidence_count(n)])
+expect("유무 질문(나라 없음) → 제외 뺀 현장실습 노트 수", res["status"] == "chat" and f"{n_left}개" in res["message"] and "KOTRA 해외무역관" in res["message"], res.get("message"))
+expect("조사: 독일이·KOTRA 해외무역관을(를)", askboo._josa("이가", "독일") == "이" and askboo._josa("을를", "무역관") == "을" and askboo._josa("을를", "(권역)") == "을(를)")
 
 # ── ② 답쓰기 + 검증 ────────────────────────────────────────────────────
 def first_cands():
