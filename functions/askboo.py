@@ -521,7 +521,7 @@ def _exists(plan, history):
     if place:
         message = country_counts(place, field)
         if field == "현장실습":
-            message += " 현장실습 노트는 기관 유형으로 나뉘니 유형으로 찾아보시면 돼요."
+            message += " 현장실습 노트는 기관 유형으로 나뉘어 있어요."   # chat은 유형 칩을 못 보여 줘서 「유형으로 찾아보세요」라고 하지 않는다
     elif program:
         message = f"{program} 해봤노트에는 선배 근거가 {evidence_count(program)}개 있어요. 궁금한 주제를 물어보시면 그 근거로 답해 드릴게요."
     elif field:
