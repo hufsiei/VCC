@@ -7,7 +7,7 @@
 #      docs/prompts/*.txt, lib/(functions/requirements.txt를 리눅스 x86_64 · Python 3.13용 wheel로 설치)
 #   3. 검사: .env·logs·data/runtime·*.jsonl이 들어가지 않았는지, .env와 환경변수의 키·비번 값이 zip 안 어떤 파일에도 없는지.
 #      걸리면 zip을 지우고 멈춘다(값은 출력하지 않는다).
-#   결과: <임시 폴더>/vcc-cloud/vcc-functions.zip (저장소 밖 — 커밋되지 않게). 경로를 출력한다.
+#   결과: 다운로드 폴더의 vcc-functions.zip (저장소 밖 — 커밋되지 않게). 경로를 출력한다.
 #   업로드: NCP 콘솔 > Cloud Functions > 액션 > 코드 > 파일 업로드(zip), 런타임 python:3.13.
 #
 # 옵션: --python 3.13  --skip-git-check  --fresh(lib 다시 설치)  --out <zip 경로>
@@ -151,14 +151,15 @@ def main():
     ap.add_argument("--python", default="3.13")
     ap.add_argument("--skip-git-check", action="store_true")
     ap.add_argument("--fresh", action="store_true")
-    ap.add_argument("--out", default=str(Path(tempfile.gettempdir()) / "vcc-cloud" / "vcc-functions.zip"))
+    ap.add_argument("--out", default=str(Path.home() / "Downloads" / "vcc-functions.zip"))   # 콘솔 「파일 업로드」에서 찾기 쉽게
     a = ap.parse_args()
 
     if not a.skip_git_check:
         check_git()
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    lib = out.parent / f"lib-py{a.python}"
+    lib = Path(tempfile.gettempdir()) / "vcc-cloud" / f"lib-py{a.python}"   # 받은 패키지는 임시 폴더에(다시 받지 않게)
+    lib.parent.mkdir(parents=True, exist_ok=True)
     install_lib(lib, a.python, a.fresh)
     items = members(lib)
     problem = check(items)
