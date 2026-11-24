@@ -207,6 +207,7 @@ const listEl = document.getElementById("noteList");
 const countEl = document.getElementById("noteCount");
 let allNotes = [];
 let currentCat = "";
+let currentQuery = ""; // 검색창 글자(그대로) — 거를 때는 norm()으로
 let loaded = false;
 let listRequested = false;
 
@@ -220,11 +221,32 @@ function errorBox(onRetry) {
   ]);
 }
 
+// 검색(7-③, 11/24): 띄어쓰기·대소문자 무시하고 프로그램명·한 줄 요약·추천 대상·나라·기관유형·종류·분야 글자에 들어 있으면 남긴다.
+// 서버 listNotes q와 같은 방식이지만, 분야 필터처럼 전체를 한 번 받아 화면에서 거른다(글자마다 서버를 부르지 않음, mock에서도 동작).
+// 검색어를 굵게·밑줄로 강조하지 않는다(디자인 규칙 12절).
+const norm = (s) => String(s || "").replace(/\s+/g, "").toLowerCase();
+function matchesQuery(n, q) {
+  if (!q) return true;
+  const words = [n.program, n.oneLine, n.forWhom, n.country, n.kind, n.type, KIND_NAME[n.type], CATEGORY_NAME[CATEGORY[n.type]]];
+  return words.some((w) => norm(w).includes(q));
+}
+
 function renderList() {
   listEl.setAttribute("aria-busy", "false");
-  const notes = currentCat ? allNotes.filter((n) => CATEGORY[n.type] === currentCat) : allNotes;
+  const q = norm(currentQuery);
+  const notes = allNotes.filter((n) => (!currentCat || CATEGORY[n.type] === currentCat) && matchesQuery(n, q));
   countEl.textContent = `노트 ${notes.length}개`;
 
+  if (!notes.length && q) {
+    // 검색 결과 없음(6-4): 이름을 바꿔 찾거나, 노트에 없는 것은 BOO에게 묻도록
+    listEl.replaceChildren(el("div", { className: "state-box" }, [
+      el("img", { className: "boo-illust", attrs: { src: "../../assets/boo-portrait.png", alt: "BOO" } }),
+      el("p", { className: "state-box__title", text: `「${currentQuery.trim()}」에 맞는 해봤노트가 없어요` }),
+      el("p", { className: "sub", text: "다른 이름으로 찾아보거나, BOO에게 물어보세요." }),
+      el("a", { className: "btn btn--secondary", text: "BOO에게 물어보기", attrs: { href: "../talk/?mode=ask" } }),
+    ]));
+    return;
+  }
   if (!notes.length) {
     listEl.replaceChildren(el("div", { className: "state-box" }, [
       el("img", { className: "boo-illust", attrs: { src: "../../assets/boo-portrait.png", alt: "BOO" } }),
@@ -265,6 +287,25 @@ document.getElementById("filters").addEventListener("click", (e) => {
   currentCat = chip.dataset.cat;
   for (const c of e.currentTarget.querySelectorAll(".choice-chip")) c.setAttribute("aria-pressed", String(c === chip));
   if (loaded) renderList(); // 불러오는 중이거나 오류면 그 화면을 그대로 둔다
+});
+
+// 검색창 — 칠 때마다 바로 거른다(같은 화면 안 전환). Enter는 휴대폰 키보드만 내린다
+const queryInput = document.getElementById("noteQuery");
+const queryClear = document.getElementById("noteQueryClear");
+function setQuery(value) {
+  currentQuery = value;
+  queryClear.hidden = value === "";
+  if (loaded) renderList();
+}
+queryInput.addEventListener("input", () => setQuery(queryInput.value));
+document.getElementById("noteSearch").addEventListener("submit", (e) => {
+  e.preventDefault();
+  queryInput.blur();
+});
+queryClear.addEventListener("click", () => {
+  queryInput.value = "";
+  setQuery("");
+  queryInput.focus();
 });
 
 // ---------------------------------------------------------------------------
