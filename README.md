@@ -10,8 +10,7 @@
 - 미리 개발 서버(미리 PC만): `functions/local_fn.py` 실행 후 `http://localhost:8787`
 - 공개 주소(GitHub Pages, `main` 루트): <https://hufsiei.github.io/VCC/screens/login/>
   - 저장소 루트는 `https://hufsiei.github.io/VCC/`이고, 각 화면은 그 아래 `screens/<화면>/`입니다.
-  - 지금은 `USE_MOCK=true`(mock 데이터)로 배포합니다. 서버 함수 호출 확인은 작업 47 이후입니다.
-  - 서버 함수(`functions/cloud/`)의 CORS는 `https://hufsiei.github.io`와 로컬 `http://localhost:8000`·`http://127.0.0.1:8000`만 허용합니다. 다른 주소를 더하려면 함수의 `ALLOW_ORIGIN` 기본 파라미터(쉼표 구분)를 씁니다.
+  - 기본은 `USE_MOCK=true`(mock 데이터)입니다. 주소 끝에 `?server=all`을 붙인 탭만 서버 함수(NCP Cloud Functions, 작업 58)로 갑니다. 배포·콘솔 구성은 [운영노트](docs/운영노트.md) 5장 「배포」.
   - 저장소가 공개라서 `data/`·`common/` 등 올린 파일은 누구나 볼 수 있습니다. 가상 데이터만 올리고, 키는 `.env`(커밋 금지)와 NCP 콘솔 기본 파라미터에만 둡니다. `.env`에 넣을 항목은 [.env.example](.env.example)(AI 키, 로그인 비번 표 `VCC_LOGIN_PW`)를 보세요.
 
 ## 가상 계정
