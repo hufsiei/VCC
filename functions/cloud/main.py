@@ -45,9 +45,10 @@ def _set_env(args):
         v = args.get(k)
         if v is None or v == "":
             continue
-        os.environ[k] = v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)   # VCC_LOGIN_PW를 객체로 넣어도 JSON 문자열로
+        # VCC_LOGIN_PW를 객체로 넣어도 JSON 문자열로. 콘솔에 붙여 넣을 때 섞인 앞뒤 공백은 지운다
+        os.environ[k] = v.strip() if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
     if args.get("CLAUDE_KEY"):
-        os.environ["ANTHROPIC_API_KEY"] = str(args["CLAUDE_KEY"])
+        os.environ["ANTHROPIC_API_KEY"] = str(args["CLAUDE_KEY"]).strip()
     os.environ.setdefault("STORE_BACKEND", "ncp")   # 액션에서 file로 쓰면 재시작 때 기록이 사라진다
 
 
