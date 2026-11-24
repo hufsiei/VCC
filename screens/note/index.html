@@ -10,21 +10,14 @@
 
   /* ---------- 목록(1단계) ---------- */
   .note-top { display: flex; flex-direction: column; gap: var(--space-md); }
-  /* 채팅형 검색창(7-③): 누르면 인터BOO 물어보기로 이동 */
-  .ask-link {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    min-height: var(--button-height);
-    padding: 0 var(--space-md);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-button);
-    background: var(--color-surface);
-    color: var(--color-text-muted);
-    text-decoration: none;
-  }
-  .ask-link .icon { color: var(--color-hufs-navy); }
-  .ask-link__text { flex: 1; }
+  /* 노트 검색창(7-③, 11/24): 해봤노트 안에서 프로그램·나라·기관으로 거른다. 돋보기는 입력칸 안 왼쪽, 지우기(×)는 오른쪽 */
+  .note-search { position: relative; }
+  .note-search .input { width: 100%; padding-left: 44px; padding-right: 48px; }
+  .note-search__icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--color-hufs-navy); pointer-events: none; }
+  .note-search__clear { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); }
+  .note-search__clear .icon { color: var(--color-text-muted); }
+  /* 검색창 기본 지우기 버튼은 숨기고(브라우저마다 모양이 달라서) 우리 × 버튼만 쓴다 */
+  .note-search input::-webkit-search-cancel-button { display: none; }
   .filter-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
   .filter-row .choice-chip { font-size: var(--font-size-secondary); cursor: pointer; }
   .note-count { margin-top: var(--space-lg); font-size: var(--font-size-secondary); color: var(--color-text-muted); }
@@ -143,11 +136,14 @@
           <p class="sub">이수 기록으로 확인된 선배들의 경험을 프로그램별로 모았어요.</p>
         </div>
 
-        <a class="ask-link" href="../talk/">
-          <i data-lucide="message-circle" class="icon"></i>
-          <span class="ask-link__text">BOO에게 물어보기</span>
-          <i data-lucide="arrow-right" class="icon"></i>
-        </a>
+        <form class="note-search" id="noteSearch" role="search" autocomplete="off">
+          <i data-lucide="search" class="icon note-search__icon" aria-hidden="true"></i>
+          <input class="input" id="noteQuery" type="search" enterkeyhint="search" maxlength="40"
+                 aria-label="해봤노트 검색" placeholder="프로그램·나라·기관 이름으로 찾기">
+          <button class="icon-btn note-search__clear" id="noteQueryClear" type="button" aria-label="검색어 지우기" hidden>
+            <i data-lucide="x" class="icon"></i>
+          </button>
+        </form>
 
         <div class="filter-row" id="filters" role="group" aria-label="분야 필터">
           <button class="choice-chip" type="button" data-cat="" aria-pressed="true">전체</button>
