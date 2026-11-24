@@ -31,7 +31,9 @@ def _main_root(root):
 
 
 MAIN_ROOT = _main_root(ROOT)
-LOGS = MAIN_ROOT / "functions" / "logs"
+# Cloud Functions(작업 58)는 /tmp만 쓸 수 있어 진입점(functions/cloud/main.py)이 VCC_LOGS=/tmp/vcc-logs를 넣는다.
+# 로컬·worktree는 VCC_LOGS가 없으므로 그대로 본 저장소의 functions/logs.
+LOGS = Path(os.environ["VCC_LOGS"]) if os.environ.get("VCC_LOGS") else MAIN_ROOT / "functions" / "logs"
 
 
 def env_files():
