@@ -53,7 +53,7 @@
 
 ## 2. 접속 주소 (README.md)
 
-- 로컬: 저장소 폴더에서 `python -m http.server 8000` → `http://localhost:8000/screens/login/`
+- 로컬: 저장소 폴더에서 `python functions/serve_screens.py` → `http://localhost:8000/screens/login/` (127.0.0.1만, 11/24 `http.server`에서 바꿈)
 - 미리 개발 서버(미리 PC만): `functions/local_fn.py` → `http://localhost:8787`
 - 공개 주소(GitHub Pages, 11/20 작업 80): https://hufsiei.github.io/VCC/screens/login/
 
