@@ -79,6 +79,9 @@ r, out = call("/getMe", token=token)
 check("logout은 헤더 토큰을 폐기", out.get("error") == "로그인이 필요해요")
 check("라우팅 표는 local_fn 것 그대로", main._load_app()["local_fn"].ROUTES is sys.modules["local_fn"].ROUTES)
 
+r, out = call("/_diag", {"secret": "본문값"})
+check("_diag는 값 없이 이름만", out.get("ow_path") == "/_diag" and "본문값" not in r["body"] and "VCC_LOGIN_PW" not in r["body"])
+
 # ---------- 2. store ncp (가짜 S3) ----------
 bucket = {}
 

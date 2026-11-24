@@ -127,6 +127,12 @@ def main(args):
     method = str(args.get("__ow_method", "")).lower()
     if method == "options":
         return {"statusCode": 204, "headers": _cors(args), "body": ""}
+    if "_diag" in str(args.get("__ow_path") or "") or "_diag" in str(args.get("__ow_query") or ""):
+        # 배포 점검용(API Gateway가 경로·본문을 어떻게 넘기는지). 값은 돌려주지 않는다 — 이름·경로·여부만
+        return _reply(args, {"ow_path": args.get("__ow_path"), "ow_method": args.get("__ow_method"),
+                             "ow_query": args.get("__ow_query"), "has_ow_body": "__ow_body" in args,
+                             "body_type": type(args.get("__ow_body")).__name__,
+                             "arg_keys": sorted(k for k in args if not k.isupper() and not k.startswith("__ow_body"))})
     if "__ow_method" in args and "__ow_body" not in args and method == "post":
         # Raw HTTP가 꺼져 있으면 본문 필드가 args에 섞여 들어온다(기본 파라미터를 덮어쓸 수 있음)
         return _reply(args, {"error": "서버 설정 오류: 웹 액션의 Raw HTTP를 켜 주세요"}, 500)
