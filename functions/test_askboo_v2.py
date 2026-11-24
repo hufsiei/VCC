@@ -116,8 +116,33 @@ expect("질문정리 입력에 이전 대화 없음 표시", "(없음)" in calls
 res, calls = run("마르부르크 기숙사 어땠어요?", [], plan=plan_q, answer=answer, match=False)
 expect("답검사가 거짓이면 다 버려져 v1 원문 인용 폴백", res["status"] == "ok" and all(l.get("cites") == [l["sourceId"]] for l in res["lines"]) and "A1" not in res["lines"][0]["lineId"], res.get("lines"))
 
+expect("검증 탈락 폴백 → 모든 줄 fallback True", res["lines"] and all(l.get("fallback") is True for l in res["lines"]), res.get("lines"))
+
 res, calls = run("마르부르크 기숙사 어땠어요?", [], plan=plan_q, answer=None)
 expect("답쓰기 실패 → 폴백(원문 인용), 줄 수 ≤ 3", res["status"] == "ok" and 1 <= len(res["lines"]) <= 3)
+expect("답쓰기 실패 폴백도 모든 줄 fallback True", all(l.get("fallback") is True for l in res["lines"]), res.get("lines"))
+
+# [11/24] 답쓰기가 {"답":[]}(근거가 질문에 안 맞음) → 원문을 답처럼 보이지 않고 보류
+res, calls = run("마르부르크 기숙사 어땠어요?", [], plan=plan_q, answer={"답": []})
+expect("답쓰기 빈 답 → hold", res["status"] == "hold" and res["lines"] == [] and res.get("_why") == "답쓰기 근거 없음", res)
+expect("빈 답 hold는 노트로 갈 noteId·선배 제안", res.get("noteId") and res["suggestSenior"] is True, res)
+expect("빈 답이면 답검사·변환을 부르지 않음", [c[0] for c in calls] == ["질문정리", "고르기", "답쓰기"], [c[0] for c in calls])
+expect("compose 기본값은 빈 답에도 None(칸 요약 build_notes용)",
+       askboo.compose.__defaults__[-1] is None)
+
+# 고르기가 max_tokens에 잘리면(14개 넘게 고름) 앞 MAX_PICK(8)개만 답쓰기에 넘긴다
+many = [{"text": f"문장 {i}이에요."} for i in range(1, 21)]
+orig = askboo._call
+askboo._call = lambda n, c: {"ok": True, "text": '{"관련":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15', "json": None, "model": "fake"}
+got, _ = askboo.pick("q", many)
+askboo._call = orig
+expect("잘린 고르기 목록(15개) → 앞 8개", askboo.MAX_PICK == 8 and got == many[:8], len(got))
+
+# [11/24] 말머리 「덧붙이자면」 등은 폴백 문장에서 지운다
+expect("덧붙이자면 제거", askboo.clean_source("덧붙이자면 일요일엔 상점이 닫아요.") == "일요일엔 상점이 닫아요.")
+expect("저 같은 경우·체감상·사족이지만·하나 더 제거",
+       [askboo.clean_source(s) for s in ("저 같은 경우 버스로 가요.", "체감상 추워요.", "사족이지만 비싸요.", "하나 더, 싸요.")]
+       == ["버스로 가요.", "추워요.", "비싸요.", "싸요."])
 
 # ── ③ 질문정리 실패 → v1 경로 ─────────────────────────────────────────
 res, calls = run("마르부르크 기숙사 어땠어요?", [], plan=None, answer=None)
