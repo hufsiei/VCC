@@ -4,7 +4,7 @@
 
 export const USE_MOCK = true; // 기본값. true: common/mock-data.json, false: 서버 함수
 // [작업 58] GitHub Pages(…github.io)에서는 NCP Cloud Functions 공개 주소, 그 밖(로컬)은 local_fn.py
-const FN_PUBLIC = ""; // 웹 액션 공개 주소(끝에 / 없이). 액션 등록 뒤 채운다
+const FN_PUBLIC = "https://x1ey63q7ei.apigw.ntruss.com/vcc-api/dev"; // API Gateway vcc-api · Stage dev · 리소스 /{fn} → 액션 vcc/vcc-api
 const IS_PUBLIC = location.hostname.endsWith("github.io");
 const FN_BASE = IS_PUBLIC ? FN_PUBLIC : "http://localhost:8787";
 
