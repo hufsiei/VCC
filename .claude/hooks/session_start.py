@@ -1,27 +1,58 @@
-# session_start.py — Claude Code SessionStart hook (미리 개인용, 11/21)
+# session_start.py — Claude Code SessionStart hook (11/21 미리 개인용 → 11/24 팀 공용)
 #
-# 설정은 저장소가 아니라 각 PC의 ~/.claude/settings.json에 넣는다(팀원 PC에서는 돌지 않게).
-#   "hooks": {"SessionStart": [{"hooks": [{"type": "command",
-#       "command": "python -X utf8 C:/dev/VCC/.claude/hooks/session_start.py", "timeout": 30}]}]}
+# 11/24부터 저장소 .claude/settings.json에 등록돼 있어 팀원 PC에서도 돈다(저장소 폴더에서 Claude Code를 열 때):
+#   "command": "python -X utf8 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start.py\""
+# 미리처럼 C:\dev에서 여는 PC는 ~/.claude/settings.json에도 같은 hook을 둔다(.claude/미리-PC설정.md 1절).
+# 두 곳에 다 걸려도 같은 세션에서는 한 번만 돈다(session_id 기록).
 #
 # 하는 일
-#   1) 세션을 열 때마다 C:\dev\VCC를 pull — main이고 고친 파일이 없을 때만(--ff-only). 아니면 건너뛰고 이유만 알린다.
+#   1) 세션을 열 때마다 본 저장소를 pull — main이고 고친 파일이 없을 때만(--ff-only). 아니면 건너뛰고 이유만 알린다.
 #   1-1) push 전 검사 켜기: git config core.hooksPath .githooks (없을 때만. .githooks/pre-push 참고)
-#   2) 그날 첫 세션에만 상태 한 줄: main 최신 여부 · 남은 작업 폴더(VCC-*) · 열린 PR · .env 키 개수(값은 읽어도 출력 안 함)
+#   2) 그날 첫 세션에만 상태: main 최신 여부 · 남은 작업 폴더(VCC-*) · 열린 PR · .env 키 개수(값은 읽어도 출력 안 함)
+#   3) 매 세션: 오늘 내 AI 사용액 한 줄(functions/ai_usage.py — 이 PC 로그 × 단가). 팀원별 키에 한도가 없어서(11/24)
+# 본 저장소: $CLAUDE_PROJECT_DIR(없으면 이 파일 위치)에서 찾고, worktree(VCC-*)면 그 본 저장소(paths.py와 같은 방식).
 # 출력: {"systemMessage": 사람에게 보일 한 줄, "hookSpecificOutput": {"additionalContext": Claude에게 줄 같은 내용}}
 #   VS Code 패널은 systemMessage를 화면에 띄우지 않으므로(11/21 확인) Windows 알림(풍선)으로도 띄우고,
 #   Claude에게는 "첫 답변 맨 위에 이 줄을 보여 주라"고 함께 전한다.
-# 다시 보기: python -X utf8 C:/dev/VCC/.claude/hooks/session_start.py --force  (그날 이미 봤어도 상태 한 줄)
+# 다시 보기: python -X utf8 .claude/hooks/session_start.py --force  (그날 이미 봤어도 상태 한 줄)
 # 실패해도 세션을 막지 않는다(항상 종료코드 0).
 import json
+import os
 import subprocess
 import sys as _sys
 import sys
 from datetime import date
 from pathlib import Path
 
-REPO = Path(r"C:\dev\VCC")
+
+def _project_dir():
+    env = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env and (Path(env) / ".claude" / "hooks").is_dir():
+        return Path(env)
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def _main_root(root):
+    """worktree면 .git 파일의 gitdir를 따라 본 저장소로(functions/paths.py와 같은 규칙)."""
+    git = root / ".git"
+    try:
+        if git.is_file():
+            text = git.read_text(encoding="utf-8").strip()
+            if text.startswith("gitdir:"):
+                gitdir = Path(text.split(":", 1)[1].strip())
+                if gitdir.parent.name == "worktrees" and gitdir.parent.parent.name == ".git":
+                    main = gitdir.parent.parent.parent
+                    if main.is_dir():
+                        return main
+    except OSError:
+        pass
+    return root
+
+
+PROJECT = _project_dir()
+REPO = _main_root(PROJECT)
 STAMP = Path.home() / ".claude" / "vcc-status-day.txt"     # PC마다 따로. 그날 상태 한 줄을 보여 줬는지
+SEEN = Path.home() / ".claude" / "vcc-hook-session.txt"    # 마지막으로 처리한 session_id (두 번 등록돼도 한 번만)
 ENV_KEYS = ("CLOVA_KEY", "ANTHROPIC_API_KEY", "VCC_LOGIN_PW")
 
 
@@ -36,10 +67,10 @@ def pull():
     if code != 0:
         return "pull 건너뜀(저장소를 읽지 못함)", False
     if branch != "main":
-        return f"pull 건너뜀(C:\\dev\\VCC가 {branch} 브랜치)", False
+        return f"pull 건너뜀({REPO}가 {branch} 브랜치)", False
     _, dirty, _ = git("status", "--porcelain", "--untracked-files=no")
     if dirty:
-        return "pull 건너뜀(C:\\dev\\VCC에 고친 파일 있음)", False
+        return f"pull 건너뜀({REPO}에 고친 파일 있음)", False
     _, before, _ = git("rev-parse", "HEAD")
     code, _, err = git("pull", "--ff-only", "-q", timeout=25)
     if code != 0:
@@ -98,9 +129,42 @@ def notify(text):
         pass
 
 
+def ai_usage_line():
+    """오늘 내 AI $x.xx (Claude n회) · HCX m회 k토큰 — 로그가 없으면 $0.00. 실패하면 None."""
+    sys.path.insert(0, str(PROJECT / "functions"))
+    try:
+        import ai_usage
+        return ai_usage.today_line()
+    except Exception:
+        return None
+    finally:
+        sys.path.pop(0)
+
+
+def already_ran():
+    """같은 세션에서 hook이 두 번 불리면(사용자 설정 + 저장소 설정) 두 번째는 건너뛴다."""
+    try:
+        data = json.loads(sys.stdin.read() or "{}") if not sys.stdin.isatty() else {}
+    except (ValueError, OSError):
+        return False
+    sid = str(data.get("session_id") or "") if isinstance(data, dict) else ""
+    if not sid:
+        return False
+    try:
+        if SEEN.exists() and SEEN.read_text(encoding="utf-8").strip() == sid:
+            return True
+        SEEN.parent.mkdir(parents=True, exist_ok=True)
+        SEEN.write_text(sid, encoding="utf-8")
+    except OSError:
+        pass
+    return False
+
+
 def main():
     if not (REPO / ".git").exists():
         return                                   # 이 PC에 저장소가 없으면 아무것도 안 함
+    if "--force" not in _sys.argv and already_ran():
+        return
     try:
         msg, changed = pull()
     except (OSError, subprocess.TimeoutExpired) as e:
@@ -123,10 +187,14 @@ def main():
         STAMP.write_text(today, encoding="utf-8")
     elif changed or "건너뜀" in msg or "실패" in msg:
         parts = [msg]                            # 그날 두 번째 창부터는 바뀐 게 있을 때만
+    alert = bool(parts)                          # 풍선 알림은 예전처럼 첫 세션·바뀐 게 있을 때만
+    usage = ai_usage_line()                      # 사용액은 매 세션
+    if usage:
+        parts.append(usage)
     if not parts:
         return
     line = "[VCC] " + " · ".join(parts)
-    if not force:
+    if alert and not force:
         notify(line[6:])
     context = (f"{line}\n(SessionStart hook 결과. VS Code 패널에는 이 줄이 보이지 않으니, 이번 세션의 첫 답변 맨 위에 "
                f"이 줄을 그대로 한 번 보여 줄 것.)")

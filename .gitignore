@@ -5,3 +5,4 @@ docs/캡처/원본/
 functions/logs/
 data/runtime/
 docs/hub-data.json
+.claude/settings.local.json
