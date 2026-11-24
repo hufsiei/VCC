@@ -22,9 +22,10 @@
 import base64
 import json
 import os
+import socket
 import sys
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import parse_qs, unquote
 
 HERE = Path(__file__).resolve().parent
 for p in (HERE / "lib", HERE / "functions"):
@@ -108,7 +109,8 @@ def handle(name, payload, token):
     me = sessions.resolve(token)
 
     if name in ("", "연습"):
-        return lf.practice(payload.get("question", "안녕하세요?"))
+        # local_fn의 연결 확인용 AI 연습 호출은 공개 주소에서 열지 않는다(로그인 없이 AI를 부르는 구멍)
+        return {"error": "함수 이름이 없어요"}
     fn = lf.ROUTES.get(name)
     if fn is None:
         return {"error": f"아직 서버에 없는 함수예요: {name}"}
@@ -123,19 +125,41 @@ def handle(name, payload, token):
     return fn(me, payload)
 
 
+def _can_connect(host):
+    try:
+        socket.create_connection((host, 443), timeout=3).close()
+        return True
+    except OSError as e:
+        return type(e).__name__
+
+
 def _diag(args):
-    """배포 점검용(API Gateway가 경로·본문을 어떻게 넘기는지). 값은 돌려주지 않는다 — 이름·경로·여부만."""
+    """배포 점검용(API Gateway가 경로·본문을 어떻게 넘기는지 + 밖으로 나가는 길). 값은 돌려주지 않는다 — 이름·경로·여부만."""
     return {"ow_path": args.get("__ow_path"), "ow_method": args.get("__ow_method"),
-            "has_ow_query": "__ow_query" in args, "has_ow_body": "__ow_body" in args,
+            "fn_arg": args.get("fn"), "has_ow_query": "__ow_query" in args, "has_ow_body": "__ow_body" in args,
             "body_type": type(args.get("__ow_body")).__name__,
-            "arg_keys": sorted(k for k in args if not k.isupper() and k not in ("__ow_body", "__ow_query"))}
+            "arg_keys": sorted(k for k in args if not k.isupper() and k not in ("__ow_body", "__ow_query")),
+            "net": {h: _can_connect(h) for h in ("kr.object.ncloudstorage.com", "clovastudio.stream.ntruss.com")}}
+
+
+def _fn_name(args, payload=None):
+    """함수 이름: 경로(__ow_path 끝) → API Gateway 경로 변수 {fn} → 쿼리 fn= → 본문 _fn."""
+    path = unquote(str(args.get("__ow_path") or "").strip("/")).split("/")[-1]
+    if path:
+        return path
+    if isinstance(args.get("fn"), str) and args["fn"]:
+        return unquote(args["fn"])
+    q = parse_qs(str(args.get("__ow_query") or "")).get("fn")
+    if q:
+        return q[0]
+    return str((payload or {}).pop("_fn", "") or "")
 
 
 def main(args):
     method = str(args.get("__ow_method", "")).lower()
     if method == "options":
         return {"statusCode": 204, "headers": _cors(args), "body": ""}
-    if "_diag" in str(args.get("__ow_path") or "") or "_diag" in str(args.get("__ow_query") or "") or "_diag" in args:
+    if _fn_name(args) == "_diag" or "_diag" in args:
         return _reply(args, _diag(args))
     if "__ow_method" in args and "__ow_body" not in args and method == "post":
         # Raw HTTP가 꺼져 있으면 본문 필드가 args에 섞여 들어온다(기본 파라미터를 덮어쓸 수 있음)
@@ -148,7 +172,7 @@ def main(args):
         return _reply(args, {"error": "요청 형식이 JSON이 아니에요"})
     headers = args.get("__ow_headers") or {}
     token = str(headers.get("x-token") or "").strip()
-    name = unquote(str(args.get("__ow_path") or "").strip("/")) or str(payload.pop("_fn", "") or "")
+    name = _fn_name(args, payload)
     try:
         _set_env(args)
         return _reply(args, handle(name, payload, token))

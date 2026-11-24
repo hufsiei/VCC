@@ -79,6 +79,12 @@ r, out = call("/getMe", token=token)
 check("logout은 헤더 토큰을 폐기", out.get("error") == "로그인이 필요해요")
 check("라우팅 표는 local_fn 것 그대로", main._load_app()["local_fn"].ROUTES is sys.modules["local_fn"].ROUTES)
 
+main._can_connect = lambda host: True   # 시험에서는 밖으로 접속하지 않는다
+r = main.main({**PARAMS, "__ow_method": "post", "__ow_path": "", "fn": "getMe", "__ow_body": "{}",
+               "__ow_headers": {"x-token": token}})
+check("API Gateway 경로 변수 fn → 함수 이름", "로그인이 필요해요" in r["body"])   # 위에서 logout한 토큰이라 로그인 필요까지 갔음
+r, out = call("", {})
+check("이름 없음 → AI 연습 호출 없이 오류", out.get("error") == "함수 이름이 없어요")
 r, out = call("/_diag", {"secret": "본문값"})
 check("_diag는 값 없이 이름만", out.get("ow_path") == "/_diag" and "본문값" not in r["body"] and "VCC_LOGIN_PW" not in r["body"])
 
