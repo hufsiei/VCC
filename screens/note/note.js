@@ -591,6 +591,20 @@ function renderDetail() {
   renderSection(panel);
 }
 
+// 최근에 본 노트(PR #232 원우 요청): 닮은선배 탭이 추천 기준 노트로 쓴다(senior.js pickBaseNotes).
+// 이 탭의 sessionStorage에만, 사람별, 최근이 앞, 5개까지(두 창 시연이 섞이지 않게)
+function rememberViewed(id) {
+  if (!me || !id) return;
+  const key = `viewedNotes:${me.colreg_no}`;
+  try {
+    const old = JSON.parse(sessionStorage.getItem(key) || "[]");
+    const list = [id, ...(Array.isArray(old) ? old : []).filter((x) => x !== id)].slice(0, 5);
+    sessionStorage.setItem(key, JSON.stringify(list));
+  } catch {
+    // 저장 공간이 막혀 있으면 기억하지 않는다
+  }
+}
+
 async function loadDetail(id) {
   detailNote = null;
   currentSection = 0;
@@ -601,6 +615,7 @@ async function loadDetail(id) {
     const res = await getNote(id);
     if (!res || res.error || !Array.isArray(res.sections)) throw new Error((res && res.error) || "노트 없음");
     detailNote = res;
+    rememberViewed(id);
     renderDetail();
   } catch (err) {
     console.error(err);
