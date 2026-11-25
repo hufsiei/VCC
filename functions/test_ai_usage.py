@@ -98,15 +98,18 @@ def fake_anthropic(url, headers):
     seen_headers.append(headers)
     if "/api_keys" in url:
         return {"data": [{"id": "apikey_1", "name": "vcc-dev(ww)"}]}
-    if "/analytics/cost" in url:
-        return {"data": [{"api_key_id": "apikey_1", "amount": "150.5"}, {"api_key_id": None, "amount": "49.5"}]}
-    return {"data": [{"api_key_id": "apikey_1", "uncached_input_tokens": 1000, "output_tokens": 200,
-                      "cache_creation": {"ephemeral_5m_input_tokens": 10}}]}
+    if "/analytics/cost" in url:      # 11/25 실제 응답 모양
+        return {"data": [{"group": {"api_key_id": "apikey_1", "model": None}, "cost": {"currency": "USD", "amount": "150.5"}},
+                         {"group": {"api_key_id": None}, "cost": {"currency": "USD", "amount": "49.5"}}]}
+    return {"data": [{"group": {"api_key_id": "apikey_1"},
+                      "usage": {"uncached_input_tokens": 1000, "output_tokens": 200, "total_tokens": 1210,
+                                "cache_creation": {"ephemeral_5m_input_tokens": 10}}}]}
 
 
 a = ai_usage.anthropic_lines("sk-ant-admin-가짜", today="2026-11-25", get=fake_anthropic)
 expect("Anthropic 금액: 센트 → $2.00", a[0].startswith("Anthropic: 오늘 $2.00 · 이번 달 $2.00"))
-expect("Anthropic 키별 토큰(이름)", a[1].strip() == "오늘 키별 토큰: vcc-dev(ww) 1,210")
+expect("Anthropic 키별(이름, 금액 큰 순, total_tokens만)", [l.strip() for l in a[1:]] ==
+       ["vcc-dev(ww): 오늘 $1.50 · 1,210토큰", "키 없음(콘솔 등): 오늘 $0.49 · 0토큰"])
 expect("Anthropic beta 헤더", all(h.get("anthropic-beta") == ai_usage.ANALYTICS_BETA for h in seen_headers))
 
 
