@@ -148,15 +148,19 @@ def _get_json(url, headers, timeout=15):
         raise RuntimeError("응답이 JSON이 아님") from None
 
 
-def _sum_tokens(row):
-    """analytics 행에서 이름에 tokens가 든 숫자를 모두 더한다(중첩 dict 포함)."""
-    total = 0
-    for k, v in (row or {}).items():
-        if isinstance(v, dict):
-            total += _sum_tokens(v)
-        elif "tokens" in k and isinstance(v, (int, float)):
-            total += int(v)
-    return total
+# analytics 행 모양(11/25 실제 응답 확인):
+#   {"group": {"api_key_id": …, (그 밖 차원은 null)}, "cost": {"amount": "330.6474", …}}   amount는 센트 단위 문자열
+#   {"group": {…}, "usage": {"total_tokens": n, "uncached_input_tokens": …, "output_tokens": …, "requests": n}}
+def _key_id(row):
+    return (row.get("group") or {}).get("api_key_id")
+
+
+def _cents(row):
+    return float((row.get("cost") or {}).get("amount") or 0)
+
+
+def _tokens(row):
+    return int((row.get("usage") or {}).get("total_tokens") or 0)
 
 
 def anthropic_lines(admin_key, today=None, get=None):
@@ -173,7 +177,7 @@ def anthropic_lines(admin_key, today=None, get=None):
         return get(f"{ANTHROPIC_API}/analytics/{kind}?{q}", h).get("data") or []
 
     def usd(rs):
-        return sum(float(r.get("amount") or 0) for r in rs) / 100      # amount는 센트 단위 문자열
+        return sum(_cents(r) for r in rs) / 100
 
     try:
         cost_today, cost_month = rows("cost", day), rows("cost", day[:8] + "01")
@@ -182,12 +186,15 @@ def anthropic_lines(admin_key, today=None, get=None):
     out = [f"Anthropic: 오늘 ${usd(cost_today):.2f} · 이번 달 ${usd(cost_month):.2f} (UTC 날짜, 데이터는 몇 시간 늦을 수 있음)"]
     try:
         names = {k.get("id"): k.get("name") for k in get(f"{ANTHROPIC_API}/api_keys?limit=100", h).get("data") or []}
+        cost_by = {}
+        for r in cost_today:
+            cost_by[_key_id(r)] = cost_by.get(_key_id(r), 0) + _cents(r) / 100
         per = {}
         for r in rows("usage", day):
-            key = names.get(r.get("api_key_id")) or r.get("api_key_id") or "키 없음(콘솔 등)"
-            per[key] = per.get(key, 0) + _sum_tokens(r)
-        if per:
-            out.append("  오늘 키별 토큰: " + " · ".join(f"{k} {v:,}" for k, v in sorted(per.items())))
+            per[_key_id(r)] = per.get(_key_id(r), 0) + _tokens(r)
+        for kid in sorted(set(per) | set(cost_by), key=lambda k: -cost_by.get(k, 0)):
+            name = names.get(kid) or kid or "키 없음(콘솔 등)"
+            out.append(f"  {name}: 오늘 ${cost_by.get(kid, 0):.2f} · {per.get(kid, 0):,}토큰")
     except RuntimeError as e:
         out.append(f"  키별 토큰 조회 실패 — {e}")
     return out
