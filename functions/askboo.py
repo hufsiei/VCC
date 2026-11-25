@@ -11,6 +11,7 @@
 #   ⑥  코드 + AI(답검사, Opus): 문장마다 인용한 근거 원문과 대조(숫자·영문·고유명사·수량 + 답검사 — 전하는 말투 허용). 근거 번호 없는 문장·
 #        걸린 문장은 버린다. 다 버려지면 v1 방식(고른 문장 원문 인용, fallback)으로 돌려준다 → v1의 답이 최악의 경우.
 #   응답: lines[].cites(인용 sourceId), singleSenior(근거가 한 사람뿐), 새 status "chat"(message·chips), notes에 oneLine·kinds.
+#   [11/25] ①‴ 코드: 여러 곳 비교 질문(「다른 지역 대비」「어디가 더」) → status "notes" 고정 안내 + 그 나라 노트 카드(AI 없음).
 #
 # v1(작업 18) 4+1단계 — 질문정리가 실패했을 때의 경로이자 ⑥의 폴백:
 #   ①′ 코드: 규정 질문 판별 → status "official" (AI 없음, spec 4장 판별 표현)
@@ -196,6 +197,10 @@ def askBoo(me, payload, save=True):
     # ①′ 규정 질문 → 공식 안내 (정규식이 먼저 — 보수 규칙, HCX 원칙 v3 5절)
     if is_official(question):
         return _official(me, question, programs, save)
+
+    # ①‴ [11/25 작업 87] 여러 곳 비교 질문 → 고정 안내 + 노트 카드(AI 없음). 비교 근거가 없으니 한 학교 답을 되풀이하지 않는다
+    if is_compare(question):
+        return _compare(question, programs, history)
 
     # ① [v2] 질문 정리(AI). 실패하면 plan=None → 아래는 v1 경로 그대로
     plan = clarify(question, history, excluded)
@@ -606,6 +611,86 @@ def _notes(programs, country):
     else:
         message = f"{country or '관련'} 해봤노트가 {len(cards)}개 있어요. 궁금한 노트를 골라 보세요."
     return {"status": "notes", "lines": [], "sources": {}, "notes": cards, "suggestSenior": True, "message": message}
+
+
+# ── ①‴ [11/25 작업 87] 비교 질문 ─────────────────────────────────────
+# 원우 실서버 시험(93): 마르부르크 생활비 답 뒤 「독일 다른 지역 대비 어떤건가요?」에 마르부르크 답을 되풀이했다.
+# 근거는 학교마다 따로라 여러 곳을 맞대 볼 수 없다 → 코드의 고정 문구로 「비교는 아직 못 해요」 + 그 나라 노트 카드.
+# 판정(AI 없음): ① 「어디가 더」「어느 학교가 더」「A랑 B 중 어디」「vs」 ② 「다른 지역·학교·나라…」 + 비교하는 말
+#   ③ 프로그램·나라 이름이 둘 이상 + 비교하는 말. 「한국보다」「가격 대비」처럼 한 곳만 두고 하는 말은 비교로 보지 않는다.
+COMPARE_DIRECT_RE = re.compile(
+    r"어디\s*(가|이|를|가\s*제일)?\s*더|어느\s*(쪽|곳|학교|대학|나라|국가|도시|지역|프로그램|기관|회사|게|것)\s*(이|가|을|를)?\s*(더|제일|나아|낫|좋)"
+    # 「학기 중에 뭐」「그 중에 뭐가 힘들었어요」는 비교가 아니다 — 「둘 중」「A랑 B 중」만 본다
+    r"|(둘|셋|두\s*(곳|군데|학교|나라))\s*중(에|에서)?\s*(어디|어느|뭐|무엇)|(?<![A-Za-z])vs(?![A-Za-z])", re.I)
+# 학교·나라 이름이 둘 이상일 때만 보는 말(「마르부르크랑 레이던 대학교 중 어디가 싸요?」). 「수업과 과제 중에 뭐가」는 비교가 아니다
+COMPARE_PICK_RE = re.compile(r"어디|어느|중(에|에서)?\s*(뭐|무엇)")
+COMPARE_OTHER_RE = re.compile(r"다른\s*(지역|학교|대학|도시|나라|국가|곳|데|프로그램|기관|회사)")
+COMPARE_WORD_RE = re.compile(r"(?<!가격\s)(?<!가격)(?<!비용\s)(?<!비용)대비|비교(?!과)|보다|비해|차이|달라|다른가|다른지|나아|낫"
+                             r"|더\s*(좋|싸|비싸|많|적|편|괜찮|추천|힘들|쉬|어렵)")
+
+
+def _places(text):
+    """질문에 나온 교환 나라 이름(긴 이름 먼저, 「독일어」는 뺌)."""
+    out = []
+    for c in sorted(COUNTRIES, key=len, reverse=True):
+        if re.search(re.escape(c) + r"(?!어)", text) and not any(c in o for o in out):
+            out.append(c)
+    return out
+
+
+def _direct_programs(question):
+    """이름·별칭으로 직접 부른 프로그램(match_programs ① 단계와 같은 규칙). 인턴 사전(직군·약칭)으로 잡힌 업체 여럿은
+    학생이 두 곳을 부른 것이 아니므로 세지 않는다(「무역 쪽 인턴 어디가 좋아요?」는 탐색)."""
+    q = _norm(question)
+    hits = [(t, name) for t, name, is_alias in _TERMS if t in q and (not is_alias or _alias_ok(t, q))]
+    return {name for t, name in hits if not any(t != t2 and t in t2 for t2, _ in hits)}
+
+
+def is_compare(question):
+    if COMPARE_DIRECT_RE.search(question):
+        return True
+    word = COMPARE_WORD_RE.search(question)
+    if word and COMPARE_OTHER_RE.search(question):
+        return True
+    many = len(_direct_programs(question)) >= 2 or len(_places(question)) >= 2
+    return bool(many and (word or COMPARE_PICK_RE.search(question)))
+
+
+def _compare(question, programs, history):
+    """status "notes": 비교 안내(고정 문구) + 그 나라(질문 > 질문의 프로그램 > 앞 대화) 노트 카드. 질문함에 저장하지 않는다."""
+    named = [p for p in programs if p in PROGRAMS]
+    places = _places(question)
+    if not places:
+        places = list(dict.fromkeys(PROGRAMS[p]["세부"] for p in named
+                                    if PROGRAMS[p].get("분야") == "국제교류" and PROGRAMS[p].get("세부")))
+    if not places and not named:
+        for h in reversed(history):
+            p = h["program"] if h["program"] in PROGRAMS else None
+            if p and PROGRAMS[p].get("분야") == "국제교류" and PROGRAMS[p].get("세부"):
+                places = [PROGRAMS[p]["세부"]]
+            elif p:
+                named = [p]
+            else:
+                places = _places(h["question"])
+            if places or named:
+                break
+    pool = list(named)
+    for c in places:
+        pool += [n for n in COUNTRIES.get(c, []) if n not in pool]
+    pool = [n for n in pool if evidence_count(n)]
+    pool = [n for n in named if n in pool] + sorted([n for n in pool if n not in named], key=evidence_count, reverse=True)
+    field = PROGRAMS.get(pool[0], {}).get("분야") if pool else None
+    noun = {"국제교류": "학교", "현장실습": "기관"}.get(field, "학교" if places else "프로그램")
+    head = f"여러 {noun} 비교는 아직 못 해요."
+    found = _notes(pool, None)
+    if not found:
+        return {"status": "notes", "lines": [], "sources": {}, "notes": [], "suggestSenior": True,
+                "message": f"{head} 궁금한 {noun} 하나를 골라 물어봐 주세요."}
+    n, total = len(found["notes"]), len(pool)
+    label = "·".join(places) if places else "관련"
+    count = f"{total}개 중 근거가 많은 {n}개를" if total > n else f"{n}개를"
+    found["message"] = f"{head} {label} 해봤노트 {count} 보여 드려요. 노트를 하나씩 열어 보거나, 한 곳을 골라 물어봐 주세요."
+    return found
 
 
 # ── ② 근거 추출 ───────────────────────────────────────────────────────

@@ -164,6 +164,35 @@ n_left = len([n for n, p in askboo.PROGRAMS.items() if p.get("분야") == "현�
 expect("유무 질문(나라 없음) → 제외 뺀 현장실습 노트 수", res["status"] == "chat" and f"{n_left}개" in res["message"] and "KOTRA 해외무역관" in res["message"], res.get("message"))
 expect("조사: 독일이·KOTRA 해외무역관을(를)", askboo._josa("이가", "독일") == "이" and askboo._josa("을를", "무역관") == "을" and askboo._josa("을를", "(권역)") == "을(를)")
 
+# ── ①-3 [11/25 작업 87] 비교 질문 → 고정 안내 + 그 나라 노트 카드(AI 없음) ─────
+# 원우 실서버 시험(93): 마르부르크 생활비 답 뒤 「독일 다른 지역 대비 어떤건가요?」에 마르부르크 답을 되풀이함
+H_MARBURG = [{"question": "마르부르크 생활비 얼마나 들어요?", "status": "ok", "program": PROGRAM}]
+DE = [n for n in askboo.COUNTRIES["독일"] if askboo.evidence_count(n)]
+res, calls = run("독일 다른 지역 대비 어떤건가요?", H_MARBURG, plan=P("경험질문", "국제교류", "독일", 후보=[PROGRAM]), answer={"답": []})
+expect("비교 질문 → notes + 「여러 학교 비교는 아직 못 해요」", res["status"] == "notes" and res["message"].startswith("여러 학교 비교는 아직 못 해요."), res)
+expect("비교 질문은 AI를 부르지 않음(고정 문구)", calls == [], [c[0] for c in calls])
+expect("비교 질문 카드 = 독일 노트(근거 많은 순, 최대 5)", [c["program"] for c in res["notes"]] == sorted(DE, key=askboo.evidence_count, reverse=True)[:5], res["notes"])
+expect("비교 질문 문구의 노트 수는 코드가 센 값", (f"독일 해봤노트 {len(DE)}개" in res["message"]), res["message"])
+expect("비교 질문은 lines 없음·질문함 저장 없음", res["lines"] == [] and "questionId" not in res)
+res, _ = run("다른 학교보다 기숙사 좋아요?", H_MARBURG, plan=None)
+expect("나라 없는 비교 질문 → 앞 대화 프로그램의 나라(독일) 카드", res["status"] == "notes" and PROGRAM in [c["program"] for c in res["notes"]]
+       and "독일 해봤노트" in res["message"], res.get("message"))
+res, _ = run("마르부르크랑 레이던 대학교 중 어디가 생활비 싸요?", [], plan=None)
+expect("두 학교 비교 → 부른 두 학교 카드가 먼저", res["status"] == "notes" and set([c["program"] for c in res["notes"]][:2]) == {PROGRAM, "레이던 대학교"}
+       and "네덜란드·독일 해봤노트" in res["message"], res.get("notes"))
+res, _ = run("둘 중에 어디가 좋아요?", [], plan=None)
+expect("비교할 곳을 모르면 카드 없이 한 곳을 고르라는 안내", res["status"] == "notes" and res["notes"] == [] and "하나를 골라" in res["message"], res)
+for q in ("독일 다른 지역 대비 어떤건가요?", "어느 학교가 더 추천할 만해요?", "레이던 vs 마르부르크", "다른 나라랑 비교하면 물가 어때요?",
+          "독일이 프랑스보다 생활비 더 싸요?"):
+    expect(f"비교 판정: {q}", askboo.is_compare(q))
+for q in ("한국보다 물가 비싸요?", "가격 대비 기숙사 괜찮아요?", "학기 중에 뭐 하면 좋아요?", "그 중에 뭐가 제일 힘들었어요?",
+          "비교과 프로그램 추천해 주세요", "한국과 비교하면 수업은 어때요?", "다른 학교 노트도 보여 주세요", "독일어 수업 어땠어요?",
+          "마르부르크 수업과 과제 중에 뭐가 힘들었어요?"):
+    expect(f"비교 아님: {q}", not askboo.is_compare(q))
+res, calls = run("마르부르크 기숙사 어땠어요?", [], plan=None, answer=None)
+expect("비교가 아닌 질문은 그대로(답 ok, AI 경로)", res["status"] == "ok" and calls, res.get("status"))
+
+
 # ── ② 답쓰기 + 검증 ────────────────────────────────────────────────────
 def first_cands():
     cands, _, _ = askboo.extract("마르부르크 기숙사 어땠어요?", [PROGRAM])
