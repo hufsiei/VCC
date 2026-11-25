@@ -4,6 +4,7 @@
 #   python tools/run_eval.py                              # 개발 질문 70개, PROVIDER 표 그대로
 #   python tools/run_eval.py --model hcx,sonnet,opus      # askBoo의 고르기·변환 모델만 바꿔 차례로 측정
 #   python tools/run_eval.py --questions <봉인 xlsx> --out <저장소 밖 폴더> --model hcx,sonnet
+#   python tools/run_eval.py --all90 --model hcx,sonnet --pause 4 # [11/25 작업 88] 개발 70 + 다중 턴·탐색·대화 20 = 90개
 #   python tools/run_eval.py --dry                        # AI 없이 흐름만 시험(고르기=1번, 변환=폴백)
 #   python tools/run_eval.py --merge <질문별 csv 여러 개>         # 나눠 돌린 결과를 합쳐 요약(같은 모델끼리)
 #   python tools/run_eval.py --model hcx --only 1-15 --pause 4   # 번호 범위 + 문항 사이 4초(HCX 테스트 키 분당 60요청 ≈ 분당 15문항, HCX 원칙 8절)
@@ -18,6 +19,11 @@
 #   보류·답변·공식안내 비율은 '유형'이 아니라 '기대결과'로 센다(함정 중에도 답해야 하는 질문이 있음).
 #   [11/23] askBoo의 notes(해봤노트 카드 안내)는 '답하지 않음' — 기대 보류면 맞음, 근거 없는 답 아님(위 NOT_ANSWER).
 #   근거 적중 = 답변 기대 질문에서 답한 줄의 출처 중 하나라도 '기대 근거ID'에 들어 있음(참고 지표).
+#   [11/25 작업 88] v2: 답쓰기 줄은 cites 전체를 이은 원문과 대조(askboo.verify_facts — 뜻 일치는 서버의 답검사가 이미 봄),
+#   폴백 줄은 예전처럼 verify(새 낱말까지). cites가 없거나 근거에 없는 ID면 「cites없음」(S10: 답 문장 전부 cites).
+#   기대결과 대화(chat)·노트안내(notes)는 그 상태여야 맞음. 대화·노트안내 기대인데 hold·official이면 「질문함저장」(S10: 0건).
+#   제외 프로그램이 답 근거나 카드에 나오면 「제외위반」, 관련 프로그램 밖이 나오거나 카드가 비면 「프로그램」 X(둘 다 틀림으로 센다).
+#   --model은 예전처럼 고르기·변환만 바꾼다(질문정리·답쓰기·답검사는 PROVIDER 표 그대로).
 # 결과: <out>/eval_<질문파일>_<모델>_<시각>.csv (질문별) + eval_요약_<시각>.csv (모델별)
 #   --why면 + eval_폴백_<질문파일>_<모델>_<시각>.csv (폴백 줄별: 번호·원문·AI출력·원인). askBoo 동작은 바꾸지 않고,
 #   변환 호출의 응답을 옆에서 받아 askboo.convert와 같은 순서(응답 실패 → JSON → 해요체 끝 → verify)로 원인만 붙인다.
@@ -30,7 +36,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "functions"))
 import paths  # noqa: E402
 
-EXPECT = {"답변": "ok", "보류": "hold", "공식안내": "official"}
+EXPECT = {"답변": "ok", "보류": "hold", "공식안내": "official", "대화": "chat", "노트안내": "notes"}
+STATUS = {"답함": "ok", "보류": "hold", "공식 안내": "official", "노트 안내": "notes", "대화": "chat"}   # 이전대화 열
+NO_CARD = "(카드 없음)"
 # [11/23] askBoo 새 상태 notes(spec 4장 [11/23 노트]): 사람·나라만 묻고 주제가 없으면 답 대신 해봤노트 카드로 안내.
 #   답을 만들지 않으므로 근거 없는 답이 아니고, '답하지 않음' 쪽이라 기대가 보류면 맞은 것으로 센다(보류율에도 넣음).
 #   기대가 답변·공식안내면 틀림(답하거나 공식 안내로 보내야 했음). notes 건수는 요약에 따로 적는다.
@@ -39,6 +47,52 @@ NOT_ANSWER = ("hold", "notes")
 
 def matches(want, got):
     return got == want or (want == "hold" and got in NOT_ANSWER)
+
+
+def read_history(text):
+    """이전대화 열: 「질문 → 상태 → 프로그램」을 ' // '로 이음 → askBoo history(화면이 보내는 모양)."""
+    out = []
+    for turn in (text or "").split(" // "):
+        if not turn.strip():
+            continue
+        part = [x.strip() for x in turn.split("→")]
+        if len(part) < 2 or part[1] not in STATUS:
+            sys.exit(f"이전대화 형식을 확인해 주세요: {turn}")
+        h = {"question": part[0], "status": STATUS[part[1]]}
+        if len(part) > 2 and part[2]:
+            h["program"] = part[2]
+        out.append(h)
+    return out
+
+
+def check_lines(lines, evid, askboo):
+    """돌려주는 값: (근거 밖 줄 목록, cites가 없거나 모르는 ID인 줄 수)"""
+    bad, no_cites = [], 0
+    for ln in lines:
+        cites = ln.get("cites") or []
+        if not cites or any(c not in evid for c in cites):
+            no_cites += 1
+        src = " ".join(evid.get(c, {}).get("text", "") for c in cites or [ln["sourceId"]])
+        probs = askboo.verify(ln["text"], src) if ln.get("fallback") else askboo.verify_facts(ln["text"], src)
+        if probs:
+            bad.append(f"{ln['text']} ← {probs}")
+    return bad, no_cites
+
+
+def check_programs(r, res):
+    """다중 턴 질문: (제외 위반 목록, 프로그램 칸 O/X/빈칸). 제외·관련 프로그램은 ' / '로 이음."""
+    if "이전대화" not in r:
+        return [], ""
+    split = lambda k: {x.strip() for x in (r.get(k) or "").split(" / ") if x.strip()}
+    got = {s.get("program") for s in (res.get("sources") or {}).values()} | {c.get("program") for c in res.get("notes") or []}
+    excl, want = sorted(split("제외 프로그램") & got), split("관련 프로그램")
+    if res.get("status") not in ("ok", "notes"):
+        return excl, ""
+    if NO_CARD in want:
+        return excl, "X" if got else "O"
+    return excl, "O" if got and (not want or got <= want) else "X"
+
+
 TASKS = ("고르기", "변환")   # askBoo가 부르는 AI 작업
 
 
@@ -136,24 +190,23 @@ def run(rows, model, askboo, pause=0.0, why=None):
         for r in rows:
             t0 = time.time()
             n_why = len(why.items) if why else 0
-            res = askboo.askBoo("eval", {"question": r["질문"]}, save=False)
+            res = askboo.askBoo("eval", {"question": r["질문"], "history": read_history(r.get("이전대화"))}, save=False)
             sec = round(time.time() - t0, 1)
             got = res.get("status", "error")
             lines = res.get("lines", [])
-            bad = []
-            for ln in lines:
-                probs = askboo.verify(ln["text"], evid.get(ln["sourceId"], {}).get("text", ""))
-                if probs:
-                    bad.append(f"{ln['text']} ← {probs}")
+            bad, no_cites = check_lines(lines, evid, askboo)
+            excl, prog = check_programs(r, res)
             want = EXPECT[r["기대결과"]]
             expect_ids = {s.strip() for s in (r.get("기대 근거ID") or "").split(",") if s.strip()}
-            used = {ln["sourceId"] for ln in lines}
+            used = {c for ln in lines for c in (ln.get("cites") or [ln["sourceId"]])}
             out.append({
                 "번호": r["번호"], "모델": model, "유형": r.get("유형", ""), "기대결과": r["기대결과"], "결과": got,
-                "일치": "O" if matches(want, got) else "X",
-                "근거없는답": "O" if got == "ok" and (bad or want != "ok") else "",
+                "일치": "O" if matches(want, got) and not excl and prog != "X" else "X",
+                "근거없는답": "O" if got == "ok" and (bad or no_cites or want in ("hold", "official")) else "",
                 "근거적중": ("O" if used & expect_ids else "X") if want == "ok" and got == "ok" and expect_ids else "",
                 "줄수": len(lines), "폴백줄": sum(bool(ln.get("fallback")) for ln in lines),
+                "cites없음": no_cites, "질문함저장": "O" if want in ("chat", "notes") and got in ("hold", "official") else "",
+                "제외위반": ", ".join(excl), "프로그램": prog,
                 "근거밖줄": " / ".join(bad), "초": sec,
                 "질문": r["질문"], "답": " / ".join(ln["text"] for ln in lines),
                 "출처": ", ".join(sorted(used)), "보류이유": res.get("_why", ""),
@@ -183,6 +236,11 @@ def summary(model, out):
         "모델": model, "질문수": len(out),
         "정답률": f(rate(out, lambda r: True, lambda r: r["일치"] == "O")),
         "보류율": f(rate(out, lambda r: True, lambda r: r["결과"] in NOT_ANSWER)),   # notes(노트 안내) 포함
+        "대화·노트안내 일치": f(rate(out, lambda r: r["기대결과"] in ("대화", "노트안내"), lambda r: r["일치"] == "O")),
+        "대화·탐색 질문함저장(0건)": sum(r.get("질문함저장") == "O" for r in out),
+        "cites없는줄(0건)": sum(int(r.get("cites없음") or 0) for r in out),
+        "제외위반": sum(bool(r.get("제외위반")) for r in out),
+        "오류": sum(r["결과"] == "error" for r in out),
         "노트안내": sum(r["결과"] == "notes" for r in out),
         "근거없는답(0건)": sum(r["근거없는답"] == "O" for r in out),
         # 유형이 아니라 기대결과로 센다 — 함정 중에도 답해야 하는 별칭 질문이 있다(개발 35 '파리 제7대학교')
@@ -208,6 +266,7 @@ def write_csv(path, rows):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--questions", default=str(ROOT / "data" / "eval-questions.csv"))
+    ap.add_argument("--all90", action="store_true", help="--questions 뒤에 다중 턴·탐색·대화 20개(data/eval-questions-multi.csv)를 이어 90개로")
     ap.add_argument("--model", default="표", help="표(PROVIDER 그대로) 또는 hcx,sonnet,opus 쉼표 구분")
     ap.add_argument("--out", default=str(paths.LOGS))
     ap.add_argument("--only", default="", help="번호만 골라 실행(쉼표·범위: 1-15,23)")
@@ -247,6 +306,14 @@ def main():
 
     qpath, out_dir = Path(a.questions), Path(a.out)
     rows = read_questions(qpath)
+    stem = qpath.stem
+    if a.all90:
+        rows += read_questions(ROOT / "data" / "eval-questions-multi.csv")
+        stem += "+multi"
+    if len({r["번호"] for r in rows}) != len(rows):
+        sys.exit("번호가 겹치는 질문이 있습니다(--merge가 같은 번호를 하나로 셉니다).")
+    for r in rows:
+        read_history(r.get("이전대화"))   # 형식 오류는 AI를 부르기 전에 찾는다
     if a.only:
         keep = set()
         for part in a.only.split(","):
@@ -274,21 +341,21 @@ def main():
     stamp = datetime.now().strftime("%Y%m%d-%H%M") + (f"_{a.only.replace(',', '+')}" if a.only else "")
     sums = []
     for m in models:
-        print(f"[{m}] {qpath.name} {len(rows)}개")
+        print(f"[{m}] {stem} {len(rows)}개")
         why = WhyLog(askboo) if a.why else None
         out = run(rows, m, askboo, 0 if a.dry else a.pause, why)
-        write_csv(out_dir / f"eval_{qpath.stem}_{m}_{stamp}.csv", out)
+        write_csv(out_dir / f"eval_{stem}_{m}_{stamp}.csv", out)
         s = summary(m, out)
         if why:
             from collections import Counter
             cnt = Counter(k for it in why.items for k in WhyLog.kind(it["원인"]))
             s["폴백원인"] = " · ".join(f"{k} {n}" for k, n in cnt.most_common())
-            write_csv(out_dir / f"eval_폴백_{qpath.stem}_{m}_{stamp}.csv",
+            write_csv(out_dir / f"eval_폴백_{stem}_{m}_{stamp}.csv",
                       [{"번호": it["번호"], "모델": m, "원인": it["원인"], "원문": it["원문"], "AI출력": it["AI출력"]}
                        for it in why.items])
             why.restore()   # 다음 모델에서 겹쳐 감싸지 않게
         sums.append(s)
-    write_csv(out_dir / f"eval_요약_{qpath.stem}_{stamp}.csv", sums)
+    write_csv(out_dir / f"eval_요약_{stem}_{stamp}.csv", sums)
     print()
     for s in sums:
         print(json.dumps(s, ensure_ascii=False))
