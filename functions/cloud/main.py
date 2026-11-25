@@ -10,6 +10,9 @@
 # 주소: POST <웹 액션 공개 주소>/<함수 이름>  (data.js의 `${FN_BASE}/${name}` 그대로)
 #   경로 대신 본문 "_fn" 필드로도 받는다(API Gateway가 경로를 넘기지 않는 경우).
 #   액션은 반드시 「웹 액션 + Raw HTTP」로 켠다. Raw가 아니면 요청 본문이 기본 파라미터(키)를 덮어쓸 수 있어 거절한다.
+#   「헤더 옵션 설정」(API custom-options, OpenWhisk web-custom-options)도 켠다. 꺼져 있으면 플랫폼이 모든 응답에
+#   Allow-Origin * 기본 묶음을 붙이고 OPTIONS도 대신 답한다(11/25 curl 확인). 켜면 기본 헤더가 빠지고 CORS는 이 파일의
+#   _cors가 모든 응답(OPTIONS·POST·오류)에 붙인다. 켜지 않은 채 이 코드를 올리면 Allow-Origin이 두 줄 → 브라우저가 막음(11/24).
 #
 # 흐름은 local_fn.py Handler.do_POST와 같다:
 #   토큰 확인 → NEEDS_NO_LOGIN → AI_ROUTES 한도 → logout 토큰 → 예외 시 error 응답
@@ -69,8 +72,15 @@ def _load_app():
     return _app
 
 
+def _allowed_origins(args):
+    """ALLOW_ORIGIN(쉼표 구분)에서 "*"·끝의 / 를 걸러 낸 목록. 남는 것이 없으면 ALLOWED_ORIGINS."""
+    given = [o.strip().rstrip("/") for o in str(args.get("ALLOW_ORIGIN") or "").split(",")]
+    return [o for o in given if o and o != "*"] or list(ALLOWED_ORIGINS)
+
+
 def _cors(args):
-    allowed = [o.strip() for o in str(args.get("ALLOW_ORIGIN") or "").split(",") if o.strip()] or ALLOWED_ORIGINS
+    """모든 응답에 붙인다. 허용 Origin이면 Allow-Origin에 그 값 하나, 아니면 Allow-Origin 없음("*"는 쓰지 않는다)."""
+    allowed = _allowed_origins(args)
     origin = (args.get("__ow_headers") or {}).get("origin", "")   # 웹 액션은 헤더 이름을 소문자로 넘긴다
     headers = {
         "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -84,9 +94,8 @@ def _cors(args):
 
 
 def _reply(args, out, status=200):
-    # API Gateway(/{fn} 리소스)가 OPTIONS 응답과 CORS 헤더를 직접 붙인다. 여기서도 붙이면 Allow-Origin이 두 개가 되어
-    # 브라우저가 응답을 막는다(11/24 확인). 그래서 본 응답에는 붙이지 않는다. OPTIONS가 액션까지 오는 경우만 _cors.
-    headers = {"Content-Type": "application/json; charset=utf-8"}
+    # CORS는 여기서 붙인다(액션의 「헤더 옵션 설정」을 켜서 플랫폼 기본 헤더 * 를 뺀 전제 — 맨 위 주석).
+    headers = {"Content-Type": "application/json; charset=utf-8", **_cors(args)}
     return {"statusCode": status, "headers": headers, "body": json.dumps(out, ensure_ascii=False)}
 
 
