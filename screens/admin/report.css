@@ -1,0 +1,39 @@
+/* 리포트 미리보기(iframe 안) — 서버 functions/admin.py _render의 rpt- 클래스. 메일 본문 모양(디자인 규칙 7-⑤).
+   토큰은 같은 iframe에 먼저 읽는 common/style.css 변수만 쓴다(HEX 금지). BOO 없음, 장식색 최소. */
+.rpt-body { margin: 0; padding: var(--space-lg); background: var(--color-background); }
+.rpt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+}
+
+/* 기간 · 부서 */
+.rpt-head { display: flex; flex-direction: column; gap: var(--space-xs); padding-bottom: var(--space-md); border-bottom: 1px solid var(--color-border); }
+.rpt-period { margin: 0; font-size: var(--font-size-secondary); color: var(--color-text-muted); }
+.rpt-dept { margin: 0; font-size: var(--font-size-section-title); font-weight: 700; line-height: 1.35; color: var(--color-heading); }
+
+/* 지표 2×2: 흰 카드 + 지표명 14px + 수치 28px */
+.rpt-kpi { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rpt-card { padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-card); }
+.rpt-card-label { margin: 0 0 var(--space-xs); font-size: var(--font-size-secondary); font-weight: 600; }
+.rpt-card-value { margin: 0; font-size: var(--font-size-page-title); font-weight: 700; line-height: 1.2; color: var(--color-heading); font-variant-numeric: tabular-nums; }
+
+/* 순위 · 인사이트 · 미답변 질문 · 신고 진술 · 요약 */
+.rpt h2 { margin: 0 0 var(--space-sm); font-size: var(--font-size-card-title); font-weight: 600; line-height: 1.4; color: var(--color-heading); }
+.rpt ol, .rpt ul { margin: 0; padding-left: 20px; font-size: var(--font-size-secondary); line-height: 1.6; }
+.rpt li + li { margin-top: var(--space-xs); }
+.rpt-rank li { font-variant-numeric: tabular-nums; }
+.rpt-summary p { margin: 0; font-size: var(--font-size-body); line-height: 1.6; }
+.rpt-summary { padding: var(--space-md); border-radius: var(--radius-card); background: var(--color-neutral-bg); }
+
+/* 공식 안내 링크 */
+.rpt-foot { padding-top: var(--space-md); border-top: 1px solid var(--color-border); font-size: var(--font-size-secondary); }
+.rpt-foot a { color: var(--color-hufs-navy); font-weight: 600; }
