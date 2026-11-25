@@ -1,9 +1,11 @@
 # test_main.py — Cloud Functions 진입점·store ncp 분기 시험 (작업 58 ①). 네트워크·AI를 부르지 않는다.
 # 실행: python -X utf8 functions/cloud/test_main.py   하나라도 틀리면 종료코드 1.
-#   1. main(): OPTIONS·CORS, Raw HTTP 아님 거절, login → 토큰 → getMe, base64 본문, 없는 함수, 로그인 필요, logout
+#   1. main(): OPTIONS·CORS, Raw HTTP 아님 거절, login → 토큰 → getMe, base64 본문, 없는 함수, 로그인 필요, logout,
+#      _diag는 VCC_DIAG=1일 때만, 예외 시 응답은 고정 문구·원문은 stderr(키 값 가림)
 #   2. store ncp: _s3를 메모리 가짜로 바꿔 load·save·next_id·begin_request·clear_all 왕복
 #      (실제 버킷 왕복은 test_store_ncp_live.py)
 import base64
+import io
 import json
 import os
 import sys
@@ -90,7 +92,60 @@ check("API Gateway 경로 변수 fn → 함수 이름", "로그인이 필요해�
 r, out = call("", {})
 check("이름 없음 → AI 연습 호출 없이 오류", out.get("error") == "함수 이름이 없어요")
 r, out = call("/_diag", {"secret": "본문값"})
-check("_diag는 값 없이 이름만", out.get("ow_path") == "/_diag" and "본문값" not in r["body"] and "VCC_LOGIN_PW" not in r["body"])
+check("VCC_DIAG 없음 → _diag는 없는 함수로 거절", out == {"error": "아직 서버에 없는 함수예요: _diag"})
+r = main.main({**PARAMS, "__ow_method": "post", "__ow_path": "/getMe", "_diag": 1, "__ow_body": "{}", "__ow_headers": {}})
+check("VCC_DIAG 없음 → _diag 파라미터도 거절", "ow_path" not in r["body"] and "_diag" in json.loads(r["body"])["error"])
+r = main.main({**PARAMS, "__ow_method": "post", "__ow_path": "/login", "id": "H0143", "pw": "test-pw", "__ow_headers": {}})
+check("VCC_DIAG 없음 → Raw HTTP 꺼짐 응답에 diag 없음", "diag" not in json.loads(r["body"]))
+DIAG = {**PARAMS, "VCC_DIAG": "1"}
+r = main.main({**DIAG, "__ow_method": "post", "__ow_path": "/_diag", "__ow_body": json.dumps({"secret": "본문값"}),
+               "__ow_headers": {}})
+out = json.loads(r["body"])
+check("VCC_DIAG=1 → _diag는 값 없이 이름만", out.get("ow_path") == "/_diag" and "본문값" not in r["body"] and "VCC_LOGIN_PW" not in r["body"])
+r = main.main({**DIAG, "__ow_method": "post", "__ow_path": "/login", "id": "H0143", "pw": "test-pw", "__ow_headers": {}})
+check("VCC_DIAG=1 → Raw HTTP 꺼짐 응답에 diag", "diag" in json.loads(r["body"]))
+
+# 예외: 응답은 고정 문구, 원문은 stderr(키 값은 가림)
+lf = main._load_app()["local_fn"]
+SECRETS = {"CLAUDE_KEY": "sk-ant-fake-key-1234", "NCP_OS_SECRET_KEY": "fake-secret-5678"}
+BOOM = ("Object Storage GET 403: <Error><Code>AccessDenied</Code><BucketName>vcc-runtime</BucketName></Error> "
+        f"{SECRETS['CLAUDE_KEY']} {SECRETS['NCP_OS_SECRET_KEY']} test-pw")
+
+
+def boom(*a, **k):
+    raise RuntimeError(BOOM)   # store._s3가 던지는 것과 같은 모양
+
+
+def call_capture(args):
+    err, sys.stderr = sys.stderr, io.StringIO()
+    try:
+        r = main.main(args)
+        return r, sys.stderr.getvalue()
+    finally:
+        sys.stderr = err
+
+
+lf.ROUTES["_boom"] = boom
+lf.NEEDS_NO_LOGIN.add("_boom")
+r, logged = call_capture({**PARAMS, **SECRETS, "__ow_method": "post", "__ow_path": "/_boom", "__ow_body": "{}",
+                          "__ow_headers": {}})
+del lf.ROUTES["_boom"]
+lf.NEEDS_NO_LOGIN.discard("_boom")
+check("예외 → 응답은 고정 문구만", json.loads(r["body"]) == {"error": "서버 처리 중 문제가 생겼어요"})
+check("예외 → 응답에 원문·버킷 이름 없음", "vcc-runtime" not in r["body"] and "RuntimeError" not in r["body"])
+check("예외 → 원문은 stderr(액션 로그)에", "RuntimeError" in logged and "AccessDenied" in logged and "vcc-runtime" in logged)
+check("예외 → 로그에 키·비번 값 없음", not any(v in logged for v in (*SECRETS.values(), "test-pw")) and "***" in logged)
+
+real_s3 = store._s3
+store._s3 = boom
+r, logged = call_capture({**PARAMS, "STORE_BACKEND": "ncp", "NCP_OS_BUCKET": "vcc-runtime", "NCP_OS_ACCESS_KEY": "a" * 8,
+                          "NCP_OS_SECRET_KEY": "s" * 8, "__ow_method": "post", "__ow_path": "/login",
+                          "__ow_body": json.dumps({"id": "h0143", "pw": "test-pw"}), "__ow_headers": {}})
+store._s3 = real_s3
+os.environ["STORE_BACKEND"] = "file"
+store._cache.clear()
+check("handle 안 store._s3 RuntimeError도 고정 문구 + 로그", json.loads(r["body"]) == {"error": "서버 처리 중 문제가 생겼어요"}
+      and "RuntimeError" in logged and "vcc-runtime" not in r["body"])
 
 # ---------- 2. store ncp (가짜 S3) ----------
 bucket = {}
