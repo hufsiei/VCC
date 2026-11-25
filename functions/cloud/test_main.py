@@ -214,5 +214,16 @@ store._cache.clear()
 store.begin_request()   # file이면 아무것도 안 함
 check("file이면 begin_request가 캐시를 비우지 않음", store.load("x", {"a": 1}) is store.load("x", {}))
 
+# timing 로그(작업 58): 단계별 ms만 — 토큰·글 내용 없이
+_e, sys.stderr = sys.stderr, io.StringIO()
+try:
+    _tok = call("login", {"id": "H0143", "pw": "test-pw"})[1]["user"]["token"]
+    call("getMe", {}, token=_tok)
+    _lg = sys.stderr.getvalue()
+finally:
+    sys.stderr = _e
+check("timing 로그 한 줄(함수·total·resolve·fn·os)", "[vcc] timing getMe total=" in _lg and " resolve=" in _lg and " fn=" in _lg and " os=" in _lg)
+check("timing 로그에 토큰·비번 없음", _tok not in _lg and "test-pw" not in _lg)
+
 print(f"\n{'실패 ' + str(len(fails)) + '건' if fails else '모두 통과'}")
 sys.exit(1 if fails else 0)

@@ -47,6 +47,7 @@ _cache = {}
 _base = {}        # ncp만: 이름 → load()가 저장소에서 읽은 그대로(깊은 복사). 없던 기록이면 None
 _lock = threading.RLock()
 _MISSING = object()
+_os_stats = {}    # ncp만: 요청 하나 동안 Object Storage 호출 {"GET": [횟수, ms], "PUT": [횟수, ms]} — 진입점이 timing 로그로 남긴다(작업 58)
 RETRIES = 3       # ncp save: 조건부 쓰기가 412(그사이 다른 컨테이너가 씀)면 다시 읽어 합쳐 쓰기를 이만큼 더 해 본다
 
 
@@ -94,6 +95,16 @@ def _s3(method, key="", body=b"", query=None, extra=None):
     if body:
         headers["Content-Type"] = "application/json; charset=utf-8"
     url = c["endpoint"] + path + ("?" + qs if qs else "")
+    t0 = time.perf_counter()
+    try:
+        return _s3_send(method, url, body, headers)
+    finally:
+        st = _os_stats.setdefault(method, [0, 0.0])
+        st[0] += 1
+        st[1] += (time.perf_counter() - t0) * 1000
+
+
+def _s3_send(method, url, body, headers):
     for attempt in range(3):   # 5xx·네트워크 오류는 두 번까지 다시(0.3·0.6초)
         req = urllib.request.Request(url, data=body if method == "PUT" else None, headers=headers, method=method)
         try:
@@ -263,9 +274,15 @@ def lock():
     return _lock
 
 
+def os_stats():
+    """이번 요청의 Object Storage 호출 요약 "GET 2×85ms PUT 1×120ms"(없으면 "없음"). 키·객체 이름은 담지 않는다."""
+    return " ".join(f"{m} {n}×{ms:.0f}ms" for m, (n, ms) in sorted(_os_stats.items())) or "없음"
+
+
 def begin_request():
     """요청 하나를 시작할 때(Cloud Functions 진입점). ncp면 메모리를 비워 이번 요청은 저장소에서 새로 읽는다.
     file(local_fn.py)은 프로세스 하나가 기록을 쥐고 있으므로 아무것도 하지 않는다."""
+    _os_stats.clear()
     if _backend() == "ncp":
         with _lock:
             _cache.clear()
