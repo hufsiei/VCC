@@ -238,7 +238,7 @@ function renderTarget() {
       el("span", { className: "consent-target__name", text: note.program }),
     ]),
     el("p", { className: "consent-target__count num" }, [icon("sparkles"), `근거 ${before}건 → ${after}건`]),
-    el("p", { className: "sub", text: "결과보고서·다른 선배 인터뷰와 함께 정리돼요" }),
+    el("p", { className: "sub", text: "보고서·다른 선배 인터뷰와 함께 정리돼요" }),
   );
 }
 

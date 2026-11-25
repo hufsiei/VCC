@@ -217,7 +217,7 @@ expect("근거 번호 없는·근거 밖 숫자·고유명사·반말 문장은 
 expect("sources는 인용한 것만", set(res["sources"]) == set(res["lines"][0]["cites"]))
 expect("singleSenior 계산", isinstance(res["singleSenior"], bool))
 expect("호출 순서: 질문정리 → 고르기 → 답쓰기 → 답검사", [c[0] for c in calls] == ["질문정리", "고르기", "답쓰기", "답검사"], [c[0] for c in calls])
-expect("답쓰기 입력에 번호·출처·선배 표시", "[1] 결과보고서" in calls[2][1] and "선배A" in calls[2][1])
+expect("답쓰기 입력에 번호·출처·선배 표시", "[1] 보고서" in calls[2][1] and "선배A" in calls[2][1])
 expect("질문정리 입력에 이전 대화 없음 표시", "(없음)" in calls[0][1])
 
 res, calls = run("마르부르크 기숙사 어땠어요?", [], plan=plan_q, answer=answer, match=False)
