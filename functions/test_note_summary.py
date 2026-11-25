@@ -42,8 +42,12 @@ sec(base, "지원").pop("summary", None)  # #188 이후 notes.json에 지원 sum
 
 # 1) 인터뷰 문장이 없을 때
 n = notes.getNote(ME, {"id": NID})
-expect("비용: summary 그대로 + newLines 0", sec(n, "비용")["summary"] == sec(base, "비용")["summary"]
-       and sec(n, "비용")["newLines"] == 0)
+def plain(summary):   # [11/25 작업 33] 서버가 붙이는 lineId는 빼고 비교
+    return [{k: v for k, v in s.items() if k != "lineId"} for s in summary]
+
+
+expect("비용: summary 그대로(+ lineId) + newLines 0", plain(sec(n, "비용")["summary"]) == sec(base, "비용")["summary"]
+       and all(s["lineId"].startswith("S-") for s in sec(n, "비용")["summary"]) and sec(n, "비용")["newLines"] == 0)
 expect("원문 lines는 그대로(접기용)", len(sec(n, "비용")["lines"]) == len(cost_ids))
 expect("배운점은 summary 없음(원문 인용)", "summary" not in sec(n, "배운점") and "newLines" not in sec(n, "배운점"))
 expect("sources 없는 요약 문장은 버림 → 다 빠지면 summary·newLines 생략",
@@ -61,7 +65,7 @@ n = notes.getNote(ME, {"id": NID})
 life = sec(n, "생활")
 expect("생활: newLines 2 = lines 끝 2개가 인터뷰 문장", life["newLines"] == 2
        and [ln["sourceId"] for ln in life["lines"][-2:]] == ["I-900", "I-901"])
-expect("문단은 다시 만들지 않음", life["summary"] == sec(base, "생활")["summary"])
+expect("문단은 다시 만들지 않음", plain(life["summary"]) == sec(base, "생활")["summary"])
 expect("비용은 newLines 0 그대로", sec(n, "비용")["newLines"] == 0)
 
 # 3) 요약 근거 문장을 신고하면 그 요약 문장만 빠진다

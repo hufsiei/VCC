@@ -15,6 +15,7 @@
 #   filter.country·filter.kind를 받고, 비교과 카드는 이수 인원(completedCount) 많은 순
 #   getNote 배운점 문장의 senior = 「선배 A」(노트 안에서만 쓰는 글자, 학과 없음 — PRD 9-1)
 #   [11/23 작업 78] getNote 칸별 summary(notes.json 사전 생성 요약 문단)를 넘기고 newLines(그 뒤 붙은 인터뷰 문장 수)를 붙인다
+#   [11/25 작업 33] 요약 문장마다 lineId(「S-…」, summary_line_id)를 붙이고, reportStatement로 신고된 요약 문장은 뺀다
 #
 # 원문 인용만 한다: 선배가 동의한 문장 그대로 붙이고, 여러 선배의 답을 합치거나 요약하지 않는다(HCX 원칙 v2). AI 없음.
 # 응답에 선배 학번(owner)·내 경험노트 id는 넣지 않는다.
@@ -199,7 +200,7 @@ def _merge(nid, rows):
         for r in items:
             note.setdefault("sources", {})[r["sourceId"]] = {"docType": INTERVIEW, "program": note["program"],
                                                              "semester": r.get("semester")}
-    _section_summary(note, by_section, hidden_sources)
+    _section_summary(note, by_section, hidden_sources, hidden)
 
     note["evidenceCount"] = (note.get("evidenceCount") or 0) + len(rows)
     sems = [s for s in [note.get("lastSemester"), *(r.get("semester") for r in rows)] if s]
@@ -210,16 +211,53 @@ def _merge(nid, rows):
 
 
 # ── 칸별 요약 문단 [v2 작업 78] ────────────────────────────────────────
-def _section_summary(note, by_section, hidden_sources):
+def summary_line_id(nid, section, text):
+    """[11/25 작업 33] 요약 문장 id — 노트·칸·문장 글의 해시라 문단 순서가 바뀌어도 같고, 문장을 다시 만들면(글이 바뀌면)
+    새 id가 된다(옛 신고가 다른 문장을 숨기지 않게). 원문 문장 id(「L-…」)와 겹치지 않게 「S-」로 시작한다."""
+    return "S-" + hashlib.sha1(f"{nid}|{section}|{text}".encode("utf-8")).hexdigest()[:10]
+
+
+def find_line(line_id):
+    """신고 기록에 남길 문장 정보 {kind: "summary"|"line", noteId, program, section, text} 또는 None.
+    요약 문장(S-…)은 notes.json의 칸 summary에서, 원문 문장(L-…)은 notes.json 칸 문장·noteLines에서 찾는다."""
+    if not line_id:
+        return None
+    if line_id.startswith("S-"):
+        for nid, n in NOTES.items():
+            for sec in n.get("sections", []):
+                for s in sec.get("summary") or []:
+                    if summary_line_id(nid, sec.get("name"), s.get("text", "")) == line_id:
+                        return {"kind": "summary", "noteId": nid, "program": n.get("program"),
+                                "section": sec.get("name"), "text": s.get("text", "")}
+        return None
+    for nid, n in NOTES.items():
+        for sec in n.get("sections", []):
+            for ln in sec.get("lines", []):
+                if ln.get("lineId") == line_id:
+                    return {"kind": "line", "noteId": nid, "program": n.get("program"),
+                            "section": sec.get("name"), "text": ln.get("text", "")}
+    with store.lock():
+        rows = list(store.load("noteLines", []))
+    for r in rows:
+        if "L-" + r.get("sourceId", "") == line_id:
+            return {"kind": "line", "noteId": r.get("noteId"), "program": r.get("program"),
+                    "section": r.get("section"), "text": r.get("text", "")}
+    return None
+
+
+def _section_summary(note, by_section, hidden_sources, hidden=()):
     """notes.json(원우 build_notes.py)의 칸별 summary를 그대로 넘긴다. 서버는 AI를 부르지 않는다.
     - 배운점은 요약하지 않는다(선배별 원문 인용) → 있어도 뺀다
+    - [11/25 작업 33] 요약 문장마다 lineId(summary_line_id)를 붙인다. 신고된 요약 문장(hidden)은 뺀다
     - 신고로 숨긴 문장을 근거로 든 요약 문장은 뺀다. 다 빠지면 summary 생략(화면은 원문 목록)
     - newLines = 요약을 만든 뒤 인터뷰로 새로 붙은 문장 수 = 그 칸 lines 끝 N개(문단은 다시 만들지 않는다)"""
     for sec in note["sections"]:
         summ = sec.pop("summary", None)
         if not summ or sec["name"] == LESSON_SECTION:
             continue
-        summ = [s for s in summ if s.get("sources") and not hidden_sources.intersection(s["sources"])]
+        summ = [{**s, "lineId": summary_line_id(note["id"], sec["name"], s.get("text", ""))} for s in summ
+                if s.get("sources") and not hidden_sources.intersection(s["sources"])]
+        summ = [s for s in summ if s["lineId"] not in hidden]
         if summ:
             sec["summary"] = summ
             sec["newLines"] = len(by_section.get(sec["name"], []))

@@ -674,11 +674,21 @@ def publish_lines(me, program, my_note_id, passing):
 
 
 def reportStatement(me, p):
-    line_id = p.get("lineId")
+    """문장 신고 {lineId, reason} → 그 문장을 바로 숨긴다(spec 4장). [11/25 작업 33] 사유는 꼭 받는다.
+    lineId는 원문 문장(「L-…」)이나 해봤노트 요약 문장(「S-…」, getNote summary[].lineId).
+    기록(reported.json)에는 사유·시각과 함께 그 문장의 글·noteId·칸을 남긴다(찾을 수 있을 때)."""
+    line_id = str(p.get("lineId") or "").strip()
     if not line_id:
         return {"error": "신고할 문장이 없어요"}
+    reason = str(p.get("reason") or "").strip()[:REASON_MAX]
+    if not reason:
+        return {"error": "신고 사유를 적어 주세요"}
+    found = notes.find_line(line_id)
+    if line_id.startswith("S-") and not found:
+        return {"error": "신고할 문장을 찾지 못했어요"}
     with store.lock():
-        store.load("reported", {})[line_id] = {"by": me, "reason": p.get("reason"), "at": now(), "status": "숨김 중"}
+        store.load("reported", {})[line_id] = {"by": me, "reason": reason, "at": now(), "status": "숨김 중",
+                                               **(found or {})}
         store.save("reported")
     return {"ok": True, "hidden": True}
 
