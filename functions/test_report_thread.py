@@ -11,6 +11,7 @@ store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"
 
 import runtime_fns as rf
 from runtime_fns import getInbox, getMessages, reportThread, respondRequest, sendMessage
+rf._call_ai = lambda *a, **k: {"ok": True, "json": {"ok": True}}   # 시험은 실제 AI를 부르지 않는다(쪽지검사 연결, 작업 27)
 
 JUNIOR, SENIOR1, SENIOR2, OTHER = "H0143", "H0469", "H0241", "H0102"
 HELLO = "안녕하세요, 마르부르크 파견 준비가 궁금해서 쪽지 드려요."

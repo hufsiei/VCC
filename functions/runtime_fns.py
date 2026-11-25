@@ -19,16 +19,21 @@
 #   recommendSeniors·previewNickname·sendMessage(새 요청)가 {locked} / reason "잠김"으로 막는다. 받은 선배의 답장은 막지 않는다.
 # recommendSeniors(작업 85): 점수는 score.py(원우), 목록 보관·더 보기·재계산은 여기(spec 4장 인원 규칙).
 import json
+import logging
 import random
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import demand
+import limits
 import notes
 import score
 import store
-from msg_check import check_message, check_public_text
+from ai import load_prompt
+from msg_check import MESSAGES, check_message, check_public_text
 
+log = logging.getLogger("vcc")
 KST = timezone(timedelta(hours=9))
 DATA = Path(__file__).resolve().parent.parent / "data"
 
@@ -182,10 +187,50 @@ def _alert(to, text, **extra):
 
 
 # ---------- 쪽지 ----------
+_slander_cache = {}
+SLANDER_CACHE_SEC = 300
+
+
+def _call_ai(*args, **kw):
+    """callAI 한 곳(시험이 바꿔 끼운다). ai.py는 쓸 때 불러온다."""
+    from ai import callAI
+    return callAI(*args, **kw)
+
+
+def _slander_by_ai(me, text):
+    """비방 판정(HCX, callAI("쪽지검사")). 비방이면 True. 한도 초과·호출 실패·형식 오류는 False(통과) —
+    쪽지가 AI 장애로 막히지 않게 하고, 기록만 남긴다. 로그인 없는 호출(me 없음)은 한도를 셀 수 없어 부르지 않는다.
+    한도(limits.py 분당 10·일 100)는 AI를 실제로 부를 때만 센다. 쪽지 원문 마스킹은 callAI 입구(mask.py)."""
+    if not me:
+        return False
+    # 화면이 보내기 전 checkMessage를 부르고 이어서 sendMessage를 부른다 — 같은 글은 5분 안에 다시 부르지 않는다
+    key, t0 = (me, text), time.time()
+    hit = _slander_cache.get(key)
+    if hit and t0 - hit[0] < SLANDER_CACHE_SEC:
+        return hit[1]
+    if limits.check(me):
+        log.warning("쪽지검사 건너뜀: 호출 한도")
+        return False
+    system, shots = load_prompt("쪽지검사")
+    out = _call_ai("쪽지검사", shots + [{"role": "user", "content": f"쪽지: {text}\n출력:"}], system)
+    j = out.get("json") if out.get("ok") else None
+    if not isinstance(j, dict) or not isinstance(j.get("ok"), bool):
+        log.warning("쪽지검사 통과로 봄: %s", out.get("error") or "형식 오류")
+        return False
+    if len(_slander_cache) > 500:
+        _slander_cache.clear()
+    _slander_cache[key] = (t0, j["ok"] is False)
+    return j["ok"] is False
+
+
 def checkMessage(me, p):
     """학번·연락처·금지어는 코드 규칙(msg_check.py, 작업 27)이 막는다. 메일은 허용.
-    비방 AI 판정(P1, callAI("쪽지검사"))은 이 규칙을 통과한 쪽지에만 이어서 붙인다."""
-    return check_message(p.get("text", ""))
+    이 규칙을 통과한 쪽지에만 비방 AI 판정(callAI("쪽지검사"), HCX)이 이어진다."""
+    text = p.get("text", "")
+    r = check_message(text)
+    if r["ok"] and _slander_by_ai(me, text):
+        return {"ok": False, "reason": "비방", "message": MESSAGES["비방"]}
+    return r
 
 
 def previewNickname(me, p):

@@ -63,6 +63,7 @@ store._s3 = fake_s3
 
 import runtime_fns as rf  # noqa: E402
 from runtime_fns import getMessages, recommendSeniors, respondRequest, sendMessage  # noqa: E402
+rf._call_ai = lambda *a, **k: {"ok": True, "json": {"ok": True}}   # 시험은 실제 AI를 부르지 않는다(쪽지검사 연결, 작업 27)
 
 JUNIOR, SENIOR1 = "H0143", "H0469"
 JUNIOR2, SENIOR2 = "H0995", "H0745"

@@ -4,7 +4,7 @@
 #
 #   check_message(text)      쪽지 한 통 → {"ok": True} 또는 {"ok": False, "reason": "연락처"|"학번"|"비방", "message": ...}
 #                            메일은 허용(spec). 연락처·학번은 mask.py의 find()와 같은 규칙으로 잡는다(규칙을 한 곳에).
-#                            이 함수가 ok면 서버(runtime_fns.checkMessage)가 비방 AI 판정(P1, docs/prompts/쪽지검사.txt)을 이어서 한다.
+#                            이 함수가 ok면 서버(runtime_fns.checkMessage)가 비방 AI 판정(HCX, docs/prompts/쪽지검사.txt)을 이어서 한다.
 #   check_public_text(text)  선배가 공개 요약 문장을 고친 뒤 다시 보는 검사(saveConsent edits.changed) →
 #                            {"ok", "reasons", "identifying", "identifyReasons", "official"}
 #                            해봤노트에 실리는 글이라 메일·링크·주소까지 막는다. 본인 식별(identify.py)은 막지 않고 알려만 준다

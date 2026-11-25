@@ -26,7 +26,7 @@ from runtime_fns import ROUTES
 ROUTES = {**ROUTES, **account.ROUTES, **admin.ROUTES, "askBoo": askBoo, "interviewNext": interviewNext, "summarizeInterview": summarizeInterview}
 NEEDS_NO_LOGIN = {"checkMessage", "login"}
 # 사용자별 호출 한도(limits.py, 분당 10·일 100)를 세는 함수. AI를 부르는 함수를 새로 연결하면 여기에 더한다
-# (checkMessage의 비방 판정은 작업 27).
+# (checkMessage·sendMessage의 비방 판정은 runtime_fns에서 AI를 부를 때만 limits.check로 직접 센다 — 작업 27).
 AI_ROUTES = {"askBoo", "interviewNext", "summarizeInterview", "issueReport"}   # issueReport: 리포트 요약(작업 67)
 
 

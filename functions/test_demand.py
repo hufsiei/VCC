@@ -12,6 +12,7 @@ store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"
 import account
 import demand
 import runtime_fns as rf
+rf._call_ai = lambda *a, **k: {"ok": True, "json": {"ok": True}}   # 시험은 실제 AI를 부르지 않는다(쪽지검사 연결, 작업 27)
 from demand import answer_problem, count_interview_answers, demandNext, recommend_status, saveDemand
 
 JUNIOR, OTHER, SENIOR1 = "H0143", "H0010", "H0469"
