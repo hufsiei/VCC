@@ -321,6 +321,59 @@ expect("프로그램을 부른 새 질문은 후속으로 보지 않음", "질�
 res, _ = run("현장실습 뭐 있어요?", [], plan=INTERN_PLAN)
 expect("노트 카드 5개로 잘림 → 전체 수를 말함", res["status"] == "notes" and f"{n_intern}개 중" in res["message"], res.get("message"))
 
+# ── [11/25 Q-14] 근거 범위: 도시·「○○ 말고 나라 전체」 (실사용 채점 길 2점 두 건) ──────────
+JP = ["긴키 대학교", "나가사키외국어대학교"]
+res, calls = run("일본 도쿄 한달 생활비 얼마에요?", [], plan=plan_q, answer=answer)
+expect("①「일본 도쿄 생활비」→ 다른 학교 근거로 답하지 않음(AI 없음)", res["status"] == "notes" and not res["lines"] and calls == [],
+       (res.get("status"), [c[0] for c in calls]))
+expect("① 도쿄 0개 + 일본 노트 수(코드가 센 값) + 일본 카드", "도쿄에 있는 학교 해봤노트는 0개" in res["message"]
+       and f"일본 교환·파견 해봤노트는 {len([n for n in JP if askboo.evidence_count(n)])}개" in res["message"]
+       and {c["program"] for c in res["notes"]} <= set(JP), res.get("message"))
+res, calls = run("도쿄는 생활비 어때요?", [{"question": "일본 교환 어때요?", "status": "notes", "program": ""}], plan=plan_q, answer=answer)
+expect("① 나라 없이 도시만 → 도시로 나라를 알아 같은 안내", res["status"] == "notes" and "도쿄" in res["message"] and calls == [])
+res, calls = run("나가사키 생활비 얼마에요?", [], plan=None)
+expect("① 학교 이름에 있는 도시(나가사키) → 그 학교로 답하는 길", res["status"] != "notes" or "0개" not in (res.get("message") or "")
+       and "고르기" in [c[0] for c in calls], (res.get("status"), res.get("message")))
+expect("① city_scope: 파리 → 파리 학교만", all("파리" in n for n in askboo.city_scope("파리 생활비", [], None)[2]))
+expect("① city_scope: 일본·본인·마르부르크(학교 이름) → 도시 아님",
+       askboo.city_scope("일본 본인 생활비", *askboo.match_country("일본 본인 생활비")) is None
+       and askboo.city_scope("마르부르크 생활비", [PROGRAM], None) is None)
+for q in ("포르투갈 한달 생활비 얼마예요?", "포르투갈 교환 어때요?", "테니스 동아리 있어요?", "프랑스 비즈니스 수업 어때요?",
+          "로마자 표기 어떻게 해요?"):   # 총괄 검토(#282): 낱말 속 도시(포르투·니스·로마)는 걸리면 안 됨
+    expect(f"① 도시 아님(낱말 속): {q}", askboo.city_scope(q, *askboo.match_country(q)) is None,
+           askboo.city_scope(q, *askboo.match_country(q)))
+res, _ = run("포르투갈 교환 어때요?", [], plan=None)
+expect("① 「포르투갈 교환」은 포르투갈 노트 그대로(0개 안내 아님)", "0개" not in (res.get("message") or ""), res.get("message"))
+expect("① 조사·문장부호 뒤 도시는 잡음: 도쿄에서·로마는·파리?", all(askboo.city_scope(q, [], None) for q in ("도쿄에서 살기", "로마는 어때요", "파리?")))
+expect("① 도쿄 인턴 질문은 교환 도시 판정에서 뺌", askboo.city_scope("도쿄 인턴 어때요?", [], None) is None)
+
+H_NGS = [{"question": "나가사키외국어대학교 생활비 얼마에요?", "status": "hold", "program": "나가사키외국어대학교"}]
+res, calls = run("나가사키외국어대학교 말고 일본 대학 전체의 해봤노트에도 없나요?", H_NGS, plan=P("대화", "국제교류", 제외=["나가사키외국어대학교"]))
+expect("②「○○ 말고 일본 전체 노트에도 없나요?」→ 남은 일본 노트 수(AI 없음)", res["status"] == "notes" and calls == []
+       and "나가사키외국어대학교를 뺀 일본 해봤노트는 1개" in res["message"] and "긴키 대학교" in res["message"], res.get("message"))
+expect("② 엇나간 문구 없음 · 카드에 나가사키 없음", "겹쳤다면" not in res["message"]
+       and all(c["program"] != "나가사키외국어대학교" for c in res["notes"]))
+res, calls = run("나가사키외국어대학교 말고 일본 다른 학교 생활비는요?", H_NGS, plan=None)
+expect("② 주제가 있는 「말고」 질문은 노트 수가 아니라 남은 학교로 답하는 길", "고르기" in [c[0] for c in calls]
+       or res["status"] == "hold", (res.get("status"), [c[0] for c in calls]))
+
+# 기존 나라·학교 질문은 그대로
+res, calls = run("마르부르크 생활비 얼마나 들어요?", [], plan=plan_q, answer=answer)
+expect("「마르부르크 생활비」는 그대로 답(도시 판정 안 탐)", res["status"] == "ok" and "질문정리" in [c[0] for c in calls], res.get("status"))
+res, calls = run("독일 교환 어디 있어요?", [], plan=None)
+expect("「독일 교환 어디 있어요?」는 그대로 독일 노트", res["status"] == "notes" and "독일" in res["message"], res.get("message"))
+
+# 기록 route에 새 길 이름
+logged = []
+_orig = askboo._log_answer
+askboo._log_answer = lambda q, out, program=None, trace=None, prev=None: logged.append((trace or {}).get("route"))
+for q, h, want in (("일본 도쿄 한달 생활비 얼마에요?", [], "도시 범위 밖"),
+                   ("나가사키외국어대학교 말고 일본 대학 전체의 해봤노트에도 없나요?", H_NGS, "제외 범위")):
+    askboo.callAI = make_fake()
+    askboo.askBoo("H0143", {"question": q, "history": h}, save=True)
+    expect(f"기록 route = {want}", logged and logged[-1] == want, logged[-1:])
+askboo._log_answer = _orig
+
 # ── 정리 ──────────────────────────────────────────────────────────────
 print()
 print("실패 %d개" % len(fails) if fails else "전부 통과")
