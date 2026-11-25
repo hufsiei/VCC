@@ -236,7 +236,7 @@
 |---|---|---|
 | status | 글자 | `ok`(근거 있음), `hold`(근거 없음), `official`(규정 질문, 공식 안내로 연결), **[11/23] `notes`**(사람·나라만 묻고 주제가 없을 때 답 대신 해봤노트 카드로 안내 — 질문함에 저장 안 함) |
 | lines[].text / sourceId / lineId | 글자 | 답변 문장과 출처, 문장 번호 |
-| lines[].fallback | 참/거짓 | AI 문장이 검증에 걸려 근거 원문을 그대로 보여 준 줄이면 true. 없으면 거짓 |
+| lines[].fallback | 참/거짓 | 답쓰기가 실패하거나 문장이 다 버려져 근거 원문을 인용한 줄(`fallback_lines`)이면 모두 true(**[11/24]** 이미 합쇼체라 변환을 건너뛴 원문 포함). 답쓰기 문장에는 없음(없으면 거짓) |
 | sources | 객체 | sourceId별 `{docType, program, semester}` |
 | noteId | 글자 | `ok`일 때 관련 노트. **[11/23]** `hold`도 노트는 있는데 이 내용이 없을 때 그 노트 |
 | suggestSenior | 참/거짓 | 닮은 선배 추천을 권할지 |
