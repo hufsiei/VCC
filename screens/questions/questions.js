@@ -23,7 +23,7 @@ if (me && me.status === "직원") document.getElementById("consoleBtn").hidden =
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };
 const KIND_NAME = { 교환: "교환학생", 파견: "파견", 인턴: "인턴", 비교과: "" };
-const DOC_LABEL = { 귀국보고서: "결과보고서", 현장실습후기: "현장실습후기", 인터뷰: "선배 인터뷰" };
+const DOC_LABEL = { 귀국보고서: "보고서", 현장실습후기: "현장실습후기", 인터뷰: "선배 인터뷰" };
 const DASH = "–";
 const TABS = ["notes", "questions", "messages", "scraps"];
 
@@ -743,7 +743,7 @@ function emptyEvidence(message) {
     el("div", { className: "evidence__head" }, [
       el("span", { className: "evidence__summary" }, [
         icon("sparkles"),
-        el("span", {}, ["근거 ", el("span", { className: "evidence__num", text: "0" }), "건 · 결과보고서 – · 선배 인터뷰 – · 최근 –"]),
+        el("span", {}, ["근거 ", el("span", { className: "evidence__num", text: "0" }), "건 · 보고서 – · 선배 인터뷰 – · 최근 –"]),
       ]),
     ]),
     el("div", { className: "evidence__empty-body" }, [el("p", { text: message })]),
@@ -762,7 +762,7 @@ function evidenceBlock(lines, sources) {
     el("summary", { className: "evidence__head" }, [
       el("span", { className: "evidence__summary" }, [
         icon("sparkles"),
-        el("span", {}, ["근거 ", num(lines.length), "건 · 결과보고서 ", num(reports), " · 선배 인터뷰 ", num(interviews), ` · 최근 ${semesterText(latest)}`]),
+        el("span", {}, ["근거 ", num(lines.length), "건 · 보고서 ", num(reports), " · 선배 인터뷰 ", num(interviews), ` · 최근 ${semesterText(latest)}`]),
       ]),
       el("span", { className: "evidence__side" }, [
         few,
