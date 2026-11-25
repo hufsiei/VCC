@@ -269,6 +269,58 @@ h = askboo.clean_history([{"question": " a ", "status": "ok", "program": "p"}, {
                           {"question": "b", "status": 3}, {"question": "c"}, {"question": "d"}, {"question": "e"}])
 expect("history 정리: 글자만, 최근 4개", [x["question"] for x in h] == ["b", "c", "d", "e"] and h[0]["status"] == "" and h[0]["program"] == "", h)
 
+# ── [11/25 Q-13] 후속 질문·시기 질문 (미리 실사용 캡처 세 질문) — 코드가 세어 답한다, AI 없음 ──────────
+INTERN_PLAN = {"의도": "탐색", "분야": "현장실습", "나라": None, "프로그램후보": [], "제외": [], "칸": None, "정리된질문": "x"}
+n_intern = len(askboo._pool("현장실습", None))
+
+res, calls = run("인턴십 보통 언제 하는지", [], plan=INTERN_PLAN)
+expect("캡처①「인턴십 보통 언제 하는지」→ 시기별 보고서 수 + 노트 카드", res["status"] == "notes" and "여름방학" in res["message"]
+       and "1학기" in res["message"] and "편" in res["message"] and res["notes"] and calls == [], res.get("message"))
+expect("시기 답의 편수는 시기별 합과 같음", sum(int(x.replace(",", "")) for x in re.findall(r"(?:학기|방학) ([\d,]+)편", res["message"]))
+       == int(re.search(r"보고서 ([\d,]+)편", res["message"]).group(1).replace(",", "")), res["message"])
+expect("시기 답은 모집 일정을 지어내지 않고 공지로", "학교 공지" in res["message"])
+
+H_NOTES = [{"question": "인턴십 보통 언제 하는지", "status": "notes", "program": ""}]
+res, calls = run("이게 다야?", H_NOTES, plan=INTERN_PLAN)
+expect("캡처②「이게 다야?」(노트 목록 뒤) → 전체 수를 말함", res["status"] == "chat" and f"모두 {n_intern}개" in res["message"]
+       and "5개만" in res["message"] and calls == [], res.get("message"))
+expect("「이게 다야?」에 엇나간 문구 없음", "겹쳤다면" not in res["message"])
+expect("「이게 다야?」 칩: 그 분야 둘러보기", res["chips"][0]["action"] == "notes" and res["chips"][0]["payload"]["field"] == "현장실습")
+
+H_EX = [{"question": "교환학생 어디가 좋아?", "status": "notes", "program": ""}]
+res, calls = run("이 해봤노트 준 기준이 뭐야", H_EX, plan=INTERN_PLAN)
+expect("캡처③「이 해봤노트 준 기준이 뭐야」→ 근거 많은 순이라고 설명", res["status"] == "chat" and "근거" in res["message"]
+       and "많은 순서" in res["message"] and "교환·파견" in res["message"] and calls == [], res.get("message"))
+
+res, _ = run("이게 다야?", [{"question": "마르부르크 기숙사 어땠어요?", "status": "ok", "program": PROGRAM}])
+expect("답 뒤 「이게 다야?」 → 그 노트 근거 수", res["status"] == "chat" and f"{askboo.evidence_count(PROGRAM)}개" in res["message"], res.get("message"))
+res, _ = run("다른 데는 없어?", [{"question": "독일 교환 어디 있어요?", "status": "notes", "program": ""}])
+expect("나라 노트 뒤 「다른 데는 없어?」 → 그 나라 노트 수", res["status"] == "chat" and "독일 해봤노트" in res["message"], res.get("message"))
+
+res, _ = run("교환학생 보통 몇 학년에 가요?", [])
+expect("「몇 학년」은 노트에 없다고 먼저 말함", res["status"] == "notes" and res["message"].startswith("몇 학년에 했는지는 해봤노트에 없어요."), res.get("message"))
+res, _ = run("독일 인턴 언제 해요?", [])
+expect("「독일 인턴 언제」→ 독일 교환 노트를 쓰지 않음", res["status"] == "notes" and "현장실습" in res["message"]
+       and all(c["type"] == "인턴" for c in res["notes"]), res.get("message"))
+res, _ = run("마르부르크 언제 가는 게 좋아요?", [])
+expect("한 학교 시기 → 그 노트만", res["status"] == "notes" and [c["program"] for c in res["notes"]] == [PROGRAM], res.get("notes"))
+
+# 걸리면 안 되는 것
+res, calls = run("교환학생 선발 기준이 뭐예요?", H_EX)
+expect("「선발 기준」은 후속이 아니라 공식 안내", res["status"] == "official", res.get("status"))
+res, calls = run("신청 기간 언제까지예요?", [])
+expect("「신청 기간 언제까지」는 시기 답이 아니라 공식 안내", res["status"] == "official")
+res, calls = run("마르부르크 기숙사 신청 언제 했어요?", [], plan=plan_q, answer=answer)
+expect("주제가 있는 「언제」(기숙사)는 시기 답이 아니라 경험 답", "질문정리" in [c[0] for c in calls] and "시기별" not in (res.get("message") or ""))
+res, calls = run("이게 다야?", [])
+expect("앞 턴 없는 「이게 다야?」는 후속으로 보지 않음", "질문정리" in [c[0] for c in calls])
+res, calls = run("마르부르크 기숙사도 더 알려줘", H_NOTES, plan=plan_q, answer=answer)
+expect("프로그램을 부른 새 질문은 후속으로 보지 않음", "질문정리" in [c[0] for c in calls])
+
+# 카드가 5개로 잘리면 「5개 있어요」라고 하지 않는다
+res, _ = run("현장실습 뭐 있어요?", [], plan=INTERN_PLAN)
+expect("노트 카드 5개로 잘림 → 전체 수를 말함", res["status"] == "notes" and f"{n_intern}개 중" in res["message"], res.get("message"))
+
 # ── 정리 ──────────────────────────────────────────────────────────────
 print()
 print("실패 %d개" % len(fails) if fails else "전부 통과")
