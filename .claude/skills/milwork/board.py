@@ -1,10 +1,15 @@
-# board.py — 창 상태판 (미리 개인용, 11/23 · 11/25 드라이브 공용 + 대기 작업·결정요망·HTML)
+# board.py — 창 상태판 (11/23 미리 개인용 · 11/25 드라이브 공용 + 대기 작업·결정요망·HTML · 11/25 사람별 파일)
 #
 # Claude 대화창을 여러 개 띄워 작업할 때, 어느 폴더(worktree)에서 무슨 작업이 어디까지 갔고
-# 누구에게 무엇을 전해야 하는지를 한 파일에 둔다. 파일은 드라이브 「@VCC\총괄\board.md」(두 PC 공용, 커밋 안 함).
-#   찾는 순서: 환경변수 VCC_BOARD(폴더 또는 .md 경로) → C:~Z: 중 「<X>:\내 드라이브\@VCC」 → 없으면 옛 C:\dev\VCC-board.md
-#   (드라이브를 못 찾으면 stderr에 「드라이브 없음, 이 PC 상태판 사용」). 잠금 파일(board.lock)과 board.html도 같은 폴더.
-#   드라이브에 파일이 없고 C:\dev\VCC-board.md가 있으면 처음 실행 때 옮기고 옛 파일은 VCC-board-이전.md로 이름만 바꾼다.
+# 누구에게 무엇을 전해야 하는지를 한 파일에 둔다. 파일은 사람마다 따로: 드라이브 「@VCC\총괄\board-<이름>.md」
+# (그 사람의 두 PC 공용, 커밋 안 함). 남의 파일은 읽지 않는다 — list·check·html 모두 내 파일만(팀 대시보드 없음, 11/25).
+#   「나」(<이름>): git config vcc.me(원우|민지|미리) → 없으면 git user.name·email로 짐작(session_start.py와 같은 규칙).
+#     못 정하면 종료코드 1 + 「git config vcc.me 원우」 안내. 한 번만 하면 된다: git config vcc.me <이름>
+#   찾는 순서: 환경변수 VCC_BOARD(폴더면 그 안의 board-<이름>.md, .md면 그 파일) → C:~Z: 중 「<X>:\내 드라이브\@VCC」
+#     → 없으면 이 PC의 C:\dev\VCC-board-<이름>.md (stderr에 「드라이브 없음, 이 PC 상태판 사용」).
+#   잠금(board-<이름>.lock)과 HTML(board-<이름>.html)도 상태판과 같은 폴더·같은 이름.
+#   이전: 드라이브에 사람 이름 없는 board.md(11/25 #249, 미리 것)가 있으면 미리가 처음 실행할 때 board-미리.md로 이름을 바꾼다
+#     (다른 사람은 건드리지 않는다). 새 파일이 없고 옛 C:\dev\VCC-board.md가 있으면 옮기고 옛 파일은 VCC-board-이전.md로.
 # 파일 모양: 맨 위 「총괄: <세션이름> (<PC>, MM/DD HH:MM)」 → 창 표 → 「## 대기 작업」 표 → 「## 결정요망」 표.
 # 드라이브 동기화가 늦으니 두 PC가 같은 시각에 쓰면 한쪽이 질 수 있다(한 PC씩 쓰는 전제).
 #
@@ -20,10 +25,10 @@
 #   prune                                           이 PC에서 폴더가 없어진 줄을 지운다
 #   chief                                           머리의 총괄 세션 이름 출력(없으면 빈 줄, 종료코드 1)
 #   chief --set <세션이름|–>                         총괄 세션 이름 쓰기(–면 비움)
-#   html                                            같은 폴더에 board.html 생성(상태판을 바꾸는 명령 뒤 자동 실행)
+#   html                                            같은 폴더에 board-<이름>.html 생성(상태판을 바꾸는 명령 뒤 자동 실행)
 #   queue                                           대기 작업 표 출력
-#   queue add --task "<작업번호 또는 –> <제목>" --files a,b --from milstart|파생|PR|미리 [--session <이름>] [--note "…"]
-#                                                   → 「Q-n 제안」(--from 미리는 「Q-n 승인」)
+#   queue add --task "<작업번호 또는 –> <제목>" --files a,b --from milstart|파생|PR|직접 [--session <이름>] [--note "…"]
+#                                                   → 「Q-n 제안」(--from 직접은 「Q-n 승인」. 옛 값 「미리」도 직접과 같게 받음)
 #   queue approve Q-n                               겹침 없으면 승인, 겹치면 종료코드 2 + 겹친 줄
 #   queue reject Q-n --why "…"                      반려(이유 기록)
 #   queue take Q-n --folder VCC-<슬러그> [--session <이름>]   승인만 시작됨으로 + 폴더 기록. 제안·반려면 종료코드 2
@@ -47,8 +52,9 @@ from datetime import datetime
 from pathlib import Path
 
 DEV = Path(r"C:\dev")
-REPO = DEV / "VCC"
+REPO = Path(os.environ.get("VCC_REPO") or DEV / "VCC")   # VCC_REPO는 selftest가 임시 저장소를 쓸 때만
 OLD_BOARD = DEV / "VCC-board.md"
+TEAM = {"미리": ("미리", "mirikang"), "민지": ("민지", "minji"), "원우": ("원우", "wwk")}  # session_start.py와 같게
 OLD_COLS = ["폴더", "브랜치", "요청", "작업", "파일", "상태", "갱신", "전달 대기"]
 COLS = ["폴더", "브랜치", "요청", "작업", "파일", "상태", "갱신", "PC", "결정요망", "전달 대기"]
 QCOLS = ["번호", "작업", "파일", "출처", "상태", "세션", "폴더", "메모", "갱신"]
@@ -59,6 +65,27 @@ EMPTY = ("", "–")
 HOST = socket.gethostname()
 BOARD = None            # main()에서 정한다
 LOCK = None
+ME = ""
+
+
+# ---------- 나 ----------
+def _git_config(key):
+    try:
+        r = subprocess.run(["git", "-C", str(REPO), "config", key], capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=15)
+        return r.stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def who_am_i():
+    """원우|민지|미리. git config vcc.me가 있으면 그것, 없으면 user.name·email에 든 글자로 짐작. 모르면 None."""
+    me = _git_config("vcc.me")
+    if me in TEAM:
+        return me
+    hay = f"{_git_config('user.name')} {_git_config('user.email')}".lower()
+    hits = [k for k, words in TEAM.items() if any(w in hay for w in words)]
+    return hits[0] if len(hits) == 1 else None
 
 
 # ---------- 위치 ----------
@@ -73,23 +100,41 @@ def find_drive():
     return None
 
 
-def resolve():
-    """(board.md 경로, 옛 파일을 옮겨도 되는지)"""
+def resolve(me):
+    """(board-<me>.md 경로, 옛 파일을 옮겨도 되는지)"""
     env = os.environ.get("VCC_BOARD", "").strip()
     if env:
         p = Path(env)
-        return (p if p.suffix.lower() == ".md" else p / "board.md"), False
+        return (p if p.suffix.lower() == ".md" else p / f"board-{me}.md"), False
     d = find_drive()
     if d:
-        return d / "총괄" / "board.md", True
+        return d / "총괄" / f"board-{me}.md", True
     print("드라이브 없음, 이 PC 상태판 사용", file=sys.stderr)
-    return OLD_BOARD, False
+    return DEV / f"VCC-board-{me}.md", True
 
 
 def set_board(path):
     global BOARD, LOCK
     BOARD = Path(path)
     LOCK = BOARD.with_suffix(".lock")
+
+
+def html_path(board=None):
+    return Path(board or BOARD).with_suffix(".html")
+
+
+def rename_unnamed(new, me):
+    """같은 폴더의 이름 없는 board.md(#249, 미리 것)를 board-미리.md로. 다른 사람은 건드리지 않는다. 바꿨으면 True."""
+    new = Path(new)
+    old = new.with_name("board.md")
+    if me != "미리" or new.exists() or not old.exists() or old == new:
+        return False
+    old.rename(new)
+    oh = old.with_suffix(".html")
+    if oh.exists() and not html_path(new).exists():
+        oh.rename(html_path(new))
+    print(f"상태판 이름 바꿈: {old.name} → {new.name}", file=sys.stderr)
+    return True
 
 
 def migrate(old, new):
@@ -186,7 +231,7 @@ def chief_line(st):
 def save(st, path=None, html=True):
     p = Path(path or BOARD)
     p.parent.mkdir(parents=True, exist_ok=True)
-    lines = [chief_line(st), "", f"# VCC 상태판 (두 PC 공용 · 갱신 {now()} {HOST})", "",
+    lines = [chief_line(st), "", f"# VCC 상태판 — {ME or p.stem} (두 PC 공용 · 갱신 {now()} {HOST})", "",
              "작업 대화창은 `milwork`로 줄을 만들고 진행에 따라 「상태」「파일」「전달 대기」를 고친다. "
              "팀원 답장은 그 대화창이 바로 쓰고 「전달 대기」에 요점을 적는다. 미리가 보내면 `--sent`로 「보냄」 표시. "
              "총괄 대화창은 대기 작업을 승인하고 결정요망에 답한다. 병합된 줄과 폴더는 `milend`가 지운다.", ""]
@@ -198,9 +243,9 @@ def save(st, path=None, html=True):
     os.replace(tmp, p)
     if html:
         try:
-            make_html(st, p.with_name("board.html"))
+            make_html(st, html_path(p))
         except Exception as e:      # HTML이 실패해도 상태판 쓰기는 살린다
-            print(f"board.html 못 만듦: {e}", file=sys.stderr)
+            print(f"{html_path(p).name} 못 만듦: {e}", file=sys.stderr)
 
 
 class locked:
@@ -455,7 +500,7 @@ def cmd_queue_add(args):
     with locked():
         st = load()
         i = next_id(st["queue"], "Q")
-        state = "승인" if args.source == "미리" else "제안"
+        state = "승인" if args.source in ("직접", "미리") else "제안"
         st["queue"].append({"번호": i, "작업": args.task, "파일": SEP.join(split_files(args.files)) or "–",
                             "출처": args.source, "상태": state, "세션": args.session or "–", "폴더": "–",
                             "메모": args.note or "–", "갱신": now()})
@@ -607,7 +652,7 @@ def html_table(cols, rows, cls=None):
 
 
 def make_html(st, path=None):
-    path = Path(path or BOARD.with_name("board.html"))
+    path = Path(path or html_path())
     rows = st["rows"]
     waitq = [x for x in st["queue"] if x["상태"] in ("제안", "승인")]
     opend = [x for x in st["decide"] if x["답"] in EMPTY]
@@ -635,8 +680,8 @@ def make_html(st, path=None):
 <html lang="ko"><head><meta charset="utf-8">
 <meta http-equiv="refresh" content="60">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VCC 상태판</title><style>{CSS}</style></head><body>
-<h1>VCC 상태판</h1>
+<title>VCC 상태판 · {e(ME or path.stem)}</title><style>{CSS}</style></head><body>
+<h1>VCC 상태판 · {e(ME or path.stem)}</h1>
 <div class="meta">{e(chief)} · 만든 때 {e(now())} ({e(HOST)}) · 60초마다 새로 읽음</div>
 <div class="tiles">{"".join(f'<div class="tile"><b>{n}</b><span>{e(t)}</span></div>' for t, n in tiles)}</div>
 <h2>창</h2>
@@ -663,11 +708,18 @@ def cmd_html(args):
 # ---------- 자체 시험 ----------
 def cmd_selftest(args):
     tmp = Path(tempfile.mkdtemp(prefix="vcc-board-"))
-    env = dict(os.environ, VCC_BOARD=str(tmp), VCC_BOARD_NOGH="1", PYTHONUTF8="1")
+    repo = tmp / "repo"          # 「나」를 바꿔 보는 임시 저장소(본 저장소 설정은 건드리지 않는다)
+    subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
+
+    def gitc(key, val):
+        subprocess.run(["git", "-C", str(repo), "config", key, val], check=True, capture_output=True)
+
+    gitc("vcc.me", "미리"); gitc("user.name", "nobody"); gitc("user.email", "n@example.invalid")
+    env = dict(os.environ, VCC_BOARD=str(tmp), VCC_BOARD_NOGH="1", PYTHONUTF8="1", VCC_REPO=str(repo))
     me = [sys.executable, "-X", "utf8", str(Path(__file__).resolve())]
     fails = []
 
-    def run(*a, code=0, first=None, has=None):
+    def run(*a, code=0, first=None, has=None, err=None):
         r = subprocess.run(me + list(a), capture_output=True, text=True, encoding="utf-8", env=env)
         out = r.stdout.strip()
         ok = r.returncode == code
@@ -675,13 +727,15 @@ def cmd_selftest(args):
             ok = False
         if has is not None and has not in out:
             ok = False
+        if err is not None and err not in r.stderr:
+            ok = False
         print(("통과 " if ok else "실패 ") + " ".join(a) + f"  → {r.returncode} {out.splitlines()[:1]}")
         if not ok:
             fails.append(f"{' '.join(a)}: 코드 {r.returncode}(기대 {code}) · {out!r} · {r.stderr.strip()!r}")
         return out
 
-    def board():
-        return load(tmp / "board.md")
+    def board(who="미리"):
+        return load(tmp / f"board-{who}.md")
 
     a, gone = "VCC-selftest-a", "VCC-selftest-zzz-없음"
     run("add", a, "--branch", "miri/st", "--who", "미리", "--task", "시험", "--files", "x/a.py")
@@ -689,7 +743,8 @@ def cmd_selftest(args):
     run("queue", "add", "--task", "– 겹치는 일", "--files", "x/a.py", "--from", "milstart", "--session", "s1",
         first="Q-1 제안")
     run("queue", "add", "--task", "58 안 겹치는 일", "--files", "y.py", "--from", "파생", first="Q-2 제안")
-    run("queue", "add", "--task", "– 미리 직접", "--files", "w.py", "--from", "미리", first="Q-3 승인")
+    run("queue", "add", "--task", "– 미리 직접(옛 값)", "--files", "w.py", "--from", "미리", first="Q-3 승인")
+    run("queue", "add", "--task", "– 직접", "--files", "v.py", "--from", "직접", first="Q-4 승인")
     run("queue", "approve", "Q-1", code=2, has="겹침: x/a.py")
     run("queue", "take", "Q-1", "--folder", "VCC-q1", code=2)
     run("queue", "approve", "Q-2", first="Q-2 승인")
@@ -714,9 +769,9 @@ def cmd_selftest(args):
     run("chief", first="총괄창")
     run("check", "x/a.py", code=2)
     run("check", "x/a.py", "--me", a, first="겹치는 파일 없음")
-    run("html", has="board.html")
-    h = (tmp / "board.html").read_text(encoding="utf-8")
-    for need in ('http-equiv="refresh" content="60"', "총괄: 총괄창", "D-2", "Q-3", "<h2>열린 PR</h2>"):
+    run("html", has="board-미리.html")
+    h = (tmp / "board-미리.html").read_text(encoding="utf-8")
+    for need in ('http-equiv="refresh" content="60"', "총괄: 총괄창", "D-2", "Q-3", "<h2>열린 PR</h2>", "상태판 · 미리"):
         if need not in h:
             fails.append(f"board.html에 {need!r} 없음")
     if re.search(r"<script|fetch\(|https?://", h, re.I):
@@ -732,6 +787,36 @@ def cmd_selftest(args):
     run("prune", first=f"지운 줄: {gone}")
     if board()["rows"]:
         fails.append(f"remove·prune 뒤 줄 남음: {board()['rows']}")
+    for x in ("board.md", "board.html", "board.lock", "board-미리.lock"):
+        if (tmp / x).exists():
+            fails.append(f"이름 없는 파일·남은 잠금: {x}")
+    # vcc.me를 바꾸면 파일 이름이 따라간다 — 남의 파일은 읽지 않는다
+    run("add", "VCC-st-m", "--branch", "miri/st", "--who", "미리", "--task", "미리 줄", "--files", "m.py")
+    gitc("vcc.me", "원우")
+    run("add", "VCC-st-w", "--branch", "wonwoo/st", "--who", "원우", "--task", "원우 줄", "--files", "x/a.py")
+    run("check", "m.py", first="겹치는 파일 없음")   # 미리 파일의 m.py 줄은 안 봄
+    run("list", has="[VCC-st-w]")
+    if not find(board("원우")["rows"], "VCC-st-w") or find(board()["rows"], "VCC-st-w"):
+        fails.append("vcc.me 원우: board-원우.md에 줄이 없거나 board-미리.md에 들어감")
+    if not (tmp / "board-원우.html").exists():
+        fails.append("vcc.me 원우: board-원우.html 없음")
+    if "원우 줄" in (tmp / "board-미리.html").read_text(encoding="utf-8"):
+        fails.append("vcc.me 원우: board-미리.html에 원우 줄")
+    gitc("vcc.me", "모름")      # 모르는 값 + 이름·메일로도 못 정함 → 종료코드 1 + 안내
+    run("list", code=1, err="git config vcc.me 원우")
+    gitc("vcc.me", "")
+    gitc("user.email", "mirikang@example.invalid")   # vcc.me 없으면 메일로 짐작
+    run("list", first="[VCC-st-m] miri/st · 미리 · 미리 줄  ← 폴더 없음(병합·삭제됐으면 remove/prune)")
+    # 이름 없는 board.md → board-미리.md (미리만)
+    ren = tmp / "ren"
+    ren.mkdir()
+    (ren / "board.md").write_text("총괄: –\n", encoding="utf-8")
+    (ren / "board.html").write_text("<p>옛</p>", encoding="utf-8")
+    if rename_unnamed(ren / "board-원우.md", "원우") or not (ren / "board.md").exists():
+        fails.append("이름 바꿈: 원우가 board.md를 건드림")
+    if not rename_unnamed(ren / "board-미리.md", "미리") or (ren / "board.md").exists() \
+            or not (ren / "board-미리.md").exists() or not (ren / "board-미리.html").exists():
+        fails.append("이름 바꿈: board.md → board-미리.md 실패")
     # 옛 상태판 이전(8열 → 10열)
     old, new = tmp / "old" / "VCC-board.md", tmp / "new" / "board.md"
     old.parent.mkdir()
@@ -752,7 +837,7 @@ def cmd_selftest(args):
 
 
 def main():
-    p = argparse.ArgumentParser(description="VCC 창 상태판 (드라이브 @VCC\\총괄\\board.md)")
+    p = argparse.ArgumentParser(description="VCC 창 상태판 (드라이브 @VCC\\총괄\\board-<이름>.md, 이름은 git config vcc.me)")
     sp = p.add_subparsers(dest="cmd", required=True)
     sp.add_parser("list").set_defaults(fn=cmd_list)
     a = sp.add_parser("add")
@@ -781,7 +866,8 @@ def main():
     qs = q.add_subparsers(dest="qcmd")
     qa = qs.add_parser("add")
     qa.add_argument("--task", required=True); qa.add_argument("--files", default="")
-    qa.add_argument("--from", dest="source", required=True, choices=["milstart", "파생", "PR", "미리"])
+    qa.add_argument("--from", dest="source", required=True, choices=["milstart", "파생", "PR", "직접", "미리"],
+                    help="직접(옛 값 미리)은 바로 승인")
     qa.add_argument("--session"); qa.add_argument("--note")
     qa.set_defaults(fn=cmd_queue_add)
     qp = qs.add_parser("approve"); qp.add_argument("id"); qp.set_defaults(fn=cmd_queue_approve)
@@ -802,9 +888,16 @@ def main():
     sp.add_parser("selftest").set_defaults(fn=cmd_selftest)
     args = p.parse_args()
     if args.cmd != "selftest":
-        path, may_migrate = resolve()
+        global ME
+        env = os.environ.get("VCC_BOARD", "").strip()
+        ME = who_am_i() or ""
+        if not ME and not env.lower().endswith(".md"):
+            print("「나」를 정하지 못함 — 한 번만: git config vcc.me 원우   (원우·민지·미리 중 하나)", file=sys.stderr)
+            sys.exit(1)
+        path, may_migrate = resolve(ME)
         set_board(path)
         if may_migrate:
+            rename_unnamed(BOARD, ME)
             migrate(OLD_BOARD, BOARD)
     args.fn(args)
 
