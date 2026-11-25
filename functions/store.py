@@ -20,8 +20,11 @@
 #         _lock은 프로세스 안 잠금이라 컨테이너 사이의 동시 쓰기는 막지 못한다. 그래서 ncp의 save()는 통째로 덮어쓰지
 #         않고 「저장 직전에 버킷을 다시 읽고, 이번 요청이 바꾼 것만 얹어서」 쓴다(11/25 두 창 시험에서 늦게 끝난
 #         getMessages가 답장을 지운 일, 작업 58). load()가 읽은 모습을 _base에 남겨 두고 save()에서 _base → 캐시의
-#         차이를 새로 읽은 기록에 합친다(_merge: dict는 키별, list는 덧붙인 항목, 정수는 더한 만큼). 다시 읽기와 쓰기
-#         사이의 틈은 남지만(조건부 쓰기 If-Match는 NCP 지원 확인 전) 요청 전체 길이에서 수십 ms로 줄어든다.
+#         차이를 새로 읽은 기록에 합친다(_merge: dict는 키별, list는 덧붙인 항목, 정수는 더한 만큼).
+#         다시 읽기와 쓰기 사이의 틈은 조건부 쓰기로 막는다(11/25, NCP가 PUT If-Match를 지키는 것 확인): 다시 읽은
+#         객체의 ETag를 If-Match에 붙여 쓰고(없던 기록이면 If-None-Match: *), 그사이 다른 컨테이너가 썼으면 412가
+#         오므로 다시 읽어 합쳐 쓰기를 RETRIES번까지 되풀이한다. 그래도 안 되면 RuntimeError(진입점이 고정 문구로 응답).
+#         캐시·_base는 쓰기가 성공한 뒤에만 합친 모습으로 바꾼다 — 실패한 시도가 이번 요청의 변경을 잃지 않게.
 #         읽기만 하는 함수는 바뀐 것이 없으면 save()를 부르지 않는다(runtime_fns.getMessages·recommendSeniors).
 import copy
 import datetime
@@ -44,6 +47,7 @@ _cache = {}
 _base = {}        # ncp만: 이름 → load()가 저장소에서 읽은 그대로(깊은 복사). 없던 기록이면 None
 _lock = threading.RLock()
 _MISSING = object()
+RETRIES = 3       # ncp save: 조건부 쓰기가 412(그사이 다른 컨테이너가 씀)면 다시 읽어 합쳐 쓰기를 이만큼 더 해 본다
 
 
 # ---------- Object Storage (ncp) ----------
@@ -65,8 +69,9 @@ def _hmac(key, msg):
     return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).digest()
 
 
-def _s3(method, key="", body=b"", query=None):
-    """S3 호환 요청 하나(SigV4, path-style). 돌려주는 값: (상태 코드, 본문 bytes). 404는 오류가 아니다."""
+def _s3(method, key="", body=b"", query=None, extra=None):
+    """S3 호환 요청 하나(SigV4, path-style). extra는 더 보낼 헤더(if-match·if-none-match 등, 서명에 넣는다).
+    돌려주는 값: (상태 코드, 본문 bytes, 응답 헤더 dict — 이름은 소문자). 404·412는 오류가 아니라 상태 코드로 돌려준다."""
     c = _os_conf()
     host = urllib.parse.urlsplit(c["endpoint"]).netloc
     path = "/" + urllib.parse.quote(c["bucket"], safe="") + ("/" + urllib.parse.quote(key, safe="/-_.~") if key else "/")
@@ -76,6 +81,7 @@ def _s3(method, key="", body=b"", query=None):
     amz_date, day = now.strftime("%Y%m%dT%H%M%SZ"), now.strftime("%Y%m%d")
     payload_hash = hashlib.sha256(body).hexdigest()
     headers = {"host": host, "x-amz-content-sha256": payload_hash, "x-amz-date": amz_date}
+    headers.update({k.lower(): str(v).strip() for k, v in (extra or {}).items()})
     signed = ";".join(sorted(headers))
     canonical = "\n".join([method, path, qs, "".join(f"{k}:{headers[k]}\n" for k in sorted(headers)), signed, payload_hash])
     scope = f"{day}/{c['region']}/s3/aws4_request"
@@ -92,10 +98,10 @@ def _s3(method, key="", body=b"", query=None):
         req = urllib.request.Request(url, data=body if method == "PUT" else None, headers=headers, method=method)
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
-                return r.status, r.read()
+                return r.status, r.read(), {k.lower(): v for k, v in r.getheaders()}
         except urllib.error.HTTPError as e:
-            if e.code == 404:
-                return 404, b""
+            if e.code in (404, 412):   # 없는 객체 · 조건부 쓰기의 조건이 어긋남(그사이 다른 컨테이너가 씀)
+                return e.code, b"", {}
             if e.code >= 500 and attempt < 2:
                 time.sleep(0.3 * (attempt + 1))
                 continue
@@ -118,24 +124,31 @@ def _backend():
 
 
 def _read(name):
+    """돌려주는 값: (기록 또는 None, ETag 또는 None). ETag는 ncp가 읽은 객체의 버전표(조건부 쓰기용) — 없던 기록·file이면 None."""
     if _backend() == "ncp":
-        status, data = _s3("GET", _os_key(name))
-        return None if status == 404 else json.loads(data.decode("utf-8"))
+        status, data, hdr = _s3("GET", _os_key(name))
+        if status == 404:
+            return None, None
+        return json.loads(data.decode("utf-8")), hdr.get("etag")
     path = RUNTIME / f"{name}.json"
     if not path.exists():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
+        return None, None
+    return json.loads(path.read_text(encoding="utf-8")), None
 
 
-def _write(name, data):
+def _write(name, data, etag=None):
+    """저장. ncp는 늘 조건부로 쓴다 — etag(다시 읽은 객체의 ETag)가 있으면 If-Match, 없던 기록이면 If-None-Match: *.
+    그사이 다른 컨테이너가 썼으면(412 — 또는 지워져서 404) False, 성공이면 True. file은 늘 True."""
     if _backend() == "ncp":
-        _s3("PUT", _os_key(name), json.dumps(data, ensure_ascii=False).encode("utf-8"))
-        return
+        cond = {"if-match": etag} if etag else {"if-none-match": "*"}
+        status, _, _ = _s3("PUT", _os_key(name), json.dumps(data, ensure_ascii=False).encode("utf-8"), extra=cond)
+        return status < 300
     RUNTIME.mkdir(parents=True, exist_ok=True)
     path = RUNTIME / f"{name}.json"
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(tmp, path)   # 반쯤 쓰인 파일이 남지 않게 바꿔 끼운다
+    return True
 
 
 # ---------- 세 갈래 합치기 (ncp) ----------
@@ -180,14 +193,20 @@ def _merge(base, mine, theirs):
 
 
 def _merged_for_save(name):
-    """ncp: 버킷을 다시 읽어 이번 요청의 변경만 얹은 기록. 캐시도 그 모습으로 바꿔 둔다(같은 요청의 다음 save를 위해)."""
+    """ncp: 버킷을 다시 읽어 이번 요청의 변경만 얹은 기록과, 그 읽기의 ETag(없던 기록이면 None)를 돌려준다.
+    캐시·_base는 건드리지 않는다 — 조건부 쓰기가 412로 실패하면 같은 _base로 다시 합쳐야 하므로. 성공한 뒤 _commit이 맞춘다."""
     cur = _cache[name]
     base = _base.get(name)
-    fresh = _read(name)
+    fresh, etag = _read(name)
     merged = _merge(_MISSING if base is None else base, cur, _MISSING if fresh is None else fresh)
-    if merged is _MISSING:
-        merged = cur
-    if merged is not cur:                      # 부르는 쪽이 들고 있는 dict/list가 그대로 최신이 되게 안에서 바꾼다
+    return (cur if merged is _MISSING else merged), etag
+
+
+def _commit(name, merged):
+    """ncp: 쓰기가 성공한 뒤. 부르는 쪽이 들고 있는 dict/list가 그대로 최신이 되게 안에서 바꾸고,
+    _base도 그 모습으로 둔다(같은 요청의 다음 save를 위해)."""
+    cur = _cache[name]
+    if merged is not cur:
         if isinstance(cur, dict) and isinstance(merged, dict):
             cur.clear()
             cur.update(merged)
@@ -196,7 +215,6 @@ def _merged_for_save(name):
         else:
             _cache[name] = cur = merged
     _base[name] = copy.deepcopy(cur)
-    return cur
 
 
 # ---------- 다른 코드가 쓰는 함수 ----------
@@ -204,7 +222,7 @@ def load(name, default):
     """기록 하나를 메모리로 가져온다. 처음 부르면 저장소에서 읽고, 없으면 default."""
     with _lock:
         if name not in _cache:
-            data = _read(name)
+            data, _ = _read(name)
             if _backend() == "ncp":
                 _base[name] = copy.deepcopy(data)
             _cache[name] = default if data is None else data
@@ -212,10 +230,20 @@ def load(name, default):
 
 
 def save(name):
-    """메모리의 기록을 저장소에 쓴다. ncp면 저장 직전에 다시 읽어 이번 요청이 바꾼 것만 얹는다(맨 위 주석)."""
+    """메모리의 기록을 저장소에 쓴다. ncp면 저장 직전에 다시 읽어 이번 요청이 바꾼 것만 얹고, 다시 읽은 ETag를 조건으로
+    쓴다. 그사이 다른 컨테이너가 썼으면(412) 다시 읽어 합치기를 RETRIES번까지 되풀이하고, 그래도 안 되면 RuntimeError(맨 위 주석)."""
     with _lock:
-        if name in _cache:
-            _write(name, _merged_for_save(name) if _backend() == "ncp" else _cache[name])
+        if name not in _cache:
+            return
+        if _backend() != "ncp":
+            _write(name, _cache[name])
+            return
+        for _attempt in range(RETRIES + 1):
+            merged, etag = _merged_for_save(name)
+            if _write(name, merged, etag):
+                _commit(name, merged)
+                return
+        raise RuntimeError(f"Object Storage 저장 충돌: {name}.json을 {RETRIES + 1}번 써도 그사이 다른 컨테이너가 계속 씁니다")
 
 
 def next_id(prefix):
@@ -248,7 +276,7 @@ def clear_all():
         _cache.clear()
         _base.clear()
         if _backend() == "ncp":
-            _, xml = _s3("GET", query={"list-type": "2", "prefix": _os_conf()["prefix"]})
+            _, xml, _ = _s3("GET", query={"list-type": "2", "prefix": _os_conf()["prefix"]})
             for key in re.findall(r"<Key>([^<]+)</Key>", xml.decode("utf-8")):
                 _s3("DELETE", key)
         elif RUNTIME.exists():

@@ -179,18 +179,18 @@ check("handle 안 store._s3 RuntimeError도 고정 문구 + 로그", json.loads(
 bucket = {}
 
 
-def fake_s3(method, key="", body=b"", query=None):
+def fake_s3(method, key="", body=b"", query=None, extra=None):   # 조건부 쓰기(If-Match)는 test_store_race.py가 본다
     if method == "GET" and query:
         keys = "".join(f"<Key>{k}</Key>" for k in bucket if k.startswith(query.get("prefix", "")))
-        return 200, f"<ListBucketResult>{keys}</ListBucketResult>".encode()
+        return 200, f"<ListBucketResult>{keys}</ListBucketResult>".encode(), {}
     if method == "GET":
-        return (200, bucket[key]) if key in bucket else (404, b"")
+        return (200, bucket[key], {"etag": f'"{len(bucket[key])}"'}) if key in bucket else (404, b"", {})
     if method == "PUT":
         bucket[key] = body
-        return 200, b""
+        return 200, b"", {}
     if method == "DELETE":
         bucket.pop(key, None)
-        return 204, b""
+        return 204, b"", {}
 
 
 store._s3 = fake_s3
