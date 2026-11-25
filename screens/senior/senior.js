@@ -113,16 +113,27 @@ let waitingLimit = 3;
 
 // ---------------------------------------------------------------------------
 // 3. 기준 노트 정하기 (11/23 미리님 결정)
-//    주소 ?noteId= → 없으면 getInbox: ① 질문함 최근 질문의 noteId(궁금한 것 정리하기로 전한 질문도 포함) → ② 최근 스크랩
+//    주소 ?noteId= → 최근에 본 해봤노트(이 탭) → getInbox: ① 질문함 최근 질문의 noteId(궁금한 것 정리하기로 전한 질문도 포함) → ② 최근 스크랩
 //    → ③ 둘 다 없으면 「관심 경험을 골라 주세요」 + 「해봤노트 둘러보기」. 후보가 여럿이면 위에 프로그램 칩.
 // ---------------------------------------------------------------------------
 
 const timeOf = (q) => String(q.answeredAt || q.askedAt || "");
 
+// 해봤노트 상세에서 최근에 본 노트(note.js rememberViewed — 이 탭 sessionStorage, 최근이 앞). askBoo 질문에는 noteId가 없어서(PR #232)
+function viewedNotes() {
+  try {
+    const list = JSON.parse(sessionStorage.getItem(`viewedNotes:${me ? me.colreg_no : ""}`) || "[]");
+    return Array.isArray(list) ? list.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function pickBaseNotes(inbox, fromUrl) {
   const ids = [];
   const add = (id) => { if (id && !ids.includes(id)) ids.push(id); };
   add(fromUrl);
+  for (const id of viewedNotes()) add(id);
   const questions = ((inbox && inbox.questions) || []).filter((q) => q.noteId).slice()
     .sort((a, b) => timeOf(b).localeCompare(timeOf(a)));
   for (const q of questions) add(q.noteId);
