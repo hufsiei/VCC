@@ -286,9 +286,9 @@ def getMessages(me, p):
     payload {read: threadId}면 그 대화만 읽음으로 바꾼다(대화창을 열 때). unread는 읽음 처리 전 수."""
     read = p.get("read")
     with store.lock():
-        out = []
+        out, changed = [], False
         threads = _threads()
-        _expire_old()
+        _expire_old()                                    # 만료가 생겼으면 저기서 저장한다
         for tid, t in sorted(threads.items(), key=lambda kv: kv[1]["requestedAt"], reverse=True):
             if me not in (t["asker"], t["senior"]):
                 continue
@@ -319,8 +319,10 @@ def getMessages(me, p):
                 item["blockedByMe"] = t.get("blockedBy") == me
             if read and tid == read:
                 t["lastRead"][me] = now()
+                changed = True
             out.append(item)
-        store.save("messages")
+        if changed:   # [11/25] 읽음 표시가 생겼을 때만 저장. 목록만 보는 호출(몇 초마다)은 쓰지 않는다 — 컨테이너가 여럿일 때
+            store.save("messages")   # 늦게 끝난 읽기 요청이 다른 요청의 답장을 덮어쓰지 않게(작업 58, store.py 맨 위)
         return {"threads": out, "waitingCount": _waiting(asker=me), "waitingLimit": WAIT_LIMIT}
 
 
@@ -469,8 +471,9 @@ def recommendSeniors(me, p):
             rest = [r["studentId"] for r in ranked if r["studentId"] not in ids]
             ids += rest[:max(0, min(PAGE, cap - len(ids)))]
         ids = ids[:MAX_SHOWN]
-        shown[me][nid] = {"ids": ids, "version": version, "at": now()}
-        store.save("shownSeniors")
+        if saved is None or saved.get("ids") != ids or saved.get("version") != version:
+            shown[me][nid] = {"ids": ids, "version": version, "at": now()}
+            store.save("shownSeniors")   # [11/25] 목록이 그대로면 저장하지 않는다(읽기 요청이 다른 기록을 덮어쓰지 않게)
 
         seniors = [{"studentId": h, "nickname": senior_label(me, h), "score": by_id[h]["score"],
                     "requestsFull": by_id[h]["requestsFull"], "reasons": by_id[h]["reasons"],
