@@ -142,7 +142,7 @@ function scrollToLatest() {
 // 3. 근거/출처 블록 (6-1, 6-2)
 // ---------------------------------------------------------------------------
 
-const DOC_LABEL = { 귀국보고서: "결과보고서", 현장실습후기: "현장실습후기", 인터뷰: "선배 인터뷰" };
+const DOC_LABEL = { 귀국보고서: "보고서", 현장실습후기: "현장실습후기", 인터뷰: "선배 인터뷰" };
 
 function evidenceBlock(sources) {
   const list = Object.values(sources || {});
@@ -157,7 +157,7 @@ function evidenceBlock(sources) {
     el("summary", { className: "evidence__head" }, [
       el("span", { className: "evidence__summary" }, [
         icon("sparkles"),
-        el("span", {}, ["근거 ", num(list.length), "건 · 결과보고서 ", num(reports), " · 선배 인터뷰 ", num(interviews), ` · 최근 ${semesterText(latest)}`]),
+        el("span", {}, ["근거 ", num(list.length), "건 · 보고서 ", num(reports), " · 선배 인터뷰 ", num(interviews), ` · 최근 ${semesterText(latest)}`]),
       ]),
       el("span", { className: "evidence__side" }, [
         el("span", { className: "evidence__toggle" }, [
@@ -185,7 +185,7 @@ function emptyEvidence(bodyChildren) {
     el("div", { className: "evidence__head" }, [
       el("span", { className: "evidence__summary" }, [
         icon("sparkles"),
-        el("span", {}, ["근거 ", el("span", { className: "evidence__num", text: "0" }), "건 · 결과보고서 – · 선배 인터뷰 – · 최근 –"]),
+        el("span", {}, ["근거 ", el("span", { className: "evidence__num", text: "0" }), "건 · 보고서 – · 선배 인터뷰 – · 최근 –"]),
       ]),
     ]),
     bodyChildren ? el("div", { className: "evidence__empty-body" }, bodyChildren) : null,
@@ -345,7 +345,7 @@ const ask = { busy: false, turns: [], log: [] };
 const HISTORY_TURNS = 4;
 const MAX_ASK_LOG = 60; // 궁금한 것 정리하기 말풍선(한 번에 20개 안팎)도 같은 log에 남는다
 
-addTo(askChat, booText("궁금한 경험을 물어보세요. 선배들의 결과보고서와 인터뷰를 근거로 답해 드려요. 근거가 없으면 지어내지 않고 질문함에 담아 둘게요."));
+addTo(askChat, booText("궁금한 경험을 물어보세요. 선배들의 보고서와 인터뷰를 근거로 답해 드려요. 근거가 없으면 지어내지 않고 질문함에 담아 둘게요."));
 
 // withHistory: false면 앞 대화 없이 묻는다(chat 칩 「질문함에 담기」 — 브리프 4-②)
 // force: "hold" = chat 칩 「질문함에 담기」 — 답을 찾지 않고 바로 질문함에 담는다(spec 4장 askBoo force, PR #179)

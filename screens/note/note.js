@@ -20,7 +20,7 @@ const KIND_NAME = { 교환: "교환학생", 파견: "파견", 인턴: "인턴", 
 const DASH = "–";
 const LEARN_SECTION = "배운점";
 // 출처 종류 표기(인터BOO와 같음). 근거 블록 머리줄의 보고서 이름은 노트 종류에 따라
-const DOC_LABEL = { 귀국보고서: "결과보고서", 현장실습후기: "현장실습후기", 인터뷰: "선배 인터뷰" };
+const DOC_LABEL = { 귀국보고서: "보고서", 현장실습후기: "현장실습후기", 인터뷰: "선배 인터뷰" };
 // 오래된 근거(6-1 v4.3): 칸의 근거가 모두 2년 넘은 연도
 const OLD_YEARS = 2;
 
@@ -348,19 +348,19 @@ queryClear.addEventListener("click", () => {
 // ---------------------------------------------------------------------------
 
 // button: 「질문함에 담기」 버튼
-function emptyEvidence(message, button) {
+function emptyEvidence(message, button, reportName = "보고서") {
   return el("div", { className: "evidence evidence--empty" }, [
     el("div", { className: "evidence__head" }, [
       el("span", { className: "evidence__summary" }, [
         icon("sparkles"),
-        el("span", {}, ["근거 ", el("span", { className: "evidence__num", text: "0" }), "건 · 결과보고서 – · 선배 인터뷰 – · 최근 –"]),
+        el("span", {}, ["근거 ", el("span", { className: "evidence__num", text: "0" }), `건 · ${reportName} – · 선배 인터뷰 – · 최근 –`]),
       ]),
     ]),
     el("div", { className: "evidence__empty-body" }, [el("p", { text: message }), button || null]),
   ]);
 }
 
-// lines: 칸 문장, sources: getNote.sources, reportName: 「결과보고서」 또는 「현장실습후기」
+// lines: 칸 문장, sources: getNote.sources, reportName: 「보고서」 또는 「현장실습후기」
 function evidenceBlock(lines, sources, reportName) {
   const items = lines.map((l) => ({ line: l, src: sources[l.sourceId] || {} }));
   const reports = items.filter((i) => i.src.docType && i.src.docType !== "인터뷰").length;
@@ -451,7 +451,7 @@ function newLineCount(section) {
   return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), total) : 0;
 }
 
-// 문장 끝 출처: 「결과보고서 2025, 2026」, 인터뷰가 섞이면 「결과보고서 2025 · 선배 인터뷰 2026」
+// 문장 끝 출처: 「보고서 2025, 2026」, 인터뷰가 섞이면 「보고서 2025 · 선배 인터뷰 2026」
 function summarySourceText(item, sources, reportName) {
   const byKind = new Map();
   for (const id of item.sources || []) {
@@ -550,12 +550,12 @@ function renderSection(panel) {
   const section = note.sections[currentSection];
   const sources = note.sources || {};
   const lines = section.lines || [];
-  const reportName = note.type === "인턴" ? "현장실습후기" : "결과보고서";
+  const reportName = note.type === "인턴" ? "현장실습후기" : "보고서"; // [11/25 #274] 화면 용어 「결과보고서」 → 「보고서」
 
   const children = [];
   const askBtn = () => askBoxButton(note.id, section.name);
   if (!lines.length) {
-    children.push(emptyEvidence("아직 이 항목을 경험한 선배의 이야기가 없어요.", askBtn()));
+    children.push(emptyEvidence("아직 이 항목을 경험한 선배의 이야기가 없어요.", askBtn(), reportName));
   } else {
     if (hasSummary(section)) children.push(...summaryBlock(section, sources, reportName));
     else children.push(...lines.map((l) => lineCard(l, sources[l.sourceId] || {}, { quote: section.name === LEARN_SECTION })));
