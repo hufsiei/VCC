@@ -1,4 +1,4 @@
-# 미리 PC 설정 (집 노트북 · 사무실 데스크탑, PC마다 한 번)
+# 미리 PC 설정 (집 노트북 · 사무실 데스크탑, PC마다 한 번 — 원우·민지도 2절 junction은 같은 방식)
 
 저장소에는 스크립트와 스킬 원본만 있다. 아래 세 가지는 PC마다 따로 걸어야 한다. 팀원은 하지 않아도 된다(이 파일들은 팀원 Claude Code에서 자동으로 돌지 않는다).
 
@@ -31,10 +31,11 @@ New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\skills\milstart" -Ta
 New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\skills\milend"   -Target "C:\dev\VCC\.claude\skills\milend"
 New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\skills\milreview" -Target "C:\dev\VCC\.claude\skills\milreview"
 New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\skills\milwork"  -Target "C:\dev\VCC\.claude\skills\milwork"
+New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\skills\milwatch" -Target "C:\dev\VCC\.claude\skills\milwatch"
 ```
-스킬 내용은 git pull로 두 PC에 같이 갱신된다. 쓰는 법: `/milstart`, `/milend`, `/milreview`, `/milwork`, 또는 "밀시작", "밀종료", "밀리뷰", "밀워크".
+스킬 내용은 git pull로 두 PC에 같이 갱신된다. 쓰는 법: `/milstart`, `/milend`, `/milreview`, `/milwork`, `/milwatch`(총괄창에서 `/loop 20m /milwatch`), 또는 "밀시작", "밀종료", "밀리뷰", "밀워크".
 
-대화창 역할(11/23): VS Code 창은 `C:\dev\VCC` 하나만 열고 Claude 대화창을 여러 개 띄운다. **총괄 대화창** 하나(milstart·milreview·milend), 저장소를 고치는 **작업 대화창**은 시작할 때 `milwork <요청자> <작업 제목>`(폴더·브랜치·상태판 줄이 생김), **상의 대화창**은 아무것도 치지 않고 결론만 작업 대화창에 넘긴다. 상태판 `C:\dev\VCC-board.md`는 PC마다 따로(worktree도 PC마다 따로이므로). 커밋하지 않는다.
+대화창 역할(11/23): VS Code 창은 `C:\dev\VCC` 하나만 열고 Claude 대화창을 여러 개 띄운다. **총괄 대화창** 하나(milstart·milreview·milend·milwatch), 저장소를 고치는 **작업 대화창**은 시작할 때 `milwork <요청자> <작업 제목>`(폴더·브랜치·상태판 줄이 생김), **상의 대화창**은 아무것도 치지 않고 결론만 작업 대화창에 넘긴다. 상태판은 사람별 `board-<이름>.md`(드라이브 `@VCC\총괄\`, 두 PC 공용. 드라이브 없으면 그 PC의 `C:\dev\VCC-board-<이름>.md`). worktree는 PC마다 따로. 커밋하지 않는다.
 
 ## 3. Claude 메모리를 드라이브와 공유
 메모리 원본: `H:\내 드라이브\@VCC\미리 memory` (드라이브 동기화). 이 PC의 메모리 폴더를 그곳에 연결한다.
