@@ -99,6 +99,14 @@
   .label-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
   .detail-actions { display: flex; flex-direction: column; gap: var(--space-sm); }
   .shared-mark { align-self: flex-start; }
+  /* [11/23 고치기] 내 경험노트 문장 고치기 — 라벨 줄과 Text 버튼(터치 44px) */
+  .line-marks { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+  .line-edit { align-self: flex-start; min-height: 44px; padding: 0; font-size: var(--font-size-secondary); }
+  .line-edit .icon { width: 14px; height: 14px; }
+  /* [11/23 추천] 「닮은선배로 추천받기」 스위치 줄 */
+  .recommend-setting { display: flex; flex-direction: column; gap: var(--space-xs); padding: 12px var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); }
+  .recommend-setting__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
+  .recommend-setting__label { font-size: var(--font-size-body); font-weight: 600; color: var(--color-heading); }
   .question-head { display: flex; flex-direction: column; gap: var(--space-sm); }
   .question-head .status-label { align-self: flex-start; }
   .question-head__text { font-size: var(--font-size-card-title); font-weight: 600; line-height: 1.4; color: var(--color-heading); }

@@ -230,10 +230,45 @@ function matchesQuery(n, q) {
   return words.some((w) => norm(w).includes(q));
 }
 
+// [11/23 주제별 묶기] spec listNotes groups: 분야·검색으로 거른 뒤, 나라·기관 유형으로 거르기 전 카드로 센다
+// (칩 하나를 눌러도 다른 칩이 그대로 보이게). 많은 순, 같으면 가나다순. 값이 null인 카드는 세지 않는다.
+// 목록을 화면에서 거르므로(국제교류 = 교환 + 파견) 칩 수도 지금 받은 카드로 센다 — 보이는 카드 수와 늘 맞는다(9절)
+const GROUP_BY_CAT = { global: { key: "country", label: "나라" }, practice: { key: "kind", label: "기관 유형" } };
+const groupEl = document.getElementById("groupChips");
+let currentGroup = ""; // 고른 나라·기관 유형(없으면 "")
+
+function renderGroupChips(base) {
+  const g = GROUP_BY_CAT[currentCat];
+  if (!g) {
+    currentGroup = "";
+    groupEl.hidden = true;
+    groupEl.replaceChildren();
+    return;
+  }
+  const counts = new Map();
+  for (const n of base) if (n[g.key]) counts.set(n[g.key], (counts.get(n[g.key]) || 0) + 1);
+  const groups = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"));
+  if (currentGroup && !counts.has(currentGroup)) currentGroup = ""; // 검색으로 사라진 칩은 풀어 준다
+  groupEl.hidden = groups.length === 0;
+  groupEl.setAttribute("aria-label", `${g.label} 필터`);
+  const chip = (value, text) => {
+    const b = el("button", { className: "choice-chip", text, attrs: { type: "button", "aria-pressed": String(currentGroup === value) } });
+    b.addEventListener("click", () => {
+      currentGroup = value;
+      renderList();
+    });
+    return b;
+  };
+  groupEl.replaceChildren(chip("", `${g.label} 전체`), ...groups.map(([name, count]) => chip(name, `${name} ${count}`)));
+}
+
 function renderList() {
   listEl.setAttribute("aria-busy", "false");
   const q = norm(currentQuery);
-  const notes = allNotes.filter((n) => (!currentCat || CATEGORY[n.type] === currentCat) && matchesQuery(n, q));
+  const base = allNotes.filter((n) => (!currentCat || CATEGORY[n.type] === currentCat) && matchesQuery(n, q));
+  renderGroupChips(base);
+  const g = GROUP_BY_CAT[currentCat];
+  const notes = g && currentGroup ? base.filter((n) => n[g.key] === currentGroup) : base;
   countEl.textContent = `노트 ${notes.length}개`;
 
   if (!notes.length && q) {
@@ -284,6 +319,7 @@ document.getElementById("filters").addEventListener("click", (e) => {
   const chip = e.target.closest(".choice-chip");
   if (!chip) return;
   currentCat = chip.dataset.cat;
+  currentGroup = ""; // 분야를 바꾸면 나라·기관 유형 칩은 처음부터
   for (const c of e.currentTarget.querySelectorAll(".choice-chip")) c.setAttribute("aria-pressed", String(c === chip));
   if (loaded) renderList(); // 불러오는 중이거나 오류면 그 화면을 그대로 둔다
 });

@@ -6,7 +6,9 @@
 // 규칙: 데이터는 common/data.js 함수로만, 화면 글은 textContent로만(innerHTML 금지), 색은 style.css 변수만.
 // 공개 동의 시트는 common/consent.js(작업 70, 11/22 common으로 옮김)를 쓴다: "open-consent"로 열고 "consent-saved"로 끝을 받는다.
 
-import { currentUser, getInbox, getMyNote, getNote, listNotes, scrapNote } from "../../common/data.js";
+import {
+  currentUser, getInbox, getMyNote, getNote, listNotes, scrapNote, updateMyNote, getMe, setRecommendable,
+} from "../../common/data.js";
 import { isUnread, markSeen, refreshBell, onBell, unreadOf, threadHasNews } from "./bell.js";
 import { setupMessages, renderMessagesTab, openThread, stopPolling, allThreads, loadThreads } from "./messages.js";
 
@@ -541,9 +543,16 @@ async function renderAlerts() {
 
 const myNoteBody = document.getElementById("myNoteBody");
 let myNote = null;
+// [11/23 고치기] 문장 고치기 — 한 번에 한 문장(spec updateMyNote). editing = "칸|순서", sharedNotice = 공유한 노트를 고친 뒤 안내
+const MAX_EDIT_CHARS = 300;
+let editing = null;
+let editBusy = false;
+let sharedNotice = false;
 
 async function loadMyNote(id) {
   myNote = null;
+  editing = null;
+  sharedNotice = false;
   document.getElementById("myNoteTitle").textContent = "내 경험노트";
   myNoteBody.setAttribute("aria-busy", "true");
   myNoteBody.replaceChildren(...skeletons(3, "detail-skeleton"));
@@ -565,18 +574,101 @@ function myNoteRow(section) {
   const row = el("div", { className: "summary-row" }, [el("span", { className: "summary-row__name", text: section.name })]);
   const lines = section.lines || [];
   if (!lines.length) row.append(el("p", { className: "summary-row__empty", text: DASH }));
-  for (const line of lines) {
+  lines.forEach((line, index) => {
+    const key = `${section.name}|${index}`;
     // 후배 질문에 답한 문장(spec [v2]: 칸은 질문의 칸): 앞에 작은 인용 「Q. 질문 원문」 + A(내 답)
     if (line.asked) row.append(el("span", { className: "msg__quote", text: `Q. ${line.asked}` }));
-    row.append(el("p", { text: line.asked ? `A. ${line.text}` : line.text }));
-    // 공유한 문장에는 작은 긍정 라벨 「공유됨」(8절)
-    if (line.shared) {
-      const mark = statusLabel("success", "check", "공유됨");
-      mark.classList.add("shared-mark");
-      row.append(mark);
+    if (editing === key) {
+      row.append(lineEditor(section.name, index, line));
+      return;
     }
-  }
+    row.append(el("p", { text: line.asked ? `A. ${line.text}` : line.text }));
+    // 공유한 문장에는 작은 긍정 라벨 「공유됨」(8절), 고친 문장에는 중립 라벨 「내가 고친 문장」
+    const marks = [
+      line.shared ? statusLabel("success", "check", "공유됨") : null,
+      line.edited ? statusLabel("neutral", "pencil", "내가 고친 문장") : null,
+    ].filter(Boolean);
+    for (const mark of marks) mark.classList.add("shared-mark");
+    if (marks.length) row.append(el("div", { className: "line-marks" }, marks));
+    const editBtn = el("button", { className: "btn btn--text line-edit", attrs: { type: "button", "data-edit": key } }, [icon("pencil"), "문장 고치기"]);
+    editBtn.disabled = editing !== null || editBusy; // 한 번에 한 문장만
+    editBtn.addEventListener("click", () => startLineEdit(key));
+    row.append(editBtn);
+  });
   return row;
+}
+
+// 문장 고치기 입력창(5-9 textarea.input) + Secondary 「저장」 / Text 「취소」 — 공개 동의 시트와 같은 모양(7-②)
+function lineEditor(sectionName, index, line) {
+  const id = `mynote-edit-${index}`;
+  const errId = `${id}-err`;
+  const box = el("textarea", { className: "input", attrs: { id, rows: 3, maxlength: MAX_EDIT_CHARS, "aria-describedby": `${id}-hint ${errId}` } });
+  box.value = line.text || "";
+  const err = el("p", { className: "field__error", attrs: { id: errId, role: "alert", hidden: true } }, [icon("circle-alert"), el("span")]);
+  const showError = (message) => {
+    err.lastChild.textContent = message;
+    err.hidden = false;
+    box.setAttribute("aria-invalid", "true");
+    drawIcons();
+    box.focus();
+  };
+  const saveBtn = el("button", { className: "btn btn--secondary", text: "저장", attrs: { type: "button" } });
+  const cancelBtn = el("button", { className: "btn btn--text", text: "취소", attrs: { type: "button" } });
+  cancelBtn.addEventListener("click", () => finishLineEdit());
+
+  saveBtn.addEventListener("click", async () => {
+    if (editBusy) return;
+    const text = box.value.trim();
+    if (!text) return showError("문장을 적어 주세요.");
+    if (text.length > MAX_EDIT_CHARS) return showError(`${MAX_EDIT_CHARS}자 안으로 적어 주세요.`);
+    if (text === line.text) return finishLineEdit(); // 같은 문장이면 고침이 아니다(spec)
+    editBusy = true;
+    saveBtn.disabled = true;
+    cancelBtn.disabled = true;
+    const res = await updateMyNote(myNote.id, [{ section: sectionName, index, text }]);
+    editBusy = false;
+    if (!res || res.error || !Array.isArray(res.sections)) {
+      saveBtn.disabled = false;
+      cancelBtn.disabled = false;
+      return showError((res && res.error) || "저장하지 못했어요. 잠시 뒤에 다시 시도해 주세요.");
+    }
+    myNote = res;
+    sharedNotice = res.share && res.share !== "private"; // 해봤노트 문장은 그대로 — 안내(8절)
+    finishLineEdit();
+    toast("문장을 고쳤어요");
+  });
+
+  return el("div", { className: "field" }, [
+    el("label", { className: "field__label", text: "내 경험노트 문장", attrs: { for: id } }),
+    box,
+    el("p", { className: "sub", attrs: { id: `${id}-hint` }, text: "나만 보는 문장이에요. 해봤노트 문장은 바뀌지 않아요." }),
+    err,
+    el("div", { className: "btn-row" }, [saveBtn, cancelBtn]),
+  ]);
+}
+
+function consentLinkButton() {
+  const b = el("button", { className: "btn btn--text", text: "해봤노트 문장 고치기", attrs: { type: "button" } });
+  b.addEventListener("click", openConsent);
+  return b;
+}
+
+function startLineEdit(key) {
+  if (editBusy) return;
+  editing = key;
+  renderMyNote();
+  const box = myNoteBody.querySelector("textarea");
+  if (box) {
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
+  }
+}
+
+function finishLineEdit() {
+  const key = editing;
+  editing = null;
+  renderMyNote();
+  if (key) myNoteBody.querySelector(`[data-edit="${CSS.escape(key)}"]`)?.focus();
 }
 
 function renderMyNote() {
@@ -606,15 +698,22 @@ function renderMyNote() {
   actions.push(...resumeButton());
 
   myNoteBody.setAttribute("aria-busy", "false");
-  myNoteBody.replaceChildren(
+  myNoteBody.replaceChildren(...[
     el("div", { className: "label-row" }, [
       statusLabel("info", "lock", "나만 보기"),
       shareLabel(n),
       el("span", { className: "question__date", text: frameText(n) }),
     ]),
+    // 이미 공유한 노트를 고쳤으면: 「해봤노트 문장은 그대로예요 · 해봤노트 문장 고치기」(→ 공개 동의 시트, 8절)
+    sharedNotice && n.publicDraft
+      ? el("div", { className: "label-row" }, [
+          statusLabel("info", "info", "해봤노트 문장은 그대로예요"),
+          consentLinkButton(),
+        ])
+      : null,
     card,
     el("div", { className: "detail-actions" }, actions),
-  );
+  ].filter(Boolean)); // 빈 자리(null)는 빼고 붙인다 — append(null)은 「null」 글자가 된다
   drawIcons();
 }
 
@@ -764,6 +863,45 @@ async function renderQuestion(questionId) {
 }
 
 // ---------------------------------------------------------------------------
+// 7-1. 「닮은선배로 추천받기」 스위치 [11/23 추천] — getMe().recommendable(기본 켬), setRecommendable(on)
+//      끄면 닮은선배 추천 후보·새 쪽지 요청에서 빠지고, 이미 수락한 대화는 이어진다(spec 4장 setRecommendable)
+// ---------------------------------------------------------------------------
+
+const RECOMMEND_HINT = {
+  on: "나와 비슷한 후배에게 닮은선배로 추천되고, 쪽지 요청을 받을 수 있어요.",
+  off: "닮은선배 추천과 새 쪽지 요청에서 빠져 있어요. 이미 수락한 대화는 이어져요.",
+};
+
+async function setupRecommendSwitch() {
+  const info = await getMe();
+  if (!info || info.error || typeof info.recommendable !== "boolean") return; // 값이 없으면 스위치를 두지 않는다
+  const sw = el("input", { className: "switch", attrs: { type: "checkbox", role: "switch", id: "recommendSwitch", "aria-describedby": "recommendHint" } });
+  sw.checked = info.recommendable;
+  const hint = el("p", { className: "sub", text: RECOMMEND_HINT[sw.checked ? "on" : "off"], attrs: { id: "recommendHint" } });
+  sw.addEventListener("change", async () => {
+    const want = sw.checked;
+    sw.disabled = true;
+    const res = await setRecommendable(want);
+    sw.disabled = false;
+    if (!res || res.error || res.ok === false || typeof res.recommendable !== "boolean") {
+      sw.checked = !want; // 실패하면 되돌린다
+      toast((res && res.error) || "바꾸지 못했어요. 잠시 뒤에 다시 시도해 주세요.", "circle-alert");
+      return;
+    }
+    sw.checked = res.recommendable;
+    hint.textContent = RECOMMEND_HINT[sw.checked ? "on" : "off"];
+    toast(sw.checked ? "닮은선배로 추천받기를 켰어요" : "닮은선배로 추천받기를 껐어요");
+  });
+  document.querySelector(".inbox-top").append(el("div", { className: "recommend-setting" }, [
+    el("div", { className: "recommend-setting__row" }, [
+      el("label", { className: "recommend-setting__label", text: "닮은선배로 추천받기", attrs: { for: "recommendSwitch" } }),
+      sw,
+    ]),
+    hint,
+  ]));
+}
+
+// ---------------------------------------------------------------------------
 // 8. 시작 — ?tab=notes|questions|scraps, 인터BOO 「나중에 할게요」는 ?from=later
 // ---------------------------------------------------------------------------
 
@@ -781,4 +919,5 @@ if (me) {
     if (!threadsKnown && currentTab !== "messages") loadThreads();
   });
   route();
+  setupRecommendSwitch();
 }
