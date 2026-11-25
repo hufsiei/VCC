@@ -315,6 +315,25 @@ function measureDock() {
 }
 window.addEventListener("resize", measureDock);
 
+// 「맨 위로」(디자인 규칙 5-8, 11/25 민지): 한 화면보다 더 내려가면 입력줄 위 오른쪽에 보이고, 누르면 맨 위로.
+// 대화가 길어지면 위쪽 안내·세그먼트(들려주기/물어보기)·처음 질문으로 돌아가기 어렵기 때문.
+const toTopBtn = document.getElementById("toTopBtn");
+let toTopTick = false;
+function updateToTop() {
+  toTopTick = false;
+  toTopBtn.hidden = window.scrollY < window.innerHeight;
+}
+window.addEventListener("scroll", () => {
+  if (!toTopTick) { toTopTick = true; requestAnimationFrame(updateToTop); }
+}, { passive: true });
+toTopBtn.addEventListener("click", () => {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  // 버튼이 사라지면 포커스가 갈 곳이 없어지므로 화면 제목으로 옮긴다(키보드 사용자)
+  const title = document.querySelector("#viewMain .page-title");
+  if (title) { title.setAttribute("tabindex", "-1"); title.focus({ preventScroll: true }); }
+});
+
 // ---------------------------------------------------------------------------
 // 5. 물어보기 — askBoo: ok / hold / official / notes / chat / error
 // ---------------------------------------------------------------------------
