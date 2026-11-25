@@ -1,8 +1,9 @@
 // 관리자 콘솔 공통(PRD 5-1, 작업 68): 직원 확인 · 부서·기간 · 탭 전환 · 다시 불러오기.
 // 데이터는 common/data.js 함수로만 받는다(fetch 직접 금지).
-import { currentUser, logout, getDepartments, getAdminOverview } from "../../common/data.js";
+import { currentUser, logout, getDepartments, getAdminOverview, getAdminSuggestions } from "../../common/data.js";
 import { el, icon, drawIcons, errorBox } from "./ui.js";
 import { renderDemand, renderDemandLoading } from "./tab1.js";
+import { renderSuggest, renderSuggestLoading } from "./tab2.js";
 
 const $ = (id) => document.getElementById(id);
 const me = currentUser();
@@ -29,7 +30,8 @@ async function start() {
   });
   $("main").hidden = false;
 
-  const state = { dept: "ALL", period: readPeriod(), tab: "demand", seq: 0 };
+  // seq: 탭마다 마지막 요청 번호(부서를 빨리 바꿔도 마지막 선택만 그린다) / stale: 다시 불러와야 하는 탭
+  const state = { dept: "ALL", period: readPeriod(), tab: "demand", seq: {}, stale: { demand: true, suggest: true } };
 
   // 부서 드롭다운: 「전체」 + 부서 목록. 부서 담당자는 자기 부서로 고정(비활성 + 이유, 5-4)
   const deptSelect = $("deptSelect");
@@ -46,8 +48,16 @@ async function start() {
     deptSelect.append(el("option", { text: "전체", attrs: { value: "ALL" } }));
     for (const d of departments) deptSelect.append(el("option", { text: d["부서명"], attrs: { value: d["부서코드"] } }));
   }
-  deptSelect.addEventListener("change", () => { state.dept = deptSelect.value; load(); });
-  $("periodSelect").addEventListener("change", () => { state.period = readPeriod(); load(); });
+  const deptNames = Object.fromEntries(departments.map((d) => [d["부서코드"], d["부서명"]]));
+  if (fixed && !deptNames[fixed] && me["부서명"]) deptNames[fixed] = me["부서명"];
+
+  // 부서·기간이 바뀌면 모든 탭이 낡는다 → 지금 탭만 바로, 나머지는 열 때 불러온다
+  const refresh = () => {
+    state.stale = { demand: true, suggest: true };
+    load(state.tab);
+  };
+  deptSelect.addEventListener("change", () => { state.dept = deptSelect.value; refresh(); });
+  $("periodSelect").addEventListener("change", () => { state.period = readPeriod(); refresh(); });
 
   // 탭 전환(같은 화면 안)
   const tabs = [...document.querySelectorAll(".console-tab")];
@@ -59,19 +69,26 @@ async function start() {
         x.setAttribute("aria-selected", String(on));
         $(x.getAttribute("aria-controls")).hidden = !on;
       }
-      if (state.tab !== "demand") renderLater($(t.getAttribute("aria-controls")), t.textContent);
+      if (state.tab === "report") renderLater($(t.getAttribute("aria-controls")), t.textContent);
+      else if (state.stale[state.tab]) load(state.tab);
     });
   }
 
-  async function load() {
-    const my = ++state.seq; // 부서를 빨리 바꿔도 마지막 선택만 그린다
+  function load(tab) {
+    if (tab === "demand") return loadDemand();
+    if (tab === "suggest") return loadSuggest();
+  }
+
+  async function loadDemand() {
+    const my = state.seq.demand = (state.seq.demand || 0) + 1;
+    state.stale.demand = false;
     const panel = $("panel-demand");
     renderDemandLoading(panel);
     const data = await getAdminOverview(state.dept, state.period);
-    if (my !== state.seq) return;
+    if (my !== state.seq.demand) return;
     if (!data || data.error || !data.kpi) {
       panel.removeAttribute("aria-busy");
-      panel.replaceChildren(errorBox(data && data.error, load));
+      panel.replaceChildren(errorBox(data && data.error, loadDemand));
       $("computedAt").textContent = "";
     } else {
       renderDemand(panel, data, { dept: state.dept });
@@ -80,7 +97,24 @@ async function start() {
     drawIcons();
   }
 
-  load();
+  async function loadSuggest() {
+    const my = state.seq.suggest = (state.seq.suggest || 0) + 1;
+    state.stale.suggest = false;
+    const panel = $("panel-suggest");
+    renderSuggestLoading(panel);
+    const data = await getAdminSuggestions(state.dept, state.period);
+    if (my !== state.seq.suggest) return;
+    if (!data || data.error || !Array.isArray(data.suggestions)) {
+      panel.removeAttribute("aria-busy");
+      panel.replaceChildren(errorBox(data && data.error, loadSuggest));
+    } else {
+      // 상태를 바꾸면 탭1 KPI 「개선 요청」(새로 옴 건수)이 달라진다 → 탭1을 다음에 열 때 다시 불러온다
+      renderSuggest(panel, data, { deptNames, onChanged: () => { state.stale.demand = true; } });
+    }
+    drawIcons();
+  }
+
+  load("demand");
 }
 
 function readPeriod() {
@@ -94,7 +128,7 @@ function timeText(iso) {
   return m ? `${m[1]} ${m[2]}` : String(iso);
 }
 
-// 탭2·3은 다음 작업(11/26~) — 자리만
+// 탭3은 다음 작업(작업 69, 11/28~) — 자리만
 function renderLater(panel, name) {
   if (panel.childElementCount) return;
   panel.append(el("div", { className: "card empty" }, [

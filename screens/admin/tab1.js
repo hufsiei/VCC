@@ -3,7 +3,7 @@ import { el, icon, statusLabel, fmt } from "./ui.js";
 
 // 칸 → 분야. 원본은 data/frames.json(교환·파견 = 국제교류, 인턴 = 현장실습, 비교과).
 // 화면 코드는 데이터 파일을 직접 읽지 않으므로(코드 규칙) 여기 적는다. 두 분야 이상에 있는 칸(배운점)은 「여러 분야 공통」.
-// 서버 sections가 칸별 합계 하나라 배운점은 분야별로 나눌 수 없다 → 미리에게 sectionsByField 요청(11/25).
+// 서버가 sectionsByField(PR #242)를 주면 배운점도 분야별로 나눈다(sectionGroups).
 const FIELD_SECTIONS = [
   { field: "국제교류", cat: "cat-global", sections: ["지원", "학점", "비용", "생활", "팁"] },
   { field: "현장실습", cat: "cat-practice", sections: ["지원동기", "업무내용", "지원·선발", "근무조건"] },
@@ -44,7 +44,7 @@ export function renderDemand(panel, data, { dept }) {
     kpiRow(data.kpi || {}, basis),
     el("div", { className: "pc-only console-panel" }, [
       programBlock(data.programs || [], dept === "ALL" ? data.unclassified : 0),
-      sectionBlock(data.sections || {}),
+      sectionBlock(data.sections || {}, data.sectionsByField),
       el("div", { className: "grid-2" }, [collegeBlock(data.colleges || []), notesBlock(data.notes || {})]),
     ]),
   );
@@ -138,7 +138,30 @@ function showProgram(detail, p) {
 }
 
 // 3. 칸별 질문 비율 — 분야별 묶음(11/25 민지 확정) --------------------------------
-function sectionBlock(sections) {
+// sectionsByField(PR #242)가 오면 배운점도 분야별로 나눈다. 서버는 sections와 같은 질문으로 세므로
+// 칸마다 「sections − 세 분야 합」 = 분야를 모르는 질문 → 「여러 분야 공통」. 필드가 없으면(mock) 예전처럼.
+function sectionGroups(sections, byField) {
+  const label = (f) => el("span", { className: `category-tag ${f.cat}`, text: f.field });
+  const commonLabel = () => el("span", { className: "field-group__common", text: COMMON });
+  if (byField && typeof byField === "object" && Object.keys(byField).length) {
+    const groups = FIELD_SECTIONS.map((f) => ({ label: label(f), counts: { ...(byField[f.field] || {}) } }));
+    const rest = {};
+    for (const [k, n] of Object.entries(sections)) {
+      const left = (n || 0) - groups.reduce((s, g) => s + (g.counts[k] || 0), 0);
+      if (left > 0) rest[k] = left;
+    }
+    groups.push({ label: commonLabel(), counts: rest });
+    return { groups, note: "분야를 알 수 없는 질문은 「여러 분야 공통」에 모았어요." };
+  }
+  const known = new Set([...FIELD_SECTIONS.flatMap((f) => f.sections), LEARNED]);
+  const pick = (keys) => Object.fromEntries(keys.filter((k) => sections[k]).map((k) => [k, sections[k]]));
+  const groups = FIELD_SECTIONS.map((f) => ({ label: label(f), counts: pick(f.sections) }));
+  // 배운점 + 틀에 없는 칸 → 여러 분야 공통
+  groups.push({ label: commonLabel(), counts: pick([LEARNED, ...Object.keys(sections).filter((k) => !known.has(k))]) });
+  return { groups, note: "배운점은 세 분야 노트에 모두 있는 칸이라 따로 모았어요." };
+}
+
+function sectionBlock(sections, byField) {
   const total = Object.values(sections).reduce((s, n) => s + (n || 0), 0);
   const block = el("div", { className: "card block" }, [
     el("div", { className: "block__head" }, [
@@ -150,21 +173,17 @@ function sectionBlock(sections) {
     block.append(empty("message-circle", "이 기간에 들어온 질문이 없어요"));
     return block;
   }
-  const max = Math.max(...Object.values(sections), 1);
-  const known = new Set([...FIELD_SECTIONS.flatMap((f) => f.sections), LEARNED]);
-  const groups = FIELD_SECTIONS.map((f) => ({ label: el("span", { className: `category-tag ${f.cat}`, text: f.field }), keys: f.sections }));
-  // 배운점 + 틀에 없는 칸 → 여러 분야 공통
-  groups.push({ label: el("span", { className: "field-group__common", text: COMMON }), keys: [LEARNED, ...Object.keys(sections).filter((k) => !known.has(k))] });
-
+  const { groups, note } = sectionGroups(sections, byField);
+  const max = Math.max(...groups.flatMap((g) => Object.values(g.counts)), 1);
   for (const g of groups) {
-    const keys = g.keys.filter((k) => sections[k] > 0).sort((a, b) => sections[b] - sections[a]);
+    const keys = Object.keys(g.counts).filter((k) => g.counts[k] > 0).sort((a, b) => g.counts[b] - g.counts[a]);
     if (!keys.length) continue; // 그 부서에 없는 분야는 묶음째 뺀다
     block.append(el("div", { className: "field-group" }, [
       el("div", { className: "field-group__label" }, g.label),
-      el("div", { className: "field-group__rows" }, keys.map((k) => secRow(k, sections[k], max, total))),
+      el("div", { className: "field-group__rows" }, keys.map((k) => secRow(k, g.counts[k], max, total))),
     ]));
   }
-  block.append(el("p", { className: "block__note", text: "배운점은 세 분야 노트에 모두 있는 칸이라 따로 모았어요." }));
+  block.append(el("p", { className: "block__note", text: note }));
   return block;
 }
 
