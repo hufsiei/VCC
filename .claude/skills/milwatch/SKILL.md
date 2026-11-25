@@ -10,7 +10,7 @@ description: 총괄창 점검 루프(미리·원우·민지 모두 각자 PC에�
 규격 원본은 공통 부록(board.py 명령·세션 메시지 형식). 아래 `board.py`는 `python -X utf8 C:/dev/VCC/.claude/skills/milwork/board.py`.
 
 ## 「나」는 누구인가
-- `git config vcc.me`(원우|민지|미리). 없으면 `git config user.name`·`user.email`에 든 글자로 짐작한다(`.claude/hooks/session_start.py`의 `who_am_i()`와 같은 방식). 모르면 한 번 묻고 `git config vcc.me <이름>`을 권한다.
+- `git config vcc.me`(원우|민지|미리). 없으면 `git config user.name`·`user.email`에 든 글자로 짐작한다(`.claude/skills/milwork/board.py`의 `who_am_i()`와 같은 방식). 모르면 한 번 묻고 `git config vcc.me <이름>`을 권한다.
 - 이 글의 「나」는 모두 이 사람이다. 상태판·큐·결정은 사람별 파일(`board-<이름>.md`)이고 `board.py`가 자동으로 내 파일을 쓴다(명령은 그대로).
 - **담당 검사는 CLAUDE.md 「누가 무엇을 고치나」를 나 기준으로 본다.** 예: 나=원우면 `data/`·`tools/`·`functions/score.py`는 내 것, `screens/<다른 화면>`·`functions/`(score.py 제외)는 남의 것.
 - 다른 사람에게 보내는 요청·결정요망은 PR 본문 「## 팀원에게」(`[to이름]` 묶음)로 한다. SendMessage는 내 PC 안의 작업창과만 쓴다.

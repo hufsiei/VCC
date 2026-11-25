@@ -3,7 +3,7 @@
 # Claude 대화창을 여러 개 띄워 작업할 때, 어느 폴더(worktree)에서 무슨 작업이 어디까지 갔고
 # 누구에게 무엇을 전해야 하는지를 한 파일에 둔다. 파일은 사람마다 따로: 드라이브 「@VCC\총괄\board-<이름>.md」
 # (그 사람의 두 PC 공용, 커밋 안 함). 남의 파일은 읽지 않는다 — list·check·html 모두 내 파일만(팀 대시보드 없음, 11/25).
-#   「나」(<이름>): git config vcc.me(원우|민지|미리) → 없으면 git user.name·email로 짐작(session_start.py와 같은 규칙).
+#   「나」(<이름>): git config vcc.me(원우|민지|미리) → 없으면 git user.name·email로 짐작(11/25까지 session_start.py에 있던 규칙, 이제 여기가 원본).
 #     못 정하면 종료코드 1 + 「git config vcc.me 원우」 안내. 한 번만 하면 된다: git config vcc.me <이름>
 #   찾는 순서: 환경변수 VCC_BOARD(폴더면 그 안의 board-<이름>.md, .md면 그 파일) → C:~Z: 중 「<X>:\내 드라이브\@VCC」
 #     → 없으면 이 PC의 C:\dev\VCC-board-<이름>.md (stderr에 「드라이브 없음, 이 PC 상태판 사용」).
@@ -55,7 +55,7 @@ from pathlib import Path
 DEV = Path(r"C:\dev")
 REPO = Path(os.environ.get("VCC_REPO") or DEV / "VCC")   # VCC_REPO는 selftest가 임시 저장소를 쓸 때만
 OLD_BOARD = DEV / "VCC-board.md"
-TEAM = {"미리": ("미리", "mirikang"), "민지": ("민지", "minji"), "원우": ("원우", "wwk")}  # session_start.py와 같게
+TEAM = {"미리": ("미리", "mirikang"), "민지": ("민지", "minji"), "원우": ("원우", "wwk")}  # 「나」 짐작의 원본(스킬 문서들이 이것을 가리킨다)
 OLD_COLS = ["폴더", "브랜치", "요청", "작업", "파일", "상태", "갱신", "전달 대기"]
 COLS = ["폴더", "브랜치", "요청", "작업", "파일", "상태", "갱신", "PC", "결정요망", "전달 대기"]
 QCOLS = ["번호", "작업", "파일", "출처", "상태", "세션", "폴더", "메모", "갱신"]
