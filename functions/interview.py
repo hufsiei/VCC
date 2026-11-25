@@ -175,9 +175,21 @@ def is_junior(a):
     return bool(a.get("questionId") or a.get("junior") or a.get("section") == QUESTION_SECTION)
 
 
+SHORT_MAX = 14            # [Q-12] 질문에 넣는 이름 상한. 별칭이 없고 다듬어도 길면 「이 프로그램」
+SHORT_FALLBACK = {"교환": "이 학교", "파견": "이 학교", "인턴": "이 기관"}   # 그 밖(비교과) 「이 프로그램」
+
+
 def short_name(program):
+    """질문에 넣는 짧은 이름. 별칭 → 다듬은 프로그램명(앞의 학교 이름·괄호 뺌) → 「이 학교·이 기관·이 프로그램」.
+    [Q-12] 미리 시험(11/25): 「한국외국어대학교 직무탐색 집중교육에서는 어떤 활동을 했어요?」처럼 긴 이름이 그대로 들어가
+    질문이 어색하고, 요약(Sonnet)이 그 이름을 문장 앞에 붙여 일치검사에서 떨어졌다."""
     aliases = askboo.PROGRAMS.get(program, {}).get("별칭") or []
-    return aliases[0] if aliases else program
+    if aliases:
+        return aliases[0]
+    name = re.sub(r"\[[^\]]*\]|\([^)]*\)", " ", program or "")
+    name = re.sub(r"^\s*(한국외국어대학교|외대|HUFS)\s+", "", name)
+    name = " ".join(re.sub(r"[_&]", " ", name).split())
+    return name if 0 < len(name) <= SHORT_MAX else SHORT_FALLBACK.get(kind_of(program), "이 프로그램")
 
 
 def _call(작업명, content):

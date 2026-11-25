@@ -64,6 +64,17 @@ const KIND_BY_FIELD = { 국제교류: "교환", 현장실습: "인턴", 비교�
 const QUESTION_SECTION = "후배 질문"; // 없어진 칸(frames.json에서 원우가 지우기 전까지 걸러 내는 용도)
 const LAST_SECTION = "배운점";
 
+// 질문에 넣는 짧은 이름 — functions/interview.py short_name과 같은 규칙(Q-12): 별칭 → 앞의 학교 이름·괄호 뺀 이름(14자 이하)
+// → 종류별 「이 학교·이 기관·이 프로그램」
+const SHORT_FALLBACK = { 교환: "이 학교", 인턴: "이 기관", 비교과: "이 프로그램" };
+function mockShortName(info, program) {
+  const alias = (info["별칭"] || [])[0];
+  if (alias) return alias;
+  const name = String(program || "").replace(/\[[^\]]*\]|\([^)]*\)/g, " ").replace(/^\s*(한국외국어대학교|외대|HUFS)\s+/, "")
+    .replace(/[_&]/g, " ").split(/\s+/).filter(Boolean).join(" ");
+  return name && name.length <= 14 ? name : SHORT_FALLBACK[KIND_BY_FIELD[info["분야"]] || "교환"];
+}
+
 function mockInterview(m, p) {
   const iv = m.interviewNext;
   const answers = p.answers || [];
@@ -79,7 +90,7 @@ function mockInterview(m, p) {
   const order = [...sections.filter((s) => s !== LAST_SECTION), ...sections.filter((s) => s === LAST_SECTION)];
   const next = order.find((s) => !answered.has(s));
   if (!next) return { done: true, progress };
-  const short = (info["별칭"] || [])[0] || p.program;
+  const short = mockShortName(info, p.program);
   const template = iv.questions[next] || iv.questions["*"];
   return { done: false, section: next, question: template.replaceAll("{p}", short).replaceAll("{s}", next), progress, pendingQuestions: 0 };
 }
@@ -220,6 +231,17 @@ function mockDemand(m, raw) {
     summary: { interest: label, program: s.program, section: s.section, when: s.when, situation: s.situation, questions: [s.question, ...s.more], hope: s.hope } };
 }
 
+// previewNickname mock: 받는 선배 학번으로 「형용사 + 동물」을 고른다(functions/runtime_fns.py 목록의 일부).
+// 첫 추천 선배는 mock 대화(getMessages)와 같은 「용감한 수달」이 나오도록 그 이름을 맨 앞에 둔다.
+const MOCK_ADJ = ["용감한", "느긋한", "다정한", "씩씩한", "반짝이는", "차분한", "포근한", "꼼꼼한"];
+const MOCK_ANIMAL = ["수달", "판다", "고래", "펭귄", "여우", "부엉이", "다람쥐", "알파카"];
+function mockNickname(m, to) {
+  const ids = ((m.recommendSeniors && m.recommendSeniors.seniors) || []).map((s) => s.studentId);
+  let i = ids.indexOf(to);
+  if (i < 0) i = [...String(to || "")].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 64, 0);
+  return `${MOCK_ADJ[i % 8]} ${MOCK_ANIMAL[(i + Math.floor(i / 8)) % 8]}`;
+}
+
 // 입력에 따라 다른 mock을 고르는 곳은 여기 한 곳입니다 (명세 3장).
 function pickMock(m, name, p) {
   switch (name) {
@@ -295,8 +317,9 @@ function pickMock(m, name, p) {
       sessionStorage.setItem("mockRecommendable", p.on ? "1" : "0");
       return { ok: true, recommendable: p.on };
     case "recommendSeniors":
-    case "previewNickname":
       return mockReady() ? m[name] : LOCKED();
+    case "previewNickname": // [Q-12] 서버처럼 선배마다 다른 이름(전에는 모든 선배에게 「용감한 수달」). 같은 선배는 늘 같은 이름
+      return mockReady() ? { myNickname: mockNickname(m, p.to) } : LOCKED();
     case "sendMessage":
       return mockReady() ? m.sendMessage : { ok: false, reason: "잠김", message: LOCKED().message, recommend: mockStatus() };
     case "summarizeInterview": {
