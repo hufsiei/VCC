@@ -147,13 +147,19 @@ expect("--dry 출력도 가려짐·학번 없음", not any(x in out for x in ("H
 expect("--dry는 파일을 쓰지 않음", not list(store.RUNTIME.parent.rglob("*.xlsx")))
 
 # 8) 엑셀 쓰기(임시 폴더): 「=」로 시작하는 글이 수식이 되지 않는다
-import openpyxl
+# openpyxl은 requirements.txt(배포 zip)에 없다. 없는 PC는 엑셀을 여는 검사(8번·9번 끝)만 건너뛴다.
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
+    print("openpyxl 없음 — 엑셀 검사 건너뜀(python -m pip install openpyxl)")
 
 xlsx = store.RUNTIME.parent / "out.xlsx"
-export_runtime.write_xlsx(sheets, xlsx)
-wb = openpyxl.load_workbook(xlsx)
-cell = next(c for row in wb["쪽지"].iter_rows(min_row=2) for c in row if str(c.value or "").startswith("=1+1"))
-expect("엑셀: 시트 4개 + 수식 아님", wb.sheetnames == list(sheets) and cell.data_type == "s")
+if openpyxl:
+    export_runtime.write_xlsx(sheets, xlsx)
+    wb = openpyxl.load_workbook(xlsx)
+    cell = next(c for row in wb["쪽지"].iter_rows(min_row=2) for c in row if str(c.value or "").startswith("=1+1"))
+    expect("엑셀: 시트 4개 + 수식 아님", wb.sheetnames == list(sheets) and cell.data_type == "s")
 
 # 9) askLog는 최근 ASK_LOG_MAX건만 남고, 잘려 나간 앞 기록은 엑셀 물어보기 시트에 이어 남는다
 askboo.ASK_LOG_MAX, askboo.ASK_LOG_SLACK = 5, 2
@@ -163,10 +169,11 @@ log = store.load("askLog", [])
 expect("askLog 상한: 최근 것만(5~7건), 마지막이 가장 최근", 5 <= len(log) <= 7 and log[-1]["question"] == "질문 9"
        and all(r["question"] != "답이 있는 질문" for r in log)
        and len(json.loads((store.RUNTIME / "askLog.json").read_text(encoding="utf-8"))) == len(log))
-merged = export_runtime.keep_old_rows(export_runtime.build_sheets(store.load), xlsx)
-asked = [row[2] for row in merged["물어보기"][1:]]
-expect("내보내기: 잘린 앞 기록도 시트에 남고 겹치지 않음", "답이 있는 질문" in asked and "질문 9" in asked and len(asked) == len(set(asked))
-       and len(asked) == len(log) + 3)
+if openpyxl:
+    merged = export_runtime.keep_old_rows(export_runtime.build_sheets(store.load), xlsx)
+    asked = [row[2] for row in merged["물어보기"][1:]]
+    expect("내보내기: 잘린 앞 기록도 시트에 남고 겹치지 않음", "답이 있는 질문" in asked and "질문 9" in asked and len(asked) == len(set(asked))
+           and len(asked) == len(log) + 3)
 
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)
