@@ -308,6 +308,27 @@
         <p class="btn-reason"><i data-lucide="lock" class="icon"></i>첫 대화를 마치면 선배 추천이 열려요</p>
       </div>
     </section>
+
+    <!-- ⑨ 여러 줄 입력창 (11/25) -->
+    <section class="demo-section">
+      <h2 class="section-title">9. 여러 줄 입력창</h2>
+      <p class="sub">5-9·7-②절. 「문장 고치기」 — textarea.input + Secondary 「저장」 / Text 「취소」.</p>
+      <div class="field">
+        <label class="field__label" for="demoEdit">내 경험노트 문장</label>
+        <textarea class="input" id="demoEdit" rows="3" maxlength="300" aria-describedby="demoEditHint">기숙사는 합격 메일을 받자마자 신청해야 방이 남아 있어요.</textarea>
+        <p class="sub" id="demoEditHint">나만 보는 문장이에요. 해봤노트 문장은 바뀌지 않아요.</p>
+        <div class="btn-row">
+          <button class="btn btn--secondary" type="button">저장</button>
+          <button class="btn btn--text" type="button">취소</button>
+        </div>
+      </div>
+      <span class="demo-caption">오류</span>
+      <div class="field">
+        <label class="field__label" for="demoEditErr">해봤노트에 보일 문장</label>
+        <textarea class="input" id="demoEditErr" rows="3" aria-invalid="true" aria-describedby="demoEditErrMsg"></textarea>
+        <p class="field__error" id="demoEditErrMsg"><i data-lucide="circle-alert" class="icon"></i><span>문장을 적어 주세요. 공개하지 않으려면 스위치를 꺼 주세요.</span></p>
+      </div>
+    </section>
   </main>
 
   <!-- 부품 3: 하단 탭 -->

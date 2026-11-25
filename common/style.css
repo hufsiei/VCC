@@ -755,6 +755,14 @@ button { font: inherit; color: inherit; }
   font: inherit;
   font-size: var(--font-size-body);
 }
+/* 여러 줄 입력창(문장 고치기·쪽지 요청) — 5-9. 색·모서리·포커스·오류는 .input 그대로, 높이만 푼다 */
+textarea.input {
+  height: auto;
+  min-height: calc(var(--button-height) * 2); /* 96px */
+  padding: 12px var(--space-md);
+  line-height: 1.5;
+  resize: vertical; /* 세로로만 늘림 — 가로로 늘리면 390px 폭을 넘는다 */
+}
 .input::placeholder { color: var(--color-text-muted); }
 /* 포커스: 2px NAVY 테두리 */
 .input:focus { outline: none; border-color: var(--color-hufs-navy); box-shadow: 0 0 0 1px var(--color-hufs-navy); }
