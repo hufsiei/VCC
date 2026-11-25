@@ -2,6 +2,7 @@
 # 실행: cd functions && python test_admin.py
 # AI 없음. 기록은 임시 폴더에 쓴다(data/runtime을 건드리지 않음). 하나라도 틀리면 종료코드 1.
 import sys
+from collections import Counter
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -67,6 +68,17 @@ expect("학기 기본값 = 지금 학기(2026-2)", admin.getAdminOverview(BOSS, 
 expect("프로그램 순위는 질문 많은 순", [r["questions"] for r in o["programs"]] == sorted((r["questions"] for r in o["programs"]), reverse=True))
 expect("학과 표는 상위 8 + 그 외", len(o["colleges"]) <= 9 and (len(o["colleges"]) < 9 or o["colleges"][-1]["학과"] == "그 외"))
 expect("학과 표 합 = 질문 수", sum(c["questions"] for c in o["colleges"]) == o["kpi"]["questions"]["value"])
+fields = {p["분야"] for p in admin.PROGRAMS.values() if p.get("분야")}
+expect("sectionsByField 분야 이름은 programs.json 「분야」 값", set(o["sectionsByField"]) <= fields and len(o["sectionsByField"]) >= 2)
+expect("sectionsByField 칸 합 ≤ sections 칸 합(분야 모르는 질문은 빠짐)",
+       all(sum(d.get(k, 0) for d in o["sectionsByField"].values()) <= v for k, v in o["sections"].items()))
+# 프로그램이 안 잡혀도 분야만 있는 질문(「교환학생 비용은?」)이 있어 분야 합 ≥ 프로그램 합
+expect("sectionsByField ⊇ 프로그램별 sections를 분야로 합친 것",
+       all(o["sectionsByField"].get(f, {}).get(k, 0) >= v for f in {p["분야"] for p in o["programs"] if p["분야"]}
+           for k, v in sum((Counter(p["sections"]) for p in o["programs"] if p["분야"] == f), Counter()).items()))
+expect("분야 있고 프로그램 없는 질문도 sectionsByField에 들어감",
+       sum(sum(d.values()) for d in o["sectionsByField"].values()) > sum(sum(p["sections"].values()) for p in o["programs"]))
+expect("부서 하나(D01)도 sectionsByField 있음", "sectionsByField" in ov("D01") and isinstance(ov("D01")["sectionsByField"], dict))
 expect("노트 현황: 251개·근거 4798", o["notes"]["count"] == 251 and o["notes"]["evidence"] == 4798)
 expect("증감은 정수 % 또는 None", all(v["delta"] is None or isinstance(v["delta"], int) for v in o["kpi"].values()))
 expect("잘못된 기간은 오류", "error" in ov("ALL", {"type": "month", "value": "abc"}))
