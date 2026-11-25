@@ -325,6 +325,9 @@ function pickMock(m, name, p) {
       return m[name][!p.dept || p.dept === "ALL" ? "ALL" : "D01"]; // mock은 전체·국제교류팀 두 벌(PRD 7장)
     case "respondRequest":
       return p.cancel ? m.cancelRequest : m.respondRequest; // 요청 취소(cancelRequest)도 같은 서버 함수
+    case "reportStatement": // [11/25 작업 33] 사유 필수. mock은 기억하지 않는다(노트는 고정값 — 화면이 그 문장을 바로 뺀다)
+      if (!String(p.reason || "").trim()) return { error: "신고 사유를 적어 주세요" };
+      return m.reportStatement;
     case "reportThread": // [11/23] mock은 기억하지 않는다(쪽지 목록은 고정값) — 응답 모양만 서버와 같게
       if (!p.reason && !p.block) return { error: "신고 사유를 골라 주세요" };
       return { ok: true, reported: !!p.reason, blocked: !!p.block, status: p.block ? "blocked" : "accepted" };
@@ -400,6 +403,8 @@ export const getNote = (id) => call("getNote", { id });
 export const scrapNote = (noteId, scrap = true) => call("scrapNote", { noteId, scrap });
 // 「질문함에 담기」: 노트의 한 칸을 질문함에 hold로 → { ok, questionId, already, message }. 다음 선배 인터뷰가 먼저 묻는다(spec 4장)
 export const saveQuestion = (noteId, section) => call("saveQuestion", { noteId, section });
+// 문장 신고 → { ok, hidden } | { error }. lineId = 원문 문장 「L-…」 또는 해봤노트 요약 문장 getNote sections[].summary[].lineId 「S-…」.
+// [11/25 작업 33] reason(사유, 100자까지)은 꼭 넣는다 — 비면 { error: "신고 사유를 적어 주세요" }. 신고된 요약 문장은 다음 getNote부터 빠진다
 export const reportStatement = (lineId, reason) => call("reportStatement", { lineId, reason });
 // more=true면 3명씩 더해 최대 9명. 응답의 hasMore가 false면 「비슷한 선배를 모두 보여드렸어요」(spec 4장)
 export const recommendSeniors = (noteId, more) => call("recommendSeniors", more ? { noteId, more: true } : { noteId });

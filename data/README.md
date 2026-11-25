@@ -196,7 +196,7 @@
 | updateMyNote(id, changed) [11/23] | `{id, changed:[{section, index, text}]}` (내 경험노트 문장 고치기, index는 getMyNote 그 칸 lines 순서 0부터) |
 | demandNext(state) [11/22] | `{state}` (「궁금한 것 정리하기」 다음 단계, AI 없음) |
 | saveDemand(state) [11/22] | `{state, consent:true}` |
-| reportStatement(lineId, reason) | `{lineId, reason?}` |
+| reportStatement(lineId, reason) | `{lineId, reason}` (**[11/25]** 사유 필수. lineId는 원문 문장 `L-…` 또는 요약 문장 `S-…`) |
 | getDeptReport(dept) | `{dept}` (직원 전용) |
 
 ## 응답 모양
@@ -325,6 +325,7 @@
 | sections[].name | 글자 | 칸 이름 |
 | sections[].interviewOnly | 참/거짓 | true면 선배 인터뷰로만 채워지는 칸 |
 | sections[].summary[].text / sources / years [v2] | 글자·목록 | 칸별 요약 문단(작업 78, 미리 만들어 둔 것). 없으면 생략, 배운점은 화면에서 쓰지 않음 |
+| sections[].summary[].lineId [11/25] | 글자 | 요약 문장 번호 `S-…`(서버가 붙임 — `notes.json`에는 없음). `reportStatement`에 넣어 신고, 신고된 문장은 빠짐 |
 | sections[].newLines [11/23] | 숫자 | `summary`가 있을 때만. `lines` 끝에서 요약 뒤 인터뷰로 붙은 문장 수 |
 | sections[].lines[].answersQuestionId [v2] | 글자 | 후배 질문에 답한 문장이면 그 질문 번호 |
 | sections[].lines[].text / sourceId / lineId | 글자 | 문장, 출처, 문장 번호 |
@@ -457,6 +458,7 @@ saveInterviewDraft는 들려주기 답을 사람·프로그램별로 하나 저�
 |---|---|---|
 | ok | 참/거짓 | 신고 접수 여부 |
 | hidden | 참/거짓 | 신고된 문장을 즉시 숨겼는지 |
+| error [11/25] | 글자 | 사유가 비면 「신고 사유를 적어 주세요」, 없는 요약 문장 id면 「신고할 문장을 찾지 못했어요」 |
 
 ### getDeptReport
 

@@ -644,7 +644,7 @@
           "name": "학점",
           "interviewOnly": false,
           "summary": [
-            { "text": "현지에서 들은 과목은 학과 승인을 받으면 학점으로 인정돼요.", "sources": ["R03-2-1"], "years": [2025], "official": true }
+            { "text": "현지에서 들은 과목은 학과 승인을 받으면 학점으로 인정돼요.", "lineId": "S-0344e9c1ea", "sources": ["R03-2-1"], "years": [2025], "official": true }
           ],
           "newLines": 0,
           "lines": [
@@ -660,8 +660,8 @@
           "name": "비용",
           "interviewOnly": false,
           "summary": [
-            { "text": "월세를 포함해 한 달에 110만~140만 원 정도 썼어요.", "sources": ["R277-2-6", "R213-2-6", "R209-2-6"], "years": [2025, 2026], "official": false },
-            { "text": "정착 초기 비용은 생활비와 따로 들어요.", "sources": ["R213-2-6"], "years": [2026], "official": false }
+            { "text": "월세를 포함해 한 달에 110만~140만 원 정도 썼어요.", "lineId": "S-2234eea080", "sources": ["R277-2-6", "R213-2-6", "R209-2-6"], "years": [2025, 2026], "official": false },
+            { "text": "정착 초기 비용은 생활비와 따로 들어요.", "lineId": "S-c618678991", "sources": ["R213-2-6"], "years": [2026], "official": false }
           ],
           "newLines": 0,
           "lines": [
@@ -689,7 +689,7 @@
           "name": "생활",
           "interviewOnly": false,
           "summary": [
-            { "text": "기숙사는 합격 통보를 받은 직후 바로 신청해야 자리가 남아요.", "sources": ["R03-1-2"], "years": [2025], "official": false }
+            { "text": "기숙사는 합격 통보를 받은 직후 바로 신청해야 자리가 남아요.", "lineId": "S-f5e7e94a53", "sources": ["R03-1-2"], "years": [2025], "official": false }
           ],
           "newLines": 2,
           "lines": [

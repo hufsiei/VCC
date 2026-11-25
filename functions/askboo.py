@@ -173,8 +173,40 @@ PROPER_NOUNS = sorted({w for name, p in PROGRAMS.items() for w in [name, *p.get(
 
 # ── 공개 함수 ─────────────────────────────────────────────────────────
 def askBoo(me, payload, save=True):
-    """local_fn.py가 부른다. save=False면 질문함에 저장하지 않는다(평가 스크립트용).
-    payload: {question, history?: [{question, status, program?}], force?: "hold"}"""
+    """local_fn.py가 부른다. save=False면 질문함에도 답 기록에도 남기지 않는다(평가 스크립트용).
+    payload: {question, history?: [{question, status, program?}], force?: "hold"}
+    [11/25 작업 33] 답을 만든 뒤 질문과 답을 runtime/askLog.json에 남긴다(_log_answer)."""
+    out = _answer(me, payload, save)
+    program = out.pop("_program", None)   # _hold·_official이 넘긴 프로그램(기록용, 응답에는 없음)
+    if save and "error" not in out:
+        _log_answer((payload.get("question") or "").strip(), out, program)
+    return out
+
+
+def _log_answer(question, out, program=None):
+    """답 기록 한 줄: 시각·status·질문·답 문장(cites)·프로그램·안내 문구. **사람 칸은 남기지 않는다**
+    (spec 0장 「질문 로그는 학번 제거 후 통계만」 — 학번·학과·학년·questionId 없음). 질문 글은 mask.py로 가린다.
+    AI를 부르지 않고 이미 만든 답을 남기기만 한다. 기록이 실패해도 답은 그대로 돌려준다."""
+    try:
+        import mask
+        import store
+        from runtime_fns import now
+        sources = out.get("sources") or {}
+        programs = [program] if program else \
+            [s.get("program") for s in sources.values()] or [c.get("program") for c in out.get("notes") or []]
+        row = {"at": now(), "status": out.get("status"), "question": mask.mask(question),
+               "lines": [{"text": ln.get("text", ""), "cites": list(ln.get("cites") or [ln.get("sourceId")]),
+                          **({"fallback": True} if ln.get("fallback") else {})} for ln in out.get("lines") or []],
+               "programs": list(dict.fromkeys(p for p in programs if p)), "noteId": out.get("noteId"),
+               "message": out.get("message")}
+        with store.lock():
+            store.load("askLog", []).append(row)
+            store.save("askLog")
+    except Exception as e:   # 기록 때문에 답을 잃지 않는다. 원인 종류만 서버 로그에(글·키는 찍지 않는다)
+        print(f"[vcc] askLog 기록 실패: {type(e).__name__}")
+
+
+def _answer(me, payload, save):
     question = (payload.get("question") or "").strip()
     if not question:
         return {"error": "질문을 입력해 주세요"}
@@ -1006,6 +1038,7 @@ def _official(me, question, programs, save):
     dept = DEPTS.get(code, {})
     qid = _save(me, question, programs[0] if programs else None, None, "official", save)
     return {"status": "official", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": False,
+            "_program": programs[0] if programs else None,
             "officialUrl": dept.get("공식안내URL", ""),
             "message": f"학교 규정에 관한 질문이라 {dept.get('부서명', '담당 부서')} 공식 안내에서 정확한 내용을 확인해 주세요."}
 
@@ -1020,7 +1053,8 @@ def _hold(me, question, program, section, save, why=""):
         message = HOLD_NO_TOPIC.format(program=program)
     else:
         message = HOLD_MESSAGE
-    out = {"status": "hold", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": True, "message": message}
+    out = {"status": "hold", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": True, "message": message,
+           "_program": program}
     if program and evidence_count(program):
         out["noteId"] = notes.note_id(program)
     if not save:
