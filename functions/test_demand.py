@@ -78,6 +78,9 @@ expect("프로그램 목록 끝에 「아직 정하지 않았어요」", r["opti
 base = {"field": "비교과", "detail": "진로·취업 교육과정", "program": demand.NOT_YET}
 r, _ = walk(JUNIOR, base)
 expect("프로그램 미정이면 분야 노트 틀(비교과)에서 칸, 후배 질문 제외", r["step"] == "section" and r["options"] == ["활동내용", "배운점"])
+expect("프로그램 미정이면 칸 질문이 관심을 가리킨다", r["question"] == "프로그램은 나중에 정해도 돼요. 비교과·진로·취업 교육과정에 대해 무엇이 가장 궁금해요?")
+r, _ = walk(JUNIOR, {"field": "국제교류", "detail": demand.NOT_YET, "program": demand.NOT_YET})
+expect("나라·프로그램 모두 미정이면 「교환학생에 대해」", r["step"] == "section" and "교환학생에 대해" in r["question"])
 
 # 국제교류: 나라 → 마르부르크
 r, _ = walk(JUNIOR, {"field": "국제교류"})
@@ -86,7 +89,8 @@ expect("국제교류 → 나라 칩(독일 포함) + 아직 정하지 않았어�
 r, _ = walk(JUNIOR, {"field": "국제교류", "detail": "독일"})
 expect("독일 → 마르부르크가 프로그램 목록에", r["step"] == "program" and MARBURG in r["options"])
 r, _ = walk(JUNIOR, {"field": "국제교류", "detail": "독일", "program": MARBURG})
-expect("마르부르크 → 교환 노트 틀 칸(지원~배운점)", r["step"] == "section" and r["options"][:2] == ["지원", "학점"] and "후배 질문" not in r["options"])
+expect("마르부르크 → 교환 노트 틀 칸(지원~배운점)", r["step"] == "section" and r["options"][:2] == ["지원", "학점"] and "후배 질문" not in r["options"]
+       and r["question"] == "이 프로그램에서 무엇이 가장 궁금해요?")
 
 # 답변 단계: 짧으면 다시
 full = {"field": "국제교류", "detail": "독일", "program": MARBURG, "section": "학점", "when": "다음 학기"}
