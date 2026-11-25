@@ -16,7 +16,7 @@
 // [11/23] 고친 문장은 changed로 보낸다. 서버가 다시 검사하고(check_public_text) 공개 초안에도 남긴다(edited: true).
 //   내 경험노트 문장은 따로 고친다 — 여기서 고쳐도 바뀌지 않는다(두 노트는 읽는 사람이 달라 표현이 다를 수 있음).
 
-import { saveConsent, listNotes } from "./data.js";
+import { saveConsent, listNotes, getMyNote } from "./data.js";
 
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };
@@ -103,6 +103,7 @@ const state = {
   on: new Map(),      // lineId → 켬(true)/끔(false)
   lineCount: 0,
   note: undefined,    // 반영될 해봤노트(listNotes 한 줄) · null이면 새 노트 · undefined면 아직 모름
+  shared: 0,          // 이 경험노트에서 이미 해봤노트에 실린 문장 수(note.evidenceCount에 들어 있음 — 다시 공유하면 바뀌어 끼워짐)
   busy: false,
   done: false,        // 공유는 됐지만 서버가 일부 문장을 거절해 결과를 보여 주는 중
   rejected: new Map(), // lineId → 서버가 준 message (saveConsent.rejected, spec 4장 [11/20])
@@ -164,7 +165,7 @@ function openSheet(draft) {
   renderLines();
   renderTarget();
   update();
-  loadTarget(draft.program);
+  loadTarget(draft);
 
   root.hidden = false;
   document.body.classList.add("sheet-open");
@@ -194,13 +195,31 @@ function allLines(draft) {
 // ① 반영될 해봤노트 (시트 맨 위)
 // ---------------------------------------------------------------------------
 
-async function loadTarget(program) {
+// [11/25 작업 35] 근거 수는 서버 evidenceCount와 같은 기준(spec 5장: 보고서 문단 + 동의 인터뷰 「문장」 수).
+// 같은 경험노트로 다시 공유하면 서버가 그 노트의 문장을 이번 범위로 바꿔 끼우므로(publish_lines) 이미 실린 문장 수를 뺀다.
+// getMyNote 응답은 sharedLines가 있고, summarizeInterview 응답은 myNoteId로 getMyNote를 한 번 더 읽는다(못 읽으면 0).
+async function sharedLinesOf(draft) {
+  if (Number.isFinite(draft.sharedLines)) return draft.sharedLines;
+  if (!draft.myNoteId) return 0;
+  try {
+    const mine = await getMyNote(draft.myNoteId);
+    return mine && Number.isFinite(mine.sharedLines) ? mine.sharedLines : 0;
+  } catch (err) {
+    console.error(err);
+    return 0;
+  }
+}
+
+async function loadTarget(draft) {
+  const program = draft.program;
   state.note = undefined;
+  state.shared = 0;
   renderTarget();
-  const res = await listNotes({ q: program });
-  if (state.draft && state.draft.program !== program) return; // 그 사이 다른 초안이 열림
+  const [res, shared] = await Promise.all([listNotes({ q: program }), sharedLinesOf(draft)]);
+  if (state.draft !== draft) return; // 그 사이 다른 초안이 열림
   const notes = (res && Array.isArray(res.notes)) ? res.notes : [];
   state.note = notes.find((n) => n.program === program) || null;
+  state.shared = shared;
   renderTarget();
   drawIcons();
 }
@@ -228,8 +247,9 @@ function renderTarget() {
   const note = state.note;
   const cat = CATEGORY[note.type];
   const before = Number(note.evidenceCount) || 0;
-  // 켠 문장이 하나도 없으면 근거 수는 바뀌지 않는다(7-②). 이번 인터뷰 1건이 더해진다.
-  const after = onCount() > 0 ? before + 1 : before;
+  // 켠 문장이 하나도 없으면 근거 수는 바뀌지 않는다(7-②). 켠 문장 수만큼 더해진다(이미 실린 이 노트 문장은 바뀌어 끼워짐)
+  const on = onCount();
+  const after = on > 0 ? Math.max(0, before - state.shared) + on : before;
 
   targetBox.replaceChildren(
     head,
@@ -252,14 +272,24 @@ function renderLines() {
     linesBox.replaceChildren(el("p", { className: "sub", text: "공개할 수 있는 문장이 없어요." }));
     return;
   }
-  linesBox.replaceChildren(...sections.map((section) => el("div", { className: "consent-section" }, [
-    el("h3", { className: "consent-section__name", text: section.name }),
-    ...section.lines.filter((l) => l && l.lineId).map((line) => lineRow(line)),
-  ])));
+  linesBox.replaceChildren(...sections.map((section) => {
+    const lines = section.lines.filter((l) => l && l.lineId);
+    return el("div", { className: "consent-section" }, [
+      el("h3", { className: "consent-section__name", text: section.name }),
+      ...lines.map((line, i) => lineRow(line, firstOfQuestion(lines, i))),
+    ]);
+  }));
+}
+
+// [11/25 작업 35 P2] 후배 질문 하나에 답한 문장이 여럿이면 문장마다 asked가 붙어 온다(spec summarizeInterview).
+// Q 인용은 같은 질문이 이어지는 문장 묶음의 첫 문장에만 보인다(같은 Q가 한 칸에 두 번 나오지 않게)
+function firstOfQuestion(lines, i) {
+  const asked = lines[i].asked;
+  return Boolean(asked) && (i === 0 || lines[i - 1].asked !== asked);
 }
 
 let switchSeq = 0;
-function lineRow(line) {
+function lineRow(line, showQ = Boolean(line.asked)) {
   const id = `consent-sw-${++switchSeq}`;
   // 끈 문장: 진한 남색 + 자물쇠로 「내 경험노트에만 남아요」
   const offNote = el("span", { className: "consent-line__off" }, [icon("lock"), "내 경험노트에만 남아요"]);
@@ -302,15 +332,15 @@ function lineRow(line) {
   const canEdit = !rejectNote && !state.done;
 
   const text = el("label", { className: "consent-line__text", attrs: { for: id } }, [
-    // 후배 질문 칸: Q(후배 질문 원문, 인용) + A(내 답)
-    line.asked ? el("span", { className: "msg__quote", text: `Q. ${line.asked}` }) : null,
+    // 후배 질문 칸: Q(후배 질문 원문, 인용 — 같은 질문 묶음의 첫 문장에만) + A(내 답)
+    showQ ? el("span", { className: "msg__quote", text: `Q. ${line.asked}` }) : null,
     el("span", { text: line.asked ? `A. ${shown}` : shown }),
   ]);
 
   if (state.editing === line.lineId) {
     return el("div", { className: "consent-line", attrs: { "data-line": line.lineId } }, [
       el("div", { className: "consent-line__main" }, [
-        line.asked ? el("span", { className: "msg__quote", text: `Q. ${line.asked}` }) : null,
+        showQ ? el("span", { className: "msg__quote", text: `Q. ${line.asked}` }) : null,
         editor(line, shown),
       ]),
     ]);

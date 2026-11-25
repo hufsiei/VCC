@@ -258,5 +258,20 @@ card = next(n for n in getInbox(WRITER, {})["myNotes"] if n["id"] == mid)
 expect("카드: 전부 공유 = shared·3문장", card["share"] == "shared" and card["sharedLines"] == 3)
 expect("카드에는 학번·문장 원문 없음", not any(k in card for k in ("owner", "sections", "publicDraft")))
 
+# [11/25 작업 35 P12] 선배 1명이 후배 질문 하나에 두 문장으로 답하면 노트에는 그 질문 문장이 2줄(sourceId도 문장마다 따로).
+# 시연 재현: 질문 상세(screens/questions/questions.js evidenceBlock)가 lines.length(2)를 사람 수로 보고 「선배 2명의 경험이에요」.
+# 노트 응답에는 사람을 가릴 값이 없다(학번을 내보내지 않음) → 화면은 spec 5장대로 1~2건이면 고정 문구 「선배 1명의 경험이에요」.
+p12_q = add_question(JUNIOR, "마르부르크 기숙사 인터넷은 바로 되나요?", program=PROGRAM, status="hold")
+p12 = [{"section": "생활", "draftLineId": f"L-P12-{i}", "text": t, "official": False, "answersQuestionId": p12_q,
+        "asked": "마르부르크 기숙사 인터넷은 바로 되나요?"}
+       for i, t in enumerate(["기숙사 인터넷은 직접 신청해야 했어요.", "첫 2주는 인터넷이 없었어요."], 1)]
+runtime_fns.publish_lines(OTHER, PROGRAM, "M-P12", p12)
+ans = [ln for s in notes.getNote(JUNIOR, {"id": "N-marburg"})["sections"] for ln in s["lines"]
+       if ln.get("answersQuestionId") == p12_q]
+expect("P12 한 선배의 두 문장 = 노트 2줄·sourceId 2개(줄 수 ≠ 선배 수)",
+       len(ans) == 2 and len({ln["sourceId"] for ln in ans}) == 2)
+expect("P12 노트 줄에 사람을 가릴 값(학번·owner) 없음",
+       OTHER not in json.dumps(ans, ensure_ascii=False) and not any("owner" in ln for ln in ans))
+
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)

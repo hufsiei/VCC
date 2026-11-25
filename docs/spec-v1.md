@@ -262,6 +262,7 @@ payload `{program, transcript:[{section, question, answer, questionId?}], append
 ### saveConsent(draftId, edits)
 payload `{draftId, edits:{removed:[lineId], changed:[{lineId, text}]}, consent:true}`. `removed` = 동의 시트에서 끈 문장(내 경험노트에는 남고 해봤노트에는 안 들어감). 이미 공유한 경험노트에서 다시 부르면 공유 범위를 바꾼다.
 **[11/19]** 통과한 문장은 `runtime/noteLines.json`에 `{noteId, section, text, sourceId: "I-…", semester, answersQuestionId?, asked?}`로 쌓인다(작업 26·74). **[v2]** `section`은 질문의 칸이고(「후배 질문」 칸 없음), 삭제된 질문(`status: "deleted"`)에 답한 문장은 칸 문장으로 싣되 `answered` 전환·알림은 하지 않는다. `answersQuestionId`가 있으면 그 질문을 `status: "answered"`, `noteId`로 바꾸고 질문자에게 알림 `「내 질문에 선배가 답했어요 · {프로그램} 해봤노트」`(`alerts.json`, `questionId`·`noteId` 포함)를 보낸다. **칸 이름이 같다는 이유만으로 알림을 보내지 않는다.** 노트가 아직 없는 프로그램이면 새 노트 id를 만든다(`"N-" + slug`).
+**[11/25 작업 35]** 동의 시트의 「근거 N건 → M건」은 노트 `evidenceCount`와 같은 기준(문장 수): N = `listNotes` `evidenceCount`, M = N − 이 경험노트의 `sharedLines`(다시 공유하면 바뀌어 끼워짐) + 켠 문장 수(0개면 N 그대로). 후배 질문 하나에 답한 문장이 여럿이면 문장마다 `asked`가 붙으므로, 화면은 같은 `asked`가 이어지는 문장 묶음의 첫 문장에만 「Q.」를 보인다.
 ```json
 { "ok": true, "noteId": "N-marburg", "added": 3, "answered": ["Q-0001"],
   "recommend": { "ready": true, "by": "talk", "need": 3, "talk": { "answered": 4, "shared": 3 }, "ask": false }, "unlocked": true }
