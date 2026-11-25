@@ -11,9 +11,10 @@ description: 미리(VCC 총괄)의 업무 시작 루틴. "밀시작", "업무 �
 - 세션 맥락에 `[VCC] …` 한 줄(SessionStart hook)이 있으면 그 결과를 쓴다. 없으면 `python -X utf8 C:/dev/VCC/.claude/hooks/session_start.py --force`를 돌려 상태 한 줄을 받는다(VS Code 패널은 hook 출력을 띄우지 않으므로 보고 맨 위에 그 줄을 보여 준다).
 - `git -C C:/dev/VCC pull` 이 건너뛰어졌으면 이유(다른 브랜치·고친 파일)를 미리에게 알리고, 남의 작업일 수 있으니 임의로 되돌리지 않는다.
 - `.env`: **값을 읽거나 출력하지 않는다.** 키 이름 3개(CLOVA_KEY·ANTHROPIC_API_KEY·VCC_LOGIN_PW)가 있는지만 본다. 모자라면 "Bitwarden에서 다시 붙여 주세요"라고만 말한다(.env 편집은 미리가 직접 한다).
-- 스킬 연결: `~\.claude\skills`에 milstart·milend·milreview·milwork 네 개가 모두 있는지 본다. 빠진 게 있으면 `.claude/미리-PC설정.md` 2절대로 junction을 만든다(SymbolicLink는 관리자 권한이 필요하니 쓰지 않는다).
+- 총괄 등록: `ListAgents` 첫 줄 「This session is <이름>」에서 내 세션 이름을 읽어 `python -X utf8 C:/dev/VCC/.claude/skills/milwork/board.py chief --set <내 세션이름>`으로 상태판 머리에 적는다(작업창이 제안·결정요망을 이 이름으로 보낸다).
+- 스킬 연결: `~\.claude\skills`에 milstart·milend·milreview·milwork·milwatch 다섯 개가 모두 있는지 본다. 빠진 게 있으면 `.claude/미리-PC설정.md` 2절대로 junction을 만든다(SymbolicLink는 관리자 권한이 필요하니 쓰지 않는다).
 - 계정: `gh auth status`의 활성 계정이 hufsiei인지, `git -C C:/dev/VCC config user.email`이 noreply 주소인지. 다르면 알린다.
-- 남은 작업 폴더(`C:\dev\VCC-*`): `python -X utf8 C:/dev/VCC/.claude/skills/milwork/board.py list`로 상태판(`C:\dev\VCC-board.md`)과 함께 본다. 줄마다 어느 작업·어느 상태인지 그대로 보고하고, 「폴더 없음」 줄은 `prune`, 「상태판에 없음」 폴더는 병합됐으면 지우고 아니면 `add`로 적을지 묻는다. 「전달 대기」가 있으면 ③ 「팀원과 맞춰야 할 일」에 넣는다.
+- 남은 작업 폴더(`C:\dev\VCC-*`): `python -X utf8 C:/dev/VCC/.claude/skills/milwork/board.py list`로 상태판(드라이브 `@VCC\총괄\board.md`, 두 PC 공용)과 함께 본다. 줄마다 어느 작업·어느 상태인지 그대로 보고하고, 「폴더 없음」 줄은 `prune`, 「상태판에 없음」 폴더는 병합됐으면 지우고 아니면 `add`로 적을지 묻는다. 「전달 대기」가 있으면 ③ 「팀원과 맞춰야 할 일」에 넣는다.
 
 ## 2. 자료 모으기
 - 작업내역서: `H:\내 드라이브\@VCC\@VCC작업내역 v6.xlsx` (openpyxl, data_only, 읽기만). 시트 `작업목록`(번호·시기·단계·담당·기한·진행상황·비고·선행·막힌 점), `전달사항`(처리상태가 확인완료가 아닌 것), `주요링크`.
@@ -35,12 +36,12 @@ description: 미리(VCC 총괄)의 업무 시작 루틴. "밀시작", "업무 �
 
 기술적인 세부는 미리가 팀 가이드를 붙여 넣으며 따로 상의하므로 여기서 풀지 않는다.
 
-## 4. 혼자 할 수 있는 일 → milwork 지시문으로 남기기
-**직접 시작하지 않는다.** 보고 뒤에 「제가 혼자 할 수 있는 일」마다 새 대화창에 그대로 붙여 넣을 지시문을 코드 블록 하나씩으로 쓴다. 한 블록 = 한 작업 = 한 대화창. 형식:
+## 4. 혼자 할 수 있는 일 → 큐에 넣고 milwork 지시문으로 남기기
+**직접 시작하지 않는다.** 먼저 「제가 혼자 할 수 있는 일」마다 `board.py queue add --task "<작업번호 또는 –> <제목>" --files a,b --from milstart`로 큐에 넣어 `Q-n`을 받는다. 그다음 보고 뒤에 새 대화창에 그대로 붙여 넣을 지시문을 코드 블록 하나씩으로 쓰고, **블록 위에 `Q-n`을 붙여 보여 준다**(지시문 첫 줄 끝에도 `Q-n`). 한 블록 = 한 작업 = 한 대화창. 형식:
 
 ````
 ```
-milwork 미리 <슬러그> <작업 제목> (작업 N)
+milwork 미리 <슬러그> <작업 제목> (작업 N) Q-n
 
 목표: <끝났을 때 무엇이 달라지나, 한두 줄>
 왜: <오늘 이 일을 하는 이유 — 무엇을 풀거나 무엇의 선행인가>
@@ -55,6 +56,7 @@ milwork 미리 <슬러그> <작업 제목> (작업 N)
 - 「고칠 곳」이 다른 지시문과 겹치면 하나로 합치거나 순서를 적는다(같은 파일을 두 대화창에서 동시에 고치지 않는다).
 - AI 비용이 드는 일(실제 AI 호출, 재분류, 측정)은 「주의」에 호출 수와 예상 금액을 적는다. **하루 기준 $20**(11/23 미리 결정): 작업 대화창은 실행 전 오늘 누적(`python -X utf8 functions/ai_usage.py` → `오늘 내 AI $x.xx (Claude n회) · HCX m회 k토큰`, Sonnet 5.5 $2/$10·Opus 5.5 $4/$20 per 1M) + 예상 금액이 $20 이하면 금액만 알리고 진행하고, 넘으면 미리에게 승인받는다. HCX는 대회 크레딧(50만 원, ~12/31, 11/24 수령)에서 빠진다. 단가를 확인하기 전까지는 $에 넣지 못하니 HCX 호출 수·토큰을 함께 보고한다(예상과 누적 모두).
 - 지시문 뒤에 한 줄만 남기고 멈춘다: **"위 블록을 새 대화창에 하나씩 붙여 넣어 돌리세요. 이 창은 총괄 창으로 남겨 두고, 끝나면 여기서 밀리뷰·밀종료를 하세요."**
+- 보고 맨 끝에 한 줄 더: **「이 창에서 `/loop 20m /milwatch`를 켜 두면 20분마다 PR 메시지·큐·겹침·결정요망을 점검해요.」**
 - 이 창에서는 이어서 팀원과 맞출 일·미리가 정할 일을 상의한다. 병합은 미리 승인 뒤에만(`gh pr merge <n> --merge --admin`, hufsiei 계정).
 
 ## 작업 규칙 (늘 지킨다)
