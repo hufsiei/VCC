@@ -1,6 +1,6 @@
 # test_main.py — Cloud Functions 진입점·store ncp 분기 시험 (작업 58 ①). 네트워크·AI를 부르지 않는다.
 # 실행: python -X utf8 functions/cloud/test_main.py   하나라도 틀리면 종료코드 1.
-#   1. main(): OPTIONS·CORS, Raw HTTP 아님 거절, login → 토큰 → getMe, base64 본문, 없는 함수, 로그인 필요, logout,
+#   1. main(): OPTIONS·CORS(모든 응답에 허용 Origin 1개, 다른 Origin·"*" 설정이면 없음), Raw HTTP 아님 거절, login → 토큰 → getMe, base64 본문, 없는 함수, 로그인 필요, logout,
 #      _diag는 VCC_DIAG=1일 때만, 예외 시 응답은 고정 문구·원문은 stderr(키 값 가림)
 #   2. store ncp: _s3를 메모리 가짜로 바꿔 load·save·next_id·begin_request·clear_all 왕복
 #      (실제 버킷 왕복은 test_store_ncp_live.py)
@@ -50,9 +50,37 @@ r = main.main({**PARAMS, "__ow_method": "options", "__ow_headers": {"origin": OR
 check("OPTIONS 204 + 허용 origin", r["statusCode"] == 204 and r["headers"].get("Access-Control-Allow-Origin") == ORIGIN)
 check("X-Token 헤더 허용", "X-Token" in r["headers"]["Access-Control-Allow-Headers"])
 
+
+
+def allow_origin(r):
+    """Allow-Origin 헤더 값 목록(대소문자 무시) — 정확히 한 줄인지 보려고 목록으로."""
+    return [v for k, v in r["headers"].items() if k.lower() == "access-control-allow-origin"]
+
+
+EVIL = "https://evil.example"
 r, out = call("/getMe")
-check("본 응답에는 CORS 헤더를 붙이지 않음(API Gateway가 붙임 — 두 개면 브라우저가 막음)",
-      not any(k.lower().startswith("access-control") for k in r["headers"]))
+check("POST 허용 Origin → Allow-Origin 그 값 1개", allow_origin(r) == [ORIGIN] and r["headers"].get("Vary") == "Origin")
+check("POST 응답 Allow-Methods는 POST, OPTIONS(기본 묶음 7개 아님)", r["headers"].get("Access-Control-Allow-Methods") == "POST, OPTIONS")
+r, out = call("/getMe", origin=EVIL)
+check("POST 다른 Origin → Allow-Origin 없음", allow_origin(r) == [] and out.get("error") == "로그인이 필요해요")
+r = main.main({**PARAMS, "__ow_method": "options", "__ow_headers": {"origin": EVIL}})
+check("OPTIONS 다른 Origin → Allow-Origin 없음", r["statusCode"] == 204 and allow_origin(r) == [])
+r = main.main({**PARAMS, "__ow_method": "post", "__ow_path": "/getMe", "__ow_body": "{}", "__ow_headers": {}})
+check("Origin 헤더 없음(curl 등) → Allow-Origin 없음", allow_origin(r) == [])
+r, out = call("/getMe", origin="null")
+check("Origin null → Allow-Origin 없음", allow_origin(r) == [])
+for given, label in (("*", "*만"), ("", "빈 값"), (" * , https://hufsiei.github.io/ ", "* 섞임·끝 /")):
+    r = main.main({**PARAMS, "ALLOW_ORIGIN": given, "__ow_method": "options", "__ow_headers": {"origin": ORIGIN}})
+    r2 = main.main({**PARAMS, "ALLOW_ORIGIN": given, "__ow_method": "options", "__ow_headers": {"origin": EVIL}})
+    check(f"ALLOW_ORIGIN {label} → *를 쓰지 않고 Pages만", allow_origin(r) == [ORIGIN] and allow_origin(r2) == [])
+r = main.main({**PARAMS, "ALLOW_ORIGIN": ORIGIN + ",http://localhost:8000", "__ow_method": "options",
+               "__ow_headers": {"origin": "http://localhost:8000"}})
+check("ALLOW_ORIGIN 쉼표 목록 → 요청 Origin 하나만", allow_origin(r) == ["http://localhost:8000"])
+r = main.main({**PARAMS, "__ow_method": "post", "__ow_path": "/getMe", "__ow_body": "{깨짐",
+               "__ow_headers": {"origin": ORIGIN}})
+check("오류 응답(JSON 아님)에도 Allow-Origin 1개 — 브라우저가 오류 문구를 읽게", allow_origin(r) == [ORIGIN])
+r = main.main({**PARAMS, "__ow_method": "get", "__ow_path": "/getMe", "__ow_headers": {"origin": ORIGIN}})
+check("405 응답에도 Allow-Origin 1개", r["statusCode"] == 405 and allow_origin(r) == [ORIGIN])
 r = main.main({**PARAMS, "__ow_method": "post", "__ow_path": "/", "__ow_query": "fn=getMe", "__ow_body": "{}",
                "__ow_headers": {}})
 check("쿼리 fn= → 함수 이름(API Gateway는 경로를 / 로 넘김)", "로그인이 필요해요" in r["body"])
