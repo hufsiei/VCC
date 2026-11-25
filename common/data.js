@@ -3,7 +3,10 @@
 // 사용: <script type="module"> import { askBoo } from "../../common/data.js"; </script>
 
 export const USE_MOCK = true; // 기본값. true: common/mock-data.json, false: 서버 함수
-const FN_BASE = "http://localhost:8787";
+// [작업 58] GitHub Pages(…github.io)에서는 NCP Cloud Functions 공개 주소, 그 밖(로컬)은 local_fn.py
+const FN_PUBLIC = "https://x1ey63q7ei.apigw.ntruss.com/vcc-api/dev"; // API Gateway vcc-api · Stage dev · 리소스 /{fn} → 액션 vcc/vcc-api
+const IS_PUBLIC = location.hostname.endsWith("github.io");
+const FN_BASE = IS_PUBLIC ? FN_PUBLIC : "http://localhost:8787";
 
 // [작업 29] 함수별 스위치 — USE_MOCK과 반대로 보낼 함수만 적는다.
 // 전환 순서(작업 29): login·getMe → askBoo → 들려주기 → 노트 → 닮은선배·쪽지 → 콘솔. 실패한 함수만 MOCK_FNS로 되돌린다.
@@ -12,11 +15,12 @@ const MOCK_FNS = []; //   USE_MOCK = false여도 mock으로 되돌릴 함수
 // 서버 함수는 로그인 토큰(X-Token)이 있어야 하므로, 서버로 가는 함수가 하나라도 있으면 로그인도 서버로 간다.
 const AUTH_FNS = ["login", "logout", "getMe"];
 
-// 로컬 확인용(미리 PC, localhost에서만): 주소 끝에 ?server=all 또는 ?server=sendMessage,getMessages
-// → 그 탭에서만 기억(sessionStorage, 두 창 시연). ?server= (빈 값)으로 해제. 공개 주소(GitHub Pages)에서는 무시한다.
+// 서버 확인용(localhost·GitHub Pages): 주소 끝에 ?server=all 또는 ?server=sendMessage,getMessages
+// → 그 탭에서만 기억(sessionStorage, 두 창 시연). ?server= (빈 값)으로 해제. 붙이지 않으면 USE_MOCK대로(기본 mock).
+// [작업 58] 공개 주소에서도 받는다 — 붙인 탭만 Cloud Functions(FN_PUBLIC)로 간다.
 function localServerFns() {
   try {
-    if (!["localhost", "127.0.0.1"].includes(location.hostname)) return [];
+    if (!IS_PUBLIC && !["localhost", "127.0.0.1"].includes(location.hostname)) return [];
     const q = new URLSearchParams(location.search);
     if (q.has("server")) {
       const v = q.get("server").trim();
@@ -338,7 +342,8 @@ async function call(name, payload = {}) {
     const headers = { "Content-Type": "application/json" };
     const me = currentUser();
     if (me && me.token) headers["X-Token"] = me.token; // 서버가 토큰으로 누가 불렀는지 안다 (spec 2-1)
-    const res = await fetch(`${FN_BASE}/${name}`, {
+    // [작업 58] ?fn=: NCP API Gateway가 경로 {fn}을 액션에 넘기지 않아 쿼리로도 보낸다(local_fn은 쿼리를 무시)
+    const res = await fetch(`${FN_BASE}/${name}?fn=${encodeURIComponent(name)}`, {
       method: "POST",
       keepalive: true, // 로그아웃 직후 화면이 바뀌어도 요청이 끊기지 않게
       headers,
