@@ -420,7 +420,7 @@ function questionCards(lines, sources) {
 
 // ---------------------------------------------------------------------------
 // 5-1. 칸별 요약 문단(작업 78, spec getNote [v2] summary·[11/23] newLines)
-//   소제목 → 요약 문단(문장 끝 출처 연도) → 「원문 N건 보기」 접기 → 「새로 더해진 선배 이야기 N건」.
+//   소제목 → 요약 문단(문장 끝 출처 연도 + official이면 「개인 경험」) → 「원문 N건 보기」 접기 → 「새로 더해진 선배 이야기 N건」.
 //   summary가 없으면 이 부분을 안 쓰고 원문 목록 그대로. 배운점은 서버가 summary를 보내지 않는다.
 // ---------------------------------------------------------------------------
 
@@ -462,6 +462,8 @@ function summaryParagraph(section, sources, reportName) {
     parts.push(el("span", { className: "summary__sentence", text: item.text }));
     const from = summarySourceText(item, sources, reportName);
     if (from) parts.push(" ", el("span", { className: "summary__from", text: from }));
+    // 규정에 닿는 요약 문장(official) — 칸 문장과 같은 중립 라벨 「개인 경험」(디자인 규칙 8-1)
+    if (item.official) parts.push(" ", statusLabel("neutral", "user", "개인 경험"));
   });
   return el("p", { className: "summary__text" }, parts);
 }
