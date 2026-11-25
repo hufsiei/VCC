@@ -22,7 +22,6 @@ const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비�
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };
 const KIND_NAME = { 교환: "교환학생", 파견: "파견", 인턴: "인턴", 비교과: "" };
 const DOC_LABEL = { 귀국보고서: "결과보고서", 현장실습후기: "현장실습후기", 인터뷰: "선배 인터뷰" };
-const QUESTION_SECTION = "후배 질문";
 const DASH = "–";
 const TABS = ["notes", "questions", "messages", "scraps"];
 
@@ -327,7 +326,7 @@ function questionCard(q) {
   if (q.status === "answered") {
     children.push(el("span", { className: "question__date", text: questionDates(q) }));
     const pub = notesById.get(q.noteId);
-    children.push(el("p", { className: "question__info", text: pub ? `${pub.program} 해봤노트 「후배 질문」 칸에 답이 실렸어요` : "해봤노트 「후배 질문」 칸에 답이 실렸어요" }));
+    children.push(el("p", { className: "question__info", text: pub ? `${pub.program} 해봤노트에 답이 실렸어요` : "해봤노트에 답이 실렸어요" }));
     if (q.noteId) {
       const id = encodeURIComponent(q.noteId);
       children.push(el("div", { className: "btn-row" }, [
@@ -567,9 +566,9 @@ function myNoteRow(section) {
   const lines = section.lines || [];
   if (!lines.length) row.append(el("p", { className: "summary-row__empty", text: DASH }));
   for (const line of lines) {
-    // 후배 질문 칸: Q(후배 질문 원문, 인용) + A(내 답)
-    if (section.name === QUESTION_SECTION && line.asked) row.append(el("span", { className: "msg__quote", text: `Q. ${line.asked}` }));
-    row.append(el("p", { text: section.name === QUESTION_SECTION ? `A. ${line.text}` : line.text }));
+    // 후배 질문에 답한 문장(spec [v2]: 칸은 질문의 칸): 앞에 작은 인용 「Q. 질문 원문」 + A(내 답)
+    if (line.asked) row.append(el("span", { className: "msg__quote", text: `Q. ${line.asked}` }));
+    row.append(el("p", { text: line.asked ? `A. ${line.text}` : line.text }));
     // 공유한 문장에는 작은 긍정 라벨 「공유됨」(8절)
     if (line.shared) {
       const mark = statusLabel("success", "check", "공유됨");
@@ -636,7 +635,7 @@ document.addEventListener("consent-saved", (event) => {
 
 // ---------------------------------------------------------------------------
 // 7. 질문 상세(2단계, 8절) — 질문 문장 + 상태 라벨 + 관련 해봤노트 근거 블록(6-1/6-2)
-//    + 답했으면 「후배 질문」 칸의 A 문장과 「해봤노트에서 보기」 + 닮은선배
+//    + 답했으면 해봤노트에서 이 질문에 답한 A 문장(어느 칸이든)과 「해봤노트에서 보기」 + 닮은선배
 // ---------------------------------------------------------------------------
 
 const questionBody = document.getElementById("questionBody");
@@ -711,7 +710,7 @@ async function renderQuestion(questionId) {
 
   if (q.status === "answered" && q.noteId) {
     const id = encodeURIComponent(q.noteId);
-    // 해봤노트 「후배 질문」 칸에서 이 질문(answersQuestionId)에 대한 선배 답만 찾는다
+    // 해봤노트 모든 칸에서 이 질문(answersQuestionId)에 대한 선배 답만 찾는다(spec [v2]: 답은 질문의 칸에 들어감)
     let note = null;
     try {
       note = await getNote(q.noteId);
@@ -719,8 +718,8 @@ async function renderQuestion(questionId) {
     } catch (err) {
       console.error(err);
     }
-    const section = note && (note.sections || []).find((s) => s.name === QUESTION_SECTION);
-    const answers = section ? (section.lines || []).filter((l) => l.answersQuestionId === q.questionId) : [];
+    const answers = ((note && note.sections) || []).flatMap((s) =>
+      (s.lines || []).filter((l) => l.answersQuestionId === q.questionId).map((l) => ({ ...l, sectionName: s.name })));
     const sources = (note && note.sources) || {};
 
     children.push(el("h3", { className: "section-title", text: "선배의 답" }));
@@ -732,7 +731,7 @@ async function renderQuestion(questionId) {
             el("span", { className: "qa__mark", text: "A", attrs: { "aria-label": "선배 답" } }),
             el("div", { className: "qa__a-body" }, [
               el("p", { text: a.text }),
-              el("div", { className: "line__meta" }, [el("span", { text: `${DOC_LABEL[src.docType] || orDash(src.docType)} · ${yearOf(src.semester)}` })]),
+              el("div", { className: "line__meta" }, [el("span", { text: `${a.sectionName} · ${DOC_LABEL[src.docType] || orDash(src.docType)} · ${yearOf(src.semester)}` })]),
             ]),
           ]),
         ]);

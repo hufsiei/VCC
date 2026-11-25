@@ -18,7 +18,6 @@ const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra:
 // 띠의 세부 분류: 종류 + 국가(spec [11/22] country). country가 null이면 종류만(비교과는 분야 태그와 같아 비움)
 const KIND_NAME = { 교환: "교환학생", 파견: "파견", 인턴: "인턴", 비교과: "" };
 const DASH = "–";
-const QUESTION_SECTION = "후배 질문";
 const LEARN_SECTION = "배운점";
 // 출처 종류 표기(인터BOO와 같음). 근거 블록 머리줄의 보고서 이름은 노트 종류에 따라
 const DOC_LABEL = { 귀국보고서: "결과보고서", 현장실습후기: "현장실습후기", 인터뷰: "선배 인터뷰" };
@@ -312,7 +311,7 @@ queryClear.addEventListener("click", () => {
 // 4. 근거/출처 블록 — 6-1 · 6-2 (칸마다)
 // ---------------------------------------------------------------------------
 
-// button: 「질문함에 담기」 버튼(후배 질문 칸은 담을 수 없어 null)
+// button: 「질문함에 담기」 버튼
 function emptyEvidence(message, button) {
   return el("div", { className: "evidence evidence--empty" }, [
     el("div", { className: "evidence__head" }, [
@@ -386,6 +385,8 @@ function lineMeta(line, src) {
     sourceChip(line, src),
     line.official ? statusLabel("neutral", "user", "개인 경험") : null,
     line.autoClassified ? statusLabel("neutral", null, "자동 분류") : null,
+    // 후배 질문에 답한 문장(spec getNote [v2]): 질문의 칸에 일반 문장으로 들어오고 라벨만 붙인다. Q 원문은 보이지 않음
+    line.answersQuestionId ? statusLabel("neutral", "message-circle", "후배 질문에 답한 문장") : null,
     reportButton(line),
   ]);
 }
@@ -396,26 +397,6 @@ function lineCard(line, src, { quote = false } = {}) {
     el("p", { className: "line__text", text: line.text }),
     lineMeta(line, src),
   ]);
-}
-
-// 후배 질문 칸: 같은 질문(answersQuestionId)에 답이 여럿이면 A가 아래로 쌓인다(8절 v4.3)
-function questionCards(lines, sources) {
-  const groups = new Map();
-  for (const l of lines) {
-    const key = l.answersQuestionId || l.asked || l.lineId;
-    if (!groups.has(key)) groups.set(key, { asked: l.asked, answers: [] });
-    groups.get(key).answers.push(l);
-  }
-  return [...groups.values()].map((g) => el("div", { className: "line qa" }, [
-    el("div", { className: "qa__q" }, [
-      el("span", { className: "qa__mark", text: "Q", attrs: { "aria-label": "후배 질문" } }),
-      el("p", { text: orDash(g.asked) }),
-    ]),
-    ...g.answers.map((a) => el("div", { className: "qa__a" }, [
-      el("span", { className: "qa__mark", text: "A", attrs: { "aria-label": "선배 답" } }),
-      el("div", { className: "qa__a-body" }, [el("p", { text: a.text }), lineMeta(a, sources[a.sourceId] || {})]),
-    ])),
-  ]));
 }
 
 // ---------------------------------------------------------------------------
@@ -536,17 +517,11 @@ function renderSection(panel) {
   const reportName = note.type === "인턴" ? "현장실습후기" : "결과보고서";
 
   const children = [];
-  const isQuestion = section.name === QUESTION_SECTION;
-  // 후배 질문 칸은 질문함에 담을 수 없다(spec saveQuestion: 오류)
-  const askBtn = () => (isQuestion ? null : askBoxButton(note.id, section.name));
+  const askBtn = () => askBoxButton(note.id, section.name);
   if (!lines.length) {
-    const msg = isQuestion
-      ? "아직 후배 질문에 답한 선배가 없어요."
-      : "아직 이 항목을 경험한 선배의 이야기가 없어요.";
-    children.push(emptyEvidence(msg, askBtn()));
+    children.push(emptyEvidence("아직 이 항목을 경험한 선배의 이야기가 없어요.", askBtn()));
   } else {
-    if (section.name === QUESTION_SECTION) children.push(...questionCards(lines, sources));
-    else if (hasSummary(section)) children.push(...summaryBlock(section, sources, reportName));
+    if (hasSummary(section)) children.push(...summaryBlock(section, sources, reportName));
     else children.push(...lines.map((l) => lineCard(l, sources[l.sourceId] || {}, { quote: section.name === LEARN_SECTION })));
     children.push(evidenceBlock(lines, sources, reportName));
 
