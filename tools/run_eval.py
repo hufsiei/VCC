@@ -5,7 +5,7 @@
 #   python tools/run_eval.py --model hcx,sonnet,opus      # askBoo의 고르기·변환 모델만 바꿔 차례로 측정
 #   python tools/run_eval.py --questions <봉인 xlsx> --out <저장소 밖 폴더> --model hcx,sonnet
 #   python tools/run_eval.py --all90 --model hcx,sonnet --pause 4 # [11/25 작업 88] 개발 70 + 다중 턴·탐색·대화 20 = 90개
-#   python tools/run_eval.py --dry                        # AI 없이 흐름만 시험(고르기=1번, 변환=폴백)
+#   python tools/run_eval.py --dry                        # AI 없이 흐름만 시험(고르기=1·2번, 답쓰기=1번 근거 옮기기(cites 2개), 변환=폴백)
 #   python tools/run_eval.py --merge <질문별 csv 여러 개>         # 나눠 돌린 결과를 합쳐 요약(같은 모델끼리)
 #   python tools/run_eval.py --model hcx --only 1-15 --pause 4   # 번호 범위 + 문항 사이 4초(HCX 테스트 키 분당 60요청 ≈ 분당 15문항, HCX 원칙 8절)
 #   python tools/run_eval.py --model hcx --why                   # [11/23] 폴백 줄마다 원인(호출 실패·JSON 형식·말투·검증 종류)과 AI 원래 출력을 따로 저장
@@ -28,7 +28,7 @@
 #   --why면 + eval_폴백_<질문파일>_<모델>_<시각>.csv (폴백 줄별: 번호·원문·AI출력·원인). askBoo 동작은 바꾸지 않고,
 #   변환 호출의 응답을 옆에서 받아 askboo.convert와 같은 순서(응답 실패 → JSON → 해요체 끝 → verify)로 원인만 붙인다.
 #   사후 검증 규칙(askboo.verify)은 그대로 쓴다 — 약하게 만들지 않는다.
-import argparse, csv, json, sys, time
+import argparse, csv, json, re, sys, time
 from datetime import datetime
 from pathlib import Path
 
@@ -118,8 +118,18 @@ def inside(p, root):
 
 
 def dry_call(작업명, messages, system=None, **_):
+    """AI 없이 흐름만. 답쓰기는 1번 근거의 한 문장을 그대로 옮기고 근거 번호를 있는 만큼(최대 2개) 단다 — cites 여러 개 대조 시험용.
+    1번 근거에 존댓말 문장이 없으면 실패로 두어 폴백 줄도 함께 지나간다."""
+    if 작업명 == "답쓰기":
+        rows = re.findall(r"^\[(\d+)\] [^:\n]*: (.+)$", messages[-1]["content"], re.M)
+        ends = [x for x in re.split(r"(?<=[.!?])\s+", rows[0][1]) if re.search(r"(요|니다)[.!?~]*$", x)] if rows else []
+        if ends:
+            j = {"답": [{"text": ends[0], "근거": [int(n) for n, _t in rows[:2]]}]}
+            return {"ok": True, "text": json.dumps(j, ensure_ascii=False), "json": j, "model": "dry"}
+    if 작업명 == "답검사":
+        return {"ok": True, "text": '{"일치":true}', "json": {"일치": True}, "model": "dry"}
     if 작업명 == "고르기":
-        return {"ok": True, "text": '{"관련":[1]}', "json": {"관련": [1]}, "model": "dry"}
+        return {"ok": True, "text": '{"관련":[1,2]}', "json": {"관련": [1, 2]}, "model": "dry"}
     return {"ok": False, "text": "", "json": None, "model": "dry", "error": "dry"}
 
 
@@ -205,7 +215,7 @@ def run(rows, model, askboo, pause=0.0, why=None):
                 "근거없는답": "O" if got == "ok" and (bad or no_cites or want in ("hold", "official")) else "",
                 "근거적중": ("O" if used & expect_ids else "X") if want == "ok" and got == "ok" and expect_ids else "",
                 "줄수": len(lines), "폴백줄": sum(bool(ln.get("fallback")) for ln in lines),
-                "cites없음": no_cites, "질문함저장": "O" if want in ("chat", "notes") and got in ("hold", "official") else "",
+                "cites2개이상": sum(len(ln.get("cites") or []) >= 2 for ln in lines), "cites없음": no_cites, "질문함저장": "O" if want in ("chat", "notes") and got in ("hold", "official") else "",
                 "제외위반": ", ".join(excl), "프로그램": prog,
                 "근거밖줄": " / ".join(bad), "초": sec,
                 "질문": r["질문"], "답": " / ".join(ln["text"] for ln in lines),
@@ -216,7 +226,8 @@ def run(rows, model, askboo, pause=0.0, why=None):
                     it["번호"] = r["번호"]
                 out[-1]["폴백원인"] = " / ".join(it["원인"] for it in why.items[n_why:])
             print(f"  {out[-1]['일치']} {r['번호']:>3} [{r['기대결과']}/{r.get('유형','')}] → {got} ({sec}초)"
-                  + (f"  근거밖 {len(bad)}줄" if bad else ""))
+                  + (f"  cites≥2 {out[-1]['cites2개이상']}줄" if out[-1]["cites2개이상"] else "")
+                  + (f"  ⚠ 근거밖 {len(bad)}줄" if bad else "") + (f"  ⚠ cites 없음 {no_cites}줄" if no_cites else ""))
             if pause:
                 time.sleep(pause)
     finally:
@@ -238,6 +249,7 @@ def summary(model, out):
         "보류율": f(rate(out, lambda r: True, lambda r: r["결과"] in NOT_ANSWER)),   # notes(노트 안내) 포함
         "대화·노트안내 일치": f(rate(out, lambda r: r["기대결과"] in ("대화", "노트안내"), lambda r: r["일치"] == "O")),
         "대화·탐색 질문함저장(0건)": sum(r.get("질문함저장") == "O" for r in out),
+        "cites2개이상줄": sum(int(r.get("cites2개이상") or 0) for r in out),
         "cites없는줄(0건)": sum(int(r.get("cites없음") or 0) for r in out),
         "제외위반": sum(bool(r.get("제외위반")) for r in out),
         "오류": sum(r["결과"] == "error" for r in out),
@@ -346,6 +358,14 @@ def main():
         out = run(rows, m, askboo, 0 if a.dry else a.pause, why)
         write_csv(out_dir / f"eval_{stem}_{m}_{stamp}.csv", out)
         s = summary(m, out)
+        # 근거 없는 답은 한 건이라도 있으면 화면과 파일에 따로 표시한다(S1·S10: 0건)
+        alone = [r for r in out if r["근거없는답"] == "O" or r["근거밖줄"] or r["cites없음"]]
+        if alone:
+            path = out_dir / f"eval_근거없음_{stem}_{m}_{stamp}.csv"
+            write_csv(path, [{k: r[k] for k in ("번호", "모델", "기대결과", "결과", "질문", "답", "출처", "근거밖줄", "cites없음")} for r in alone])
+            print(f"⚠ 근거 확인이 필요한 답 {len(alone)}건: {', '.join(r['번호'] for r in alone)} → {path.name}")
+        else:
+            print("근거 없는 답 0건 · 근거 밖 줄 0 · cites 없는 줄 0")
         if why:
             from collections import Counter
             cnt = Counter(k for it in why.items for k in WhyLog.kind(it["원인"]))
