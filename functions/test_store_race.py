@@ -3,7 +3,8 @@
 #
 # 11/25 두 창 시험: H0469(선배) 답장이 보였다가 새로고침 뒤 양쪽에서 사라짐. 화면이 몇 초마다 부르는 getMessages가
 # 바뀐 게 없어도 messages를 통째로 저장했고, 다른 컨테이너의 늦게 끝난 읽기 요청이 옛 기록으로 덮어썼다.
-# 고친 것: ① getMessages·recommendSeniors는 바뀐 게 있을 때만 저장  ② store(ncp).save는 다시 읽고 이번 요청의 변경만 얹음.
+# 고친 것: ① getMessages·recommendSeniors는 바뀐 게 있을 때만 저장  ② store(ncp).save는 다시 읽고 이번 요청의 변경만 얹음
+#         ③ 그 쓰기는 다시 읽은 ETag를 If-Match(없던 기록은 If-None-Match: *)로 붙이고, 412면 다시 읽어 합치기를 3번까지(7절).
 #
 # 가짜 컨테이너: store._cache·_base를 컨테이너마다 다른 dict로 바꿔 끼운다(같은 가짜 버킷을 본다).
 #   request(name)  그 컨테이너에서 새 요청 시작(begin_request → 버킷에서 새로 읽음)
@@ -21,21 +22,41 @@ store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"
 os.environ.update(STORE_BACKEND="ncp", NCP_OS_BUCKET="b", NCP_OS_ACCESS_KEY="a" * 8, NCP_OS_SECRET_KEY="s" * 8)
 
 bucket, puts = {}, []
+etags = {}          # key → 지금 ETag(가짜: 쓸 때마다 다른 값). NCP처럼 If-Match가 어긋나면 412, If-None-Match: *인데 있으면 412
+intruders = {}      # key → body: 그 key에 PUT하기 직전에 다른 컨테이너가 끼어들어 쓴 것처럼(한 번만. always면 매번)
+always_intrude = set()
+put_log = []        # (key, 상태 코드, 조건 헤더 이름) — 모든 PUT
+_seq = [0]
 
 
-def fake_s3(method, key="", body=b"", query=None):
+def _intrude(key, body):
+    _seq[0] += 1
+    bucket[key], etags[key] = body, f'"intruder-{_seq[0]}"'
+
+
+def fake_s3(method, key="", body=b"", query=None, extra=None):
+    cond = {k.lower(): v for k, v in (extra or {}).items()}
     if method == "GET" and query:
         keys = "".join(f"<Key>{k}</Key>" for k in bucket if k.startswith(query.get("prefix", "")))
-        return 200, f"<ListBucketResult>{keys}</ListBucketResult>".encode()
+        return 200, f"<ListBucketResult>{keys}</ListBucketResult>".encode(), {}
     if method == "GET":
-        return (200, bucket[key]) if key in bucket else (404, b"")
+        return (200, bucket[key], {"etag": etags[key]}) if key in bucket else (404, b"", {})
     if method == "PUT":
-        bucket[key] = body
+        if key in intruders:
+            _intrude(key, intruders[key] if key in always_intrude else intruders.pop(key))
+        cur = etags.get(key)
+        if ("if-match" in cond and cond["if-match"] != cur) or ("if-none-match" in cond and cur is not None):
+            put_log.append((key, 412, sorted(cond)))
+            return 412, b"", {}
+        _seq[0] += 1
+        bucket[key], etags[key] = body, f'"v{_seq[0]}"'
         puts.append(key)
-        return 200, b""
+        put_log.append((key, 200, sorted(cond)))
+        return 200, b"", {"etag": etags[key]}
     if method == "DELETE":
         bucket.pop(key, None)
-        return 204, b""
+        etags.pop(key, None)
+        return 204, b"", {}
 
 
 store._s3 = fake_s3
@@ -186,7 +207,51 @@ expect("B가 먼저 Q-0001", store.next_id("Q") == "Q-0001")
 resume("A")
 expect("A는 합친 뒤 Q-0002", store.next_id("Q") == "Q-0002")
 
-# ── 7. file 방식은 그대로(스냅샷 없이 바로 씀) ───────────────────────────
+# ── 7. 조건부 쓰기(If-Match): 다시 읽기와 쓰기 사이에 끼어든 쓰기 → 412 → 다시 읽어 합쳐 둘 다 남음 ──
+PK = "runtime/probe.json"
+request("A")
+probe = store.load("probe", {})           # 없던 기록
+probe["mine"] = 1
+intruders[PK] = json.dumps({"theirs": 2}).encode()   # 첫 PUT 직전에 다른 컨테이너가 같은 기록을 만듦
+n0 = len(put_log)
+store.save("probe")
+log = [(s, c) for k, s, c in put_log[n0:] if k == PK]
+expect("새 기록: 첫 PUT은 If-None-Match:* → 412, 다시 읽어 If-Match로 200", log == [(412, ["if-none-match"]), (200, ["if-match"])])
+expect("버킷에 둘 다 남음", in_bucket("probe") == {"mine": 1, "theirs": 2})
+expect("요청이 들고 있는 dict도 합친 모습", probe == {"mine": 1, "theirs": 2} and store.load("probe", {}) is probe)
+
+request("A")
+probe = store.load("probe", {})           # 있는 기록(ETag 있음)
+probe["mine"] = 5
+intruders[PK] = json.dumps({"mine": 1, "theirs": 2, "late": 3}).encode()
+n0 = len(put_log)
+store.save("probe")
+log = [(s, c) for k, s, c in put_log[n0:] if k == PK]
+expect("있는 기록: If-Match 어긋남 → 412 → 다시 합쳐 200", log == [(412, ["if-match"]), (200, ["if-match"])])
+expect("내 변경(mine=5)과 끼어든 변경(late) 둘 다", in_bucket("probe") == {"mine": 5, "theirs": 2, "late": 3})
+
+request("A")
+probe = store.load("probe", {})
+probe["mine"] = 9
+intruders[PK] = json.dumps({"mine": 5, "theirs": 2, "late": 4}).encode()
+always_intrude.add(PK)                    # 매번 끼어듦 → 재시도를 다 써도 412
+n0 = len(put_log)
+try:
+    store.save("probe")
+    expect("재시도 초과 → RuntimeError", False)
+except RuntimeError as e:
+    expect("재시도 초과 → RuntimeError", "저장 충돌" in str(e))
+expect(f"PUT은 1 + 재시도 {store.RETRIES}번 = {store.RETRIES + 1}번, 모두 412",
+       [s for k, s, c in put_log[n0:] if k == PK] == [412] * (store.RETRIES + 1))
+expect("실패한 요청의 변경은 캐시에 그대로(mine=9), _base는 안 바뀜", probe["mine"] == 9 and store._base["probe"]["mine"] == 5)
+always_intrude.discard(PK)
+intruders.pop(PK, None)
+store.save("probe")                       # 끼어들기가 멎으면 같은 요청이 다시 저장할 수 있음
+expect("다시 저장하면 내 변경 + 끼어든 변경 모두", in_bucket("probe") == {"mine": 9, "theirs": 2, "late": 4})
+
+expect("모든 PUT에 조건 헤더(If-Match 또는 If-None-Match)", all(c in (["if-match"], ["if-none-match"]) for k, s, c in put_log))
+
+# ── 8. file 방식은 그대로(스냅샷 없이 바로 씀) ───────────────────────────
 os.environ["STORE_BACKEND"] = "file"
 store._cache, store._base = {}, {}
 store.load("x", {"a": 1})["b"] = 2
