@@ -183,6 +183,10 @@ def askBoo(me, payload, save=True):
     return out
 
 
+ASK_LOG_MAX = 2000    # askLog.json에 남기는 최근 답 기록 수(askBoo마다 파일 전체를 읽고 쓰므로 상한을 둔다)
+ASK_LOG_SLACK = 200   # 이만큼 더 쌓이면 한 번에 ASK_LOG_MAX건으로 자른다
+
+
 def _log_answer(question, out, program=None):
     """답 기록 한 줄: 시각·status·질문·답 문장(cites)·프로그램·안내 문구. **사람 칸은 남기지 않는다**
     (spec 0장 「질문 로그는 학번 제거 후 통계만」 — 학번·학과·학년·questionId 없음). 질문 글은 mask.py로 가린다.
@@ -200,7 +204,12 @@ def _log_answer(question, out, program=None):
                "programs": list(dict.fromkeys(p for p in programs if p)), "noteId": out.get("noteId"),
                "message": out.get("message")}
         with store.lock():
-            store.load("askLog", []).append(row)
+            log = store.load("askLog", [])
+            log.append(row)
+            # 끝없이 커지지 않게: ASK_LOG_MAX + ASK_LOG_SLACK건을 넘으면 최근 ASK_LOG_MAX건만 남긴다(그 전은 드라이브 로그 시트).
+            # 매번 자르지 않고 여유를 두는 이유 — store(ncp)는 줄어든 목록을 통째로 쓰므로, 자르는 요청을 드물게 한다
+            if len(log) > ASK_LOG_MAX + ASK_LOG_SLACK:
+                del log[:len(log) - ASK_LOG_MAX]
             store.save("askLog")
     except Exception as e:   # 기록 때문에 답을 잃지 않는다. 원인 종류만 서버 로그에(글·키는 찍지 않는다)
         print(f"[vcc] askLog 기록 실패: {type(e).__name__}")

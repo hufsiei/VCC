@@ -101,6 +101,22 @@ def build_sheets(load):
     return sheets
 
 
+def keep_old_rows(sheets, path, name="물어보기"):
+    """askLog.json은 최근 2,000건만 남으므로(askboo.ASK_LOG_MAX), 이미 엑셀에 있는 그 시트의 앞 기록을 이어 둔다.
+    엑셀이 없거나 읽지 못하면 그대로. 같은 행(모든 칸이 같음)은 한 번만."""
+    try:
+        import openpyxl
+        ws = openpyxl.load_workbook(path, read_only=True)[name]
+        old = [["" if v is None else v for v in row] for row in ws.iter_rows(min_row=2, values_only=True)]
+    except Exception:
+        return sheets
+    rows = sheets[name]
+    width = len(rows[0])
+    seen = {tuple("" if v is None else v for v in r) for r in rows[1:]}
+    extra = [r[:width] for r in old if len(r) >= width and tuple(r[:width]) not in seen]
+    return {**sheets, name: _sorted(rows + extra)}
+
+
 def _sorted(rows):
     """머리 줄은 두고 최근 것이 위로."""
     return [rows[0]] + sorted(rows[1:], key=lambda r: str(r[0] or ""), reverse=True)
@@ -158,6 +174,7 @@ def main(argv):
     folder = drive / FOLDER
     folder.mkdir(exist_ok=True)
     out = folder / FILE_NAME
+    sheets = keep_old_rows(sheets, out)
     try:
         write_xlsx(sheets, out)
     except PermissionError:   # 엑셀에서 열어 둔 채면 덮어쓸 수 없다 → 다음 회차에 다시

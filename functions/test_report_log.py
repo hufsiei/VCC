@@ -155,5 +155,18 @@ wb = openpyxl.load_workbook(xlsx)
 cell = next(c for row in wb["쪽지"].iter_rows(min_row=2) for c in row if str(c.value or "").startswith("=1+1"))
 expect("엑셀: 시트 4개 + 수식 아님", wb.sheetnames == list(sheets) and cell.data_type == "s")
 
+# 9) askLog는 최근 ASK_LOG_MAX건만 남고, 잘려 나간 앞 기록은 엑셀 물어보기 시트에 이어 남는다
+askboo.ASK_LOG_MAX, askboo.ASK_LOG_SLACK = 5, 2
+for i in range(10):
+    askboo._log_answer(f"질문 {i}", {"status": "hold", "lines": [], "message": "보류"})
+log = store.load("askLog", [])
+expect("askLog 상한: 최근 것만(5~7건), 마지막이 가장 최근", 5 <= len(log) <= 7 and log[-1]["question"] == "질문 9"
+       and all(r["question"] != "답이 있는 질문" for r in log)
+       and len(json.loads((store.RUNTIME / "askLog.json").read_text(encoding="utf-8"))) == len(log))
+merged = export_runtime.keep_old_rows(export_runtime.build_sheets(store.load), xlsx)
+asked = [row[2] for row in merged["물어보기"][1:]]
+expect("내보내기: 잘린 앞 기록도 시트에 남고 겹치지 않음", "답이 있는 질문" in asked and "질문 9" in asked and len(asked) == len(set(asked))
+       and len(asked) == len(log) + 3)
+
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)
