@@ -1,6 +1,7 @@
 # export_runtime.py — 쓰기 기록을 드라이브 엑셀로 내보낸다 (작업 33, 11/25 미리 결정 2A·3A·4A)
 #
 # 신고·물어보기(질문+답)·들려주기·쪽지 기록을 읽어 시트 4개짜리 엑셀 하나로 쓴다.
+# [11/25 Q-13] 이 PC에 judge_asklog.py 채점 결과(functions/logs/ask-judge.jsonl)가 있으면 「채점」 시트를 더한다.
 # 미리 PC에서 1시간마다 돌리고(작업 스케줄러 — docs/운영노트.md 5절), 구글 드라이브 앱이 올린다.
 #
 # 실행: cd C:\dev\VCC\functions
@@ -77,13 +78,19 @@ def build_sheets(load):
                      _m(r.get("reason")), "차단" if r.get("block") else "신고만", r.get("threadId")])
     sheets = {"신고": _sorted(rows)}
 
-    rows = [["시각", "결과", "질문", "답", "근거 번호", "프로그램", "노트", "안내 문구"]]
+    # [11/25 Q-13] 뒤에 판단값·앞 턴·기록 id 칸을 더했다(앞 8칸은 그대로 — 예전 엑셀 행은 keep_old_rows가 빈칸으로 채운다)
+    rows = [["시각", "결과", "질문", "답", "근거 번호", "프로그램", "노트", "안내 문구",
+             "처리 경로", "의도", "분야", "칸", "정리된 질문", "앞 질문", "앞 결과", "기록 id"]]
     for r in ask_log:
         lines = r.get("lines") or []
+        prev = r.get("prev") or {}
         rows.append([r.get("at"), STATUS_WORD.get(r.get("status"), r.get("status")), _m(r.get("question")),
                      "\n".join(_m(ln.get("text")) + (" (근거 원문)" if ln.get("fallback") else "") for ln in lines),
                      "\n".join(", ".join(str(c) for c in ln.get("cites") or []) for ln in lines),
-                     ", ".join(r.get("programs") or []), r.get("noteId"), _m(r.get("message"))])
+                     ", ".join(r.get("programs") or []), r.get("noteId"), _m(r.get("message")),
+                     r.get("route"), r.get("intent"), r.get("field"), r.get("section"), _m(r.get("asked")),
+                     _m(prev.get("question")) or None, STATUS_WORD.get(prev.get("status"), prev.get("status")) or None,
+                     r.get("id")])
     sheets["물어보기"] = _sorted(rows)
 
     rows = [["시각", "프로그램", "칸", "공개 문장", "경험 학기", "공식 확인", "후배 질문", "노트", "문장 id"]]
@@ -101,9 +108,20 @@ def build_sheets(load):
     return sheets
 
 
+def judge_sheet(judged):
+    """[11/25 Q-13] judge_asklog.py 채점 결과(이 PC functions/logs/ask-judge.jsonl) → 「채점」 시트. 학번 칸 없음, 질문은 가린 글."""
+    rows = [["시각", "질문", "결과", "처리 경로", "의도", "답했나", "근거", "길 선택", "이유", "채점 시각", "기록 id"]]
+    for r in judged:
+        rows.append([r.get("at"), _m(r.get("question")), STATUS_WORD.get(r.get("status"), r.get("status")), r.get("route"),
+                     r.get("intent"), r.get("답했나"), r.get("근거"), r.get("길"), _m(r.get("이유")), r.get("judgedAt"),
+                     r.get("key")])
+    return _sorted(rows)
+
+
 def keep_old_rows(sheets, path, name="물어보기"):
     """askLog.json은 최근 2,000건만 남으므로(askboo.ASK_LOG_MAX), 이미 엑셀에 있는 그 시트의 앞 기록을 이어 둔다.
-    엑셀이 없거나 읽지 못하면 그대로. 같은 행(모든 칸이 같음)은 한 번만."""
+    엑셀이 없거나 읽지 못하면 그대로. 같은 행(모든 칸이 같음)은 한 번만.
+    [Q-13] 칸을 더하기 전 엑셀 행(짧은 행)은 뒤를 빈칸으로 채워 잇는다(버리지 않는다)."""
     try:
         import openpyxl
         ws = openpyxl.load_workbook(path, read_only=True)[name]
@@ -113,7 +131,8 @@ def keep_old_rows(sheets, path, name="물어보기"):
     rows = sheets[name]
     width = len(rows[0])
     seen = {tuple("" if v is None else v for v in r) for r in rows[1:]}
-    extra = [r[:width] for r in old if len(r) >= width and tuple(r[:width]) not in seen]
+    old = [(r + [""] * width)[:width] for r in old if any(v != "" for v in r)]
+    extra = [r for r in old if tuple(r) not in seen]
     return {**sheets, name: _sorted(rows + extra)}
 
 
@@ -164,6 +183,10 @@ def main(argv):
     import store
 
     sheets = build_sheets(store.load)
+    import judge_asklog
+    judged = judge_asklog.read_judged()
+    if judged:   # 채점을 한 번도 안 돌린 PC는 시트를 만들지 않는다
+        sheets["채점"] = judge_sheet(judged)
     if dry:
         print_sheets(sheets)
         return 0

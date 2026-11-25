@@ -51,6 +51,7 @@ PROVIDER = {
     "문단분류": "sonnet",  # 현장실습 후기 문장 → 칸 {"칸":"업무내용"} — HCX 8/10 미달, Sonnet 9/10
     "개선제안": "sonnet",  # 관리자 콘솔 개선 제안 (사전 생성·캐시) — 11/21 작업 67: 묶음 32개 사후 검증 32/32 통과(FAQ 오탐 수정 후)
     "리포트요약": "sonnet", # 관리자 리포트 요약 한 단락 — 11/21 작업 67: 전체·국제교류팀 2건 실호출 통과, 실패 시 템플릿
+    "채점":     "opus",    # [11/25 Q-13] 실사용 askLog 한 건 → 답했나·근거·길 1~5점 + 이유(judge_asklog.py, 하루 한 번 몰아서. 답할 때 부르지 않음)
 }
 
 # ── 2. 작업별 설정 ─────────────────────────────────────────────────
@@ -72,6 +73,7 @@ SETTINGS = {
     "문단분류": {"max_tokens": 2000, "effort": "low"},   # 11/20 Sonnet 측정 설정 그대로
     "개선제안": {"max_tokens": 2000, "effort": "medium"},
     "리포트요약": {"max_tokens": 2000, "effort": "medium"},
+    "채점":     {"max_tokens": 2000, "effort": "low"},     # 출력은 점수 3개 + 이유 한 줄. 건당 비용을 낮게(하루 몰아서 수십 건)
 }
 
 CLOVA_URL = os.environ.get("CLOVA_URL", "https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-005")

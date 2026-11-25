@@ -12,6 +12,8 @@
 #        걸린 문장은 버린다. 다 버려지면 v1 방식(고른 문장 원문 인용, fallback)으로 돌려준다 → v1의 답이 최악의 경우.
 #   응답: lines[].cites(인용 sourceId), singleSenior(근거가 한 사람뿐), 새 status "chat"(message·chips), notes에 oneLine·kinds.
 #   [11/25] ①‴ 코드: 여러 곳 비교 질문(「다른 지역 대비」「어디가 더」) → status "notes" 고정 안내 + 그 나라 노트 카드(AI 없음).
+#   [11/25 Q-13] ①⁗ 코드: 앞 답에 대한 후속(「이게 다야?」「기준이 뭐야」) → "chat" 노트 수·고른 기준 /
+#        시기 질문(「인턴 보통 언제 해요?」) → "notes" 근거 보고서의 학기별 편수 + 카드(AI 없음). 기록(askLog)에 판단값·앞 턴.
 #
 # v1(작업 18) 4+1단계 — 질문정리가 실패했을 때의 경로이자 ⑥의 폴백:
 #   ①′ 코드: 규정 질문 판별 → status "official" (AI 없음, spec 4장 판별 표현)
@@ -175,11 +177,15 @@ PROPER_NOUNS = sorted({w for name, p in PROGRAMS.items() for w in [name, *p.get(
 def askBoo(me, payload, save=True):
     """local_fn.py가 부른다. save=False면 질문함에도 답 기록에도 남기지 않는다(평가 스크립트용).
     payload: {question, history?: [{question, status, program?}], force?: "hold"}
-    [11/25 작업 33] 답을 만든 뒤 질문과 답을 runtime/askLog.json에 남긴다(_log_answer)."""
-    out = _answer(me, payload, save)
+    [11/25 작업 33] 답을 만든 뒤 질문과 답을 runtime/askLog.json에 남긴다(_log_answer).
+    [11/25 Q-13] 기록에 판단값(질문정리의 의도·분야·칸, 코드가 고른 길)과 바로 앞 턴을 더한다 — judge_asklog.py 채점용."""
+    trace = {}
+    out = _answer(me, payload, save, trace)
     program = out.pop("_program", None)   # _hold·_official이 넘긴 프로그램(기록용, 응답에는 없음)
     if save and "error" not in out:
-        _log_answer((payload.get("question") or "").strip(), out, program)
+        history = clean_history(payload.get("history"))
+        _log_answer((payload.get("question") or "").strip(), out, program, trace=trace,
+                    prev=history[-1] if history else None)
     return out
 
 
@@ -187,22 +193,33 @@ ASK_LOG_MAX = 2000    # askLog.json에 남기는 최근 답 기록 수(askBoo마
 ASK_LOG_SLACK = 200   # 이만큼 더 쌓이면 한 번에 ASK_LOG_MAX건으로 자른다
 
 
-def _log_answer(question, out, program=None):
+def _log_answer(question, out, program=None, trace=None, prev=None):
     """답 기록 한 줄: 시각·status·질문·답 문장(cites)·프로그램·안내 문구. **사람 칸은 남기지 않는다**
     (spec 0장 「질문 로그는 학번 제거 후 통계만」 — 학번·학과·학년·questionId 없음). 질문 글은 mask.py로 가린다.
-    AI를 부르지 않고 이미 만든 답을 남기기만 한다. 기록이 실패해도 답은 그대로 돌려준다."""
+    AI를 부르지 않고 이미 만든 답을 남기기만 한다. 기록이 실패해도 답은 그대로 돌려준다.
+    [11/25 Q-13] 채점용 칸: id(채점이 새 기록만 고르는 열쇠, 사람과 무관한 무작위 값) · route(코드가 고른 길) ·
+      intent·field·section·asked(질문정리 결과, 실패하면 None) · prev(바로 앞 턴: 질문·결과·프로그램)."""
     try:
+        import uuid
+
         import mask
         import store
         from runtime_fns import now
+        trace = trace or {}
+        plan = trace.get("plan") or {}
         sources = out.get("sources") or {}
         programs = [program] if program else \
             [s.get("program") for s in sources.values()] or [c.get("program") for c in out.get("notes") or []]
-        row = {"at": now(), "status": out.get("status"), "question": mask.mask(question),
+        asked = plan.get("정리된질문")
+        row = {"id": uuid.uuid4().hex[:12], "at": now(), "status": out.get("status"), "question": mask.mask(question),
                "lines": [{"text": ln.get("text", ""), "cites": list(ln.get("cites") or [ln.get("sourceId")]),
                           **({"fallback": True} if ln.get("fallback") else {})} for ln in out.get("lines") or []],
                "programs": list(dict.fromkeys(p for p in programs if p)), "noteId": out.get("noteId"),
-               "message": out.get("message")}
+               "message": out.get("message"),
+               "route": trace.get("route"), "intent": plan.get("의도"), "field": plan.get("분야"), "section": plan.get("칸"),
+               "asked": mask.mask(asked) if asked and asked != question else None,
+               "prev": {"question": mask.mask(prev["question"]), "status": prev.get("status") or "",
+                        "program": prev.get("program") or ""} if prev else None}
         with store.lock():
             log = store.load("askLog", [])
             log.append(row)
@@ -215,7 +232,9 @@ def _log_answer(question, out, program=None):
         print(f"[vcc] askLog 기록 실패: {type(e).__name__}")
 
 
-def _answer(me, payload, save):
+def _answer(me, payload, save, trace=None):
+    """trace: [Q-13] 기록용 판단값을 담는 사전(route·plan). 응답에는 나가지 않는다."""
+    trace = {} if trace is None else trace
     question = (payload.get("question") or "").strip()
     if not question:
         return {"error": "질문을 입력해 주세요"}
@@ -225,6 +244,7 @@ def _answer(me, payload, save):
 
     # [v2] chat 칩 「질문함에 담기」: 답을 찾지 않고 바로 질문함에 hold로
     if payload.get("force") == "hold":
+        trace["route"] = "담기"
         return _hold(me, question, None, None, save, why="담기")
 
     # [11/24 작업 87] 앞 턴(과 이번 말)에서 「○○ 말고」로 뺀 프로그램 — 이번 말이 그 이름을 다시 부르지 않으면 계속 뺀다
@@ -237,14 +257,29 @@ def _answer(me, payload, save):
 
     # ①′ 규정 질문 → 공식 안내 (정규식이 먼저 — 보수 규칙, HCX 원칙 v3 5절)
     if is_official(question):
+        trace["route"] = "규정(정규식)"
         return _official(me, question, programs, save)
 
     # ①‴ [11/25 작업 87] 여러 곳 비교 질문 → 고정 안내 + 노트 카드(AI 없음). 비교 근거가 없으니 한 학교 답을 되풀이하지 않는다
     if is_compare(question):
+        trace["route"] = "비교"
         return _compare(question, programs, history)
+
+    # ①⁗ [11/25 Q-13] 앞 답에 대한 후속 질문(「이게 다야?」「기준이 뭐야」)과 시기 질문(「인턴 보통 언제 해요?」)
+    #     — 코드가 노트 수·근거 학기를 세어 답한다(AI 없음, 지어낼 것이 없게). 걸리지 않으면 아래 그대로
+    found = follow_up(question, history, programs, excluded)
+    if found:
+        trace["route"] = found.pop("_route")
+        return found
+    found = timing(question, history, programs, country, excluded)
+    if found:
+        trace["route"] = "시기"
+        return found
 
     # ① [v2] 질문 정리(AI). 실패하면 plan=None → 아래는 v1 경로 그대로
     plan = clarify(question, history, excluded)
+    trace["plan"] = plan
+    trace["route"] = "질문정리" if plan else "v1(질문정리 실패)"
     effective = question
     if plan:
         if plan["의도"] == "규정":
@@ -492,7 +527,7 @@ def _explore(plan, programs, country):
         total = 0
     if not programs:
         return None
-    found = _notes(programs, country)
+    found = _notes(programs, country, total=total)
     if found and plan["제외"] and len(found["notes"]) > 1:
         lab = _label(plan["제외"])
         n = len(found["notes"])
@@ -637,8 +672,10 @@ def has_topic(question):
     return any(re.search(pattern, question) for pattern, _ in TOPICS_EXCHANGE)
 
 
-def _notes(programs, country):
-    """status "notes": 답을 만들지 않고 해봤노트 카드로 안내한다(질문함에 저장하지 않음 — 답할 질문이 아니라 길 안내)."""
+def _notes(programs, country, total=0):
+    """status "notes": 답을 만들지 않고 해봤노트 카드로 안내한다(질문함에 저장하지 않음 — 답할 질문이 아니라 길 안내).
+    total: 카드로 다 못 보여 준 전체 노트 수(부르는 쪽이 이미 5개로 자른 경우). [Q-13] 카드가 5개로 잘렸으면
+    「5개 있어요」라고 하지 않고 전체 수를 말한다(11/25 캡처: 「관련 해봤노트가 5개」 뒤 「이게 다야?」)."""
     cards = [{"noteId": notes.note_id(n), "program": n, "country": PROGRAMS.get(n, {}).get("세부") if
               PROGRAMS.get(n, {}).get("분야") == "국제교류" else None, "evidenceCount": evidence_count(n),
               "oneLine": (notes.NOTES.get(notes.note_id(n)) or {}).get("oneLine", ""),   # [v2] 카드 한 줄(사전 생성 노트 커버)
@@ -647,8 +684,11 @@ def _notes(programs, country):
              for n in programs if evidence_count(n)][:MAX_NOTES]
     if not cards:
         return None
-    if len(cards) == 1:
+    total = max(total, len([n for n in dict.fromkeys(programs) if evidence_count(n)]))
+    if len(cards) == 1 and total <= 1:
         message = f"{cards[0]['program']} 해봤노트에서 선배들의 경험을 볼 수 있어요. 궁금한 내용을 물어보셔도 돼요."
+    elif total > len(cards):
+        message = f"{country or '관련'} 해봤노트 {total}개 중 근거가 많은 {len(cards)}개를 보여 드려요. 궁금한 노트를 골라 보세요."
     else:
         message = f"{country or '관련'} 해봤노트가 {len(cards)}개 있어요. 궁금한 노트를 골라 보세요."
     return {"status": "notes", "lines": [], "sources": {}, "notes": cards, "suggestSenior": True, "message": message}
@@ -731,6 +771,118 @@ def _compare(question, programs, history):
     label = "·".join(places) if places else "관련"
     count = f"{total}개 중 근거가 많은 {n}개를" if total > n else f"{n}개를"
     found["message"] = f"{head} {label} 해봤노트 {count} 보여 드려요. 노트를 하나씩 열어 보거나, 한 곳을 골라 물어봐 주세요."
+    return found
+
+
+# ── ①⁗ [11/25 Q-13] 후속 질문·시기 질문 (코드, AI 없음) ───────────────────
+# 11/25 미리 실사용 캡처: 노트 목록 뒤 「이게 다야?」「이 해봤노트 준 기준이 뭐야」에 질문정리가 「대화」로 보내
+# 「앞에서 본 노트와 겹쳤다면…」(엇나간 문구)이 나왔고, 「인턴십 보통 언제 하는지」는 시기를 말하지 않고 노트 5개만 보여 줬다.
+# 셋 다 데이터로 셀 수 있는 답이 있다 → 코드가 세어 고정 문구로 답한다.
+MORE_RE = re.compile(r"(이게|그게|이거|이것|그거|요게)\s*(다|전부|끝|뿐|밖에)|^\s*(다야|끝이야|전부야)"
+                     r"|(더|다른\s*(건|거|것|노트|곳|데))\s*(는|은|도)?\s*(없|있|보여|알려|찾아)")
+CRITERIA_RE = re.compile(r"기준|뭘\s*보고|무엇을\s*보고|무슨\s*순서|순서(가|는)?\s*(뭐|어떻게|왜)"
+                         r"|어떻게\s*(골|뽑|정했|정한|고른|찾은)|왜\s*(이|이걸|이거|이것|이런|그|저)\s*(노트|걸|거|것|곳|학교|기관|들)")
+FOLLOW_MAX = 40   # 이보다 긴 말은 새 질문으로 본다
+TIMING_RE = re.compile(r"(언제|몇\s*학년|어느\s*(시기|학기|때)|무슨\s*학기|시기)\s*(쯤|에|에는|가|는|이)?\s*"
+                       r"(주로|보통|많이|제일|가장)?\s*(하|해|가|떠나|다녀|시작|나가|많|\?|$)")
+SEASON = {"1": "1학기", "여름": "여름방학", "2": "2학기", "겨울": "겨울방학"}
+
+
+def _field_of(text):
+    return next((f for f, rx in FIELD_RE if rx.search(text)), None)
+
+
+def _pool(field, country, excluded=()):
+    """그 분야(·나라)의 근거 있는 노트 — 근거 많은 순. _explore가 카드를 고르는 범위와 같다."""
+    names = [n for n, p in PROGRAMS.items() if (not field or p.get("분야") == field)
+             and (not country or p.get("세부") == country) and n not in excluded and evidence_count(n)]
+    return sorted(names, key=evidence_count, reverse=True)
+
+
+def _noun(field, country):
+    return f"{country} 해봤노트" if country else FIELD_NOUN.get(field, "해봤노트")
+
+
+def follow_up(question, history, programs, excluded=()):
+    """앞 답(노트 목록·답)에 대한 「이게 다야?」「기준이 뭐야?」 → status "chat" 고정 문구. 해당 없으면 None.
+    새 질문(프로그램·나라·주제어가 있거나 긴 말)이면 보지 않는다."""
+    if not history or programs or has_topic(question) or len(question) > FOLLOW_MAX:
+        return None
+    kind = "더" if MORE_RE.search(question) else "기준" if CRITERIA_RE.search(question) else None
+    last = history[-1]
+    if not kind or last["status"] not in ("notes", "ok"):
+        return None
+    q = last["question"]
+    program = last["program"] if last["program"] in PROGRAMS else None
+    country, _ = match_country(q)
+    field = _field_of(q) or (PROGRAMS[program]["분야"] if program else None)
+    chips = [{"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field, "exclude": list(excluded)}}]
+    if last["status"] == "ok":
+        if not program:
+            return None
+        if kind == "더":
+            message = (f"{program} 해봤노트에는 선배 근거가 {evidence_count(program)}개 있어요. 그중 질문에 맞는 문장만 골라 답했어요. "
+                       f"다른 주제(비용·생활·학점 등)도 물어보시면 그 근거로 답해 드릴게요.")
+        else:
+            message = f"{program} 해봤노트의 선배 근거 가운데 질문에 맞는 문장을 골라 답했어요. 답 아래 근거에서 원문을 볼 수 있어요."
+    else:
+        pool = _pool(field, country, excluded)
+        shown, noun = min(MAX_NOTES, len(pool)), _noun(field, country)
+        if not pool:
+            return None
+        if kind == "기준":
+            message = (f"질문에 맞는 {noun} 가운데 선배 근거(보고서 문단·인터뷰 문장)가 많은 순서로 {shown}개까지 보여 드렸어요. "
+                       f"카드의 「근거 n건」이 그 수예요. 좋고 나쁨을 매긴 순위는 아니에요.")
+        elif len(pool) > shown:
+            hint = {"현장실습": "기관 유형이나 주제", "국제교류": "나라·학교나 주제"}.get(field, "주제")
+            message = (f"근거가 많은 {shown}개만 먼저 보여 드렸어요. {noun}는 모두 {len(pool)}개예요. "
+                       f"궁금한 {hint}를 적어 주시면 그 노트에서 선배 이야기를 찾아 드릴게요.")
+        else:
+            message = f"{noun}는 지금 그 {len(pool)}개가 전부예요. 선배 이야기가 더 쌓이면 늘어나요."
+    return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "message": message, "chips": chips,
+            "_route": f"후속({kind})"}
+
+
+def season_counts(names):
+    """선배 보고서(같은 선배·같은 학기·같은 프로그램 = 한 편)를 시기별로 센다 → [(시기, 편수)] 많은 순."""
+    from collections import Counter
+    docs = {(e["프로그램명"], e.get("학번"), e.get("semester")) for n in names for e in EVIDENCE.get(n, [])}
+    c = Counter(SEASON.get(str(s).rsplit("-", 1)[-1]) for _, _, s in docs if s)
+    c.pop(None, None)
+    return c.most_common()
+
+
+def timing(question, history, programs, country, excluded=()):
+    """「인턴 보통 언제 해요?」「교환은 몇 학년에 가요?」 → 근거 보고서의 학기를 세어 말하고 노트 카드(status "notes").
+    모집 일정(기한·발표)은 규정 질문으로 먼저 빠진다(is_official). 분야·프로그램을 질문에서 알 수 없으면 None."""
+    if not TIMING_RE.search(question) or has_topic(question):
+        return None
+    field = _field_of(question)
+    names = [n for n in programs if n in PROGRAMS and n not in excluded and evidence_count(n)
+             and (not field or PROGRAMS[n].get("분야") == field)]   # 「독일 인턴 언제」에 독일 교환 노트를 쓰지 않는다
+    if not names:
+        country = None
+    if names:
+        label = f"{country} 교환·파견 해봤노트" if country else \
+            (f"{names[0]} 해봤노트" if len(names) == 1 else "관련 해봤노트")
+    elif field:
+        names = _pool(field, None, excluded)
+        label = FIELD_NOUN[field]
+    else:
+        return None
+    seasons = season_counts(names)
+    if not seasons:
+        return None
+    total = sum(n for _, n in seasons)
+    found = _notes(names, country, total=len(names))
+    if not found:
+        return None
+    # 노트에는 학기만 있고 학년은 없다(가상데이터 열) — 「몇 학년」은 없다고 먼저 말한다
+    head = "몇 학년에 했는지는 해봤노트에 없어요. " if re.search(r"몇\s*학년", question) else ""
+    tail = "근거가 많은 노트부터 보여 드려요." if len(found["notes"]) > 1 else "노트에서 선배 경험을 볼 수 있어요."
+    found["message"] = (head + f"{label} 선배 보고서 {total:,}편을 시기별로 보면 "
+                        + " · ".join(f"{s} {n:,}편" for s, n in seasons)
+                        + f"이에요. 모집 일정은 학교 공지에서 확인해 주세요. {tail}")
     return found
 
 

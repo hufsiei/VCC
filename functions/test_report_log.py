@@ -96,8 +96,10 @@ r = askboo.askBoo(ME, {"question": "휴학하고 교환학생 가도 되나요? 
 log = store.load("askLog", [])
 expect("규정 질문 → official 한 줄 기록", r["status"] == "official" and len(log) == 1 and log[0]["status"] == "official")
 expect("응답에 기록용 칸(_program)이 새지 않음", "_program" not in r)
-expect("기록 칸: 시각·질문·답 문장·프로그램·안내 문구", set(log[0]) == {"at", "status", "question", "lines", "programs", "noteId", "message"}
-       and log[0]["at"] and log[0]["message"] == r["message"])
+expect("기록 칸: 시각·질문·답 문장·프로그램·안내 문구 + [Q-13] id·판단값·앞 턴",
+       set(log[0]) == {"id", "at", "status", "question", "lines", "programs", "noteId", "message",
+                       "route", "intent", "field", "section", "asked", "prev"}
+       and log[0]["at"] and log[0]["message"] == r["message"] and log[0]["route"] == "규정(정규식)" and log[0]["prev"] is None)
 expect("기록에 사람 칸 없음(학번·questionId)", ME not in json.dumps(log, ensure_ascii=False) and "questionId" not in log[0])
 expect("기록의 질문은 가려짐", "010-9999" not in log[0]["question"] and "[연락처]" in log[0]["question"])
 r = askboo.askBoo(ME, {"question": "마르부르크 기숙사 어땠어요?", "force": "hold"})
@@ -174,6 +176,48 @@ if openpyxl:
     asked = [row[2] for row in merged["물어보기"][1:]]
     expect("내보내기: 잘린 앞 기록도 시트에 남고 겹치지 않음", "답이 있는 질문" in asked and "질문 9" in asked and len(asked) == len(set(asked))
            and len(asked) == len(log) + 3)
+    # [Q-13] 칸을 더하기 전 엑셀(짧은 행)도 버리지 않고 잇는다
+    old_wb = openpyxl.Workbook()
+    ws = old_wb.active
+    ws.title = "물어보기"
+    ws.append(["시각", "결과", "질문", "답", "근거 번호", "프로그램", "노트", "안내 문구"])
+    ws.append(["2026-11-20T10:00", "보류", "옛 8칸 기록", "", "", "", "", "보류"])
+    old_x = store.RUNTIME.parent / "old.xlsx"
+    old_wb.save(old_x)
+    merged = export_runtime.keep_old_rows(export_runtime.build_sheets(store.load), old_x)
+    old_row = next((row for row in merged["물어보기"][1:] if row[2] == "옛 8칸 기록"), None)
+    expect("내보내기: 8칸 옛 행도 이어짐(빈칸 채움)", old_row is not None and len(old_row) == len(merged["물어보기"][0]))
+
+# 10) [Q-13] 기록에 판단값과 바로 앞 턴 — 후속 질문(AI 없음)·질문정리 결과
+askboo.ASK_LOG_MAX, askboo.ASK_LOG_SLACK = 2000, 200
+prev_turn = {"question": "인턴십 보통 언제 하는지 010-1111-2222", "status": "notes", "program": ""}
+r = askboo.askBoo(ME, {"question": "이게 다야?", "history": [prev_turn]})
+row = store.load("askLog", [])[-1]
+expect("후속 질문 기록: route·앞 턴(가려짐)", r["status"] == "chat" and row["route"] == "후속(더)"
+       and row["prev"]["status"] == "notes" and "[연락처]" in row["prev"]["question"] and "010-1111" not in json.dumps(row, ensure_ascii=False))
+expect("기록 id는 서로 다름", len({x["id"] for x in store.load("askLog", []) if x.get("id")}) == len([x for x in store.load("askLog", []) if x.get("id")]))
+
+
+def plan_call(작업명, messages, system=None):
+    if 작업명 == "질문정리":
+        return {"ok": True, "text": "", "model": "fake", "json": {"의도": "경험질문", "분야": "국제교류", "나라": None,
+                "프로그램후보": [PROGRAM], "제외": [], "칸": "생활", "정리된질문": "마르부르크필립스대학교 기숙사는 어땠어요?"}}
+    return {"ok": False, "text": "", "json": None, "model": "fake"}
+
+
+askboo.callAI = plan_call
+askboo.askBoo(ME, {"question": "거기 기숙사는요?", "history": [{"question": "마르부르크 어때요?", "status": "notes", "program": PROGRAM}]})
+row = store.load("askLog", [])[-1]
+expect("질문정리 판단값 기록: 의도·분야·칸·정리된 질문", row["route"] == "질문정리" and row["intent"] == "경험질문"
+       and row["field"] == "국제교류" and row["section"] == "생활" and row["asked"].startswith("마르부르크") and row["prev"]["program"] == PROGRAM)
+sheets = export_runtime.build_sheets(store.load)
+head = sheets["물어보기"][0]
+top = next(x for x in sheets["물어보기"][1:] if x[15] == row["id"])
+expect("물어보기 시트에 판단값·앞 턴·기록 id 칸", head[8:] == ["처리 경로", "의도", "분야", "칸", "정리된 질문", "앞 질문", "앞 결과", "기록 id"]
+       and top[9] == "경험질문" and top[13] == "마르부르크 어때요?" and top[14] == "노트 안내" and top[15] == row["id"])
+js = export_runtime.judge_sheet([{"key": row["id"], "at": row["at"], "question": "질문 010-3333-4444", "status": "ok", "route": "질문정리",
+                                  "intent": "경험질문", "답했나": 4, "근거": None, "길": 5, "이유": "ok", "judgedAt": "2026-11-26T09:00"}])
+expect("채점 시트: 점수·이유·가려짐", js[1][5:8] == [4, None, 5] and "010-3333" not in json.dumps(js, ensure_ascii=False))
 
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)
