@@ -7,7 +7,7 @@ PR 본문 「## 팀원에게」의 메시지를 **읽기 전용**으로 모아 �
 
 ## 1. 모으기
 - '나'는 `git config vcc.me`(없으면 user.name·email로 짐작: 미리·민지·원우).
-- `gh pr list -R hufsiei/VCC --state all --limit 40 --json number,title,state,isDraft,mergedAt,updatedAt,headRefName,body` 로 열린 PR 전부 + 7일 안 병합·닫힌 PR을 읽는다.
+- `gh pr list -R hufsiei/VCC --state all --limit 100 --json number,title,state,isDraft,mergedAt,updatedAt,headRefName,body` 로 열린 PR 전부 + 7일 안 병합·닫힌 PR을 읽는다.
 - 본문의 「## 팀원에게」 절에서 `[to…]` 묶음 중 나에게 온 것(`[to나]`·`[to전원]`·`[to원우·나]` 포함)을 항목(1. 2. …)별로 쪼갠다. 세션 시작 훅의 「본 기록」은 무시하고 안 본 것까지 전부 다시 본다(기록 파일은 고치지 않는다).
 
 ## 2. 항목마다 상태 판정
