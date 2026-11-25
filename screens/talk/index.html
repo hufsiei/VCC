@@ -54,6 +54,30 @@
   .demand-retry .icon { width: 16px; height: 16px; flex: none; }
   .demand-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-xs); }
   .demand-foot .btn--text { min-height: 44px; }
+  /* 「맨 위로」(디자인 규칙 5-8, 11/25): 대화를 한 화면 넘게 내리면 고정 입력줄 바로 위 오른쪽에 뜬다.
+     보조 버튼 색(SOFT BLUE + NAVY), 44px 원형. 입력줄(dock)이 fixed라 그 기준으로 붙인다 */
+  .to-top {
+    position: absolute;
+    right: 12px;
+    bottom: calc(100% + var(--space-sm));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-soft-blue);
+    color: var(--color-hufs-navy);
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+  }
+  .to-top[hidden] { display: none; }
+  .to-top:active { filter: brightness(.92); }
+  .to-top:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .to-top .icon { width: 20px; height: 20px; }
+  #viewMain .page-title:focus { outline: none; } /* 「맨 위로」 뒤 포커스 자리(눈에 보이는 테두리 없음) */
 </style>
 </head>
 <body>
@@ -105,6 +129,7 @@
 
     <!-- 하단 탭 위 고정: (들려주기) AI 요약 바 + 입력줄 -->
     <div class="dock" id="mainDock">
+      <button class="to-top" id="toTopBtn" type="button" aria-label="맨 위로" title="맨 위로" hidden><i data-lucide="arrow-up-to-line" class="icon"></i></button>
       <div id="summaryArea" hidden>
         <div class="summary-bar">
           <span class="summary-bar__text"><i data-lucide="sparkles" class="icon"></i><span id="summaryCount">내 이야기 0칸 · 보고서 0칸</span></span>
