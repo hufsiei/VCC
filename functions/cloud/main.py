@@ -10,6 +10,9 @@
 # 주소: POST <웹 액션 공개 주소>/<함수 이름>  (data.js의 `${FN_BASE}/${name}` 그대로)
 #   경로 대신 본문 "_fn" 필드로도 받는다(API Gateway가 경로를 넘기지 않는 경우).
 #   액션은 반드시 「웹 액션 + Raw HTTP」로 켠다. Raw가 아니면 요청 본문이 기본 파라미터(키)를 덮어쓸 수 있어 거절한다.
+#   「헤더 옵션 설정」(API custom-options, OpenWhisk web-custom-options)도 켠다. 꺼져 있으면 플랫폼이 모든 응답에
+#   Allow-Origin * 기본 묶음을 붙이고 OPTIONS도 대신 답한다(11/25 curl 확인). 켜면 기본 헤더가 빠지고 CORS는 이 파일의
+#   _cors가 모든 응답(OPTIONS·POST·오류)에 붙인다. 켜지 않은 채 이 코드를 올리면 Allow-Origin이 두 줄 → 브라우저가 막음(11/24).
 #
 # 흐름은 local_fn.py Handler.do_POST와 같다:
 #   토큰 확인 → NEEDS_NO_LOGIN → AI_ROUTES 한도 → logout 토큰 → 예외 시 error 응답
@@ -19,6 +22,9 @@
 #   CLAUDE_KEY (→ ANTHROPIC_API_KEY)  CLOVA_KEY  VCC_LOGIN_PW  ALLOW_ORIGIN  STORE_BACKEND=ncp
 #   NCP_OS_BUCKET  NCP_OS_ACCESS_KEY  NCP_OS_SECRET_KEY  (선택) NCP_OS_ENDPOINT NCP_OS_REGION NCP_OS_PREFIX
 #   (선택) CLOVA_URL  CLAUDE_MODEL
+#   (선택) VCC_DIAG=1  배포 점검 때만 넣는다. 없으면 _diag는 「없는 함수」로 거절(로그인 없이 부를 수 있으므로). 점검 뒤 지운다.
+#
+# 오류: 응답에는 고정 문구만. 예외 종류·원문(Object Storage 오류 XML·버킷 이름 등)은 stderr → 액션 로그(키 값은 가린다).
 import base64
 import json
 import os
@@ -36,6 +42,8 @@ for p in (HERE / "lib", HERE / "functions"):
 ENV_PARAMS = ("CLOVA_KEY", "CLOVA_URL", "CLAUDE_MODEL", "VCC_LOGIN_PW", "STORE_BACKEND",
               "NCP_OS_BUCKET", "NCP_OS_ACCESS_KEY", "NCP_OS_SECRET_KEY", "NCP_OS_ENDPOINT", "NCP_OS_REGION", "NCP_OS_PREFIX")
 ALLOWED_ORIGINS = ("https://hufsiei.github.io",)   # ALLOW_ORIGIN이 없을 때. "*"는 쓰지 않는다(PRD 9장)
+SECRET_PARAMS = ("CLAUDE_KEY", "CLOVA_KEY", "VCC_LOGIN_PW", "NCP_OS_ACCESS_KEY", "NCP_OS_SECRET_KEY")
+SERVER_ERROR = "서버 처리 중 문제가 생겼어요"
 
 _app = None   # 첫 요청에서 한 번 import(컨테이너가 살아 있는 동안 재사용)
 
@@ -64,8 +72,15 @@ def _load_app():
     return _app
 
 
+def _allowed_origins(args):
+    """ALLOW_ORIGIN(쉼표 구분)에서 "*"·끝의 / 를 걸러 낸 목록. 남는 것이 없으면 ALLOWED_ORIGINS."""
+    given = [o.strip().rstrip("/") for o in str(args.get("ALLOW_ORIGIN") or "").split(",")]
+    return [o for o in given if o and o != "*"] or list(ALLOWED_ORIGINS)
+
+
 def _cors(args):
-    allowed = [o.strip() for o in str(args.get("ALLOW_ORIGIN") or "").split(",") if o.strip()] or ALLOWED_ORIGINS
+    """모든 응답에 붙인다. 허용 Origin이면 Allow-Origin에 그 값 하나, 아니면 Allow-Origin 없음("*"는 쓰지 않는다)."""
+    allowed = _allowed_origins(args)
     origin = (args.get("__ow_headers") or {}).get("origin", "")   # 웹 액션은 헤더 이름을 소문자로 넘긴다
     headers = {
         "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -79,9 +94,8 @@ def _cors(args):
 
 
 def _reply(args, out, status=200):
-    # API Gateway(/{fn} 리소스)가 OPTIONS 응답과 CORS 헤더를 직접 붙인다. 여기서도 붙이면 Allow-Origin이 두 개가 되어
-    # 브라우저가 응답을 막는다(11/24 확인). 그래서 본 응답에는 붙이지 않는다. OPTIONS가 액션까지 오는 경우만 _cors.
-    headers = {"Content-Type": "application/json; charset=utf-8"}
+    # CORS는 여기서 붙인다(액션의 「헤더 옵션 설정」을 켜서 플랫폼 기본 헤더 * 를 뺀 전제 — 맨 위 주석).
+    headers = {"Content-Type": "application/json; charset=utf-8", **_cors(args)}
     return {"statusCode": status, "headers": headers, "body": json.dumps(out, ensure_ascii=False)}
 
 
@@ -156,15 +170,50 @@ def _fn_name(args, payload=None):
     return str((payload or {}).pop("_fn", "") or "")
 
 
+def _diag_on(args):
+    """기본 파라미터 VCC_DIAG가 "1"일 때만 _diag를 연다(공개 주소에서 로그인 없이 불리므로 기본은 꺼 둔다)."""
+    return str(args.get("VCC_DIAG") or "").strip() == "1"
+
+
+def _secret_values(args):
+    vals = []
+    for k in SECRET_PARAMS:
+        v = args.get(k)
+        if isinstance(v, dict):   # VCC_LOGIN_PW {학번: 비번}
+            vals += [str(x) for x in v.values()]
+        elif isinstance(v, str):
+            vals.append(v.strip())
+            try:   # 문자열로 넣은 VCC_LOGIN_PW
+                d = json.loads(v)
+                if isinstance(d, dict):
+                    vals += [str(x) for x in d.values()]
+            except ValueError:
+                pass
+    return sorted({v for v in vals if len(v) >= 4}, key=len, reverse=True)
+
+
+def _log_error(name, e, args):
+    """예외 원문은 응답에 넣지 않고 stderr(액션 로그)로만. 혹시 섞인 키·비번 값은 가린다."""
+    text = f"{type(e).__name__}: {e}"
+    for v in _secret_values(args):
+        text = text.replace(v, "***")
+    print(f"[vcc] {name or '-'} 오류 {text}", file=sys.stderr)
+
+
 def main(args):
     method = str(args.get("__ow_method", "")).lower()
     if method == "options":
         return {"statusCode": 204, "headers": _cors(args), "body": ""}
     if _fn_name(args) == "_diag" or "_diag" in args:
-        return _reply(args, _diag(args))
+        if _diag_on(args):
+            return _reply(args, _diag(args))
+        return _reply(args, {"error": "아직 서버에 없는 함수예요: _diag"})
     if "__ow_method" in args and "__ow_body" not in args and method == "post":
         # Raw HTTP가 꺼져 있으면 본문 필드가 args에 섞여 들어온다(기본 파라미터를 덮어쓸 수 있음)
-        return _reply(args, {"error": "서버 설정 오류: 웹 액션의 Raw HTTP를 켜 주세요", "diag": _diag(args)}, 500)
+        out = {"error": "서버 설정 오류: 웹 액션의 Raw HTTP를 켜 주세요"}
+        if _diag_on(args):
+            out["diag"] = _diag(args)
+        return _reply(args, out, 500)
     if method and method != "post":
         return _reply(args, {"error": "POST로 불러 주세요"}, 405)
     try:
@@ -177,5 +226,6 @@ def main(args):
     try:
         _set_env(args)
         return _reply(args, handle(name, payload, token))
-    except Exception as e:   # 시연 중 서버가 죽지 않게(local_fn과 같은 문구)
-        return _reply(args, {"error": f"서버 처리 중 문제가 생겼어요: {e}"})
+    except Exception as e:   # 시연 중 서버가 죽지 않게. store._s3의 RuntimeError(오류 XML·버킷 이름)도 여기로 온다
+        _log_error(name, e, args)
+        return _reply(args, {"error": SERVER_ERROR})
