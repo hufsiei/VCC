@@ -289,6 +289,18 @@ def begin_request():
             _base.clear()
 
 
+def list_names():
+    """저장소에 있는 기록 이름 목록(「messages」처럼 .json 앞부분). 초기화 도구(reset_runtime.py --only)용."""
+    if _backend() == "ncp":
+        prefix = _os_conf()["prefix"]
+        _, xml, _ = _s3("GET", query={"list-type": "2", "prefix": prefix})
+        rest = [k[len(prefix):] for k in re.findall(r"<Key>([^<]+)</Key>", xml.decode("utf-8"))]
+        return sorted(r[:-5] for r in rest if r.endswith(".json") and "/" not in r)
+    if not RUNTIME.exists():
+        return []
+    return sorted(p.stem for p in RUNTIME.glob("*.json"))
+
+
 def clear_all():
     """초기화(reset_runtime.py)용. 메모리와 저장소를 모두 비운다."""
     with _lock:
