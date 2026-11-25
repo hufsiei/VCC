@@ -590,6 +590,11 @@ function myNoteRow(section) {
     ].filter(Boolean);
     for (const mark of marks) mark.classList.add("shared-mark");
     if (marks.length) row.append(el("div", { className: "line-marks" }, marks));
+    // 이미 공유한 노트의 문장을 고쳤으면 그 문장 바로 아래: 「해봤노트 문장은 그대로예요 · 해봤노트 문장 고치기」(→ 공개 동의 시트, 8절)
+    // 맨 위에 두면 아래쪽 문장을 고쳤을 때 화면 밖이라 보이지 않는다(11/25 민지 확인)
+    if (sharedNotice === key && myNote && myNote.publicDraft) {
+      row.append(el("div", { className: "label-row" }, [statusLabel("info", "info", "해봤노트 문장은 그대로예요"), consentLinkButton()]));
+    }
     const editBtn = el("button", { className: "btn btn--text line-edit", attrs: { type: "button", "data-edit": key } }, [icon("pencil"), "문장 고치기"]);
     editBtn.disabled = editing !== null || editBusy; // 한 번에 한 문장만
     editBtn.addEventListener("click", () => startLineEdit(key));
@@ -633,7 +638,8 @@ function lineEditor(sectionName, index, line) {
       return showError((res && res.error) || "저장하지 못했어요. 잠시 뒤에 다시 시도해 주세요.");
     }
     myNote = res;
-    sharedNotice = res.share && res.share !== "private"; // 해봤노트 문장은 그대로 — 안내(8절)
+    // 공유한 노트면 고친 문장 아래에 안내(8절) — 어느 문장인지 기억
+    sharedNotice = res.share && res.share !== "private" ? `${sectionName}|${index}` : null;
     finishLineEdit();
     toast("문장을 고쳤어요");
   });
@@ -704,13 +710,6 @@ function renderMyNote() {
       shareLabel(n),
       el("span", { className: "question__date", text: frameText(n) }),
     ]),
-    // 이미 공유한 노트를 고쳤으면: 「해봤노트 문장은 그대로예요 · 해봤노트 문장 고치기」(→ 공개 동의 시트, 8절)
-    sharedNotice && n.publicDraft
-      ? el("div", { className: "label-row" }, [
-          statusLabel("info", "info", "해봤노트 문장은 그대로예요"),
-          consentLinkButton(),
-        ])
-      : null,
     card,
     el("div", { className: "detail-actions" }, actions),
   ].filter(Boolean)); // 빈 자리(null)는 빼고 붙인다 — append(null)은 「null」 글자가 된다
