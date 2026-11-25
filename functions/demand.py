@@ -44,7 +44,8 @@ QUESTIONS = {
     "detail": {"국제교류": "어느 나라가 궁금해요?", "현장실습": "어떤 곳에서 일해 보고 싶어요?",
                "비교과": "어떤 종류의 프로그램이 궁금해요?"},
     "program": "궁금한 프로그램을 골라 주세요. 아직 정하지 않았어도 괜찮아요.",
-    "section": "그중에서 무엇이 가장 궁금해요?",
+    "section": "이 프로그램에서 무엇이 가장 궁금해요?",
+    "sectionNotYet": "프로그램은 나중에 정해도 돼요. {i}에 대해 무엇이 가장 궁금해요?",   # 프로그램 「아직 정하지 않았어요」
     "when": "언제쯤 해 보려고 해요?",
     "situation": "지금 어느 정도 준비됐어요? 선배가 답할 때 참고할 수 있게 지금 상황을 적어 주세요.",
     "question": "{s}에 대해 무엇이 궁금해요? 선배에게 묻고 싶은 것을 한 문장으로 적어 주세요.",
@@ -220,7 +221,8 @@ def next_step(s):
                      options=_programs(field, s.get("detail")) + [NOT_YET])
     sections = _sections(field, s.get("program"))
     if s.get("section") not in sections:
-        return _step(s, "section", question=QUESTIONS["section"], options=sections)
+        q = QUESTIONS["section"] if s.get("program") else             QUESTIONS["sectionNotYet"].replace("{i}", label_of(field, s.get("detail")))
+        return _step(s, "section", question=q, options=sections)
     if s.get("when") not in WHEN:
         return _step(s, "when", question=QUESTIONS["when"], options=WHEN)
     for key in ("situation", "question", "hope"):
