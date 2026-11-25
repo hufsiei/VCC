@@ -249,6 +249,19 @@ intruders.pop(PK, None)
 store.save("probe")                       # 끼어들기가 멎으면 같은 요청이 다시 저장할 수 있음
 expect("다시 저장하면 내 변경 + 끼어든 변경 모두", in_bucket("probe") == {"mine": 9, "theirs": 2, "late": 4})
 
+# ── 7-2. 바뀐 것이 없으면 save는 GET·PUT 0회 ──
+request("A")
+probe = store.load("probe", {})
+calls = []
+_orig_s3 = store._s3
+store._s3 = lambda *a, **k: (calls.append(a[0]), _orig_s3(*a, **k))[1]
+store.save("probe")
+expect("바뀐 것 없음 → save는 GET·PUT 0회", calls == [])
+probe["mine"] = probe.get("mine", 0) + 1
+store.save("probe")
+expect("바뀐 것 있으면 GET 1 + PUT 1", calls == ["GET", "PUT"])
+store._s3 = _orig_s3
+
 expect("모든 PUT에 조건 헤더(If-Match 또는 If-None-Match)", all(c in (["if-match"], ["if-none-match"]) for k, s, c in put_log))
 
 # ── 8. file 방식은 그대로(스냅샷 없이 바로 씀) ───────────────────────────

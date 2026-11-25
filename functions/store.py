@@ -238,6 +238,8 @@ def save(name):
         if _backend() != "ncp":
             _write(name, _cache[name])
             return
+        if name in _base and _cache[name] == _base[name]:
+            return   # 이번 요청이 바꾼 것이 없다 → 다시 읽기(GET)도 쓰기(PUT)도 하지 않는다(412 재시도 기회도 줄임)
         for _attempt in range(RETRIES + 1):
             merged, etag = _merged_for_save(name)
             if _write(name, merged, etag):
