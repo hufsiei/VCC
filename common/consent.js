@@ -59,6 +59,8 @@ function buildSheet() {
         el("div", { className: "consent-result", attrs: { id: "consentResult", role: "status", hidden: true } }),
         // ① 반영될 해봤노트
         el("div", { className: "consent-target", attrs: { id: "consentTarget" } }),
+        // [작업 92] 인터뷰 답이 need개보다 적으면 선배 추천이 아직 안 열린 것 — 정보 라벨(공유는 막지 않음)
+        el("div", { attrs: { id: "consentUnlock", hidden: true } }),
         // ② 칸별 문장 + 공개 스위치
         el("div", {}, [
           el("p", { className: "sub", text: "문장마다 공개할지 골라 주세요. 끈 문장은 내 경험노트에만 남아요." }),
@@ -95,6 +97,7 @@ const submitBtn = root.querySelector("#consentSubmit");
 const submitReason = root.querySelector("#consentReason");
 const cancelBtn = root.querySelector("#consentCancel");
 const resultBox = root.querySelector("#consentResult");
+const unlockBox = root.querySelector("#consentUnlock");
 
 const state = {
   draft: null,        // summarizeInterview 응답
@@ -146,6 +149,11 @@ function openSheet(draft) {
     state.on.set(line.lineId, state.rejected.has(line.lineId) ? false : on);
   }
   state.lineCount = state.on.size;
+
+  // summarizeInterview 응답의 answered·need가 둘 다 숫자이고 answered < need일 때만(getMyNote 응답엔 값이 없어 안 보임)
+  const lacking = Number.isFinite(draft.answered) && Number.isFinite(draft.need) && draft.answered < draft.need;
+  unlockBox.replaceChildren(...(lacking ? [statusLabel("info", "info", "세 가지 이상 이야기하면 선배 추천이 열려요")] : []));
+  unlockBox.hidden = !lacking;
 
   agreeBox.checked = false;
   agreeBox.disabled = false;
