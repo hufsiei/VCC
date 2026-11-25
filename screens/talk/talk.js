@@ -4,7 +4,7 @@
 
 import {
   currentUser, logout, getMe, askBoo, interviewNext, summarizeInterview,
-  saveInterviewDraft, getInterviewDraft,
+  saveInterviewDraft, getInterviewDraft, demandNext, saveDemand,
 } from "../../common/data.js";
 
 // ---------------------------------------------------------------------------
@@ -237,7 +237,10 @@ const ASK_EXAMPLE = "마르부르크 생활비 얼마예요?"; // 360px 휴대�
 const canTab = !!(window.matchMedia && window.matchMedia("(pointer: fine)").matches); // 마우스·키보드 기기에서만 「Tab」 안내
 const exampleFill = (ex) => String(ex).replace(/\s*…\s*$/, " ");
 function currentExamples() {
-  if (mode === "ask") return [ASK_EXAMPLE];
+  if (mode === "ask") {
+    if (!demand.active) return [ASK_EXAMPLE];
+    return demandTyping() && Array.isArray(demand.step.examples) ? demand.step.examples.slice(0, 3) : [];
+  }
   const step = tell.step;
   if (!step || step.done || !Array.isArray(step.examples)) return [];
   return step.examples.slice(0, 3);
@@ -254,12 +257,18 @@ function fillExample(ex) {
 function updateComposer() {
   // 질문이 끝난 뒤에도 칸을 고르면 이어서 쓸 수 있다
   const tellReady = mode === "tell" && tell.step && !tell.busy && (!tell.step.done || tell.extra);
-  const enabled = mode === "ask" ? !ask.busy : tellReady;
+  // 궁금한 것 정리하기 중에는 입력줄이 정리 답변 칸이다. 칩을 고르는 단계·끝난 뒤에는 위에서 고르게 막는다
+  const askReady = !ask.busy && !demand.busy && (!demand.active || demandTyping());
+  const enabled = mode === "ask" ? askReady : tellReady;
   composerInput.disabled = !enabled;
   const examples = currentExamples();
   const tabHint = canTab && examples.length ? " · Tab" : "";
   composerInput.placeholder = mode === "ask"
-    ? `예: ${ASK_EXAMPLE}${tabHint}`
+    ? demand.active
+      ? demandTyping()
+        ? (examples.length ? `예: ${exampleFill(examples[0]).trim()}${tabHint}` : "답을 적어 주세요")
+        : "위에서 골라 주세요"
+      : `예: ${ASK_EXAMPLE}${tabHint}`
     : tell.step && tell.step.done
       ? (tell.extra ? `「${tell.extra}」에 이어서 쓰기` : "위 칸을 골라 이어서 써 주세요")
       : examples.length ? `예: ${exampleFill(examples[0]).trim()}${tabHint}` : "경험을 들려주세요";
@@ -286,8 +295,10 @@ composer.addEventListener("submit", (event) => {
   const text = composerInput.value.trim();
   if (!text) return;
   composerInput.value = "";
-  if (mode === "ask") sendQuestion(text);
-  else sendAnswer(text);
+  if (mode === "ask") {
+    if (demandTyping()) sendDemandAnswer(text);
+    else sendQuestion(text);
+  } else sendAnswer(text);
   updateComposer();
 });
 
@@ -313,7 +324,7 @@ const askChat = document.getElementById("askChat");
 // log: 화면에 그린 질문·답(9절 대화 보존 — 다른 메뉴에 갔다 와도 다시 그린다)
 const ask = { busy: false, turns: [], log: [] };
 const HISTORY_TURNS = 4;
-const MAX_ASK_LOG = 30;
+const MAX_ASK_LOG = 60; // 궁금한 것 정리하기 말풍선(한 번에 20개 안팎)도 같은 log에 남는다
 
 addTo(askChat, booText("궁금한 경험을 물어보세요. 선배들의 결과보고서와 인터뷰를 근거로 답해 드려요. 근거가 없으면 지어내지 않고 질문함에 담아 둘게요."));
 
@@ -371,6 +382,8 @@ function renderAnswer(res, question) {
               el("a", { className: "link-more", text: "해봤노트 보기 ›", attrs: { href: noteHref(res.noteId) } }),
             ])
           : null,
+        // [작업 92] 보류된 내 질문 → 궁금한 것 정리하기(질문·프로그램·칸은 미리 채워짐, spec demandNext fromQuestionId)
+        res.questionId ? holdDemandButton(res.questionId) : null,
         res.suggestSenior !== false
           ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } })
           : null,
@@ -558,6 +571,293 @@ function renderError(message, retry) {
     el("p", { className: "hold-box__text", text: message || "잠시 뒤에 다시 시도해 주세요." }),
     retry ? el("button", { className: "btn btn--outline", text: "다시 시도", attrs: { type: "button" }, on: { click: (e) => { e.currentTarget.disabled = true; retry(); } } }) : null,
   ]));
+  return msg;
+}
+
+// ---------------------------------------------------------------------------
+// 5-1. 궁금한 것 정리하기 (작업 92, spec 4장 demandNext·saveDemand [11/22 열림], PRD 3-2 시연 0:40)
+//      AI 없음 — 칩과 규칙만. 서버는 기억하지 않으므로 화면이 응답의 state를 들고 다니다 고른 값·쓴 답을 넣어 다시 보낸다.
+//      말풍선은 물어보기 대화(askChat)에 이어 그리고 ask.log에 남긴다(9절 — 갔다 와도 이어서).
+//      ① 잠겼을 때 물어보기 위 카드 ② 보류 답 아래 버튼(fromQuestionId) 두 곳에서 시작한다.
+// ---------------------------------------------------------------------------
+
+const DEMAND_TEXT_STEPS = new Set(["situation", "question", "hope", "more"]); // 입력줄로 쓰는 단계(나머지는 칩)
+// active: 정리하는 중 · busy: 서버 응답 기다리는 중 · step: 마지막 demandNext 응답(done 포함)
+// from: 보류 질문에서 시작했으면 그 질문 id · sent: 이미 전한 보류 질문 id(그 버튼을 다시 켜지 않게)
+const demand = { active: false, busy: false, step: null, from: null, sent: [] };
+let demandCard = null;
+
+const demandTyping = () => demand.active && !!demand.step && !demand.step.done && DEMAND_TEXT_STEPS.has(demand.step.step);
+
+function logAsk(item) {
+  ask.log.push({ ...item, at: timeText() });
+  if (ask.log.length > MAX_ASK_LOG) ask.log.shift();
+  saveKeep();
+}
+function demandUser(text) {
+  logAsk({ t: "d-user", text });
+  addTo(askChat, userText(text));
+}
+function demandBoo(text) {
+  logAsk({ t: "d-boo", text });
+  addTo(askChat, booText(text));
+}
+
+// 지나간 단계의 칩·버튼은 끈다(한 번에 한 단계만 답한다)
+function disableDemandButtons() {
+  for (const b of askChat.querySelectorAll("[data-demand] button")) b.disabled = true;
+}
+
+// ① 잠김 카드(6-6): 선배 추천이 아직 안 열렸을 때만 물어보기 맨 위에. 열려 있으면 만들지 않는다
+async function showDemandCard() {
+  if (demandCard || demand.active) return;
+  const info = await getMe();
+  const rec = info && !info.error ? info.recommend : null;
+  if (!rec || rec.ready !== false || demandCard || demand.active) return;
+  demandCard = el("section", { className: "card demand-invite" }, [
+    el("h2", { className: "demand-invite__title", text: "궁금한 것 정리하기" }),
+    el("p", { className: "sub", text: "BOO와 함께 궁금한 것을 정리해 선배와 담당 부서에 전해 보세요." }),
+    el("button", { className: "btn btn--primary btn--block", text: "궁금한 것 정리하기", attrs: { type: "button" }, on: { click: () => startDemand() } }),
+    el("p", { className: "btn-reason" }, [icon("lock"), "경험을 들려주거나 궁금한 것을 정리하면 선배 추천이 열려요"]),
+  ]);
+  panelAsk.insertBefore(demandCard, askChat);
+  drawIcons();
+}
+function hideDemandCard() {
+  if (demandCard) demandCard.remove();
+  demandCard = null;
+}
+
+// ② 보류 답 아래: 「이 질문을 선배에게 전하고 선배 추천 받기」
+function holdDemandButton(questionId) {
+  const sent = demand.sent.includes(questionId);
+  return el("button", {
+    className: "btn btn--primary btn--block",
+    text: "이 질문을 선배에게 전하고 선배 추천 받기",
+    attrs: { type: "button", disabled: sent, "data-from": questionId },
+    on: {
+      click: (e) => {
+        if (demand.active) return toast("지금 정리하던 것을 먼저 마쳐 주세요", "info");
+        e.currentTarget.disabled = true;
+        startDemand(questionId);
+      },
+    },
+  });
+}
+
+async function startDemand(fromQuestionId) {
+  if (demand.active || demand.busy || ask.busy) return;
+  Object.assign(demand, { active: true, step: null, from: fromQuestionId || null });
+  hideDemandCard();
+  demandBoo(fromQuestionId
+    ? "좋아요. 선배가 답하기 좋게 몇 가지만 더 물어볼게요."
+    : "좋아요. 선배가 답하기 좋게 궁금한 것을 함께 정리해 볼게요.");
+  await nextDemand(fromQuestionId ? { fromQuestionId } : {});
+}
+
+async function nextDemand(state) {
+  demand.busy = true;
+  updateComposer();
+  const typing = addTo(askChat, typingMessage());
+  const res = await demandNext(state);
+  typing.remove();
+  demand.busy = false;
+  if (!res || res.error || (!res.done && !res.step)) {
+    // 오류(6-5): 정리를 멈추고 다시 시도하면 같은 state로 이어 간다
+    demand.active = false;
+    demand.step = null;
+    updateComposer();
+    addTo(askChat, renderError(res && res.error, () => {
+      demand.active = true;
+      nextDemand(state);
+    }));
+    return;
+  }
+  showDemandStep(res);
+}
+
+function showDemandStep(res) {
+  disableDemandButtons();
+  demand.step = res;
+  logAsk({ t: "d-step", step: res });
+  addTo(askChat, demandStepMessage(res));
+  updateComposer();
+  if (demandTyping()) composerInput.focus({ preventScroll: true });
+}
+
+// 한 단계 말풍선: (다시 묻기 문구) + 질문 + 칩 또는 예시 칩 + 「답변 n/3」 + 넘어가기·그만두기
+function demandStepMessage(res) {
+  if (res.done) return demandSummaryMessage(res);
+  const { msg, body } = booMessage({ wide: true });
+  msg.dataset.demand = "step";
+  const progress = res.progress || {};
+  const typing = DEMAND_TEXT_STEPS.has(res.step);
+  const actions = el("div", { className: "msg__actions" }, [
+    res.canSkip ? el("button", { className: "btn btn--text", text: "넘어가기", attrs: { type: "button" }, on: { click: () => skipDemandMore(res) } }) : null,
+    el("button", { className: "btn btn--text", text: "정리 그만두기", attrs: { type: "button" }, on: { click: () => stopDemand(res) } }),
+  ]);
+  appendAll(body,
+    // 유효 답변이 아니면 같은 단계를 다시 묻는다 — 입력 오류(5-9): 아이콘 + 14px 문구
+    res.retry ? el("p", { className: "demand-retry" }, [icon("triangle-alert"), res.retry]) : null,
+    el("p", { className: "msg__bubble", text: res.question || "" }),
+    !typing && Array.isArray(res.options) && res.options.length ? demandOptions(res) : null,
+    typing && Array.isArray(res.examples) && res.examples.length
+      ? el("div", { className: "chip-row" }, res.examples.slice(0, 3).map((ex) => el("button", {
+          className: "btn btn--secondary", text: ex, attrs: { type: "button" }, on: { click: () => fillExample(ex) }, // 바로 보내지 않음(5-7)
+        })))
+      : null,
+    el("div", { className: "demand-foot" }, [
+      statusLabel("neutral", null, `답변 ${Number(progress.answered) || 0}/${Number(progress.need) || 3}`),
+      actions,
+    ]),
+    el("span", { className: "msg__time", text: timeText() }),
+  );
+  return msg;
+}
+
+// 칩 단계: 옵션은 문자열 또는 {value, label}(detail — 「아직 정하지 않았어요」는 value: null)
+function demandOptions(res) {
+  const row = el("div", { className: "chip-row" });
+  for (const opt of res.options) {
+    const isObj = opt && typeof opt === "object";
+    const label = String(isObj ? opt.label ?? "" : opt ?? "");
+    if (!label) continue;
+    const value = isObj ? (opt.value ?? null) : opt;
+    row.append(el("button", {
+      className: "btn btn--secondary", text: label, attrs: { type: "button" },
+      on: { click: () => pickDemand(res, value, label) },
+    }));
+  }
+  return row;
+}
+
+function pickDemand(res, value, label) {
+  if (!demand.active || demand.busy || demand.step !== res) return;
+  disableDemandButtons();
+  demandUser(label);
+  const state = { ...res.state };
+  if (res.step === "explore") state.explore = label; // 「잘 모르겠어요」 → 고민 칩(field는 그대로)
+  else state[res.step] = value;
+  nextDemand(state);
+}
+
+function sendDemandAnswer(text) {
+  const res = demand.step;
+  if (!demandTyping() || demand.busy) return;
+  disableDemandButtons();
+  demandUser(text);
+  const state = { ...res.state };
+  if (res.step === "more") {
+    // 더 궁금한 것(최대 2개): 다시 묻는 중이면 방금 틀린 문장을 새 문장으로 바꾼다
+    const more = Array.isArray(state.more) ? [...state.more] : [];
+    if (res.retry && more.length) more[more.length - 1] = text;
+    else more.push(text);
+    state.more = more;
+  } else {
+    state[res.step] = text;
+  }
+  nextDemand(state);
+}
+
+function skipDemandMore(res) {
+  if (!demand.active || demand.busy || demand.step !== res) return;
+  disableDemandButtons();
+  demandUser("넘어가기");
+  nextDemand({ ...res.state, moreDone: true });
+}
+
+function stopDemand(res) {
+  if (!demand.active || demand.busy || demand.step !== res) return;
+  disableDemandButtons();
+  // 보류 질문에서 시작했으면 그 버튼을 다시 켠다(질문함에는 이미 담겨 있다)
+  if (demand.from) for (const b of askChat.querySelectorAll(`button[data-from="${CSS.escape(demand.from)}"]`)) b.disabled = false;
+  Object.assign(demand, { active: false, step: null, from: null });
+  demandBoo("알겠어요. 궁금한 게 생기면 언제든 다시 정리할 수 있어요.");
+  updateComposer();
+  showDemandCard();
+}
+
+// 끝(done): 「내가 궁금한 것」 카드 + 동의 문구 + Primary 「선배와 담당 부서에 전하기」(spec saveDemand)
+// AI가 만든 글이 아니라 내가 고르고 쓴 것이므로 MINT가 아닌 SOFT BLUE 머리(3-1 AI 표시색 규칙)
+function demandSummaryMessage(res) {
+  const s = res.summary || {};
+  const questions = (Array.isArray(s.questions) ? s.questions : []).filter((q) => typeof q === "string" && q.trim());
+  const rows = [
+    ["관심", s.interest],
+    ["프로그램", s.program || "아직 정하지 않았어요"],
+    ["궁금한 칸", s.section],
+    ["시기", s.when],
+    ["선배에게 묻고 싶은 것", questions],
+    ["지금 내 상황", s.situation],
+    ["얻고 싶은 것", s.hope],
+  ];
+  const card = el("article", { className: "summary-card demand-card" }, [
+    el("div", { className: "summary-card__head" }, [icon("list-checks"), "내가 궁금한 것"]),
+  ]);
+  for (const [name, value] of rows) {
+    const row = el("div", { className: "summary-row" }, [el("span", { className: "summary-row__name", text: name })]);
+    const list = Array.isArray(value) ? value : [value];
+    if (!list.length || list.every((v) => !v)) row.append(el("p", { className: "summary-row__empty", text: "–" }));
+    else for (const v of list) if (v) row.append(el("p", { text: v }));
+    card.append(row);
+  }
+
+  const { msg, body } = booMessage({ wide: true });
+  msg.dataset.demand = "summary";
+  const sendBtn = el("button", { className: "btn btn--primary btn--block", text: "선배와 담당 부서에 전하기", attrs: { type: "button" } });
+  sendBtn.addEventListener("click", () => sendDemand(res, sendBtn));
+  appendAll(body,
+    el("p", { className: "msg__bubble", text: "정리했어요. 이 질문을 선배와 담당 부서에 전해도 될까요?" }),
+    card,
+    el("p", { className: "sub", text: "선배에게는 질문만 전해져요. 지금 내 상황과 얻고 싶은 것은 선배에게 보내지 않아요." }),
+    el("div", { className: "dock__buttons" }, [
+      sendBtn,
+      el("button", { className: "btn btn--text", text: "정리 그만두기", attrs: { type: "button" }, on: { click: () => stopDemand(res) } }),
+    ]),
+    el("span", { className: "msg__time", text: timeText() }),
+  );
+  return msg;
+}
+
+async function sendDemand(res, button) {
+  if (!demand.active || demand.busy || demand.step !== res) return;
+  demand.busy = true;
+  button.disabled = true;
+  updateComposer();
+  const out = await saveDemand(res.state);
+  demand.busy = false;
+  if (!out || out.error) {
+    button.disabled = false;
+    updateComposer();
+    toast((out && out.error) || "전하지 못했어요. 잠시 뒤에 다시 시도해 주세요.", "circle-alert");
+    return;
+  }
+  if (out.ok === false) {
+    // 서버가 다시 검사해 아직 덜 끝났다고 하면 그 단계부터 다시
+    demandBoo(out.message || "아직 정리가 끝나지 않았어요");
+    if (out.next && (out.next.done || out.next.step)) showDemandStep(out.next);
+    else updateComposer();
+    return;
+  }
+  disableDemandButtons();
+  if (demand.from) demand.sent.push(demand.from);
+  Object.assign(demand, { active: false, step: null, from: null });
+  logAsk({ t: "d-sent", res: out });
+  addTo(askChat, demandSentMessage(out));
+  hideDemandCard();
+  updateComposer();
+  toast(out.unlocked ? "선배 추천이 열렸어요" : "선배와 담당 부서에 전했어요");
+}
+
+function demandSentMessage(out) {
+  const { msg, body } = booMessage({ wide: true });
+  const ready = !!(out.recommend && out.recommend.ready);
+  appendAll(body,
+    el("p", { className: "msg__bubble", text: "선배와 담당 부서에 전했어요. 질문은 질문함에 담겨 있고, 선배가 경험을 들려줄 때 이 질문을 먼저 물어볼게요." }),
+    ready ? statusLabel("success", "check", "선배 추천이 열렸어요") : null,
+    ready ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } }) : null,
+    el("span", { className: "msg__time", text: timeText() }),
+  );
   return msg;
 }
 
@@ -1034,7 +1334,8 @@ document.addEventListener("consent-saved", (event) => {
   label.classList.add("status-label--shared");
   summaryStatus.append(" ", label);
   measureDock();
-  toast("해봤노트에 반영됐어요");
+  // [작업 92] 이번 공유로 선배 추천이 처음 열렸으면 함께 알린다(spec saveConsent unlocked)
+  toast(event.detail.result && event.detail.result.unlocked ? "해봤노트에 반영됐어요 · 선배 추천이 열렸어요" : "해봤노트에 반영됐어요");
 });
 
 // 「나중에 할게요」 → 내 보관함 · 내 경험노트 탭(토스트는 보관함 화면이 from=later를 보고 띄운다)
@@ -1073,7 +1374,8 @@ function saveKeep() {
           extra: tell.extra, experiences: tell.experiences, log: tell.log, waiting: tell.waiting,
         }
       : null;
-    sessionStorage.setItem(KEEP_KEY, JSON.stringify({ mode, ask: { turns: ask.turns, log: ask.log }, tell: t }));
+    const d = { active: demand.active, step: demand.active ? demand.step : null, from: demand.from, sent: demand.sent };
+    sessionStorage.setItem(KEEP_KEY, JSON.stringify({ mode, ask: { turns: ask.turns, log: ask.log, demand: d }, tell: t }));
   } catch {
     // 저장 공간이 없거나 막혀 있으면 보존 없이 그대로 쓴다
   }
@@ -1091,13 +1393,30 @@ function loadKeep() {
 function restoreAsk(kept) {
   ask.turns = Array.isArray(kept.turns) ? kept.turns.slice(-HISTORY_TURNS) : [];
   ask.log = Array.isArray(kept.log) ? kept.log.slice(-MAX_ASK_LOG) : [];
+  const d = kept.demand && typeof kept.demand === "object" ? kept.demand : {};
+  demand.sent = Array.isArray(d.sent) ? d.sent : []; // 보류 답의 버튼을 그리기 전에
   for (const item of ask.log) {
     replayAt = item.at;
-    addTo(askChat, userText(item.q));
-    replayAt = item.resAt;
-    addTo(askChat, renderAnswer(item.res, item.q));
+    // 궁금한 것 정리하기 말풍선(5-1)
+    if (item.t === "d-user") addTo(askChat, userText(item.text));
+    else if (item.t === "d-boo") addTo(askChat, booText(item.text));
+    else if (item.t === "d-step" && item.step) addTo(askChat, demandStepMessage(item.step));
+    else if (item.t === "d-sent" && item.res) addTo(askChat, demandSentMessage(item.res));
+    else if (!item.t) {
+      addTo(askChat, userText(item.q));
+      replayAt = item.resAt;
+      addTo(askChat, renderAnswer(item.res, item.q));
+    }
   }
   replayAt = null;
+  disableDemandButtons(); // 지나간 단계는 끄고, 정리하던 중이면 아래에 그 단계를 다시
+  for (const b of askChat.querySelectorAll("button[data-from]")) b.disabled = demand.sent.includes(b.dataset.from);
+  if (d.active && d.step && (d.step.done || d.step.step)) {
+    Object.assign(demand, { active: true, step: d.step, from: d.from || null });
+    for (const b of askChat.querySelectorAll(`button[data-from="${CSS.escape(String(demand.from))}"]`)) b.disabled = true;
+    addTo(askChat, booText("아까 정리하던 것을 이어서 할게요."));
+    addTo(askChat, demandStepMessage(d.step));
+  }
 }
 
 function restoreTell(kept) {
@@ -1176,5 +1495,6 @@ if (kept) {
 
 history.replaceState({ view: "main" }, "", location.href);
 setMode(mode);
+showDemandCard(); // ① 선배 추천이 잠겼을 때만 물어보기 맨 위 카드(작업 92)
 drawIcons();
 measureDock();

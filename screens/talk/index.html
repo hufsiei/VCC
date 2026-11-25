@@ -43,6 +43,17 @@
   /* [v2] 보고서로 채워짐(covered): 중립색 — 내 이야기(MINT ✓)와 구분 */
   .progress-chip--covered { border-color: transparent; background: var(--status-neutral-bg); color: var(--status-neutral-fg); }
   .progress-chip__note { font-size: var(--font-size-caption); font-weight: 400; }
+  /* [작업 92] 궁금한 것 정리하기 — ① 잠김 카드(6-6) */
+  .demand-invite { display: flex; flex-direction: column; gap: 12px; }
+  .demand-invite__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
+  .demand-invite .btn-reason { margin-top: 0; }
+  /* 「내가 궁금한 것」 카드: 내가 고르고 쓴 것이라 AI 표시색(MINT) 대신 SOFT BLUE 머리 */
+  .demand-card .summary-card__head { background: var(--color-soft-blue); color: var(--color-heading); }
+  /* 다시 묻기(입력 오류 5-9): 아이콘 + 14px 문구 */
+  .demand-retry { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--font-size-secondary); color: var(--status-warning-fg); }
+  .demand-retry .icon { width: 16px; height: 16px; flex: none; }
+  .demand-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-xs); }
+  .demand-foot .btn--text { min-height: 44px; }
 </style>
 </head>
 <body>
