@@ -7,7 +7,7 @@
 ## 접속 주소
 
 - 로컬: 저장소 폴더에서 `python functions/serve_screens.py` 실행 후 `http://localhost:8000/screens/login/` (이 PC에서만 열림)
-- 로컬 서버 함수(각자 PC, `.env` 자기 키): `functions/local_fn.py` 실행 후 `http://localhost:8787`. 공개 주소 서버가 기본, 로컬은 백업(11/25, 작업 32). 순서는 「실행법」의 「실서버 시험」.
+- 로컬 서버 함수(각자 PC. AI 키는 미리 PC에만, 11/25): `functions/local_fn.py` 실행 후 `http://localhost:8787`. 공개 주소 서버가 기본, 로컬은 백업(11/25, 작업 32). 순서는 「실행법」의 「실서버 시험」.
 - 공개 주소(GitHub Pages, `main` 루트): <https://hufsiei.github.io/VCC/screens/login/>
   - 저장소 루트는 `https://hufsiei.github.io/VCC/`이고, 각 화면은 그 아래 `screens/<화면>/`입니다.
   - 기본은 `USE_MOCK=true`(mock 데이터)입니다. 주소 끝에 `?server=all`을 붙인 탭만 서버 함수(NCP Cloud Functions, 작업 58)로 갑니다. 배포·콘솔 구성은 [운영노트](docs/운영노트.md) 5장 「배포」.
@@ -47,12 +47,12 @@ python functions/serve_screens.py
 3. 문제는 「화면·계정·시각·재현 순서·캡처」로 단톡에. 끝나면 주소 끝에 `?server=`를 붙여 해제합니다.
 - 쓰기 기록(쪽지·질문함·동의)은 공용 버킷 `vcc-runtime`에 남습니다. 리허설 전 초기화는 [운영노트](docs/운영노트.md) 5장 「배포」.
 
-② 로컬 서버 1회 (11/26) — 각자 PC에서 `.env`의 자기 키로
-1. `main`을 받고, 저장소 맨 위에 `.env`가 없으면 [.env.example](.env.example)을 복사해 만듭니다. 자기 키(`CLOVA_KEY`·`ANTHROPIC_API_KEY`)와 로그인 비번 표 `VCC_LOGIN_PW`를 넣습니다(값은 미리가 따로 전함. 채팅·커밋에 적지 않음).
+② 로컬 서버 1회 (11/26) — 각자 PC에서. 원우·민지 PC는 AI 키가 없어(11/25 비활성화) 인터BOO 답·요약 같은 AI 단계는 실패합니다. AI 흐름은 ①로 봅니다.
+1. `main`을 받고, 저장소 맨 위에 `.env`가 없으면 [.env.example](.env.example)을 복사해 만듭니다. 로그인 비번 표 `VCC_LOGIN_PW`를 넣습니다(값은 미리가 따로 전함. 채팅·커밋에 적지 않음). AI 키 두 줄은 비워 둡니다(미리만 넣음).
 2. Claude 작업을 쓰면 `pip install -r functions/requirements.txt`(HCX만 쓰면 생략).
 3. 창 1(저장소 맨 위): `python functions/serve_screens.py` → 화면 `http://localhost:8000`. 창 2: `cd functions` → `python local_fn.py` → 서버 함수 `http://localhost:8787`(포트 고정).
 4. `http://localhost:8000/screens/login/?server=all` 을 열어 ①과 같은 흐름을 1회. 쓰기 기록은 내 PC `data/runtime/*.json`에만 남습니다.
-5. 안 되는 것(패키지·`.env`·포트)은 단톡에. 로컬 서버 AI 호출은 자기 키로 나가니 Claude Code에서 `/token`으로 사용량을 봅니다.
+5. 안 되는 것(패키지·`.env`·포트)은 단톡에. AI 단계 실패는 키가 없어서이니 보고하지 않아도 됩니다. 사용량은 Claude Code에서 `/token`.
 
 ## push 전 검사
 
