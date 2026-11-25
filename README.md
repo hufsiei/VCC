@@ -52,7 +52,7 @@ python functions/serve_screens.py
 2. Claude 작업을 쓰면 `pip install -r functions/requirements.txt`(HCX만 쓰면 생략).
 3. 창 1(저장소 맨 위): `python functions/serve_screens.py` → 화면 `http://localhost:8000`. 창 2: `cd functions` → `python local_fn.py` → 서버 함수 `http://localhost:8787`(포트 고정).
 4. `http://localhost:8000/screens/login/?server=all` 을 열어 ①과 같은 흐름을 1회. 쓰기 기록은 내 PC `data/runtime/*.json`에만 남습니다.
-5. 안 되는 것(패키지·`.env`·포트)은 단톡에. 로컬 서버 AI 호출은 자기 키로 나가니 `python -X utf8 functions/ai_usage.py`로 오늘 사용액을 봅니다.
+5. 안 되는 것(패키지·`.env`·포트)은 단톡에. 로컬 서버 AI 호출은 자기 키로 나가니 Claude Code에서 `/token`으로 사용량을 봅니다.
 
 ## push 전 검사
 

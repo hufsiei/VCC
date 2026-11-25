@@ -11,7 +11,6 @@ allowed-tools: Bash(git:*), Bash(gh:*), PowerShell
 4. `gh pr list -R hufsiei/VCC --head <현재 브랜치> --state all --json number,state,isDraft,mergedAt,title` — 이 브랜치의 PR 상태(없음 / open / draft / merged).
 5. 이 대화에서 백그라운드로 돌린 명령·에이전트가 있으면 아직 도는지(없으면 「없음」).
 6. 이 대화에서 내가 하겠다고 하고 아직 안 끝낸 일, 사용자 답을 기다리는 질문이 있는지.
-7. `python -X utf8 functions/ai_usage.py` 한 줄 — CLAUDE.md 규칙상 PR 마지막에 적는 「오늘 AI」. 이 창에서 PR을 올렸다면 같이 보여 준다.
 
 답은 맨 위에 한 줄 결론:
 - **닫아도 됨** — 위 항목에 걸리는 게 없음(또는 PR 병합까지 끝났고 작업 폴더만 남음 → 그 폴더를 지울지 한 줄로 묻기. 지우지는 말 것).

@@ -4,10 +4,11 @@
 # 그래서 각자 이 PC의 호출 기록(functions/logs/ai-calls.jsonl, ai.py가 씀)으로 오늘 사용액을 매번 본다.
 #   python -X utf8 functions/ai_usage.py                → 오늘 내 AI $0.12 (Claude 5회) · HCX 3회 1,234토큰
 #   python -X utf8 functions/ai_usage.py --date 2026-11-23
-#   python -X utf8 functions/ai_usage.py --journals <일지.md> <일지.md> ...   → 팀 합계(milend)
-# 쓰는 곳: .claude/hooks/session_start.py의 [VCC] 줄, PR 올릴 때 마지막 답, 작업일지 「오늘 AI」 줄.
-# 금액은 로그 토큰 × 아래 단가로 낸 추정이다. 실제 청구는 Claude 콘솔(키별 비용)·NCP 이용 요금과 대조한다.
-# AI를 부르지 않고 .env도 읽지 않는다.
+#   python -X utf8 functions/ai_usage.py --journals <일지.md> <일지.md> ...   → 팀 합계
+#   python -X utf8 functions/ai_usage.py --live   → 실제 청구(/token, 아래 「실제 청구 조회」)
+# 11/25부터 매 창 표시·일지 줄은 없앴다. 사용량은 /token(--live)으로 필요할 때 본다.
+# 로그 줄 금액은 로그 토큰 × 아래 단가로 낸 추정이다.
+# AI를 부르지 않는다. .env는 --live일 때만 읽고 값은 출력하지 않는다.
 import argparse
 import json
 import re
@@ -119,13 +120,142 @@ def team_total(texts):
     return total, missing
 
 
+# ── 실제 청구 조회 (--live, /token) ── 11/25
+# Anthropic: .env ANTHROPIC_ADMIN_KEY(sk-ant-admin…)가 있으면 Usage and Cost Analytics API(beta)로
+#   오늘·이번 달 $(UTC 날짜 기준, 데이터는 최대 수 시간 늦음) + 키별 토큰. 없으면 이 PC 로그 추정(today_line).
+# NCP: .env NCP_OS_ACCESS_KEY·NCP_OS_SECRET_KEY(서브 계정에 NCP_BILLING_VIEWER)로 Billing API —
+#   이번 달 CLOVA Studio 이용 금액 + 크레딧 차감(11월부터 누적)과 대회 크레딧 남은 추정.
+# 키 값은 출력·로그하지 않는다. 실패는 한 줄 이유로. AI는 부르지 않는다(비용 없음).
+ANTHROPIC_API = "https://api.anthropic.com/v1/organizations"
+ANALYTICS_BETA = "analytics-usage-cost-2026-08-24"
+NCP_BILLING = "https://billingapi.apigw.ntruss.com"
+CREDIT_TOTAL = 500_000          # 대회 크레딧(원), 11/24 수령, ~12/31
+CREDIT_FROM = "202611"          # 크레딧 차감을 세기 시작하는 달
+
+
+def _get_json(url, headers, timeout=15):
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"HTTP {e.code}") from None
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise RuntimeError(f"연결 실패({type(e).__name__})") from None
+    except ValueError:
+        raise RuntimeError("응답이 JSON이 아님") from None
+
+
+def _sum_tokens(row):
+    """analytics 행에서 이름에 tokens가 든 숫자를 모두 더한다(중첩 dict 포함)."""
+    total = 0
+    for k, v in (row or {}).items():
+        if isinstance(v, dict):
+            total += _sum_tokens(v)
+        elif "tokens" in k and isinstance(v, (int, float)):
+            total += int(v)
+    return total
+
+
+def anthropic_lines(admin_key, today=None, get=None):
+    """Admin 키로 오늘·이번 달 $와 키별 토큰 → 줄 목록."""
+    from datetime import datetime, timezone
+    from urllib.parse import urlencode
+    get = get or _get_json
+    now = datetime.now(timezone.utc)
+    day = today or now.strftime("%Y-%m-%d")
+    h = {"x-api-key": admin_key, "anthropic-version": "2023-06-01", "anthropic-beta": ANALYTICS_BETA}
+
+    def rows(kind, start):
+        q = urlencode([("starting_at", f"{start}T00:00:00Z"), ("group_by[]", "api_key_id"), ("limit", "1000")])
+        return get(f"{ANTHROPIC_API}/analytics/{kind}?{q}", h).get("data") or []
+
+    def usd(rs):
+        return sum(float(r.get("amount") or 0) for r in rs) / 100      # amount는 센트 단위 문자열
+
+    try:
+        cost_today, cost_month = rows("cost", day), rows("cost", day[:8] + "01")
+    except RuntimeError as e:
+        return [f"Anthropic: 조회 실패 — {e}"]
+    out = [f"Anthropic: 오늘 ${usd(cost_today):.2f} · 이번 달 ${usd(cost_month):.2f} (UTC 날짜, 데이터는 몇 시간 늦을 수 있음)"]
+    try:
+        names = {k.get("id"): k.get("name") for k in get(f"{ANTHROPIC_API}/api_keys?limit=100", h).get("data") or []}
+        per = {}
+        for r in rows("usage", day):
+            key = names.get(r.get("api_key_id")) or r.get("api_key_id") or "키 없음(콘솔 등)"
+            per[key] = per.get(key, 0) + _sum_tokens(r)
+        if per:
+            out.append("  오늘 키별 토큰: " + " · ".join(f"{k} {v:,}" for k, v in sorted(per.items())))
+    except RuntimeError as e:
+        out.append(f"  키별 토큰 조회 실패 — {e}")
+    return out
+
+
+def _ncp_headers(uri, access, secret):
+    import base64
+    import hashlib
+    import hmac
+    import time
+    ts = str(int(time.time() * 1000))
+    msg = f"GET {uri}\n{ts}\n{access}".encode("utf-8")
+    sig = base64.b64encode(hmac.new(secret.encode("utf-8"), msg, hashlib.sha256).digest()).decode()
+    return {"x-ncp-apigw-timestamp": ts, "x-ncp-iam-access-key": access, "x-ncp-apigw-signature-v2": sig}
+
+
+def ncp_lines(access, secret, month=None, get=None):
+    """Billing API로 이번 달 CLOVA Studio 이용 금액·크레딧 차감 → 줄 목록."""
+    get = get or _get_json
+    month = month or date.today().strftime("%Y%m")
+
+    def call(path, start):
+        uri = f"/billing/v1/cost/{path}?startMonth={start}&endMonth={month}&responseFormatType=json"
+        return get(NCP_BILLING + uri, _ncp_headers(uri, access, secret))
+
+    try:
+        prod = call("getProductDemandCostList", month)["getProductDemandCostListResponse"]["productDemandCostList"]
+        demand = call("getDemandCostList", CREDIT_FROM)["getDemandCostListResponse"]["demandCostList"]
+    except RuntimeError as e:
+        return [f"NCP: 조회 실패 — {e}"]
+    except (KeyError, TypeError):
+        return ["NCP: 응답 모양이 예상과 다름"]
+    clova = sum(int(p.get("useAmount") or 0) for p in prod
+                if "clova" in str((p.get("productDemandType") or {}).get("codeName", "")).lower())
+    total = sum(int(p.get("useAmount") or 0) for p in prod)
+    credit = sum(int(d.get("creditDiscountAmount") or 0) for d in demand)
+    return [f"NCP: 이번 달 이용 ₩{total:,} (CLOVA Studio ₩{clova:,}) · 크레딧 차감 ₩{credit:,}({CREDIT_FROM}~) "
+            f"→ 대회 크레딧 남은 약 ₩{CREDIT_TOTAL - credit:,} (추정, 청구 반영은 늦을 수 있음)"]
+
+
+def live_lines(env=None):
+    """--live 출력 줄들. env: 환경변수 dict(시험용). 없으면 .env를 읽어 os.environ."""
+    import os
+    if env is None:
+        paths.load_env()
+        env = os.environ
+    out = []
+    admin = env.get("ANTHROPIC_ADMIN_KEY")
+    if admin:
+        out += anthropic_lines(admin)
+    else:
+        out.append("Anthropic: Admin 키 없음 — 이 PC 로그 추정: " + today_line())
+    ak, sk = env.get("NCP_OS_ACCESS_KEY"), env.get("NCP_OS_SECRET_KEY")
+    out += ncp_lines(ak, sk) if ak and sk else ["NCP: NCP 키 없음"]
+    return out
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="오늘 내 AI 사용액 한 줄 (ai-calls.jsonl × 단가)")
+    ap.add_argument("--live", action="store_true", help="실제 청구 조회(/token): Anthropic Admin API · NCP Billing API")
     ap.add_argument("--date", help="YYYY-MM-DD (기본: 오늘)")
     ap.add_argument("--log", help="로그 파일 (기본: 본 저장소 functions/logs/ai-calls.jsonl)")
     ap.add_argument("--json", action="store_true", help="숫자를 JSON으로")
     ap.add_argument("--journals", nargs="+", metavar="일지", help="작업일지들의 「오늘 AI」 줄을 더해 팀 합계")
     a = ap.parse_args(argv)
+    if a.live:
+        print("\n".join(live_lines()))
+        return 0
     if a.journals:
         texts = []
         for f in a.journals:

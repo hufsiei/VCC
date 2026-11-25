@@ -85,5 +85,53 @@ r = subprocess.run([sys.executable, "-X", "utf8", str(here / "ai_usage.py"), "--
                    capture_output=True, text=True, encoding="utf-8")
 expect("명령줄 팀 합계", r.stdout.strip() == "오늘 팀 AI $1.00 (Claude 1회) · HCX 1회 10토큰 — 일지 1/2개 (「오늘 AI」 줄 없음: b.md)")
 
+# --live (/token): 네트워크 없이 — 키 없음 분기와 가짜 응답
+out = ai_usage.live_lines(env={})
+expect("--live 키 없음: Anthropic 로그 추정", out[0].startswith("Anthropic: Admin 키 없음 — 이 PC 로그 추정: 오늘 내 AI $"))
+expect("--live 키 없음: NCP", out[1] == "NCP: NCP 키 없음")
+expect("--live NCP 키 하나만 있어도 키 없음", ai_usage.live_lines(env={"NCP_OS_ACCESS_KEY": "x"})[1] == "NCP: NCP 키 없음")
+
+seen_headers = []
+
+
+def fake_anthropic(url, headers):
+    seen_headers.append(headers)
+    if "/api_keys" in url:
+        return {"data": [{"id": "apikey_1", "name": "vcc-dev(ww)"}]}
+    if "/analytics/cost" in url:
+        return {"data": [{"api_key_id": "apikey_1", "amount": "150.5"}, {"api_key_id": None, "amount": "49.5"}]}
+    return {"data": [{"api_key_id": "apikey_1", "uncached_input_tokens": 1000, "output_tokens": 200,
+                      "cache_creation": {"ephemeral_5m_input_tokens": 10}}]}
+
+
+a = ai_usage.anthropic_lines("sk-ant-admin-가짜", today="2026-11-25", get=fake_anthropic)
+expect("Anthropic 금액: 센트 → $2.00", a[0].startswith("Anthropic: 오늘 $2.00 · 이번 달 $2.00"))
+expect("Anthropic 키별 토큰(이름)", a[1].strip() == "오늘 키별 토큰: vcc-dev(ww) 1,210")
+expect("Anthropic beta 헤더", all(h.get("anthropic-beta") == ai_usage.ANALYTICS_BETA for h in seen_headers))
+
+
+def fail_get(url, headers):
+    raise RuntimeError("HTTP 401")
+
+
+expect("Anthropic 실패 한 줄", ai_usage.anthropic_lines("k", get=fail_get) == ["Anthropic: 조회 실패 — HTTP 401"])
+expect("Anthropic 실패에 키 값 없음", "비밀키값" not in ai_usage.anthropic_lines("비밀키값", get=fail_get)[0])
+
+
+def fake_ncp(url, headers):
+    assert "x-ncp-apigw-signature-v2" in headers
+    if "getProductDemandCostList" in url:
+        return {"getProductDemandCostListResponse": {"productDemandCostList": [
+            {"productDemandType": {"codeName": "CLOVA Studio"}, "useAmount": 1200},
+            {"productDemandType": {"codeName": "API Gateway"}, "useAmount": 180}]}}
+    return {"getDemandCostListResponse": {"demandCostList": [{"creditDiscountAmount": 1260}]}}
+
+
+n = ai_usage.ncp_lines("ak", "sk", month="202611", get=fake_ncp)
+expect("NCP 금액·크레딧", n == ["NCP: 이번 달 이용 ₩1,380 (CLOVA Studio ₩1,200) · 크레딧 차감 ₩1,260(202611~) "
+                              "→ 대회 크레딧 남은 약 ₩498,740 (추정, 청구 반영은 늦을 수 있음)"])
+expect("NCP 실패 한 줄", ai_usage.ncp_lines("ak", "sk", get=fail_get) == ["NCP: 조회 실패 — HTTP 401"])
+expect("NCP 응답 모양 다름", ai_usage.ncp_lines("ak", "sk", get=lambda u, h: {}) == ["NCP: 응답 모양이 예상과 다름"])
+
 print(f"\n{len(fails)} fail" if fails else "\nall ok")
 sys.exit(1 if fails else 0)

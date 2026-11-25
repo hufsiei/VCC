@@ -2,7 +2,7 @@
 
 저장소에는 스크립트와 스킬 원본만 있다. 아래 세 가지는 PC마다 따로 걸어야 한다. 팀원은 하지 않아도 된다(이 파일들은 팀원 Claude Code에서 자동으로 돌지 않는다).
 
-## 1. SessionStart hook (자동 pull + 하루 한 번 상태 한 줄 + 매 세션 오늘 AI 사용액)
+## 1. SessionStart hook (자동 pull + 실패 시 알림)
 11/24부터 저장소 `.claude/settings.json`에 같은 hook이 등록돼 있어, 저장소 폴더(`C:\dev\VCC`나 `C:\dev\VCC-*`)에서 Claude Code를 열면 팀원 PC에서도 저절로 돈다. 미리처럼 `C:\dev`에서 여는 PC는 저장소 설정을 읽지 않으니 아래를 계속 둔다. 두 곳에 다 걸려도 같은 세션에서는 한 번만 돈다.
 - 저장소 `.claude/settings.json`은 hook만 담는다. 이 PC 전용 권한 줄은 `.claude/settings.local.json`에 둔다(커밋 안 함). **병합 뒤 처음 pull하기 전에** 예전에 추적되지 않던 `C:\dev\VCC\.claude\settings.json`(권한 줄)을 `settings.local.json`으로 옮기고 지워야 pull이 된다.
 
@@ -16,11 +16,11 @@
   ]
 }
 ```
-- 세션을 열 때마다 `C:\dev\VCC`가 main이고 고친 파일이 없을 때만 pull한다.
-- 그날 첫 세션에만 `[VCC] main 최신 · 남은 작업 폴더 0 · 열린 PR 2 · .env 키 3/3`을 보여 준다(`~\.claude\vcc-status-day.txt`에 날짜 기록).
-- 매 세션 끝에 `오늘 내 AI $x.xx (Claude n회) · HCX m회 k토큰`을 붙인다(`functions/ai_usage.py`, 로그가 없으면 $0.00). 풍선 알림은 예전처럼 첫 세션·바뀐 게 있을 때만.
-- VS Code 패널은 hook 출력을 화면에 띄우지 않는다(11/21 확인). 그래서 **Windows 알림(오른쪽 아래 풍선)**으로 띄우고, Claude가 첫 답변 맨 위에 같은 줄을 보여 준다. 알림이 안 보이면 Windows 「방해 금지/집중 지원」이 켜져 있는지 본다.
-- 그날 이미 봤어도 다시 보려면: Claude에게 "상태 한 줄" 또는 `python -X utf8 C:/dev/VCC/.claude/hooks/session_start.py --force`.
+- 세션을 열 때마다 `C:\dev\VCC`를 pull한다(main이고 고친 파일이 없을 때만, `--ff-only`). 성공·최신이면 **아무것도 띄우지 않는다**.
+- 본 폴더의 추적 안 하는 파일(캡처 등)이 pull을 막으면 그 파일을 `~\.claude\vcc-pull-backup\<YYYYMMDD>\`로 옮기고 다시 pull한다(11/25: 이것 때문에 170커밋 밀린 일).
+- 그 밖에 안 되면(다른 브랜치·고친 파일·네트워크) `[VCC] pull 안 됨 — <이유> · 직접 pull하세요: git -C C:/dev/VCC pull` 한 줄을 **Windows 알림(풍선)**으로 띄우고, Claude가 첫 답변 맨 위에 같은 줄을 보여 준다(VS Code 패널은 hook 출력을 띄우지 않는다, 11/21 확인). 알림이 안 보이면 Windows 「방해 금지/집중 지원」을 본다.
+- 사용량은 `/token`, 팀원 메시지는 `/mchk`로 본다(11/25부터 hook이 띄우지 않는다).
+- 시험: `python -X utf8 .claude/hooks/test_session_start.py`(임시 저장소에서).
 - 끄려면 `/hooks`에서 끄거나 위 블록을 지운다.
 
 ## 2. 스킬 milstart · milend 연결
