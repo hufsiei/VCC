@@ -361,6 +361,8 @@ function pickMock(m, name, p) {
   }
 }
 
+const NEED_LOGIN = "로그인이 필요해요"; // 서버의 토큰 없음·무효 응답(local_fn.py·cloud/main.py)
+
 async function call(name, payload = {}) {
   try {
     if (isMock(name)) {
@@ -377,7 +379,13 @@ async function call(name, payload = {}) {
       headers,
       body: JSON.stringify(payload),
     });
-    return await res.json();
+    const out = await res.json();
+    // 토큰을 보냈는데 서버가 「로그인이 필요해요」면 토큰이 무효(초기화·만료) — me를 지우고 로그인 화면으로 (이 탭만)
+    if (me && me.token && name !== "login" && out && out.error === NEED_LOGIN) {
+      sessionStorage.removeItem("me");
+      if (!location.pathname.includes("/screens/login/")) location.replace(new URL("../screens/login/", import.meta.url).href);
+    }
+    return out;
   } catch (e) {
     return { error: "데이터를 불러오지 못했어요: " + e.message };
   }
