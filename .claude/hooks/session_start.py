@@ -191,7 +191,7 @@ def message_blocks(body):
 
 def team_messages(me, force=False):
     """나에게 온, 아직 안 본 묶음들 → (보여 줄 글 목록, PR 번호 목록). gh가 없거나 실패하면 ([], [])."""
-    r = subprocess.run(["gh", "pr", "list", "-R", "hufsiei/VCC", "--state", "all", "--limit", "40",
+    r = subprocess.run(["gh", "pr", "list", "-R", "hufsiei/VCC", "--state", "all", "--limit", "100",
                         "--json", "number,state,isDraft,updatedAt,body"],
                        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
     if r.returncode != 0:
