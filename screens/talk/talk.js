@@ -318,13 +318,14 @@ const MAX_ASK_LOG = 30;
 addTo(askChat, booText("궁금한 경험을 물어보세요. 선배들의 결과보고서와 인터뷰를 근거로 답해 드려요. 근거가 없으면 지어내지 않고 질문함에 담아 둘게요."));
 
 // withHistory: false면 앞 대화 없이 묻는다(chat 칩 「질문함에 담기」 — 브리프 4-②)
-async function sendQuestion(question, { withHistory = true } = {}) {
+// force: "hold" = chat 칩 「질문함에 담기」 — 답을 찾지 않고 바로 질문함에 담는다(spec 4장 askBoo force, PR #179)
+async function sendQuestion(question, { withHistory = true, force } = {}) {
   ask.busy = true;
   updateComposer();
   const at = timeText();
   addTo(askChat, userText(question));
   const typing = addTo(askChat, typingMessage());
-  const res = await askBoo(question, withHistory ? ask.turns.slice(-HISTORY_TURNS) : []);
+  const res = await askBoo(question, withHistory ? ask.turns.slice(-HISTORY_TURNS) : [], force ? { force } : {});
   typing.remove();
   ask.busy = false;
   updateComposer();
@@ -497,10 +498,8 @@ function renderChat(res) {
   return msg;
 }
 
-// "save"(질문함에 담기)는 잠시 숨긴다: data.js askBoo가 force: "hold"를 아직 넘기지 않아, 다시 물으면
-// payload.question(「○○ 말고 …」)이 또 chat으로 돌아와 같은 말풍선이 되풀이된다(11/23 mock 확인).
-// 미리가 data.js에 force를 넣으면 "save"를 다시 넣고 아래 save 분기를 askBoo(question, [], { force: "hold" })로 바꾼다.
-const CHAT_ACTIONS = new Set(["notes", "ask"]);
+// save(질문함에 담기)는 askBoo force: "hold"로 바로 hold가 된다 — 「○○ 말고 …」가 chat으로 되풀이되지 않는다(#179)
+const CHAT_ACTIONS = new Set(["notes", "save", "ask"]);
 
 // 칩 동작(브리프 4-②): notes → 해봤노트 목록(그 분야 필터), save → 질문함에 담기, ask → 닮은선배.
 // 한 번 누른 칩 줄은 끈다(기관 유형 칩과 같은 규칙).
@@ -508,7 +507,8 @@ function chatChips(chips) {
   const row = el("div", { className: "chip-row" });
   for (const chip of chips) {
     const payload = chip.payload && typeof chip.payload === "object" ? chip.payload : {};
-    const button = el("button", { className: "btn btn--secondary", text: chip.label, attrs: { type: "button" } });
+    // 「질문함에 담기」는 외곽선 버튼(디자인 규칙 5-4), 나머지는 보조 버튼
+    const button = el("button", { className: chip.action === "save" ? "btn btn--outline" : "btn btn--secondary", text: chip.label, attrs: { type: "button" } });
     button.addEventListener("click", () => {
       if (ask.busy) return;
       for (const b of row.querySelectorAll("button")) b.disabled = true;
@@ -518,9 +518,9 @@ function chatChips(chips) {
       } else if (chip.action === "ask") {
         location.href = "../senior/";
       } else {
-        // save: 지금은 CHAT_ACTIONS에서 빠져 오지 않는다(위 주석). force가 생기면 여기서 질문함에 담는다
+        // save: 질문함에 담기 — 답을 찾지 않고 hold로(spec 4장 chat 칩 save)
         const question = typeof payload.question === "string" && payload.question.trim() ? payload.question.trim() : "";
-        if (question) sendQuestion(question, { withHistory: false });
+        if (question) sendQuestion(question, { withHistory: false, force: "hold" });
         else for (const b of row.querySelectorAll("button")) b.disabled = false;
       }
     });
