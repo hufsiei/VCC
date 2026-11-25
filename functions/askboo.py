@@ -844,6 +844,7 @@ CITIES = {
     "체코": ["프라하", "브르노", "플젠"],
 }
 CITY_COUNTRY = {c: k for k, cs in CITIES.items() if k in COUNTRIES for c in cs}
+CITY_END = r"(?=에서|으로|에|은|는|의|이|가|도|로|랑|\s|[?!.,~]|$)"
 
 
 def _in_city(name, city):
@@ -857,9 +858,9 @@ def city_scope(text, programs, country):
     if (programs and not country) or _field_of(text) == "현장실습":
         return None
     for city in sorted(CITY_COUNTRY, key=len, reverse=True):
-        # 「본」「릴」처럼 한 글자 도시는 낱말로 따로 쓴 경우만(「본인」「일본」에 걸리지 않게)
-        pat = (r"(?<![가-힣])" + city + r"(?=\s|에|은|는|의|$)") if len(city) == 1 else (re.escape(city) + r"(?!어)")
-        if re.search(pat, text):
+        # 낱말로 따로 쓴 도시만 — 앞에 한글이 없고 뒤는 조사·공백·문장부호·끝(총괄 검토 #282:
+        #   「포르투갈」의 포르투, 「테니스」「비즈니스」의 니스, 「로마자」의 로마, 「일본」「본인」의 본에 걸리지 않게)
+        if re.search(r"(?<![가-힣])" + re.escape(city) + CITY_END, text):
             k = CITY_COUNTRY[city]
             if country and k != country:   # 「독일 파리」처럼 나라와 안 맞으면 나라를 따른다
                 return None

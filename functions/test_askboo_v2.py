@@ -338,6 +338,13 @@ expect("① city_scope: 파리 → 파리 학교만", all("파리" in n for n in
 expect("① city_scope: 일본·본인·마르부르크(학교 이름) → 도시 아님",
        askboo.city_scope("일본 본인 생활비", *askboo.match_country("일본 본인 생활비")) is None
        and askboo.city_scope("마르부르크 생활비", [PROGRAM], None) is None)
+for q in ("포르투갈 한달 생활비 얼마예요?", "포르투갈 교환 어때요?", "테니스 동아리 있어요?", "프랑스 비즈니스 수업 어때요?",
+          "로마자 표기 어떻게 해요?"):   # 총괄 검토(#282): 낱말 속 도시(포르투·니스·로마)는 걸리면 안 됨
+    expect(f"① 도시 아님(낱말 속): {q}", askboo.city_scope(q, *askboo.match_country(q)) is None,
+           askboo.city_scope(q, *askboo.match_country(q)))
+res, _ = run("포르투갈 교환 어때요?", [], plan=None)
+expect("① 「포르투갈 교환」은 포르투갈 노트 그대로(0개 안내 아님)", "0개" not in (res.get("message") or ""), res.get("message"))
+expect("① 조사·문장부호 뒤 도시는 잡음: 도쿄에서·로마는·파리?", all(askboo.city_scope(q, [], None) for q in ("도쿄에서 살기", "로마는 어때요", "파리?")))
 expect("① 도쿄 인턴 질문은 교환 도시 판정에서 뺌", askboo.city_scope("도쿄 인턴 어때요?", [], None) is None)
 
 H_NGS = [{"question": "나가사키외국어대학교 생활비 얼마에요?", "status": "hold", "program": "나가사키외국어대학교"}]
