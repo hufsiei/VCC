@@ -65,6 +65,21 @@ def read_history(text):
     return out
 
 
+def evidence_pool(askboo):
+    """{id: {"text"}} — evidence.json + 동의 통과 인터뷰 문장(runtime/noteLines). askBoo가 둘 다 근거로 쓰므로
+    인터뷰 문장을 빼면 맞는 답을 「근거 없음」으로 센다(11/25). 같은 인터뷰 id에 문장이 여럿이면 이어 붙인다."""
+    pool = {e["id"]: {"text": e["text"]} for rs in askboo.EVIDENCE.values() for e in rs}
+    n = 0
+    for name in askboo.PROGRAMS:
+        for r in askboo.notes.interview_lines(name):
+            old = pool.get(r["id"], {}).get("text", "")
+            pool[r["id"]] = {"text": f"{old} {r['text']}".strip()}
+            n += 1
+    if n:
+        print(f"동의 통과 인터뷰 문장 {n}개도 근거로 함께 봄(이 PC의 runtime — 봉인 측정 전 동결 상태인지 확인)")
+    return pool
+
+
 def check_lines(lines, evid, askboo):
     """돌려주는 값: (근거 밖 줄 목록, cites가 없거나 모르는 ID인 줄 수)"""
     bad, no_cites = [], 0
@@ -194,7 +209,7 @@ def run(rows, model, askboo, pause=0.0, why=None):
     if model not in ("표", "dry"):
         for t in TASKS:
             ai.PROVIDER[t] = model
-    evid = {e["id"]: e for rs in askboo.EVIDENCE.values() for e in rs}
+    evid = evidence_pool(askboo)
     out = []
     try:
         for r in rows:
