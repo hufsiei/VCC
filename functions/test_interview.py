@@ -223,5 +223,14 @@ expect("빈 transcript는 오류", "error" in interview.summarizeInterview(SENIO
 expect("말머리만 있는 transcript도 요약 안 함(작업 84)", "error" in interview.summarizeInterview(SENIOR, {"program": PROGRAM, "transcript": [
     {"section": "배운점", "question": interview.base_question(PROGRAM, "배운점"), "answer": "가장 크게 배운 건 …"}]}))
 
+# [Q-12] 질문에 넣는 짧은 이름 — 앞의 학교 이름·괄호를 빼고, 그래도 길면 종류별 「이 학교·이 기관·이 프로그램」
+expect("짧은 이름: 앞의 학교 이름 뺌", interview.short_name("한국외국어대학교 직무탐색 집중교육") == "직무탐색 집중교육")
+expect("짧은 이름: 괄호 뺌", interview.short_name("합격 면접 취업특강(커리어랩)") == "합격 면접 취업특강")
+expect("짧은 이름: 길면 이 프로그램(비교과)",
+       interview.short_name("[LG화학_석유화학해외영업] 해외영업(사업) 현직자 온라인 직무 특강") == "이 프로그램")
+expect("짧은 이름: 별칭 우선", interview.short_name(PROGRAM) == (interview.askboo.PROGRAMS[PROGRAM].get("별칭") or [PROGRAM])[0])
+expect("첫 질문에 긴 학교 이름 없음",
+       interview.base_question("한국외국어대학교 직무탐색 집중교육", "활동내용") == "직무탐색 집중교육에서는 어떤 활동을 했어요?")
+
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)
