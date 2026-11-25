@@ -250,10 +250,18 @@ def _answer(me, payload, save, trace=None):
     # [11/24 작업 87] 앞 턴(과 이번 말)에서 「○○ 말고」로 뺀 프로그램 — 이번 말이 그 이름을 다시 부르지 않으면 계속 뺀다
     excluded = carried_exclusions(question, history)
 
-    programs = match_programs(question)
+    # [11/25 Q-14] 「○○ 말고」로 뺀 프로그램은 대조에서 바로 뺀다 — 빼고 남는 것이 없으면 「말고」 뒤 말로 나라를 찾는다
+    #   (「나가사키외국어대학교 말고 일본 대학 전체…」가 나가사키로 잡혀 나라를 못 보던 일)
+    rest = EXCLUDE_RE.sub(" ", question)
+    programs = [p for p in match_programs(question) if p not in excluded]
     country = None
     if not programs:                       # [11/23] 프로그램명이 없으면 나라 이름으로(근거 많은 순)
-        country, programs = match_country(question)
+        country, programs = match_country(rest)
+        programs = [p for p in programs if p not in excluded]
+    # [11/25 Q-14] 질문의 도시가 그 나라 학교 이름에 있으면 그 학교만, 없으면 아래에서 「그 도시 노트 0개」로 답한다
+    city = city_scope(rest, programs, country)
+    if city and city[2]:
+        country, programs = city[1], city[2]
 
     # ①′ 규정 질문 → 공식 안내 (정규식이 먼저 — 보수 규칙, HCX 원칙 v3 5절)
     if is_official(question):
@@ -264,6 +272,16 @@ def _answer(me, payload, save, trace=None):
     if is_compare(question):
         trace["route"] = "비교"
         return _compare(question, programs, history)
+
+    # ①⁗′ [11/25 Q-14] 근거 범위 밖 도시(「일본 도쿄 생활비」) → 다른 학교 근거로 답하지 않고 노트 수 + 카드(AI 없음)
+    if city and not city[2]:
+        trace["route"] = "도시 범위 밖"
+        return _city_none(city[0], city[1], excluded)
+    # 「○○ 말고 일본 대학 전체의 노트에도 없나요?」 → 빼고 남은 그 나라(분야) 노트 수(AI 없음)
+    found = exclude_scope(question, rest, excluded)
+    if found:
+        trace["route"] = "제외 범위"
+        return found
 
     # ①⁗ [11/25 Q-13] 앞 답에 대한 후속 질문(「이게 다야?」「기준이 뭐야」)과 시기 질문(「인턴 보통 언제 해요?」)
     #     — 코드가 노트 수·근거 학기를 세어 답한다(AI 없음, 지어낼 것이 없게). 걸리지 않으면 아래 그대로
@@ -387,7 +405,7 @@ def clean_history(items):
 
 EXCLUDE_RE = re.compile(r"([^,.?!~\n]{1,30}?)\s*(?:말고|말구|말곤|빼고|제외하고)")
 # 있고 없음을 묻는 말 — 「아예 데이터가 없나요?」「노트가 하나도 없어요?」
-EXIST_RE = re.compile(r"(데이터|자료|노트|근거|정보|후기|사례)\s*(가|이|는|도|조차)?\s*(아예|전혀|하나도|정말|진짜)?\s*(없|있)"
+EXIST_RE = re.compile(r"(데이터|자료|노트|근거|정보|후기|사례)\s*(가|이|는|도|조차|에도|에는|엔|에서도|에)?\s*(아예|전혀|하나도|정말|진짜)?\s*(없|있)"
                       r"|아예\s*없|하나도\s*없")
 
 
@@ -801,6 +819,89 @@ def _pool(field, country, excluded=()):
 
 def _noun(field, country):
     return f"{country} 해봤노트" if country else FIELD_NOUN.get(field, "해봤노트")
+
+
+# ── ①⁗′ [11/25 Q-14] 근거 범위: 도시·「○○ 말고」 (코드, AI 없음) ───────────────
+# 11/25 실사용 채점(길 2점): ① 「일본 도쿄 한달 생활비」에 도쿄 근거가 없는데 나라 대조로 나가사키·긴키 근거로 답했다.
+#   ② 「나가사키외국어대학교 말고 일본 대학 전체의 해봤노트에도 없나요?」가 「대화」로 빠져 엇나간 문구가 나왔다.
+# 도시는 학교 이름·별칭에 있을 때만 그 학교로 본다. 근거 글자에 도시가 나오는 것(「마드리드로 여행」)은 그 도시 학교가 아니다.
+# 도시 표는 교환 나라(COUNTRIES)의 큰 도시만 — data/가 아니라 여기 둔다(나라 대조와 같은 코드 규칙).
+CITIES = {
+    "일본": ["도쿄", "오사카", "교토", "후쿠오카", "삿포로", "요코하마", "나고야", "고베", "나가사키", "히로시마", "오키나와"],
+    "프랑스": ["파리", "리옹", "마르세유", "니스", "툴루즈", "보르도", "스트라스부르", "낭트", "몽펠리에", "그르노블"],
+    "독일": ["베를린", "뮌헨", "프랑크푸르트", "쾰른", "함부르크", "슈투트가르트", "드레스덴", "하이델베르크", "본", "라이프치히"],
+    "스페인": ["마드리드", "바르셀로나", "발렌시아", "세비야", "그라나다", "말라가", "빌바오"],
+    "네덜란드": ["암스테르담", "로테르담", "위트레흐트", "헤이그", "레이던"],
+    "러시아": ["모스크바", "상트페테르부르크", "블라디보스토크", "야쿠츠크"],
+    "포르투갈": ["리스본", "포르투", "코임브라"],
+    "스웨덴": ["스톡홀름", "예테보리", "웁살라", "룬드", "말뫼"],
+    "이탈리아": ["로마", "밀라노", "피렌체", "베네치아", "나폴리", "볼로냐", "토리노", "시에나"],
+    "미국": ["뉴욕", "로스앤젤레스", "샌프란시스코", "시카고", "보스턴", "시애틀", "워싱턴", "콜럼버스"],
+    "브라질": ["상파울루", "상파울로", "리우데자네이루", "브라질리아"],
+    "벨기에": ["브뤼셀", "앤트워프", "겐트", "루벤", "브뤼헤"],
+    "덴마크": ["코펜하겐", "오르후스", "오덴세"],
+    "아일랜드": ["더블린", "코크", "골웨이"],
+    "체코": ["프라하", "브르노", "플젠"],
+}
+CITY_COUNTRY = {c: k for k, cs in CITIES.items() if k in COUNTRIES for c in cs}
+
+
+def _in_city(name, city):
+    terms = [name] + list(PROGRAMS.get(name, {}).get("별칭") or [])
+    return any(city in t for t in terms)
+
+
+def city_scope(text, programs, country):
+    """돌려주는 값: (도시, 나라, 그 도시 학교 — 근거 많은 순) 또는 None.
+    학교를 이름으로 부른 질문(programs가 나라 대조가 아님)·인턴 질문은 보지 않는다."""
+    if (programs and not country) or _field_of(text) == "현장실습":
+        return None
+    for city in sorted(CITY_COUNTRY, key=len, reverse=True):
+        # 「본」「릴」처럼 한 글자 도시는 낱말로 따로 쓴 경우만(「본인」「일본」에 걸리지 않게)
+        pat = (r"(?<![가-힣])" + city + r"(?=\s|에|은|는|의|$)") if len(city) == 1 else (re.escape(city) + r"(?!어)")
+        if re.search(pat, text):
+            k = CITY_COUNTRY[city]
+            if country and k != country:   # 「독일 파리」처럼 나라와 안 맞으면 나라를 따른다
+                return None
+            named = sorted([n for n in COUNTRIES[k] if _in_city(n, city) and evidence_count(n)], key=evidence_count, reverse=True)
+            return city, k, named
+    return None
+
+
+def _city_none(city, country, excluded=()):
+    """status "notes": 그 도시 학교 노트 0개 + 그 나라 노트 카드. 다른 학교 근거로 그 도시 이야기를 하지 않는다."""
+    pool = [n for n in COUNTRIES.get(country, []) if n not in excluded and evidence_count(n)]
+    pool = sorted(pool, key=evidence_count, reverse=True)
+    head = (f"{city}에 있는 학교 해봤노트는 0개예요. 다른 도시 학교의 근거로는 {city} 이야기를 답하지 않을게요. ")
+    found = _notes(pool, country)
+    if not found:
+        return {"status": "notes", "lines": [], "sources": {}, "notes": [], "suggestSenior": True,
+                "message": head + f"{country} 교환·파견 해봤노트도 아직 없어요."}
+    found["message"] = head + f"{country} 교환·파견 해봤노트는 {len(pool)}개 있어요. 노트를 열어 보거나 그 학교로 물어봐 주세요."
+    return found
+
+
+def exclude_scope(question, rest, excluded):
+    """「○○ 말고 (나라·분야) 노트에도 없나요?」 → 뺀 뒤 남은 노트 수(코드가 셈). 이번 말에 「말고」가 없거나,
+    있고 없음을 묻는 말이 아니거나, 주제어(생활비 등)가 있는 새 질문이면 None(아래 길 그대로)."""
+    if not excluded or not EXCLUDE_RE.search(question) or not EXIST_RE.search(rest) or has_topic(rest):
+        return None
+    base = PROGRAMS.get(excluded[0], {})
+    field = _field_of(rest) or base.get("분야")
+    country = match_country(rest)[0] if field != "현장실습" else None
+    if not country and field == "국제교류" and re.search(r"다른|말고|전체|나머지", question):
+        country = base.get("세부")
+    pool = _pool(field, country, excluded)
+    lab, noun = _label(excluded), _noun(field, country)
+    if not pool:
+        return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "chips": [
+                    {"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field, "exclude": list(excluded)}}],
+                "message": f"{lab}{_josa('을를', lab)} 빼면 {noun}는 0개예요. 지금은 {lab} 노트뿐이에요."}
+    found = _notes(pool, country, total=len(pool))
+    names = "·".join(pool) if len(pool) <= 3 else ""
+    found["message"] = (f"{lab}{_josa('을를', lab)} 뺀 {noun}는 {len(pool)}개 있어요"
+                        + (f"({names})" if names else "") + f". 노트를 열어 보거나 그 {'기관' if field == '현장실습' else '학교'}로 물어봐 주세요.")
+    return found
 
 
 def follow_up(question, history, programs, excluded=()):
