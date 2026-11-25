@@ -112,7 +112,7 @@
 - 두 종류만 쓴다. 칩을 고치지 않고 보내도 **지어낸 사실이 노트에 들어가지 않게** 하려는 것이다.
   - **고르는 보기**(시기·금액·절차): 그대로 보내도 본인의 사실이 되는 것. 예: 비용 `월 150만 원 이하였어요` · `월 150~200만 원 들었어요` · `월 200만 원 넘게 들었어요`(귀국보고서 「월 N만 원」 211건 분포 66·81·64건으로 나눔)
   - **말머리**(서술 칸): `…`로 끝나며 이어 써야 완성되는 것. 예: `가장 크게 배운 건 …`
-- 칸 이름은 `칸` 목록과 같아야 하고 `후배 질문`에는 넣지 않는다(질문이 매번 달라서). 칩 하나는 20자 이하, 프로그램 이름·사람·숫자 성적은 넣지 않는다.
+- 칸 이름은 `칸` 목록과 같아야 한다(**[11/25 작업 89]** 「후배 질문」 칸은 `frames.json`에서 뺐다 — 교환·파견 6칸, 인턴 5칸, 비교과 2칸. 후배 질문의 답은 그 질문이 속한 칸에). 칩 하나는 20자 이하, 프로그램 이름·사람·숫자 성적은 넣지 않는다.
 - 교환·파견은 같은 예시를 쓴다. **[11/23 #139] 칩이 붙는 질문**: 기본 질문(근거가 비었거나 오래된 칸)·배운점은 이 `예시`, 깊이 질문은 질문마다 정한 예시(`functions/interview.py` `DEPTH_QUESTIONS` 세 번째 값, 미리). 후배 질문·꼬리 질문에는 없다.
 - 말머리 칩만 보낸 답(「가장 크게 배운 건 …」, `…`를 지워도 같음)은 서버가 없던 답으로 치고 같은 질문을 「조금만 더 이어서 써 주세요. 」를 붙여 다시 묻는다(`retry: true`). 요약에도 들어가지 않는다 — 말머리가 노트 문장이 되지 않게.
 
@@ -163,29 +163,35 @@
 | 로그인 정보 | 화면이 `sessionStorage`의 `"me"`에 저장한다. 함수는 따로 받지 않는다 |
 | docType | `귀국보고서` · `현장실습후기` · `인터뷰` |
 
-## 함수 15개 (+ 11/22 추가 5개, 11/23 추가 3개)
+## 함수
+
+(관리자 콘솔 함수는 PRD 7장이 원본)
 
 | 함수 | 보내는 값 |
 |---|---|
 | login(id, pw) | `{id, pw}` |
 | getMe() | 없음 |
 | setRecommendable(on) [11/23] | `{on: true\|false}` (닮은선배로 추천받기 켜기·끄기) |
-| askBoo(question) | `{question}` |
-| interviewNext(program, answers) | `{program, answers:[{section, question, answer}]}` |
-| summarizeInterview(program, transcript) | `{program, transcript:[{section, question, answer}]}` |
+| askBoo(question, history, {force}) [v2] | `{question, history?:[{question, status, program?}], force?:"hold"}` (history는 최근 4턴, `force`는 chat 칩 「질문함에 담기」) |
+| interviewNext(program, answers) | `{program, answers:[{section, question, answer, questionId?, skipped?}]}` |
+| summarizeInterview(program, transcript, append) [v2] | `{program, transcript:[{section, question, answer, questionId?}], append?:true}` (append는 이어 쓰기) |
 | saveConsent(draftId, edits) | `{draftId, edits:{removed:[lineId], changed:[{lineId, text}]}, consent:true}` |
-| listNotes(filter) | `{filter:{type?, q?}}` (type: 교환·파견·인턴·비교과) |
+| listNotes(filter) | `{filter:{type?, q?, country?, kind?}}` (type: 교환·파견·인턴·비교과, **[11/23]** country는 나라, kind는 인턴 기관유형) |
 | getNote(id) | `{id}` |
 | scrapNote(noteId, scrap) [11/22] | `{noteId, scrap?}` (생략 = 켜기, `false` = 끄기, 다시 불러도 같은 결과) |
 | saveQuestion(noteId, section) [11/22] | `{noteId, section}` (「질문함에 담기」, 그 칸을 질문함에 `hold`로) |
-| recommendSeniors(noteId) | `{noteId}` |
+| recommendSeniors(noteId, more) | `{noteId, more?:true}` (3명씩 더, 최대 9명) |
 | checkMessage(text) | `{text}` |
 | previewNickname(to) | `{to}` (쪽지 요청 시트를 열 때, 이 대화에서 쓸 내 닉네임) |
 | sendMessage(to, text) | `{to, text}` (to는 상대 studentId) |
-| getMessages() | 없음 |
-| respondRequest(threadId, accept) | `{threadId, accept}` (받은 선배의 수락·거절) |
+| getMessages(read) [11/23] | `{read?: threadId}` (주면 그 대화를 읽음으로, 없으면 목록만) |
+| respondRequest(threadId, accept) | `{threadId, accept}` (받은 선배의 수락·거절). 보낸 사람의 취소는 `cancelRequest(threadId)` = `{threadId, cancel:true}` |
 | reportThread(threadId, reason, block) [11/23] | `{threadId, reason?, block?}` (쪽지 대화 ⋮ 메뉴의 신고·차단, reason은 신고 사유 최대 100자) |
 | getInbox() | 없음 |
+| deleteQuestion(questionId) [v2] | `{questionId}` (본인 `hold` 질문만) |
+| updateQuestion(questionId, text) [v2] | `{questionId, text}` (본인 `hold` 질문만, 300자까지) |
+| saveInterviewDraft(program, answers) [v2] | `{program, answers}` (들려주기 미완성 초안, 빈 목록이면 초안 지움) |
+| getInterviewDraft(program) [v2] | `{program}` |
 | getMyNote(id) [11/22] | `{id}` (내 경험노트 상세, 본인 것만) |
 | updateMyNote(id, changed) [11/23] | `{id, changed:[{section, index, text}]}` (내 경험노트 문장 고치기, index는 getMyNote 그 칸 lines 순서 0부터) |
 | demandNext(state) [11/22] | `{state}` (「궁금한 것 정리하기」 다음 단계, AI 없음) |
@@ -235,16 +241,20 @@
 
 | 필드 | 형식 | 뜻 |
 |---|---|---|
-| status | 글자 | `ok`(근거 있음), `hold`(근거 없음), `official`(규정 질문, 공식 안내로 연결), **[11/23] `notes`**(사람·나라만 묻고 주제가 없을 때 답 대신 해봤노트 카드로 안내 — 질문함에 저장 안 함) |
+| status | 글자 | `ok`(근거 있음), `hold`(근거 없음), `official`(규정 질문, 공식 안내로 연결), **[11/23] `notes`**(사람·나라만 묻고 주제가 없을 때 답 대신 해봤노트 카드로 안내 — 질문함에 저장 안 함), **[v2] `chat`**(대화·확인 말에 고정 문구로 답함 — 질문함에 저장 안 함) |
 | lines[].text / sourceId / lineId | 글자 | 답변 문장과 출처, 문장 번호 |
+| lines[].cites [v2] | 글자 목록 | 그 문장이 인용한 sourceId(1개 이상). `fallback` 줄은 `sourceId` 하나 |
 | lines[].fallback | 참/거짓 | 답쓰기가 실패하거나 문장이 다 버려져 근거 원문을 인용한 줄(`fallback_lines`)이면 모두 true(**[11/24]** 이미 합쇼체라 변환을 건너뛴 원문 포함). 답쓰기 문장에는 없음(없으면 거짓) |
 | sources | 객체 | sourceId별 `{docType, program, semester}` |
 | noteId | 글자 | `ok`일 때 관련 노트. **[11/23]** `hold`도 노트는 있는데 이 내용이 없을 때 그 노트 |
+| singleSenior [v2] | 참/거짓 | `ok`일 때. 근거가 한 사람뿐이면 true(화면 「선배 1명의 경험이에요」) |
 | suggestSenior | 참/거짓 | 닮은 선배 추천을 권할지 |
 | questionId | 글자 | `hold`·`official`일 때. 질문함에 자동 저장된 질문 번호 |
 | officialUrl | 글자 | `official`일 때. 담당 부서의 공식 안내 주소 |
-| message | 글자 | `hold`·`official`·`notes`일 때. 안내 문구(**[11/23]** `hold` 문구는 이유별 세 가지 — spec 4장) |
-| notes[].noteId / program / type / country / evidenceCount [11/23] | 글자·숫자 | `notes`일 때. 해봤노트 카드 최대 5개(근거 있는 것만, 근거 많은 순). 근거 블록은 두지 않는다 |
+| message | 글자 | `hold`·`official`·`notes`·`chat`일 때. 안내 문구(**[11/23]** `hold` 문구는 이유별 세 가지 — spec 4장) |
+| notes[].noteId / program / type / country / evidenceCount / oneLine [11/23] | 글자·숫자 | `notes`일 때. 해봤노트 카드 최대 5개(근거 있는 것만, 근거 많은 순). 근거 블록은 두지 않는다 |
+| kinds [v2] | 글자 목록 | `notes`일 때. 현장실습을 나라로 물으면 기관 유형 목록(카드는 비거나 그 나라가 근거에 나오는 노트만) |
+| chips[].label / action / payload [v2] | 글자·객체 | `chat`일 때. `action`은 `notes`(해봤노트 목록으로, `{field, exclude}`) · `save`(`{question}` — askBoo를 `force: "hold"`로 부름) · `ask`(닮은선배 보기) |
 
 ### interviewNext
 
@@ -253,6 +263,12 @@
 | done | 참/거짓 | 인터뷰가 끝났는지 |
 | section, question | 글자 | `done`이 false일 때. 다음 질문 한 개 |
 | progress.filled / total | 숫자 | 채운 칸 수 / 전체 칸 수 |
+| progress.mine [v2] | 숫자 | 내가 답한 칸 수(`filled`와 같은 값) |
+| covered | 글자 목록 | 보고서가 이미 채워 묻지 않는 칸(화면 칩 「보고서」) |
+| junior / questionId / asked [v2] | 참거짓·글자 | 후배 질문을 먼저 물을 때. `section`은 그 질문이 속한 칸, `asked`는 질문 원문 |
+| pendingQuestions | 숫자 | 기다리는 후배 질문 수 |
+| depth | 참/거짓 | 깊이 질문이면 true |
+| resumed / myNoteId [v2] | 참거짓·글자 | 첫 응답에만. 같은 프로그램의 내 경험노트를 이어 쓰는 경우 |
 | examples [11/23] | 목록 | (P1-여건, 작업 84) 예시 칩 2~3개 — 기본 질문·배운점은 `frames.json` 칸 예시, 깊이 질문은 질문별 예시. 후배 질문·꼬리 질문은 생략. `…`로 끝나는 것은 말머리 |
 | retry [11/23] | 참/거짓 | 말머리만 보낸 답을 다시 묻는 질문이면 true(질문 앞에 「조금만 더 이어서 써 주세요. 」, 같은 `examples`) |
 
@@ -268,6 +284,9 @@
 | publicDraft.sections[].lines[].match | 참/거짓 | AI 원문 일치 검사. false면 "원문과 다를 수 있어요" 표시 |
 | publicDraft.sections[].lines[].identifying | 참/거짓 | 코드가 찾은 본인 식별 문장. true면 동의 시트에서 기본 꺼짐 |
 | saved / myNoteId | 참/거짓 · 글자 | 요약과 동시에 내 경험노트로 저장됐는지, 그 번호(저장은 기본, 공유는 선택) |
+| answered / need [11/22] | 숫자 | 이번 유효 답변 수 / 선배 추천이 열리는 수(3) |
+| …lines[].answersQuestionId / asked | 글자 | 후배 질문에 답한 문장(myNote·publicDraft). 그 질문의 칸 안에 있다 |
+| …lines[].new [v2] | 참/거짓 | `append`일 때 새로 덧붙인 문장이면 true. 응답은 기존 문장과 합친 전체 |
 
 ### saveConsent
 
@@ -290,6 +309,8 @@
 | notes[].satisfaction / completedCount | 숫자 | 만족도, 이수 인원(비교과만, 나머지는 `null`) |
 | notes[].country [11/22] | 글자 | 국제교류(교환·파견)는 `programs.json`의 `세부` 국가, 인턴·비교과는 `null` |
 | notes[].scrapped [11/22] | 참/거짓 | 부른 사람이 스크랩했는지 |
+| notes[].kind [11/23] | 글자 | 인턴만 기관유형(`programs.json`의 `세부`), 나머지는 `null` |
+| groups.country[] / groups.kind[] [11/23] | 목록 | 묶음 칩용 `{name, count}`. `type`·`q`로 거른 뒤, `country`·`kind`로 거르기 전 수 |
 
 ### getNote
 
@@ -299,10 +320,13 @@
 |---|---|---|
 | id / program / type / oneLine / forWhom | 글자 | listNotes와 같음 |
 | evidenceCount / lastSemester / satisfaction / completedCount | 숫자·글자 | listNotes와 같음 |
-| country / scrapped [11/22] | 글자·참거짓 | listNotes와 같음 |
+| country / scrapped [11/22] / kind [11/23] | 글자·참거짓 | listNotes와 같음 |
 | officialUrl | 글자 | 공식 안내 주소. 프로그램의 `운영부서코드`로 `departments.json`의 `공식안내URL`을 찾아 넣음(프로그램 목록에는 URL 없음) |
 | sections[].name | 글자 | 칸 이름 |
 | sections[].interviewOnly | 참/거짓 | true면 선배 인터뷰로만 채워지는 칸 |
+| sections[].summary[].text / sources / years [v2] | 글자·목록 | 칸별 요약 문단(작업 78, 미리 만들어 둔 것). 없으면 생략, 배운점은 화면에서 쓰지 않음 |
+| sections[].newLines [11/23] | 숫자 | `summary`가 있을 때만. `lines` 끝에서 요약 뒤 인터뷰로 붙은 문장 수 |
+| sections[].lines[].answersQuestionId [v2] | 글자 | 후배 질문에 답한 문장이면 그 질문 번호 |
 | sections[].lines[].text / sourceId / lineId | 글자 | 문장, 출처, 문장 번호 |
 | sections[].lines[].official | 참/거짓 | true면 규정성 진술. "개인 경험이에요" 표시와 `officialUrl` 링크를 붙인다 |
 | sections[].lines[].senior [11/22] | 글자 | 배운점 칸만. 「선배 A」처럼 이 노트 안에서만 쓰는 글자, 학과 없음(PRD 9-1). 닮은 선배 `nickname`과 다른 글자. 쓴 사람을 모르면 없음 |
@@ -316,6 +340,8 @@
 | seniors[].nickname | 글자 | 자동 생성 닉네임 |
 | seniors[].score | 숫자 | 닮은 정도 점수 |
 | seniors[].reasons | 글자 목록 | 점수 이유 |
+| seniors[].retryAt [11/24] | 글자 | 내가 요청을 취소한 지 7일이 안 된 선배만. 다시 보낼 수 있는 시각(ISO KST) |
+| hasMore | 참/거짓 | 더 보여 줄 선배가 있는지 |
 
 ### checkMessage
 
@@ -333,7 +359,7 @@
 | threadId | 글자 | 대화 번호. 첫 메시지는 쪽지 신청이 된다 |
 | myNickname | 글자 | 이 대화에서 선배에게 보이는 내 이름(형용사 + 동물, 대화마다 새로) |
 | at | 글자 | 보낸 시각 |
-| reason / message | 글자 | 실패일 때만. `연락처`·`학번`·`비방`(검사) · `한도`·`선배한도` · `잠김` · **[11/23] `차단`**(차단된 대화 — 누가 차단했든 양쪽 모두, 「더 이어 갈 수 없는 대화예요」) · **[11/23] `추천 제외`**(추천받기를 끈 선배에게 새 요청, 「이 선배는 지금 쪽지 요청을 받지 않아요.」) |
+| reason / message | 글자 | 실패일 때만. `연락처`·`학번`·`비방`(검사) · `한도`·`선배한도` · `잠김` · **[11/24] `취소`**(취소한 지 7일 안, `retryAt`이 함께 옴) · **[11/23] `차단`**(차단된 대화 — 누가 차단했든 양쪽 모두, 「더 이어 갈 수 없는 대화예요」) · **[11/23] `추천 제외`**(추천받기를 끈 선배에게 새 요청, 「이 선배는 지금 쪽지 요청을 받지 않아요.」) |
 
 ### previewNickname
 
@@ -354,6 +380,7 @@
 | threads[].accepted | 참/거짓 | 상대가 수락했는지(옛 필드, 새 화면은 `status`) |
 | threads[].blockedByMe [11/23] | 참/거짓 | `blocked`일 때 내가 차단했는지. 화면은 차단한 쪽 「차단한 대화예요」, 당한 쪽 「더 이어 갈 수 없는 대화예요」 |
 | threads[].unread | 숫자 | 안 읽은 메시지 수 |
+| threads[].retryAt [11/24] | 글자 | `cancelled`이고 취소한 지 7일이 안 됐을 때(asker). 취소 응답에도 같은 값 |
 | threads[].messages[].from | 글자 | `me` 또는 `them` |
 | threads[].messages[].text / at | 글자 | 내용, 시각 |
 
@@ -399,13 +426,26 @@
 | ok / questionId | 참거짓·글자 | 질문함에 담긴 질문 번호 |
 | already | 참/거짓 | 같은 사람·노트·칸의 `hold` 질문이 이미 있으면 true(새로 만들지 않음) |
 | message | 글자 | 토스트 문구 |
-| error | 글자 | 「담을 수 없는 칸이에요」(`후배 질문` 칸·없는 칸) 또는 「노트를 찾지 못했어요」 |
+| error | 글자 | 「담을 수 없는 칸이에요」(없는 칸) 또는 「노트를 찾지 못했어요」 |
 
 질문 글은 서버가 정한 글(`"{칸} 이야기를 최근 경험으로 듣고 싶어요."`)이다. 질문함 집계·측정에서 askBoo 질문과 나눌 때는 `noteId`·칸이 채워진 행으로 본다.
 
 ### updateMyNote [11/23]
 
 응답은 getMyNote와 같은 모양 + `ok: true`. 고친 줄은 `edited: true`(화면 「내가 고친 문장」)·`aiText`(처음 AI 문장). 오류: 빈 문장 「문장을 적어 주세요」, 300자 초과 「300자 안으로 적어 주세요」(둘 다 `section`·`index` 함께), 없는 칸·순서 「고칠 문장을 찾지 못했어요」, 남의 것 「볼 수 없는 기록이에요」 — **하나라도 틀리면 아무것도 바꾸지 않는다.** 해봤노트 공개 문장은 바뀌지 않는다(공개 문장은 saveConsent `changed`로 따로).
+
+### deleteQuestion · updateQuestion [v2]
+
+| 필드 | 형식 | 뜻 |
+|---|---|---|
+| ok / questionId | 참거짓·글자 | 처리 여부, 질문 번호 |
+| status | 글자 | deleteQuestion: `deleted`(소프트 삭제) |
+| text / editedAt | 글자 | updateQuestion: 고친 질문, 고친 시각 |
+| error / reason | 글자 | 본인 `hold` 질문이 아니거나 빈 문장·300자 초과·연락처 등(문구는 spec 4장) |
+
+### saveInterviewDraft · getInterviewDraft [v2]
+
+saveInterviewDraft는 들려주기 답을 사람·프로그램별로 하나 저장한다(7일, 빈 `answers`면 지움). getInterviewDraft는 `{answers, savedAt}`, 없거나 7일이 지났으면 `{answers: []}`. 자세한 규칙은 spec 4장.
 
 ### getMyNote · demandNext · saveDemand [11/22]
 
