@@ -242,6 +242,13 @@ def _overview(dept, period):
                         "sections": dict(Counter(q.get("칸") for q in qs if q.get("칸")))}
                        for p, qs in by_prog.items()), key=lambda r: (-r["questions"], r["프로그램명"]))
 
+    # [11/25 PR #236] 분야별 칸 수. 분야 = 질문의 분야(없으면 programs.json 「분야」). 분야를 모르는 질문은 넣지 않는다
+    by_field = defaultdict(Counter)
+    for q in rows:
+        field = q.get("분야") or (PROGRAMS.get(q.get("프로그램명")) or {}).get("분야")
+        if field and q.get("칸"):
+            by_field[field][q["칸"]] += 1
+
     by_dept = defaultdict(list)
     for q in rows:
         by_dept[q.get("crs_nm") or "–"].append(q)
@@ -267,6 +274,7 @@ def _overview(dept, period):
                 "improvements": {"value": imp, "delta": _delta(imp, pimp)}},
         "programs": programs,
         "sections": dict(Counter(q.get("칸") for q in rows if q.get("칸"))),
+        "sectionsByField": {f: dict(c) for f, c in sorted(by_field.items())},
         "colleges": colleges,
         "notes": _note_stats(dept, start, end),
         "weekly": [{"week": k, "questions": v[0], "hold": v[1]} for k, v in sorted(weekly.items())],
