@@ -30,6 +30,7 @@ import json
 import os
 import socket
 import sys
+import time
 from pathlib import Path
 from urllib.parse import parse_qs, unquote
 
@@ -46,6 +47,7 @@ SECRET_PARAMS = ("CLAUDE_KEY", "CLOVA_KEY", "VCC_LOGIN_PW", "NCP_OS_ACCESS_KEY",
 SERVER_ERROR = "서버 처리 중 문제가 생겼어요"
 
 _app = None   # 첫 요청에서 한 번 import(컨테이너가 살아 있는 동안 재사용)
+_timing = {}  # 이번 요청의 단계별 ms(handle이 채우고 main이 로그로 남긴다 — 키·글 내용 없이 숫자만)
 
 
 def _set_env(args):
@@ -118,10 +120,15 @@ def _payload(args):
 
 def handle(name, payload, token):
     """local_fn.py Handler.do_POST와 같은 순서. 응답 dict를 돌려준다."""
+    _timing.clear()
+    t = time.perf_counter()
     app = _load_app()
+    _timing["load"] = _ms(t)   # 따뜻한 컨테이너면 0, 콜드 스타트 첫 요청이면 import 시간
     lf, sessions, limits = app["local_fn"], app["sessions"], app["limits"]
     app["store"].begin_request()   # 컨테이너가 여럿이어도 이번 요청은 저장소에서 새로 읽는다
+    t = time.perf_counter()
     me = sessions.resolve(token)
+    _timing["resolve"] = _ms(t)
 
     if name in ("", "연습"):
         # local_fn의 연결 확인용 AI 연습 호출은 공개 주소에서 열지 않는다(로그인 없이 AI를 부르는 구멍)
@@ -132,12 +139,29 @@ def handle(name, payload, token):
     if not me and name not in lf.NEEDS_NO_LOGIN:
         return {"error": "로그인이 필요해요"}
     if name in lf.AI_ROUTES:   # 토큰 확인(위) → 전역 상한 → 사용자별 한도
+        t = time.perf_counter()
         over = limits.check(me)
+        _timing["limits"] = _ms(t)
         if over:
             return over
     if name == "logout":   # 폐기할 토큰은 헤더의 것만 쓴다(본문 값은 믿지 않는다)
         payload = {**payload, "token": token}
-    return fn(me, payload)
+    t = time.perf_counter()
+    try:
+        return fn(me, payload)
+    finally:
+        _timing["fn"] = _ms(t)
+
+
+def _ms(t):
+    return round((time.perf_counter() - t) * 1000)
+
+
+def _log_timing(name, total_ms):
+    """액션 로그에 `[vcc] timing 함수 total=… load=… resolve=… limits=… fn=… os=GET 3×80ms PUT 1×120ms` (ms만, 작업 58)."""
+    parts = " ".join(f"{k}={_timing[k]}" for k in ("load", "resolve", "limits", "fn") if k in _timing)
+    os_part = _app["store"].os_stats() if _app else "없음"
+    print(f"[vcc] timing {name or '-'} total={total_ms} {parts} os={os_part}", file=sys.stderr)
 
 
 def _can_connect(host):
@@ -223,9 +247,12 @@ def main(args):
     headers = args.get("__ow_headers") or {}
     token = str(headers.get("x-token") or "").strip()
     name = _fn_name(args, payload)
+    t0 = time.perf_counter()
     try:
         _set_env(args)
-        return _reply(args, handle(name, payload, token))
+        out = handle(name, payload, token)
+        _log_timing(name, _ms(t0))
+        return _reply(args, out)
     except Exception as e:   # 시연 중 서버가 죽지 않게. store._s3의 RuntimeError(오류 XML·버킷 이름)도 여기로 온다
         _log_error(name, e, args)
         return _reply(args, {"error": SERVER_ERROR})
