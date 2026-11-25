@@ -88,5 +88,47 @@ r = saveConsent(OTHER, {"draftId": "D-0001", "consent": True,
                         "edits": {"removed": [], "changed": [{"lineId": "L-D1-1", "text": "남이 고친 문장이에요."}]}})
 expect("남의 초안은 볼 수 없는 기록", r == {"error": "볼 수 없는 기록이에요"} and pub_line("L-D1-1")["text"] == AI_1)
 
+# ── 5. [11/25 작업 35 P3] 근거 건수 기준 — 공개 동의 시트(consent.js)와 해봤노트 상단이 같은 수 ──────
+# 시연 재현: 시트 「60→61건」(인터뷰 1건) vs 노트 상단 64건(문장 4개). 기준은 spec 5장 evidenceCount
+# = 보고서 문단 + 동의 인터뷰 「문장」 수. 시트는 「listNotes 근거 − 이 경험노트의 sharedLines + 켠 문장 수」로 센다.
+import notes
+
+
+def list_count():
+    card = next(c for c in notes.listNotes(SENIOR, {"filter": {"q": PROGRAM}})["notes"] if c["program"] == PROGRAM)
+    return card["evidenceCount"]
+
+
+def sheet_after(before, my_note_id, on):
+    """consent.js renderTarget과 같은 셈."""
+    shared = rf.getMyNote(SENIOR if my_note_id == "M-0001" else OTHER, {"id": my_note_id})["sharedLines"]
+    return max(0, before - shared) + on if on else before
+
+
+lines4 = ["학기 중에는 수업이 많아 인턴을 병행하기 어려웠어요.", "방학에는 단기 인턴을 했어요.",
+          "준비 과정은 처음 생각보다 할 일이 많았어요.", "기숙사 인터넷은 직접 신청해야 해서 첫 2주는 없었어요."]
+store.load("myNotes", {})["M-0002"] = {
+    "owner": OTHER, "program": PROGRAM, "draftId": "D-0002", "share": "private", "answered": 3,
+    "myNote": {"sections": [{"name": "생활", "lines": [{"text": t} for t in lines4]}]},
+    "publicDraft": {"sections": [{"name": "생활", "lines": [
+        {"lineId": f"L-D2-{i}", "text": t, "match": True, "identifying": False} for i, t in enumerate(lines4, 1)]}]},
+}
+before = list_count()
+want = sheet_after(before, "M-0002", 4)
+r = saveConsent(OTHER, {"draftId": "D-0002", "consent": True, "edits": {"removed": []}})
+after = list_count()
+expect("처음 공유 4문장: 근거는 +4(+1 아님)", r.get("added") == 4 and after == before + 4)
+expect("시트 셈 = 공유 뒤 listNotes", want == after)
+expect("해봤노트 상단(getNote) = listNotes", notes.getNote(OTHER, {"id": r["noteId"]})["evidenceCount"] == after)
+
+before = list_count()
+want = sheet_after(before, "M-0002", 2)
+r = saveConsent(OTHER, {"draftId": "D-0002", "consent": True, "edits": {"removed": ["L-D2-1", "L-D2-2"]}})
+expect("다시 공유(4→2문장): 이미 실린 문장은 바뀌어 끼워짐 → 근거 −2", list_count() == before - 2 == want)
+before = list_count()
+want = sheet_after(before, "M-0001", 3)
+r = saveConsent(SENIOR, {"draftId": "D-0001", "consent": True, "edits": {"removed": []}})
+expect("다른 선배 노트 다시 공유도 같은 셈", r.get("added") == 3 and list_count() == want)
+
 print(f"\n{'통과' if not fails else '실패'}: {len(fails)}건 틀림")
 sys.exit(1 if fails else 0)

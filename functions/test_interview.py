@@ -232,5 +232,41 @@ expect("짧은 이름: 별칭 우선", interview.short_name(PROGRAM) == (intervi
 expect("첫 질문에 긴 학교 이름 없음",
        interview.base_question("한국외국어대학교 직무탐색 집중교육", "활동내용") == "직무탐색 집중교육에서는 어떤 활동을 했어요?")
 
+# [11/25 작업 35 P2] 후배 질문 하나에 답이 두 문장으로 요약되면 문장마다 asked가 붙는다(spec — 문장 단위로 공개·끄기).
+# 시연 재현: 화면이 문장마다 「Q.」를 그려 같은 Q가 한 칸에 두 번 나옴. 서버는 같은 질문 문장을 한 칸 안에 이어 붙이므로
+# 화면은 「같은 asked가 이어지는 묶음의 첫 문장에만 Q」로 그리면 된다(common/consent.js firstOfQuestion).
+P2_A = "학기 중에는 수업이 많아 인턴을 병행하기 어려웠어요."
+P2_B = "방학에는 단기 인턴을 했어요."
+P2_C = "기숙사 인터넷은 직접 신청해야 해서 첫 2주는 없었어요."
+
+
+def p2_call(작업명, messages, system=None):
+    import json
+    c = messages[-1]["content"]
+    j = {"요약": {"문장": [P2_A, P2_B]} if "단기 인턴" in c else {"문장": [P2_C]},
+         "일치검사": {"일치": True}}.get(작업명)
+    return {"ok": j is not None, "text": json.dumps(j, ensure_ascii=False) if j else "", "json": j, "model": "fake"}
+
+
+interview.callAI = p2_call
+r5 = interview.summarizeInterview(SENIOR, {"program": PROGRAM, "transcript": [
+    {"section": "생활", "question": s_again["asked"], "answer": "학기 중엔 수업이 많아 어렵고 방학에 단기 인턴을 했어요."},
+    {"section": "생활", "question": interview.base_question(PROGRAM, "생활"), "answer": P2_C}]})
+
+
+def q_marks(lines):
+    """consent.js firstOfQuestion과 같은 규칙으로 Q가 몇 번 보이는지."""
+    return sum(1 for i, ln in enumerate(lines) if ln.get("asked") and (i == 0 or lines[i - 1].get("asked") != ln["asked"]))
+
+
+for name, sections in (("publicDraft", r5["publicDraft"]["sections"]), ("myNote", r5["myNote"]["sections"])):
+    life = next(s["lines"] for s in sections if s["name"] == "생활")
+    idx = [i for i, ln in enumerate(life) if ln.get("asked") == s_again["asked"]]
+    expect(f"P2 {name}: 한 질문 답 두 문장 모두 asked·answersQuestionId", len(idx) == 2
+           and all(life[i].get("answersQuestionId") == qid for i in idx))
+    expect(f"P2 {name}: 같은 질문 문장은 이어 붙음 → 첫 문장에만 Q(1번)", idx == [idx[0], idx[0] + 1] and q_marks(life) == 1)
+    expect(f"P2 {name}: 칸 질문 답(asked 없음)은 Q 없이 따로", any(not ln.get("asked") for ln in life))
+interview.callAI = lambda *a, **k: {"ok": False, "text": "", "json": None, "model": "fake", "error": "x"}
+
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)
