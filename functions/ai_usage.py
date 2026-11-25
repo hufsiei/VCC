@@ -1,7 +1,7 @@
 # ai_usage.py — 오늘 내 AI 사용액 한 줄 (11/24 미리 결정)
 #
-# 팀원마다 미리 계정에서 따로 발급한 키(Claude vcc-dev(ww)·vcc-dev(minji), CLOVA)를 쓰고, 키별 한도가 없다.
-# 그래서 각자 이 PC의 호출 기록(functions/logs/ai-calls.jsonl, ai.py가 씀)으로 오늘 사용액을 매번 본다.
+# AI 키는 미리 PC와 서버에만 있다(11/25: 팀원별 키 vcc-dev(ww)·vcc-dev(minji)·CLOVA 비활성화). 키별 한도가 없다.
+# 그래서 이 PC의 호출 기록(functions/logs/ai-calls.jsonl, ai.py가 씀)으로 오늘 사용액을 본다.
 #   python -X utf8 functions/ai_usage.py                → 오늘 내 AI $0.12 (Claude 5회) · HCX 3회 1,234토큰
 #   python -X utf8 functions/ai_usage.py --date 2026-11-23
 #   python -X utf8 functions/ai_usage.py --journals <일지.md> <일지.md> ...   → 팀 합계
