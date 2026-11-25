@@ -17,7 +17,13 @@
 #         컨테이너가 여럿 뜨면 서로 다른 메모리를 보므로, 진입점(functions/cloud/main.py)이 요청마다
 #         begin_request()로 캐시를 비운다. 한 요청 안에서는 file과 똑같이 캐시를 쓴다
 #         (같은 요청에서 load를 두 번 불러도 같은 dict — 고친 내용이 사라지지 않게).
-#         _lock은 프로세스 안 잠금이라 컨테이너 사이의 동시 쓰기는 막지 못한다(시연 수준에서 감수, PR 「확인 전」).
+#         _lock은 프로세스 안 잠금이라 컨테이너 사이의 동시 쓰기는 막지 못한다. 그래서 ncp의 save()는 통째로 덮어쓰지
+#         않고 「저장 직전에 버킷을 다시 읽고, 이번 요청이 바꾼 것만 얹어서」 쓴다(11/25 두 창 시험에서 늦게 끝난
+#         getMessages가 답장을 지운 일, 작업 58). load()가 읽은 모습을 _base에 남겨 두고 save()에서 _base → 캐시의
+#         차이를 새로 읽은 기록에 합친다(_merge: dict는 키별, list는 덧붙인 항목, 정수는 더한 만큼). 다시 읽기와 쓰기
+#         사이의 틈은 남지만(조건부 쓰기 If-Match는 NCP 지원 확인 전) 요청 전체 길이에서 수십 ms로 줄어든다.
+#         읽기만 하는 함수는 바뀐 것이 없으면 save()를 부르지 않는다(runtime_fns.getMessages·recommendSeniors).
+import copy
 import datetime
 import hashlib
 import hmac
@@ -35,7 +41,9 @@ RUNTIME = Path(__file__).resolve().parent.parent / "data" / "runtime"
 BACKEND = os.environ.get("STORE_BACKEND", "file")   # file | ncp (진입점이 import 뒤에 바꿔도 따르도록 _backend()로 다시 본다)
 
 _cache = {}
+_base = {}        # ncp만: 이름 → load()가 저장소에서 읽은 그대로(깊은 복사). 없던 기록이면 None
 _lock = threading.RLock()
+_MISSING = object()
 
 
 # ---------- Object Storage (ncp) ----------
@@ -130,25 +138,89 @@ def _write(name, data):
     os.replace(tmp, path)   # 반쯤 쓰인 파일이 남지 않게 바꿔 끼운다
 
 
+# ---------- 세 갈래 합치기 (ncp) ----------
+def _is_int(v):
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _merge(base, mine, theirs):
+    """base(이 요청이 읽은 것) → mine(이 요청이 고친 것)의 차이를 theirs(그사이 다른 컨테이너가 저장한 것)에 얹는다.
+    없는 쪽은 _MISSING. 돌려주는 값이 _MISSING이면 「지운다」.
+      · 내가 안 바꿨으면 theirs 그대로, 저쪽이 안 바꿨으면 mine 그대로
+      · dict: 키별로 다시 합친다(내가 지운 키는 저쪽이 그대로 둔 경우에만 지운다)
+      · list: 양쪽 다 줄이지 않았으면 앞부분은 항목별로 합치고 뒤에 저쪽이 더한 것 + 내가 더한 것(쪽지 messages·질문 행)
+      · 정수: 저쪽 값 + 내가 늘린 만큼(counters·aiUsage — 두 컨테이너가 같이 번호를 뽑아도 겹치지 않게)
+      · 그 밖(문자열·None·모양이 다름): 둘 다 바꿨으면 mine"""
+    if mine == base:
+        return theirs
+    if theirs == base or theirs is _MISSING:
+        return mine
+    if mine is _MISSING:                       # 내가 지웠지만 저쪽이 고쳤다 → 저쪽 것을 둔다
+        return theirs
+    if isinstance(mine, dict) and isinstance(theirs, dict):
+        b = base if isinstance(base, dict) else {}
+        out = dict(theirs)
+        for k in set(b) | set(mine):
+            m = _merge(b.get(k, _MISSING), mine.get(k, _MISSING), theirs.get(k, _MISSING))
+            if m is _MISSING:
+                out.pop(k, None)
+            else:
+                out[k] = m
+        return out
+    if isinstance(mine, list) and isinstance(theirs, list):
+        b = base if isinstance(base, list) else []
+        n = len(b)
+        if len(mine) >= n and len(theirs) >= n:
+            head = [_merge(x, y, z) for x, y, z in zip(b, mine[:n], theirs[:n])]
+            return head + theirs[n:] + mine[n:]
+        return mine
+    if _is_int(mine) and _is_int(theirs):
+        return theirs + (mine - (base if _is_int(base) else 0))
+    return mine
+
+
+def _merged_for_save(name):
+    """ncp: 버킷을 다시 읽어 이번 요청의 변경만 얹은 기록. 캐시도 그 모습으로 바꿔 둔다(같은 요청의 다음 save를 위해)."""
+    cur = _cache[name]
+    base = _base.get(name)
+    fresh = _read(name)
+    merged = _merge(_MISSING if base is None else base, cur, _MISSING if fresh is None else fresh)
+    if merged is _MISSING:
+        merged = cur
+    if merged is not cur:                      # 부르는 쪽이 들고 있는 dict/list가 그대로 최신이 되게 안에서 바꾼다
+        if isinstance(cur, dict) and isinstance(merged, dict):
+            cur.clear()
+            cur.update(merged)
+        elif isinstance(cur, list) and isinstance(merged, list):
+            cur[:] = merged
+        else:
+            _cache[name] = cur = merged
+    _base[name] = copy.deepcopy(cur)
+    return cur
+
+
 # ---------- 다른 코드가 쓰는 함수 ----------
 def load(name, default):
     """기록 하나를 메모리로 가져온다. 처음 부르면 저장소에서 읽고, 없으면 default."""
     with _lock:
         if name not in _cache:
             data = _read(name)
+            if _backend() == "ncp":
+                _base[name] = copy.deepcopy(data)
             _cache[name] = default if data is None else data
         return _cache[name]
 
 
 def save(name):
-    """메모리의 기록을 저장소에 쓴다."""
+    """메모리의 기록을 저장소에 쓴다. ncp면 저장 직전에 다시 읽어 이번 요청이 바꾼 것만 얹는다(맨 위 주석)."""
     with _lock:
         if name in _cache:
-            _write(name, _cache[name])
+            _write(name, _merged_for_save(name) if _backend() == "ncp" else _cache[name])
 
 
 def next_id(prefix):
-    """T-0001, Q-0001처럼 종류별로 하나씩 늘어나는 번호."""
+    """T-0001, Q-0001처럼 종류별로 하나씩 늘어나는 번호. ncp에서는 save가 합친 뒤의 번호를 돌려준다
+    (다른 컨테이너가 그사이 뽑은 번호를 건너뛴다)."""
     with _lock:
         counters = load("counters", {})
         counters[prefix] = counters.get(prefix, 0) + 1
@@ -167,12 +239,14 @@ def begin_request():
     if _backend() == "ncp":
         with _lock:
             _cache.clear()
+            _base.clear()
 
 
 def clear_all():
     """초기화(reset_runtime.py)용. 메모리와 저장소를 모두 비운다."""
     with _lock:
         _cache.clear()
+        _base.clear()
         if _backend() == "ncp":
             _, xml = _s3("GET", query={"list-type": "2", "prefix": _os_conf()["prefix"]})
             for key in re.findall(r"<Key>([^<]+)</Key>", xml.decode("utf-8")):
