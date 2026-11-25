@@ -20,7 +20,7 @@ import store
 store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"
 os.environ.update(STORE_BACKEND="ncp", NCP_OS_BUCKET="b", NCP_OS_ACCESS_KEY="a" * 8, NCP_OS_SECRET_KEY="s" * 8)
 
-bucket, puts = {}, []
+bucket, puts, gets = {}, [], []
 
 
 def fake_s3(method, key="", body=b"", query=None):
@@ -28,6 +28,7 @@ def fake_s3(method, key="", body=b"", query=None):
         keys = "".join(f"<Key>{k}</Key>" for k in bucket if k.startswith(query.get("prefix", "")))
         return 200, f"<ListBucketResult>{keys}</ListBucketResult>".encode()
     if method == "GET":
+        gets.append(key)
         return (200, bucket[key]) if key in bucket else (404, b"")
     if method == "PUT":
         bucket[key] = body
@@ -186,7 +187,25 @@ expect("B가 먼저 Q-0001", store.next_id("Q") == "Q-0001")
 resume("A")
 expect("A는 합친 뒤 Q-0002", store.next_id("Q") == "Q-0002")
 
-# ── 7. file 방식은 그대로(스냅샷 없이 바로 씀) ───────────────────────────
+# ── 7. ncp save(): 이번 요청이 바꾼 것이 없으면 GET도 PUT도 없음 (11/25 후속) ──
+request("A")
+m = store.load("messages", {})
+p0, g0 = len(puts), len(gets)
+store.save("messages")
+expect("바뀐 것 없으면 PUT 없음", len(puts) == p0)
+expect("바뀐 것 없으면 다시 읽기(GET)도 없음", len(gets) == g0)
+m["T-9999"] = {"messages": []}
+store.save("messages")
+expect("바꾸면 GET 1 + PUT 1", len(puts) == p0 + 1 and len(gets) == g0 + 1)
+store.save("messages")
+expect("같은 요청에서 다시 save: 또 바꾼 게 없으면 PUT 없음", len(puts) == p0 + 1)
+request("B")
+store.load("never", {})
+p1 = len(puts)
+store.save("never")
+expect("없던 기록에 기본값만 든 채 save → 기본값을 한 번 씀(전과 같음)", len(puts) == p1 + 1)
+
+# ── 8. file 방식은 그대로(스냅샷 없이 바로 씀) ───────────────────────────
 os.environ["STORE_BACKEND"] = "file"
 store._cache, store._base = {}, {}
 store.load("x", {"a": 1})["b"] = 2

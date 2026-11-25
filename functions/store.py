@@ -21,8 +21,10 @@
 #         않고 「저장 직전에 버킷을 다시 읽고, 이번 요청이 바꾼 것만 얹어서」 쓴다(11/25 두 창 시험에서 늦게 끝난
 #         getMessages가 답장을 지운 일, 작업 58). load()가 읽은 모습을 _base에 남겨 두고 save()에서 _base → 캐시의
 #         차이를 새로 읽은 기록에 합친다(_merge: dict는 키별, list는 덧붙인 항목, 정수는 더한 만큼). 다시 읽기와 쓰기
-#         사이의 틈은 남지만(조건부 쓰기 If-Match는 NCP 지원 확인 전) 요청 전체 길이에서 수십 ms로 줄어든다.
+#         사이의 틈은 남지만 요청 전체 길이에서 수십 ms로 줄어든다. 조건부 쓰기(PUT If-Match)는 NCP Object Storage가
+#         지원하지 않는다(11/25 확정 — 틀린 ETag를 붙여도 그대로 200). 그래서 이 방식이 최종이다.
 #         읽기만 하는 함수는 바뀐 것이 없으면 save()를 부르지 않는다(runtime_fns.getMessages·recommendSeniors).
+#         그래도 save()가 불리면, 이번 요청이 바꾼 것이 없을 때(캐시 == _base) GET도 PUT도 하지 않고 돌아온다.
 import copy
 import datetime
 import hashlib
@@ -212,10 +214,17 @@ def load(name, default):
 
 
 def save(name):
-    """메모리의 기록을 저장소에 쓴다. ncp면 저장 직전에 다시 읽어 이번 요청이 바꾼 것만 얹는다(맨 위 주석)."""
+    """메모리의 기록을 저장소에 쓴다. ncp면 이번 요청이 바꾼 것이 없을 때(캐시 == _base)는 아무것도 하지 않고,
+    바꿨으면 저장 직전에 다시 읽어 이번 요청이 바꾼 것만 얹는다(맨 위 주석)."""
     with _lock:
-        if name in _cache:
-            _write(name, _merged_for_save(name) if _backend() == "ncp" else _cache[name])
+        if name not in _cache:
+            return
+        if _backend() != "ncp":
+            _write(name, _cache[name])
+            return
+        if _cache[name] == _base.get(name):    # 바뀐 것 없음 → 옛 모습으로 덮어쓰지도, 다시 읽지도 않는다
+            return
+        _write(name, _merged_for_save(name))
 
 
 def next_id(prefix):
