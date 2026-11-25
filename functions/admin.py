@@ -320,7 +320,7 @@ def _reported(dept, start, end):
     for n in notes.NOTES.values():
         for s in n.get("sections", []):
             for ln in s.get("lines", []):
-                lines[ln.get("lineId")] = (n, ln)
+                lines[ln.get("lineId")] = (n, ln, s.get("name"))
     rows = []
     for r in USAGE.get("reports", []):
         rows.append({"lineId": r.get("lineId"), "at": r.get("at"), "reason": r.get("사유"), "status": r.get("status")})
@@ -329,12 +329,13 @@ def _reported(dept, start, end):
                      "saved": r})
     out = []
     for r in rows:
-        n, ln = lines.get(r["lineId"], (None, None))
+        n, ln, section = lines.get(r["lineId"], (None, None, None))
         saved = r.get("saved") or {}
         summary = saved.get("kind") == "summary"
         if n is None and saved.get("noteId"):   # [11/25 작업 33] 요약 문장·인터뷰 문장 신고는 기록에 남긴 글·노트로
             n = {"id": saved["noteId"], "program": saved.get("program")}
             ln = {"text": saved.get("text")}
+            section = saved.get("section")
         program = n.get("program") if n else None
         if not _in(r["at"], start, end) or (dept != "ALL" and _dept_of(program) != dept):
             continue
@@ -342,7 +343,7 @@ def _reported(dept, start, end):
                     # 노트 문장 = 근거 원문 1:1(작업 26). 요약 문장은 원문이 아니라 AI 문단의 한 문장 → sourceText 없음
                     "sourceText": ln.get("text") if ln and not summary else None,
                     "kind": "summary" if summary else "line",
-                    "reason": r["reason"], "noteId": n.get("id") if n else None, "program": program,
+                    "reason": r["reason"], "noteId": n.get("id") if n else None, "program": program, "section": section,
                     "status": r["status"] or "숨김 중", "at": r["at"]})
     return sorted(out, key=lambda r: r["at"], reverse=True)
 

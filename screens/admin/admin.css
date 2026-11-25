@@ -311,3 +311,13 @@
 .sugg__q:first-child { border-top: 0; }
 .sugg__q-meta { font-size: var(--font-size-caption); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
 .sugg__q-text { font-size: var(--font-size-secondary); color: var(--color-text); }
+
+/* 신고된 진술(작업 33) */
+.reported { display: flex; flex-direction: column; gap: var(--space-md); margin-top: var(--space-md); }
+.reported-list { display: flex; flex-direction: column; gap: var(--space-md); }
+.reported__item { display: flex; flex-direction: column; gap: 12px; padding: var(--space-lg); }
+.reported__fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); margin: 0; }
+.reported__field { display: flex; flex-direction: column; gap: var(--space-xs); margin: 0; }
+.reported__field:first-child { grid-column: 1 / -1; }
+.reported__field dt, .reported__field dd { margin: 0; }
+.reported__text { font-size: var(--font-size-secondary); line-height: 1.5; color: var(--color-text); }

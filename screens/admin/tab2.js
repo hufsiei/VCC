@@ -1,6 +1,6 @@
 // 탭2 개선 제안(PRD 5-3, 작업 68) — getAdminSuggestions 응답을 카드 목록으로 그린다.
 // 제안 문장은 사전 생성(data/suggestions.json)이라 시연 중 AI 호출이 없다. 화면은 그리기 + 상태 바꾸기만.
-// 「신고된 진술」 섹션(reported)은 작업 33에서 미리가 이 탭 아래에 붙인다(11/25 재계획).
+// 「신고된 진술」 섹션(reported, 작업 33)은 카드 목록 끝에 붙는다(reportedSection).
 import { setSuggestionStatus } from "../../common/data.js";
 import { el, icon, statusLabel, fmt, toast, drawIcons } from "./ui.js";
 
@@ -62,8 +62,56 @@ export function renderSuggest(panel, data, { deptNames = {}, onChanged } = {}) {
   } else {
     wrap.append(...sorted.map((s) => card(s, deptNames, changed)));
   }
+  wrap.append(reportedSection(Array.isArray(data.reported) ? data.reported : []));
   panel.replaceChildren(wrap);
   panel.removeAttribute("aria-busy");
+}
+
+// 신고된 진술(작업 33) ---------------------------------------------------------
+// 신고된 해봤노트 문장. 신고자·학번은 응답에 없다. 요약 문장은 sourceText: null(AI 문단의 한 문장).
+const KINDS = { summary: "요약 문장", line: "원문 문장" };
+const REPORT_STATUS = {   // 상태 = 색 + 아이콘 + 문구(3-4). 그 밖의 값은 중립
+  "숨김 중": { kind: "warning", icon: "eye-off" },
+  "복구": { kind: "success", icon: "check" },
+};
+
+function reportedSection(rows) {
+  const titleId = "reported-title";
+  const head = el("div", { className: "block__head" }, [
+    el("h2", { className: "section-title", text: `신고된 진술 ${fmt(rows.length)}건`, attrs: { id: titleId } }),
+    el("p", { className: "block__note", text: "신고된 해봤노트 문장 · 최근 신고순" }),
+  ]);
+  const body = rows.length
+    ? el("div", { className: "reported-list" }, rows.map(reportedCard))
+    : el("div", { className: "card empty" }, [
+      icon("flag"),
+      el("p", { className: "empty__title", text: "신고된 진술 0건" }),
+      el("p", { className: "sub", text: "이 기간에 신고된 해봤노트 문장이 없어요." }),
+    ]);
+  return el("section", { className: "reported", attrs: { "aria-labelledby": titleId } }, [head, body]);
+}
+
+function reportedCard(r) {
+  const st = REPORT_STATUS[r.status] || { kind: "neutral", icon: "info" };
+  const where = [r.program, r.section].filter(Boolean).join(" · ") || "–";
+  const source = r.sourceText == null ? "–" : r.sourceText === r.text ? "위 문장과 같아요" : r.sourceText;
+  const field = (label, text) => el("div", { className: "reported__field" }, [
+    el("dt", { className: "field__label", text: label }),
+    el("dd", { className: "reported__text", text }),
+  ]);
+  return el("article", { className: "card reported__item" }, [
+    el("div", { className: "sugg__top" }, [
+      statusLabel("neutral", "quote", KINDS[r.kind] || "문장"),
+      statusLabel(st.kind, st.icon, r.status || "–"),
+      el("span", { className: "sugg__dept", text: where }),
+    ]),
+    el("dl", { className: "reported__fields" }, [
+      field("문장", r.text || "–"),
+      field("원문", source),
+      field("신고 사유", r.reason || "–"),
+    ]),
+    el("p", { className: "sugg__meta", text: `신고 ${stamp(r.at)}` }),
+  ]);
 }
 
 // 카드 하나 -------------------------------------------------------------------
@@ -150,4 +198,6 @@ function questionRow(q) {
 
 // "2026-10-21T20:41:04+09:00" → "2026-10-21" / "2026-10"
 const day = (iso) => (/^\d{4}-\d{2}-\d{2}/.exec(String(iso || "")) || [""])[0];
+// "2026-10-21T20:41:04+09:00" → "2026-10-21 20:41"
+const stamp = (iso) => { const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(String(iso || "")); return m ? `${m[1]} ${m[2]}` : "–"; };
 const month = (iso) => (/^\d{4}-\d{2}/.exec(String(iso || "")) || ["–"])[0];

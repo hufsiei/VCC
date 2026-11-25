@@ -549,7 +549,7 @@ payload `{lineId, reason}`. 신고된 문장은 즉시 숨김, 부서 리포트�
 - **[11/25 신고·기록] `reason`(신고 사유, 최대 100자)은 필수.** 비었으면 `{ "error": "신고 사유를 적어 주세요" }`(원문·요약 문장 모두). `lineId`가 없으면 `{ "error": "신고할 문장이 없어요" }`.
 - `lineId`는 원문 문장(「L-…」, `getNote` `lines[].lineId`)이나 **해봤노트 요약 문장**(「S-…」, `getNote` `sections[].summary[].lineId`). 없는 요약 문장 id는 `{ "error": "신고할 문장을 찾지 못했어요" }`.
 - 요약 문장을 신고하면 그 문장만 다음 `getNote`부터 `summary`에서 빠진다(근거 원문 `lines`는 그대로). 화면은 응답을 받으면 그 문장을 바로 뺀다.
-- 기록 `reported.json`: `{lineId: {by, reason, at, status: "숨김 중", kind: "summary"|"line", noteId, program, section, text}}` — 신고한 문장 글·노트·칸을 함께 남긴다(문장을 찾을 수 있을 때). 콘솔 `getAdminSuggestions.reported`에 들고, 행마다 `kind`가 붙으며 요약 문장은 `sourceText: null`(원문이 아니라 AI 문단의 한 문장).
+- 기록 `reported.json`: `{lineId: {by, reason, at, status: "숨김 중", kind: "summary"|"line", noteId, program, section, text}}` — 신고한 문장 글·노트·칸을 함께 남긴다(문장을 찾을 수 있을 때). 콘솔 `getAdminSuggestions.reported`에 들고, 행마다 `kind`·`section`(칸 이름, 못 찾으면 null)이 붙으며 요약 문장은 `sourceText: null`(원문이 아니라 AI 문단의 한 문장).
 - 화면(민지, `screens/note/`): 요약 문장을 길게 누르거나(모바일) 드래그하면(PC) 「신고하기」 풍선 → 사유 입력 시트(필수) → `reportStatement(lineId, reason)`.
 ```json
 { "ok": true, "hidden": true }
