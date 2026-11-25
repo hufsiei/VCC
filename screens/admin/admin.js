@@ -1,9 +1,10 @@
 // 관리자 콘솔 공통(PRD 5-1, 작업 68): 직원 확인 · 부서·기간 · 탭 전환 · 다시 불러오기.
 // 데이터는 common/data.js 함수로만 받는다(fetch 직접 금지).
 import { currentUser, logout, getDepartments, getAdminOverview, getAdminSuggestions } from "../../common/data.js";
-import { el, icon, drawIcons, errorBox } from "./ui.js";
+import { el, drawIcons, errorBox } from "./ui.js";
 import { renderDemand, renderDemandLoading } from "./tab1.js";
 import { renderSuggest, renderSuggestLoading } from "./tab2.js";
+import { loadReport } from "./tab3.js";
 
 const $ = (id) => document.getElementById(id);
 const me = currentUser();
@@ -31,7 +32,7 @@ async function start() {
   $("main").hidden = false;
 
   // seq: 탭마다 마지막 요청 번호(부서를 빨리 바꿔도 마지막 선택만 그린다) / stale: 다시 불러와야 하는 탭
-  const state = { dept: "ALL", period: readPeriod(), tab: "demand", seq: {}, stale: { demand: true, suggest: true } };
+  const state = { dept: "ALL", period: readPeriod(), tab: "demand", seq: {}, stale: { demand: true, suggest: true, report: true } };
 
   // 부서 드롭다운: 「전체」 + 부서 목록. 부서 담당자는 자기 부서로 고정(비활성 + 이유, 5-4)
   const deptSelect = $("deptSelect");
@@ -53,7 +54,7 @@ async function start() {
 
   // 부서·기간이 바뀌면 모든 탭이 낡는다 → 지금 탭만 바로, 나머지는 열 때 불러온다
   const refresh = () => {
-    state.stale = { demand: true, suggest: true };
+    state.stale = { demand: true, suggest: true, report: true };
     load(state.tab);
   };
   deptSelect.addEventListener("change", () => { state.dept = deptSelect.value; refresh(); });
@@ -69,14 +70,14 @@ async function start() {
         x.setAttribute("aria-selected", String(on));
         $(x.getAttribute("aria-controls")).hidden = !on;
       }
-      if (state.tab === "report") renderLater($(t.getAttribute("aria-controls")), t.textContent);
-      else if (state.stale[state.tab]) load(state.tab);
+      if (state.stale[state.tab]) load(state.tab);
     });
   }
 
   function load(tab) {
     if (tab === "demand") return loadDemand();
     if (tab === "suggest") return loadSuggest();
+    if (tab === "report") return loadReportTab();
   }
 
   async function loadDemand() {
@@ -114,6 +115,22 @@ async function start() {
     drawIcons();
   }
 
+  // 탭3: 발행 설정·이력은 부서별(기간은 「지금 발행」에만 쓰임). 부서 담당자는 받은 리포트만
+  function loadReportTab() {
+    const my = state.seq.report = (state.seq.report || 0) + 1;
+    state.stale.report = false;
+    const sel = $("periodSelect");
+    const ctx = {
+      dept: state.dept,
+      deptName: state.dept === "ALL" ? "전체" : (deptNames[state.dept] || state.dept),
+      deptNames,
+      period: state.period,
+      periodLabel: sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : "",
+      isDept,
+    };
+    return loadReport($("panel-report"), ctx, () => my === state.seq.report);
+  }
+
   load("demand");
 }
 
@@ -126,15 +143,4 @@ function readPeriod() {
 function timeText(iso) {
   const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(String(iso));
   return m ? `${m[1]} ${m[2]}` : String(iso);
-}
-
-// 탭3은 다음 작업(작업 69, 11/28~) — 자리만
-function renderLater(panel, name) {
-  if (panel.childElementCount) return;
-  panel.append(el("div", { className: "card empty" }, [
-    icon("clock"),
-    el("p", { className: "empty__title", text: `${name} 화면을 만들고 있어요` }),
-    el("p", { className: "sub", text: "수요 현황 탭에서 부서별 질문을 먼저 볼 수 있어요." }),
-  ]));
-  drawIcons();
 }

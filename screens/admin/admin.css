@@ -224,6 +224,43 @@
 /* 토스트: 콘솔엔 하단 탭이 없어 아래 24px */
 .console-toast { bottom: var(--space-lg); }
 
+/* ---------- 탭3 리포트 발행(PRD 5-4): 발행 설정 → 미리보기 → 발행 이력 ---------- */
+.report-tab { display: flex; flex-direction: column; gap: var(--space-lg); }
+.report--skeleton { height: 220px; }
+.report-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-lg); align-items: start; }
+.report-form__col { display: flex; flex-direction: column; gap: var(--space-lg); }
+.report-segment { max-width: 320px; }
+.report-day__row { display: flex; align-items: center; gap: var(--space-sm); }
+.report-day__text { font-size: var(--font-size-body); color: var(--color-text); white-space: nowrap; }
+.report-day { width: 96px; font-variant-numeric: tabular-nums; }
+.report-fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.report-fieldset > legend { margin-bottom: 6px; padding: 0; }
+.report-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
+.report-check { align-items: center; padding: 10px 12px; font-size: var(--font-size-secondary); }
+.report-check .checkbox { margin: 0; }
+.report-field-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-sm); }
+.report-recipients { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border: 1px solid var(--color-border); border-radius: var(--radius-card); }
+.report-recipient { display: flex; align-items: center; gap: var(--space-sm); min-height: 48px; padding: 0 var(--space-xs) 0 12px; border-top: 1px solid var(--color-border); font-size: var(--font-size-secondary); }
+.report-recipient:first-child { border-top: 0; }
+.report-recipient .icon { width: 16px; height: 16px; color: var(--color-text-muted); }
+.report-recipient__mail { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-recipient .btn--text { min-height: 44px; font-size: var(--font-size-secondary); }
+.report-recipient--empty { color: var(--color-text-muted); }
+.report-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-sm); }
+.report-next { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-md); }
+.report-form-error:empty { display: none; }
+.report-actions { display: flex; align-items: flex-start; gap: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--color-border); }
+.report-actions > .btn { min-width: 120px; }
+.report-issue { display: flex; flex-direction: column; gap: var(--space-xs); }
+.report-issue .btn { align-self: flex-start; gap: var(--space-sm); }
+.report-preview__meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-md); }
+.report-frame { width: 100%; height: 720px; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-background); }
+.report-send { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); }
+.report-table .is-action { text-align: right; }
+.report-table .is-action .btn { min-height: 44px; }
+.report-table td { vertical-align: middle; }
+.report-table .is-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
 /* ---------- 폭별 ---------- */
 .mobile-only { display: none; }
 @media (max-width: 767px) {
