@@ -31,6 +31,7 @@
 #                                                   → 「Q-n 제안」(--from 직접은 「Q-n 승인」. 옛 값 「미리」도 직접과 같게 받음)
 #   queue approve Q-n                               겹침 없으면 승인, 겹치면 종료코드 2 + 겹친 줄
 #   queue reject Q-n --why "…"                      반려(이유 기록)
+#   queue done Q-n [--pr N] [--force]                        병합이 끝난 줄을 완료로(시작됨·승인에서만). 겹침 검사에서 빠짐
 #   queue take Q-n --folder VCC-<슬러그> [--session <이름>]   승인만 시작됨으로 + 폴더 기록. 제안·반려면 종료코드 2
 #   decide                                          결정요망 표 출력(답 없는 것 위)
 #   decide add --folder VCC-x --session <이름> --q "질문" --options "A(추천) …; B …"   → 「D-n」, 그 폴더 줄 결정요망에 D-n
@@ -408,9 +409,9 @@ def overlaps(st, files, me=None, skip_q=None):
                     hits.append(f"겹침: {f} ↔ [{r['폴더']}] {r['브랜치']} ({r['요청']} · {r['작업']} · {r['상태']})")
         for q in st["queue"]:
             if q["번호"] == skip_q or q["상태"] not in ("승인", "시작됨"):
-                continue
-            if q["상태"] == "시작됨" and find(rows, q["폴더"]):
-                continue            # 창 줄로 이미 셌다
+                continue            # 완료·반려·제안은 세지 않는다
+            if q["상태"] == "시작됨":
+                continue            # 창 줄이 있으면 위에서 셌고, 없으면(remove됨) 고치는 중이 아니다
             for g in split_files(q["파일"]):
                 if overlap(f, g):
                     hits.append(f"겹침: {f} ↔ [{q['번호']}] {q['작업']} ({q['상태']})")
@@ -451,8 +452,13 @@ def cmd_remove(args):
             raise SystemExit(f"안 보낸 답장이 있음: {name} — {r['전달 대기']}\n"
                              "보냈으면 set --sent 뒤 다시, 버려도 되면 --force")
         st["rows"] = [x for x in st["rows"] if x["폴더"] != name]
+        closed = [x for x in st["queue"] if x["폴더"] == name and x["상태"] == "시작됨"]
+        for x in closed:
+            x["상태"], x["갱신"] = "완료", now()
         save(st)
     print(f"지움: {name}")
+    for x in closed:
+        print(f"{x['번호']} 시작됨 → 완료 (PR 번호를 남기려면 queue done {x['번호']} --pr N)")
 
 
 def cmd_prune(args):
@@ -539,6 +545,22 @@ def cmd_queue_reject(args):
         x["메모"] = f"반려: {args.why}" + (f" · {x['메모']}" if x["메모"] not in EMPTY else "")
         save(st)
     print(f"{x['번호']} 반려")
+
+
+def cmd_queue_done(args):
+    with locked():
+        st = load()
+        x = _q(st, args.id)
+        if x["상태"] not in ("시작됨", "승인", "완료") and not (args.force and x["상태"] == "반려"):
+            print(f"{x['번호']} 상태 {x['상태']} — 시작됨·승인만 완료로 바꿀 수 있음(반려로 잘못 닫은 줄은 --force)")
+            sys.exit(2)
+        pr = f" PR #{str(args.pr).lstrip('#')} 병합" if args.pr else ""
+        note = f"완료{pr} ({now()})"
+        base = x["메모"] if x["메모"] not in EMPTY and not x["메모"].startswith(("완료", "반려")) else ""
+        x["상태"], x["갱신"] = "완료", now()
+        x["메모"] = note + (f" · {base}" if base else "")
+        save(st)
+    print(f"{x['번호']} 완료")
 
 
 def cmd_queue_take(args):
@@ -687,7 +709,7 @@ def make_html(st, path=None):
 <h2>창</h2>
 {'<div class="cards">' + "".join(cards) + '</div>' if cards else '<p class="none">–</p>'}
 <h2>대기 작업</h2>
-{html_table(QCOLS, st["queue"], lambda x: "done" if x["상태"] in ("시작됨", "반려") else "")}
+{html_table(QCOLS, st["queue"], lambda x: "done" if x["상태"] in ("시작됨", "반려", "완료") else "")}
 <h2>결정요망</h2>
 {html_table(DCOLS, dec, lambda x: "done" if x["답"] not in EMPTY else "")}
 <h2>열린 PR</h2>
@@ -752,7 +774,25 @@ def cmd_selftest(args):
     run("queue", "reject", "Q-1", "--why", "겹침", first="Q-1 반려")
     run("queue", "take", "Q-1", "--folder", "VCC-q1", code=2)
     run("queue", has="Q-2 시작됨")
+    # 완료: 시작됨·승인에서만, 반려는 안 바뀜, 겹침에서 빠짐
+    run("queue", "done", "Q-1", code=2)                      # 반려 → 완료 불가(--force만)
+    run("queue", "add", "--task", "– 겹침 시험", "--files", "q2/f.py", "--from", "직접", first="Q-5 승인")
+    run("queue", "take", "Q-5", "--folder", "VCC-q5", first="Q-5 시작됨 → VCC-q5")   # 창 줄 없는 시작됨
+    run("queue", "add", "--task", "– 겹침 시험2", "--files", "q2/f.py", "--from", "milstart", first="Q-6 제안")
+    run("queue", "approve", "Q-6", first="Q-6 승인")         # 창 줄 없는 시작됨은 세지 않음
+    run("queue", "done", "Q-2", "--pr", "258", first="Q-2 완료")
+    run("queue", "done", "Q-6", first="Q-6 완료")             # 승인 → 완료
+    run("queue", "add", "--task", "– 겹침 시험3", "--files", "w.py", "--from", "milstart", first="Q-7 제안")
+    run("queue", "approve", "Q-7", code=2, has="[Q-3]")      # 승인 상태는 아직 센다
+    run("queue", "done", "Q-3", first="Q-3 완료")
+    run("queue", "approve", "Q-7", first="Q-7 승인")         # 완료는 세지 않음
+    run("add", "VCC-q5", "--branch", "miri/q5", "--who", "미리", "--task", "q5", "--files", "q5.py")
+    run("remove", "VCC-q5", has="Q-5 시작됨 → 완료")          # remove하면 맡은 큐 줄이 완료로
+    if {x["번호"]: x for x in board()["queue"]}["Q-5"]["상태"] != "완료":
+        fails.append("remove 뒤 Q-5가 완료가 아님")
     q = {x["번호"]: x for x in board()["queue"]}
+    if not (q["Q-2"]["상태"] == "완료" and "PR #258 병합" in q["Q-2"]["메모"]):
+        fails.append(f"queue done 표 내용: {q['Q-2']}")
     if not (q["Q-1"]["메모"].startswith("반려: 겹침") and q["Q-2"]["폴더"] == "VCC-q2" and q["Q-2"]["세션"] == "s2"):
         fails.append(f"queue 표 내용: {q}")
     run("decide", "add", "--folder", a, "--session", "작업창A", "--q", "어느 쪽?", "--options", "A(추천) 하나; B 둘",
@@ -873,6 +913,9 @@ def main():
     qp = qs.add_parser("approve"); qp.add_argument("id"); qp.set_defaults(fn=cmd_queue_approve)
     qr = qs.add_parser("reject"); qr.add_argument("id"); qr.add_argument("--why", required=True)
     qr.set_defaults(fn=cmd_queue_reject)
+    qd = qs.add_parser("done"); qd.add_argument("id"); qd.add_argument("--pr")
+    qd.add_argument("--force", action="store_true", help="반려로 잘못 닫은 줄을 완료로 고침")
+    qd.set_defaults(fn=cmd_queue_done)
     qt = qs.add_parser("take"); qt.add_argument("id"); qt.add_argument("--folder", required=True)
     qt.add_argument("--session"); qt.set_defaults(fn=cmd_queue_take)
 
