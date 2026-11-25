@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관리자 콘솔 · 외대人사이드</title>
+<link rel="stylesheet" href="../../common/style.css">
+<link rel="stylesheet" href="./admin.css">
+</head>
+<body>
+<div class="console">
+  <!-- 상단 바: PC 콘솔은 학생 앱 헤더(5-1)와 달리 왼쪽에 심벌 + 이름, 오른쪽에 계정·로그아웃. BOO는 쓰지 않는다(2-2) -->
+  <header class="console-bar">
+    <div class="console-bar__brand">
+      <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
+      <span>외대人사이드</span>
+      <span class="console-bar__name">관리자 콘솔</span>
+    </div>
+    <div class="console-bar__side">
+      <span class="console-bar__who" id="who"></span>
+      <button class="btn btn--text" id="logoutBtn" type="button" hidden><i data-lucide="log-out" class="icon"></i>로그아웃</button>
+    </div>
+  </header>
+
+  <!-- 직원이 아니면: 안내 + 로그인 -->
+  <main class="console-main" id="gate" hidden>
+    <div class="card console-gate">
+      <i data-lucide="lock" class="icon console-gate__icon"></i>
+      <h1 class="section-title">직원 계정으로 로그인해 주세요</h1>
+      <p class="sub">관리자 콘솔은 교직원만 볼 수 있어요.</p>
+      <button class="btn btn--primary" id="gateLogin" type="button">로그인하러 가기</button>
+    </div>
+  </main>
+
+  <main class="console-main" id="main" hidden>
+    <!-- 상단 고정: 부서 · 기간 · 마지막 집계 시각 (PRD 5-1) -->
+    <div class="console-controls">
+      <div class="field">
+        <label class="field__label" for="deptSelect">부서</label>
+        <select class="input console-select" id="deptSelect"></select>
+        <p class="btn-reason" id="deptReason" hidden><i data-lucide="info" class="icon"></i><span>부서 담당자는 자기 부서만 볼 수 있어요</span></p>
+      </div>
+      <div class="field pc-only">
+        <label class="field__label" for="periodSelect">기간</label>
+        <select class="input console-select" id="periodSelect">
+          <optgroup label="학기">
+            <option value="semester:2026-2">2026년 2학기</option>
+            <option value="semester:2026-1">2026년 1학기</option>
+          </optgroup>
+          <optgroup label="월">
+            <option value="month:2026-11">2026년 11월</option>
+            <option value="month:2026-10">2026년 10월</option>
+            <option value="month:2026-09">2026년 9월</option>
+          </optgroup>
+        </select>
+      </div>
+      <p class="console-controls__time" id="computedAt"></p>
+    </div>
+
+    <!-- 탭 3개: 같은 화면 안 전환(5-2) -->
+    <div class="console-tabs pc-only" role="tablist" aria-label="관리자 콘솔 메뉴">
+      <button class="console-tab" type="button" role="tab" id="tab-demand" data-tab="demand" aria-controls="panel-demand" aria-selected="true">수요 현황</button>
+      <button class="console-tab" type="button" role="tab" id="tab-suggest" data-tab="suggest" aria-controls="panel-suggest" aria-selected="false">개선 제안</button>
+      <button class="console-tab" type="button" role="tab" id="tab-report" data-tab="report" aria-controls="panel-report" aria-selected="false">리포트 발행</button>
+    </div>
+
+    <!-- 모바일 폭: KPI 4개 + 부서만, 나머지는 안내(PRD 5-1) -->
+    <p class="mobile-only console-mobile-note">
+      <span class="status-label status-label--info"><i data-lucide="monitor" class="icon"></i><span>표와 그래프는 PC에서 보세요</span></span>
+    </p>
+
+    <section class="console-panel" id="panel-demand" role="tabpanel" aria-labelledby="tab-demand" aria-busy="true"></section>
+    <section class="console-panel" id="panel-suggest" role="tabpanel" aria-labelledby="tab-suggest" hidden></section>
+    <section class="console-panel" id="panel-report" role="tabpanel" aria-labelledby="tab-report" hidden></section>
+  </main>
+
+  <div class="toast-host console-toast" id="toastHost" role="status" aria-live="polite"></div>
+</div>
+
+<script src="../../assets/lucide/lucide.min.js"></script>
+<script type="module" src="./admin.js"></script>
+</body>
+</html>
