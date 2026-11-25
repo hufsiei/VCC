@@ -20,7 +20,6 @@ import { saveConsent, listNotes } from "./data.js";
 
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };
-const QUESTION_SECTION = "후배 질문";
 const MAX_EDIT_CHARS = 300; // 서버 runtime_fns.MAX_EDIT_CHARS와 같게
 
 // ---------------------------------------------------------------------------
@@ -255,12 +254,12 @@ function renderLines() {
   }
   linesBox.replaceChildren(...sections.map((section) => el("div", { className: "consent-section" }, [
     el("h3", { className: "consent-section__name", text: section.name }),
-    ...section.lines.filter((l) => l && l.lineId).map((line) => lineRow(section.name, line)),
+    ...section.lines.filter((l) => l && l.lineId).map((line) => lineRow(line)),
   ])));
 }
 
 let switchSeq = 0;
-function lineRow(sectionName, line) {
+function lineRow(line) {
   const id = `consent-sw-${++switchSeq}`;
   // 끈 문장: 진한 남색 + 자물쇠로 「내 경험노트에만 남아요」
   const offNote = el("span", { className: "consent-line__off" }, [icon("lock"), "내 경험노트에만 남아요"]);
@@ -304,14 +303,14 @@ function lineRow(sectionName, line) {
 
   const text = el("label", { className: "consent-line__text", attrs: { for: id } }, [
     // 후배 질문 칸: Q(후배 질문 원문, 인용) + A(내 답)
-    sectionName === QUESTION_SECTION && line.asked ? el("span", { className: "msg__quote", text: `Q. ${line.asked}` }) : null,
-    el("span", { text: sectionName === QUESTION_SECTION ? `A. ${shown}` : shown }),
+    line.asked ? el("span", { className: "msg__quote", text: `Q. ${line.asked}` }) : null,
+    el("span", { text: line.asked ? `A. ${shown}` : shown }),
   ]);
 
   if (state.editing === line.lineId) {
     return el("div", { className: "consent-line", attrs: { "data-line": line.lineId } }, [
       el("div", { className: "consent-line__main" }, [
-        sectionName === QUESTION_SECTION && line.asked ? el("span", { className: "msg__quote", text: `Q. ${line.asked}` }) : null,
+        line.asked ? el("span", { className: "msg__quote", text: `Q. ${line.asked}` }) : null,
         editor(line, shown),
       ]),
     ]);
