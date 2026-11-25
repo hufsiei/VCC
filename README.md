@@ -7,7 +7,7 @@
 ## 접속 주소
 
 - 로컬: 저장소 폴더에서 `python functions/serve_screens.py` 실행 후 `http://localhost:8000/screens/login/` (이 PC에서만 열림)
-- 미리 개발 서버(미리 PC만): `functions/local_fn.py` 실행 후 `http://localhost:8787`
+- 로컬 서버 함수(각자 PC, `.env` 자기 키): `functions/local_fn.py` 실행 후 `http://localhost:8787`. 공개 주소 서버가 기본, 로컬은 백업(11/25, 작업 32). 순서는 「실행법」의 「실서버 시험」.
 - 공개 주소(GitHub Pages, `main` 루트): <https://hufsiei.github.io/VCC/screens/login/>
   - 저장소 루트는 `https://hufsiei.github.io/VCC/`이고, 각 화면은 그 아래 `screens/<화면>/`입니다.
   - 기본은 `USE_MOCK=true`(mock 데이터)입니다. 주소 끝에 `?server=all`을 붙인 탭만 서버 함수(NCP Cloud Functions, 작업 58)로 갑니다. 배포·콘솔 구성은 [운영노트](docs/운영노트.md) 5장 「배포」.
@@ -35,7 +35,24 @@ python functions/serve_screens.py
 `python -m http.server 8000`은 쓰지 않습니다(11/24). 저장소 전체를 같은 와이파이의 다른 기기에도 열어 `.env`(키)·`functions/logs`·`data/runtime`이 주소로 보입니다. `serve_screens.py`는 이 PC(127.0.0.1)에서만 열리고 `screens/`·`common/`·`assets/`·`data/`(runtime 제외)만 보여 줍니다. 포트를 바꾸려면 끝에 번호(`… serve_screens.py 8001`).
 기본은 mock 데이터(`common/mock-data.json`)로 동작합니다(`common/data.js`의 `USE_MOCK`).
 함수마다 따로 서버로 보내려면 `data.js`의 `SERVER_FNS`(또는 되돌릴 때 `MOCK_FNS`)에 함수 이름을 적습니다.
-코드를 고치지 않고 확인할 때는 localhost에서 주소 끝에 `?server=all` 또는 `?server=sendMessage,getMessages`를 붙입니다. 그 탭에서만 기억하고(두 창 시연), `?server=`로 해제합니다. 서버로 가는 함수가 하나라도 있으면 로그인도 서버로 가므로 다시 로그인합니다. 서버(`functions/local_fn.py`)는 미리 PC에서만 켭니다.
+코드를 고치지 않고 확인할 때는 localhost에서 주소 끝에 `?server=all` 또는 `?server=sendMessage,getMessages`를 붙입니다. 그 탭에서만 기억하고(두 창 시연), `?server=`로 해제합니다. 서버로 가는 함수가 하나라도 있으면 로그인도 서버로 가므로 다시 로그인합니다. 로컬 서버(`functions/local_fn.py`)는 각자 PC에서 `.env`의 자기 키로 켭니다(아래 「실서버 시험」 ②).
+
+### 실서버 시험 (작업 93, 전원)
+
+서버는 공개 주소(NCP Cloud Functions)가 기본이고 로컬 서버는 백업입니다(11/25, 작업 32). 두 가지를 순서대로 한 번씩 합니다.
+
+① 공개 주소 `?server=all` 한 바퀴 (11/25) — 키·설치 필요 없음
+1. 브라우저에서 <https://hufsiei.github.io/VCC/screens/login/?server=all> 을 엽니다(그 탭만 서버로 감).
+2. 로그인 H0143 → 인터BOO 2문항 → 들려주기 3답 → 해봤노트 → 닮은선배 → 쪽지 요청. (선배 쪽은 H0469 → 인터BOO → 들려주기 → 내 보관함 → 쪽지.)
+3. 문제는 「화면·계정·시각·재현 순서·캡처」로 단톡에. 끝나면 주소 끝에 `?server=`를 붙여 해제합니다.
+- 쓰기 기록(쪽지·질문함·동의)은 공용 버킷 `vcc-runtime`에 남습니다. 리허설 전 초기화는 [운영노트](docs/운영노트.md) 5장 「배포」.
+
+② 로컬 서버 1회 (11/26) — 각자 PC에서 `.env`의 자기 키로
+1. `main`을 받고, 저장소 맨 위에 `.env`가 없으면 [.env.example](.env.example)을 복사해 만듭니다. 자기 키(`CLOVA_KEY`·`ANTHROPIC_API_KEY`)와 로그인 비번 표 `VCC_LOGIN_PW`를 넣습니다(값은 미리가 따로 전함. 채팅·커밋에 적지 않음).
+2. Claude 작업을 쓰면 `pip install -r functions/requirements.txt`(HCX만 쓰면 생략).
+3. 창 1(저장소 맨 위): `python functions/serve_screens.py` → 화면 `http://localhost:8000`. 창 2: `cd functions` → `python local_fn.py` → 서버 함수 `http://localhost:8787`(포트 고정).
+4. `http://localhost:8000/screens/login/?server=all` 을 열어 ①과 같은 흐름을 1회. 쓰기 기록은 내 PC `data/runtime/*.json`에만 남습니다.
+5. 안 되는 것(패키지·`.env`·포트)은 단톡에. 로컬 서버 AI 호출은 자기 키로 나가니 `python -X utf8 functions/ai_usage.py`로 오늘 사용액을 봅니다.
 
 ## push 전 검사
 
