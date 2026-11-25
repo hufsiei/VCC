@@ -5,6 +5,7 @@
 #   1 남의 기록     임시 서버(임시 runtime, 빈 포트)를 띄워 다른 계정 토큰으로 남의 쪽지·초안·관리자 함수를 직접 부른다 → 거절
 #   2 XSS          screens·common에 innerHTML·insertAdjacentHTML·outerHTML·document.write 0건 + 서버 리포트 HTML이 글자를 escape
 #   3 키·연락처    .env가 커밋 안 됨, 커밋된 파일·로그·data에 .env 값(8자 이상)이 없음, 흔한 키 모양(sk-ant- 등) 0건
+#                  (버킷 이름처럼 비밀이 아닌 설정 값은 NON_SECRET_ENV_KEYS에 키 이름으로 적어 뺀다)
 #   4 AI 로그      ai-calls.jsonl에 글 내용 칸이 없고 연락처·메일 모양이 없음
 #   5 가상 데이터  data/에 실제 학번 모양(20으로 시작하는 9자리) 0건, 메일은 example.com·noreply만
 #   6 토큰         토큰 없이·X-User 헤더만·가짜 토큰으로 부르면 「로그인이 필요해요」
@@ -39,7 +40,13 @@ def git(*args):
 
 
 def tracked_files():
-    return [ROOT / p for p in git("ls-files").splitlines() if p]
+    # -z: 한글 이름 파일(docs/운영노트.md 등)을 git이 "\354\234…"로 감싸 내보내면 is_file()이 거짓이라 검사에서 빠진다
+    return [ROOT / p for p in git("ls-files", "-z").split("\0") if p]
+
+
+# .env에 있어도 비밀이 아닌 설정 값(버킷 이름·주소·지역·접두사). 문서·시험·README에 그대로 적혀 있어도 노출이 아니다.
+# 키 이름으로만 뺀다 — 목록에 없는 이름(키·비번 등)은 값이 어디 나와도 실패. 새 설정 값이 생기면 여기에 적는다.
+NON_SECRET_ENV_KEYS = {"NCP_OS_BUCKET", "NCP_OS_ENDPOINT", "NCP_OS_REGION", "NCP_OS_PREFIX"}
 
 
 # ---------- 1·6: 임시 서버로 실제 HTTP 요청 ----------
@@ -66,6 +73,9 @@ def check_access_and_tokens():
     srv, base = start_server()
     try:
         junior, senior, other = sessions.issue("H0143"), sessions.issue("H0469"), sessions.issue("H0745")
+        # 새 쪽지 요청은 「선배 추천 열림」(demand.py) 뒤에만 보낼 수 있다. 안 열면 요청이 잠김으로 막혀 threadId가 없고,
+        # 남의 쪽지 접근도 「쪽지가 없어서」 거절되는 헛 통과가 된다. 보낸 사람·남(other) 둘 다 열어 둬서 거절 이유를 소유자 검사로 좁힌다.
+        store.load("demands", []).extend({"id": f"R-{h}", "owner": h} for h in ("H0143", "H0745"))
         # 후배1 → 선배1 쪽지 요청, 후배1 내 경험노트 초안 하나
         sent = call(base, "sendMessage", {"to": "H0469", "text": "마르부르크 파견 준비가 궁금해요."}, junior)
         tid = sent.get("threadId")
@@ -85,8 +95,14 @@ def check_access_and_tokens():
         r = call(base, "getIssuedReport", {"reportId": "R-0001"}, junior)
         denied.append(("학생이 발행 리포트", "error" in r))
         bad = [n for n, ok in denied if not ok]
-        add(1, "남의 기록 직접 입력 → 거절", not bad and bool(tid),
-            "6가지 모두 거절" if not bad else "거절 안 됨: " + ", ".join(bad))
+        # 대조군: 당사자(보낸 후배·받은 선배)에게는 그 쪽지가 보인다 — 아니면 위 거절이 「원래 없는 쪽지」라서일 수 있다
+        own = [tid in [t["threadId"] for t in call(base, "getMessages", {}, tok).get("threads", [])] for tok in (junior, senior)]
+        if not tid:
+            add(1, "남의 기록 직접 입력 → 거절", False, "점검용 쪽지 요청이 만들어지지 않음: " + str(sent.get("reason") or sent.get("error") or sent))
+        elif not all(own):
+            add(1, "남의 기록 직접 입력 → 거절", False, "당사자에게도 쪽지가 안 보여 거절을 가릴 수 없음")
+        else:
+            add(1, "남의 기록 직접 입력 → 거절", not bad, "6가지 모두 거절(당사자 둘에게는 보임)" if not bad else "거절 안 됨: " + ", ".join(bad))
         add(1, "화면에서 남의 URL 직접 입력", True, "주소창에 남의 threadId·노트 id를 넣어 보기(화면 연결 뒤)", manual=True)
 
         tries = [("토큰 없음", call(base, "getMessages", {})),
@@ -138,7 +154,7 @@ def env_values():
         for line in lines:
             k, sep, v = line.strip().partition("=")
             v = v.strip().strip('"').strip("'")
-            if sep and not k.strip().startswith("#") and len(v) >= 8:
+            if sep and not k.strip().startswith("#") and k.strip() not in NON_SECRET_ENV_KEYS and len(v) >= 8:
                 vals.append(v)
                 try:   # VCC_LOGIN_PW(JSON)는 안의 비번 하나하나도 본다
                     vals += [str(x) for x in json.loads(v).values() if len(str(x)) >= 8]
@@ -148,7 +164,7 @@ def env_values():
 
 
 def check_secrets():
-    tracked = git("ls-files").splitlines()
+    tracked = [p for p in git("ls-files", "-z").split("\0") if p]
     add(3, ".env가 커밋 안 됨", not any(Path(p).name == ".env" for p in tracked), "저장소에 .env 없음")
     vals = env_values()
     key_like = re.compile(r"sk-ant-[A-Za-z0-9_\-]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|nv-[A-Za-z0-9]{24,}")
