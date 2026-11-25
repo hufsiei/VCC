@@ -11,6 +11,7 @@ store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"
 
 import notes
 import runtime_fns as rf
+rf._call_ai = lambda *a, **k: {"ok": True, "json": {"ok": True}}   # 시험은 실제 AI를 부르지 않는다(쪽지검사 연결, 작업 27)
 from account import getMe
 from runtime_fns import recommendSeniors, respondRequest, sendMessage, setRecommendable
 

@@ -13,6 +13,7 @@ store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"
 
 import runtime_fns as rf
 from runtime_fns import getInbox, getMessages, recommendSeniors, respondRequest, sendMessage
+rf._call_ai = lambda *a, **k: {"ok": True, "json": {"ok": True}}   # 시험은 실제 AI를 부르지 않는다(쪽지검사 연결, 작업 27)
 
 JUNIOR, SENIOR1, SENIOR2 = "H0143", "H0469", "H0241"
 MARBURG = "N-marburg"
@@ -182,6 +183,57 @@ expect("수락된 대화는 만료되지 않음", thread(JUNIOR, tid1)["status"]
 store.load("messages", {})["T-old"] = {"asker": "H0010", "senior": SENIOR1, "askerNickname": "조용한 고래",
                                         "status": "requested", "createdAt": rf.now(), "messages": [], "lastRead": {}}
 expect("옛 requested는 waiting으로 읽음", thread(SENIOR1, "T-old")["status"] == "waiting")
+
+# ── 쪽지검사 AI 연결(작업 27 후속): 가짜 callAI로 3경우 + 코드 규칙 우선 + 한도·캐시 ─────
+import limits
+calls = []
+
+
+def fake(reply):
+    def f(task, messages, system=None, **k):
+        calls.append((task, messages, system))
+        return reply
+    return f
+
+
+def ai_check(text, reply, me="H0999"):
+    rf._slander_cache.clear()
+    calls.clear()
+    rf._call_ai = fake(reply)
+    return rf.checkMessage(me, {"text": text}), len(calls)
+
+
+r, n = ai_check("그 정도도 몰라요?", {"ok": True, "json": {"ok": False, "reason": "비방"}})
+expect("AI 비방 판정: 막힘(reason 비방, 기존 모양)", r["ok"] is False and r["reason"] == "비방" and r["message"] and n == 1)
+expect("AI 호출: 작업명 쪽지검사·예시 대화·쪽지 원문", calls[0][0] == "쪽지검사" and calls[0][1][-1]["content"].startswith("쪽지: 그 정도도") and len(calls[0][1]) > 1)
+r, n = ai_check(HELLO, {"ok": True, "json": {"ok": True}})
+expect("AI 정상 판정: 통과", r == {"ok": True} and n == 1)
+for label, reply in [("호출 실패", {"ok": False, "json": None, "error": "boom"}), ("json 없음", {"ok": True, "json": None}),
+                     ("형식 오류", {"ok": True, "json": {"ok": "no"}}), ("엉뚱한 json", {"ok": True, "json": {"x": 1}})]:
+    r, n = ai_check(HELLO, reply)
+    expect(f"AI {label}: 통과로 보고 막지 않음", r == {"ok": True} and n == 1)
+r, n = ai_check("제 번호 010-1234-5678이에요", {"ok": True, "json": {"ok": True}})
+expect("코드 규칙에 걸리면 AI를 부르지 않음(연락처)", r["ok"] is False and r["reason"] == "연락처" and n == 0)
+r, n = ai_check("한심하네요", {"ok": True, "json": {"ok": True}})
+expect("금지어도 AI를 부르지 않음", r["ok"] is False and r["reason"] == "비방" and n == 0)
+r, n = ai_check(HELLO, {"ok": True, "json": {"ok": False, "reason": "비방"}}, me=None)
+expect("로그인 없는 호출은 AI를 부르지 않음(한도를 셀 수 없음)", r == {"ok": True} and n == 0)
+# 같은 글을 checkMessage → sendMessage로 이어 보내면 AI는 한 번(5분 캐시)
+r, n = ai_check(HELLO, {"ok": True, "json": {"ok": True}})
+rf.checkMessage("H0999", {"text": HELLO})
+expect("같은 글 두 번째는 캐시(AI 1회)", len(calls) == 1)
+# 한도: 분당 10 넘으면 AI 없이 통과, 한도 카운트는 AI를 부를 때만
+store_usage = store.load("aiUsage", {})
+store_usage.pop("H0888", None)
+rf._call_ai = fake({"ok": True, "json": {"ok": True}})
+rf._slander_cache.clear()
+calls.clear()
+for i in range(12):
+    rf.checkMessage("H0888", {"text": f"{HELLO} {i}"})
+expect("분당 한도 10회: 11번째부터 AI 안 부르고 통과", len(calls) == limits.PER_MINUTE)
+r = rf.checkMessage("H0888", {"text": HELLO + " 한도 뒤"})
+expect("한도 뒤에도 쪽지는 통과", r == {"ok": True})
+rf._call_ai = lambda *a, **k: {"ok": True, "json": {"ok": True}}
 
 print()
 if fails:
