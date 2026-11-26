@@ -651,6 +651,15 @@ expect("「꼭 확인」 안내는 lines에 넣지 않음(근거 번호 없는 �
 res, _ = run("독일에서 교환학생 장학금 받은 사람이 있나? 독일 현지 대학교에서 주는 장학금 말이야", [], plan=None)
 expect("현지 대학 장학금(Q-38 근거 길) → 「그 대학 안내」 확인 안내", res["status"] != "official"
        and "그 대학 안내" in (res.get("officialCheck") or {}).get("message", ""), (res["status"], res.get("officialCheck")))
+# [11/26 미리 결정] 학점 인정 경험 → 선배 답 + 「학과 사무실에서 꼭 확인」(연락처 없음 — departments.json에 학과 사무실 없음)
+for q in ["마르부르크에서 들은 수업 학점 인정 받을 때 주의할 점 있어요?", "리옹3 대학 학점 인정 받을 때 챙길 서류 있어요?"]:
+    res, _ = run(q, [], plan=None)
+    chk = res.get("officialCheck") or {}
+    expect(f"학점 인정 경험: 「{q}」 → 선배 답 + 「학과 사무실에서 꼭 확인」, 전화 없음", res["status"] == "ok"
+           and "학과 사무실에서 꼭 확인해 주세요." in chk.get("message", "") and "문의" not in chk.get("message", "")
+           and "officialPhone" not in chk, (res["status"], chk))
+res, _ = run("국내 인턴십 학점 인정 신청은 언제까지예요?", [], plan=None)
+expect("학점 인정 신청(규정 표현)은 official 그대로(확인 안내 없음)", res["status"] == "official" and "officialCheck" not in res, res)
 res, _ = run("하이델베르크대학교 파견 서류 뭐 내요?", [], plan=None)
 expect("보류여도 지원 서류 질문이면 확인 안내", res["status"] == "hold" and res.get("officialCheck"), res)
 askboo.callAI = make_fake()
@@ -660,7 +669,7 @@ expect("「질문함에 담기」(force hold)에는 확인 안내 없음", "offi
 for q in ["마르부르크 가면 한 달 생활비 얼마나 들어요?", "마르부르크 기숙사비 한 달에 얼마예요?", "이날코 교환학생 기숙사 있어요?",
           "마르부르크 수강신청은 어떻게 해요?", "마르부르크대 공항에서 학교까지 어떻게 가요?", "볼로냐대학교 교환 가기 전에 알아 두면 좋은 팁 있어요?",
           "리스본종합대학교 방 구할 때 예산은요?", "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?", "파견 대학에서 몇 학점 수강했어요?",
-          "보통 독일 대학교에서 몇학점 들어?", "리옹3 대학 학점 인정 받을 때 챙길 서류 있어요?", "코임브라대학교 공항에서 학교까지 교통편은?"]:
+          "보통 독일 대학교에서 몇학점 들어?", "코임브라대학교 공항에서 학교까지 교통편은?"]:
     res, _ = run(q, [], plan=None)
     expect(f"과잉 안내 없음: 「{q}」", "officialCheck" not in res, res.get("officialCheck"))
 expect("official 응답에는 officialCheck 없음(문구에 이미 연락처)", "officialCheck" not in run("파견 장학금은 얼마 받아요?", [], plan=None)[0])
