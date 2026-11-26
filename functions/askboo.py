@@ -34,7 +34,8 @@
 #        다 버려지면 답쓰기가 가리킨 원문 문장을 인용(fallback_lines → 변환 HCX). 답쓰기가 실패하면 위 옛 길로.
 #
 # AI는 ai.py의 callAI로만 부른다. 프롬프트 원문은 docs/prompts/askBoo-고르기.txt, askBoo-변환.txt.
-# hold·official 질문은 runtime_fns.add_question으로 질문함에 저장한다.
+# hold·official 질문은 runtime_fns.add_question으로 질문함에 저장한다. [작업 116] 저장 전 관문(_save → _gate): 알고 싶은 말만,
+#   연락처·학번·메일·금지어(msg_check)·비방(HCX 쪽지검사)이 들면 담지 않고 chat 문구로.
 import json
 import os
 import re
@@ -64,6 +65,29 @@ HOLD_NO_TOPIC = "{program} 해봤노트에는 아직 이 내용이 없어요. �
 HOLD_SAVED = "질문함에 담아 두었어요. 선배가 답하면 알려 드릴게요."
 HOLD_EXTRA_TAIL = "질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?"   # [작업 106] 비교과 사실 답 뒤
 MAX_NOTES = 5        # status "notes"로 보여 주는 노트 카드 수 상한
+
+# ── [11/26 작업 116] 질문함에 담기 전 관문 ─────────────────────────────────
+# 질문함 글은 선배 인터뷰에 「후배가 이렇게 물었어요」로 그대로 나간다(공개 서버 Q-0036 「너 되게 멍청하구나」).
+#   ① 알고 싶은 것이 있는 말만 담는다 — 질문정리의 「궁금」(AI 판단), 질문정리 전(규정 정규식 길)·실패 때(v1)는 WANT_RE.
+#      물음표 하나로 정하지 않는다(「?」「너 되게 멍청하구나?」).
+#   ② 담는 입구(_save) 한 곳에서 연락처·학번·메일·금지어(msg_check, 코드) → 비방(HCX 쪽지검사, 담길 때만 1회).
+#      걸리면 담지 않고 이유를 chat 문구로 돌려준다(코드 고정 문구, AI 없음). force: "hold"(칩 「질문함에 담기」)도 같은 관문.
+WANT_RE = re.compile(
+    r"궁금|알고\s*싶|알려|가르쳐|모르겠|몰라|여쭤|물어\s*보|질문"
+    r"|어때|어땠|어떤|어떻|어떡|어느|어디|언제|얼마|몇|뭐|뭘|무엇|무슨|누가|누구|왜"
+    r"|추천|소개|방법|가능|수\s*(가\s*)?있|되나|될까|나요|까요|는지|은지|인지|던가|(있|없)(나|니|냐|을까)"
+    r"|[가-힣]요\s*\?|[가-힣](?<!구)(니|냐|나|가|까|어|래|지)\s*\?\s*$")   # 「멍청하구나?」는 감탄
+SAVE_NOT_WANT = "무엇이 궁금한지 조금 더 구체적으로 물어봐 주세요. 예: 「마르부르크 기숙사 어땠어요?」"
+SAVE_BLOCKED = {
+    "연락처": "전화번호·메일·SNS 아이디 같은 연락처가 든 말은 질문함에 담지 않아요. 그 부분을 빼고 다시 물어봐 주세요.",
+    "학번": "학번이 든 말은 질문함에 담지 않아요. 그 부분을 빼고 다시 물어봐 주세요.",
+    "비방": "다른 사람을 깎아내리는 말은 질문함에 담지 않아요. 궁금한 것을 적어 주시면 선배 이야기로 찾아볼게요.",
+}
+
+
+def wants_to_know(question):
+    """[작업 116] 질문정리 없이 정하는 「알고 싶은 것이 있는 말」(규정 정규식 길·v1 경로)."""
+    return bool(WANT_RE.search(question or ""))
 
 # [11/23] 사람을 찾는 질문(「네덜란드 교환 다녀온 선배?」) — 주제어가 없으면 답 대신 해봤노트 카드로 안내한다
 # [11/23] 「다녀온 선배」 뒤에 있는지·누구인지를 묻는 말이 올 때만 사람 찾기로 본다.
@@ -363,8 +387,9 @@ def _answer(me, payload, save, trace=None):
         if program:   # [Q-44] 칸까지 남긴다 — 「궁금한 것 정리하기」가 분야부터 다시 묻지 않게(못 정하면 None)
             from demand import guess_section   # demand → runtime_fns → askboo로 이어지므로 쓸 때 불러온다
             section = guess_section(question, program)
-        return _hold(me, question, program, section, save, why="담기")
+        return _hold(me, question, program, section, save, why="담기")   # [작업 116] 관문은 _save에서(궁금 판단은 안 함 — 칩으로 직접 담음)
 
+    want = wants_to_know(question)   # [작업 116] 질문정리 전·실패 때의 「알고 싶은 말」. 질문정리가 되면 그 「궁금」으로 바꾼다
     # [11/24 작업 87] 앞 턴(과 이번 말)에서 「○○ 말고」로 뺀 프로그램 — 이번 말이 그 이름을 다시 부르지 않으면 계속 뺀다
     excluded = carried_exclusions(question, history)
 
@@ -384,7 +409,7 @@ def _answer(me, payload, save, trace=None):
     # ①′ 규정 질문 → 공식 안내 (정규식이 먼저 — 보수 규칙, HCX 원칙 v3 5절)
     if is_official(question):
         trace["route"] = "규정(정규식)"
-        return _official(me, question, programs, save)
+        return _official(me, question, programs, save, want=want)
 
     # ①‴′ [11/26] 인원·순위 질문(「독일 7+1 가장 많이 간 대학교」) → 학적의 파견대학을 코드가 세어 답한다(AI 없음).
     #     비교(「어느 학교가 제일 많이」)보다 먼저 본다
@@ -443,9 +468,10 @@ def _answer(me, payload, save, trace=None):
     trace["route"] = "질문정리" if plan else "v1(질문정리 실패)"
     effective = question
     if plan:
+        want = plan["궁금"]
         if plan["의도"] == "규정":
             if not local_scope(question):
-                return _official(me, question, programs, save)
+                return _official(me, question, programs, save, want=want)
             plan["의도"] = "경험질문"   # [Q-38] 현지·파견 대학 이야기는 질문정리가 규정이라 해도 근거 길로(정규식과 같은 기준)
         # [11/26 Q-38] 「장학금 받은 사람이 있나?」처럼 주제어가 있는 사람 찾기는 경험 질문(①″ 정규식 길과 같은 기준 —
         #   사람 찾기 카드는 주제어가 없을 때만). 근거가 없으면 카드 대신 보류 → 질문함
@@ -478,7 +504,7 @@ def _answer(me, payload, save, trace=None):
                 found.pop("_route", None)
                 return found
             return _hold(me, question, programs[0] if programs else None, plan["칸"], save, why="탐색 결과 없음",
-                         place=_place(country or plan["나라"], programs))
+                         place=_place(country or plan["나라"], programs), want=want, history=history)
         if not programs and plan["분야"] and plan["제외"]:
             # 「코트라 말고 무역 인턴」처럼 제외하고 남는 프로그램이 없으면 그 분야 노트 목록으로
             found = _explore(plan, [], country or plan["나라"], question)
@@ -490,7 +516,7 @@ def _answer(me, payload, save, trace=None):
 
     # ① 프로그램이 없으면 보류
     if not programs:
-        return _hold(me, question, None, None, save, why="프로그램 없음")
+        return _hold(me, question, None, None, save, why="프로그램 없음", want=want, history=history)
     # [11/26 Q-38] 나라로 여러 학교를 잡았으면 보류 문구를 나라 단위로(「독일 해봤노트에는 …」).
     #   programs[0]은 근거가 가장 많은 학교일 뿐이라 학교 이름으로 말하면 그 학교만 본 것처럼 읽힌다(실서버 「독일 학비 알려줘」)
     place = _place(country, programs)
@@ -505,7 +531,7 @@ def _answer(me, payload, save, trace=None):
     #     답쓰기가 실패(형식·호출)하면 None → 아래 옛 길(추출 → 고르기 → 답쓰기 → 원문 인용) 그대로
     if ask_full():
         trace["route"] = (trace.get("route") or "") + "·전문"
-        found = _answer_full(me, question, effective, programs, plan, save, place, spec)
+        found = _answer_full(me, question, effective, programs, plan, save, place, spec, want=want)
         if found is not None:
             return found
         trace["route"] += "→옛 길"
@@ -514,18 +540,18 @@ def _answer(me, payload, save, trace=None):
     cands, section, why = extract(effective if effective == question else f"{question} {effective}", programs,
                                   section_hint=plan["칸"] if plan else None)
     if not cands:
-        return _hold(me, question, programs[0], section, save, why=why, place=place)
+        return _hold(me, question, programs[0], section, save, why=why, place=place, want=want)
 
     # ④ 고르기 (HCX)
     picked, why = pick(effective, cands)
     if not picked:
-        return _hold(me, question, programs[0], section, save, why=why, place=place)
+        return _hold(me, question, programs[0], section, save, why=why, place=place, want=want)
 
     # ⑤ 답쓰기 + ⑥ 검증 (v2) → 다 버려지면 v1 원문 인용
     # [11/24 작업 87] 답쓰기가 {"답":[]}(근거가 질문에 안 맞음)를 내면 원문을 답처럼 보여 주지 않고 보류한다
     out = compose(effective, picked, on_empty=EMPTY_ANSWER)
     if out is EMPTY_ANSWER:
-        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음", place=place)
+        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음", place=place, want=want)
     if out is None:
         out = fallback_lines(picked)
     out["noteId"] = notes.note_id(picked[0]["program"])
@@ -533,16 +559,16 @@ def _answer(me, payload, save, trace=None):
     return out
 
 
-def _answer_full(me, question, effective, programs, plan, save, place=None, spec=None):
+def _answer_full(me, question, effective, programs, plan, save, place=None, spec=None, want=True):
     """[11/26 A안] 전문 길. 돌려주는 값: 응답 사전, 또는 None(답쓰기 실패 — 부르는 쪽이 옛 길로).
     spec: [작업 35] _overlap_start가 미리 시작한 답쓰기. 프로그램·근거 글이 같으면 그 결과를 쓴다."""
     paras, why = full_evidence(effective if effective == question else f"{question} {effective}", programs)
     section = "근무조건" if why.startswith("인터뷰로만") else (plan["칸"] if plan else None)
     if not paras:
-        return _hold(me, question, programs[0], section, save, why=why, place=place)
+        return _hold(me, question, programs[0], section, save, why=why, place=place, want=want)
     out, quotes = compose_full(effective, paras, written=_overlap_take(spec, programs, paras))
     if out is EMPTY_ANSWER:
-        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음", place=place)
+        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음", place=place, want=want)
     if out is None:
         if not quotes:          # 답쓰기 호출·형식 실패 → 옛 길
             return None
@@ -667,7 +693,9 @@ def clarify(question, history, excluded=()):
     # [11/24] 나라원문: 교환 나라 목록(COUNTRIES)에 없는 나라도 「0개」라고 답하려고 남긴다(한글 2~10자, 「…어」는 언어라 뺌)
     raw = j.get("나라").strip() if isinstance(j.get("나라"), str) else ""
     raw = raw if re.fullmatch(r"[가-힣]{2,10}", raw) and not raw.endswith("어") and raw in question else None
-    return {"의도": j["의도"], "분야": j.get("분야") if j.get("분야") in FIELDS else None, "나라": country,
+    # [작업 116] 궁금: 알고 싶은 것이 있는 말인지(AI 판단). 빠지거나 참·거짓이 아니면 정규식(wants_to_know)으로
+    want = j["궁금"] if isinstance(j.get("궁금"), bool) else wants_to_know(question)
+    return {"의도": j["의도"], "분야": j.get("분야") if j.get("분야") in FIELDS else None, "나라": country, "궁금": want,
             "나라원문": country or raw,
             "프로그램후보": names("프로그램후보"), "제외": names("제외"), "칸": section, "정리된질문": asked}
 
@@ -715,7 +743,8 @@ def _chat(plan, history):
     else:
         message = "무엇이 궁금한지 조금 더 구체적으로 물어봐 주세요. 예: 「마르부르크 기숙사 어땠어요?」"
         chips.append({"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field}})
-    chips.append({"label": "질문함에 담기", "action": "save", "payload": {"question": plan["정리된질문"]}})
+    if plan.get("궁금"):   # [작업 116] 알고 싶은 것이 있는 말에만(욕·혼잣말·「?」에는 칩 없음)
+        chips.append({"label": "질문함에 담기", "action": "save", "payload": {"question": plan["정리된질문"]}})
     return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "message": message, "chips": chips}
 
 
@@ -840,7 +869,8 @@ def _exists(plan, history):
         message = f"{head}{FIELD_NOUN[field]}가 {len(pool)}개 있어요. 궁금한 노트를 둘러보세요."
     else:
         return None
-    chips.append({"label": "질문함에 담기", "action": "save", "payload": {"question": plan["정리된질문"]}})
+    if plan.get("궁금"):   # [작업 116] 알고 싶은 것이 있는 말에만(욕·혼잣말·「?」에는 칩 없음)
+        chips.append({"label": "질문함에 담기", "action": "save", "payload": {"question": plan["정리된질문"]}})
     return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "message": message, "chips": chips}
 
 
@@ -2196,9 +2226,10 @@ def _contact(dept):
     return f"문의: {dept.get('부서명', '담당 부서')} {phone}" if phone else ""
 
 
-def _official(me, question, programs, save):
+def _official(me, question, programs, save, want=True):
+    """[작업 116] 관문(_save)에 걸리면 질문함에 담지 않는다(questionId None) — 공식 안내 문구는 그대로."""
     dept = _dept(question, programs)
-    qid = _save(me, question, programs[0] if programs else None, None, "official", save)
+    qid, _ = _save(me, question, programs[0] if programs else None, None, "official", save, want=want)
     contact = _contact(dept)
     out = {"status": "official", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": False,
            "_program": programs[0] if programs else None,
@@ -2267,10 +2298,21 @@ def _place(country, programs):
     return country if country and len(programs) > 1 else None
 
 
-def _hold(me, question, program, section, save, why="", place=None):
+def _hold(me, question, program, section, save, why="", place=None, want=True, history=None):
     """place: [Q-38] 나라 단위 보류(「독일 해봤노트에는 …」). 이때 한 학교 노트 링크(noteId)는 주지 않는다.
-    질문함에는 지금처럼 program(근거가 가장 많은 학교)으로 담는다."""
-    qid = _save(me, question, program, section, "hold", save)
+    질문함에는 지금처럼 program(근거가 가장 많은 학교)으로 담는다.
+    [작업 116] want·관문: 알고 싶은 말이 아니거나 연락처·비방이 들면 담지 않고 chat 문구(_not_saved)로 돌려준다.
+    history: 질문에서 프로그램을 못 정했으면 바로 앞 턴의 프로그램으로 담는다(_saved_program, 못 정하면 None).
+    문구·noteId는 이번에 찾은 program으로만 정한다(앞 턴 프로그램의 노트를 찾아본 것이 아니므로)."""
+    saved, saved_section = program, section
+    if not program and history:
+        saved = _saved_program(question, history)
+        if saved and not section:
+            from demand import guess_section   # demand → runtime_fns → askboo로 이어지므로 쓸 때 불러온다
+            saved_section = guess_section(question, saved)
+    qid, blocked = _save(me, question, saved, saved_section, "hold", save, want=want)
+    if blocked:
+        return _not_saved(blocked, program)
     if why == "담기":
         message = HOLD_SAVED
     elif not program:
@@ -2292,11 +2334,51 @@ def _hold(me, question, program, section, save, why="", place=None):
     return out
 
 
-def _save(me, question, program, section, status, save):
-    if not save:
-        return None
+def _save(me, question, program, section, status, save, want=True):
+    """질문함에 담는 입구 한 곳. 돌려주는 값: (questionId 또는 None, 담지 않은 이유 문구 또는 None).
+    [작업 116] 관문(_gate)은 save=False(평가)여도 코드 규칙까지는 같게 본다 — 비방 AI 판정만 실제로 담을 때."""
+    blocked = _gate(me, question, save, want)
+    if blocked or not save:
+        return None, blocked
     from runtime_fns import add_question
-    return add_question(me, question, program=program, section=section, status=status)
+    return add_question(me, question, program=program, section=section, status=status), None
+
+
+def _gate(me, question, save, want=True):
+    """[작업 116] 담기 전 관문. None(담아도 됨) 또는 이유 문구(SAVE_NOT_WANT·SAVE_BLOCKED).
+    순서: 알고 싶은 말인지 → 학번·연락처·메일·금지어(msg_check, 코드) → 비방(HCX 쪽지검사, save일 때만 1회)."""
+    if not want:
+        return SAVE_NOT_WANT
+    from msg_check import _kinds, check_message
+    r = check_message(question)
+    if not r["ok"]:
+        return SAVE_BLOCKED[r["reason"]]
+    if "메일" in _kinds(question):   # 쪽지는 메일을 허용하지만 질문함 글은 선배 인터뷰에 그대로 나간다
+        return SAVE_BLOCKED["연락처"]
+    if save and _slander(question):
+        return SAVE_BLOCKED["비방"]
+    return None
+
+
+def _slander(question):
+    """[작업 116] 비방 판정 — 쪽지검사(HCX)와 같은 프롬프트(docs/prompts/쪽지검사.txt). 비방이면 True.
+    호출 실패·형식 오류는 False(통과, runtime_fns._slander_by_ai와 같은 기준 — AI 장애로 질문이 막히지 않게).
+    askBoo 요청 1건은 입구(local_fn·main)에서 한도를 이미 셌으므로 여기서 다시 세지 않는다. 원문 가리기는 callAI 입구."""
+    try:
+        system, shots = load_prompt("쪽지검사")
+        out = callAI("쪽지검사", shots + [{"role": "user", "content": f"쪽지: {question}\n출력:"}], system)
+    except Exception as e:   # 시험용 가짜 callAI가 모르는 작업이어도 통과
+        print(f"[vcc] 질문함 쪽지검사 건너뜀: {type(e).__name__}")
+        return False
+    j = out.get("json") if out.get("ok") else None
+    return isinstance(j, dict) and j.get("ok") is False
+
+
+def _not_saved(message, program=None):
+    """[작업 116] 관문에 걸린 말 — 담지 않고 chat(코드 고정 문구 + 해봤노트 둘러보기 칩). 응답 모양은 기존 chat 그대로."""
+    field = PROGRAMS.get(program, {}).get("분야") if program else None
+    return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "message": message,
+            "chips": [{"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field}}], "_program": program}
 
 
 _FREQUENT_BIGRAMS.update(_frequent_bigrams())   # 근거를 다 읽은 뒤 한 번만 센다
