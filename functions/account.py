@@ -3,6 +3,7 @@
 #
 #   login(me, {id, pw})  — 환경변수 VCC_LOGIN_PW(JSON {"학번":"비번"})와 대조하고 토큰을 발급한다(작업 73).
 #                          students.json의 비번 열은 읽지 않는다. 로그인 전이라 me는 비어 있다.
+#                          계정마다 1분에 5번 틀리면 60초 막는다(limits.login_*, 작업 38). 성공은 세지 않는다.
 #   logout(me, {token})  — 토큰을 폐기한다.
 #   getMe(me, {})        — 내 학생 행(번호·비번 제외) + 이수 기록 3종(시트 헤더 그대로, 본문 칸 제외)
 import paths
@@ -11,11 +12,17 @@ import re
 import os
 from pathlib import Path
 
+import limits
 import sessions
 from runtime_fns import student
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 FAIL = {"ok": False, "reason": "아이디 또는 비밀번호가 맞지 않아요."}
+
+
+def locked(wait):
+    """[작업 38] 실패 한도에 걸린 계정. retryAfter = 다시 시도할 수 있을 때까지 남은 초."""
+    return {"ok": False, "reason": f"로그인 시도가 많아요. {wait}초 뒤에 다시 시도해 주세요.", "retryAfter": wait}
 HIDDEN = {"번호", "비번"}   # 응답에 넣지 않는 열(spec 0장)
 
 # 이수 기록에 담는 열(spec 4장 getMe 예시). 귀국보고서 문항·현장실습 후기 본문은 뺀다.
@@ -74,8 +81,17 @@ def login(me, p):
     expected = table.get(uid)
     if expected is None and uid.startswith("H"):   # 학생은 공용 비번("*")으로도 로그인. 직원은 반드시 개별 항목
         expected = table.get("*")
+    if row:   # [작업 38] 실패 한도 — 있는 계정만 센다(limits.py 「로그인 실패 한도」)
+        wait = limits.login_wait(uid)
+        if wait:
+            return locked(wait)
     if not row or expected is None or str(p.get("pw") or "") != str(expected):
+        if row:
+            wait = limits.login_failed(uid)
+            if wait:
+                return locked(wait)
         return FAIL
+    limits.login_ok(uid)
     token = sessions.issue(uid)
     if not uid.startswith("staff"):
         return {"ok": True, "user": {"colreg_no": uid, "status": "학생", "token": token}}
