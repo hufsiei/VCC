@@ -32,6 +32,7 @@
 #                                                   탭 4개 = 파일 4개(board-<이름>.html 창 · -queue · -decide · -pr .html), 스크립트는 묵은 경고 하나
 #                                                   끝난 창은 이 PC에서 그 세션이 열려 있을 때만 카드, 나머지는 접힌 「지난 창」(11/26 Q-61)
 #   schedule [--install [--every 2] | --remove]     작업 스케줄러로 html 자동 새로 만들기(등록은 미리 승인 뒤) · watch [--every 120] 백그라운드 대안
+#   serve [--port 8765]                             상태판 로컬 서버(127.0.0.1만). 새로고침할 때마다 html을 새로 만들어 돌려줌(11/26 Q-62, milstart가 백그라운드로 켬)
 #   queue                                           대기 작업 표 출력
 #   queue add --task "<작업번호 또는 –> <제목>" --files a,b --from milstart|파생|PR|직접 [--session <이름>] [--note "…"]
 #                                                   → 「Q-n 제안」(--from 직접은 「Q-n 승인」. 옛 값 「미리」도 직접과 같게 받음)
@@ -47,6 +48,7 @@
 # <폴더>는 "VCC-xxx" 또는 "C:\dev\VCC-xxx" 어느 쪽이든 된다.
 import argparse
 import html as H
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote
 import json
 import os
@@ -56,7 +58,9 @@ import string
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -393,6 +397,7 @@ def mine(r):
 PR_RE = re.compile(r"PR #(\d+)")
 PR_FIELDS = "number,state,mergedAt,title,author,createdAt,headRefName"
 _PRS = []                   # [] = 아직 안 읽음, 그 뒤로는 list 또는 None
+GH_NOTE = ""                # 서버가 gh를 못 읽어 지난 결과를 보일 때 한 줄(Q-62). 평소엔 빈 글
 
 
 def all_prs():
@@ -1062,7 +1067,8 @@ def card_html(st, r, states):
             + (f"<dl>{dl}</dl>" if dl else "") + "</div>")
 
 
-def make_html(st, path=None):
+def make_html(st, path=None, pages=None):
+    """탭 파일 4개를 쓴다. pages(dict)를 주면 같은 내용을 서버용(탭 주소 /·/queue…, 자동 새로 읽기·묵은 경고 없음)으로 담는다."""
     path = Path(path or html_path())
     rows = st["rows"]
     states = pr_states(rows)
@@ -1131,28 +1137,38 @@ def make_html(st, path=None):
         "pr": f"<h2>열린 PR</h2>\n{pr_html}",
     }
     made = int(time.time() * 1000)
-    for k, label in TABS:
+
+    def page(k, label, serving):
         tabs = "".join(
-            f'<a class="tab{" on" if j == k else ""}" href="{quote(tab_path(path, j).name)}" data-tab="{j}">'
+            f'<a class="tab{" on" if j == k else ""}" href="{SERVE_PATH[j] if serving else quote(tab_path(path, j).name)}" data-tab="{j}">'
             f'<b>{e(tab_n[j])}</b><span>{e(t)}</span><small>{e(tab_sub[j])}</small></a>' for j, t in TABS)
-        doc = f"""<!doctype html>
+        if serving:       # 서버: 새로고침이 곧 갱신이라 자동 새로 읽기·묵은 경고는 뺀다
+            refresh, stale, how = "", "", "새로고침하면 최신 · 이 PC 서버"
+        else:
+            refresh = '<meta http-equiv="refresh" content="60">\n'
+            stale = (f'<p class="stale" id="stale" data-made="{made}" hidden>⚠ 만든 지 {STALE_MIN}분 넘음 — 자동 새로 만들기가 멈췄을 수 있어요(board.py html로 다시 만들기)</p>\n'
+                     f'<script>{STALE_JS}</script>\n')
+            how = "60초마다 새로 읽음(고른 탭 그대로)"
+        gh = f" · {GH_NOTE}" if GH_NOTE else ""
+        return f"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
-<meta http-equiv="refresh" content="60">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+{refresh}<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VCC 상태판 · {e(ME or path.stem)} · {e(label)}</title><style>{CSS}</style></head><body>
 <h1>VCC 상태판 · {e(ME or path.stem)}</h1>
-<div class="meta">{e(chief)} · 만든 때 {e(now())} ({e(HOST)}) · 60초마다 새로 읽음(고른 탭 그대로){f" · 안 보낸 전달 {unsent_n}건" if unsent_n else ""}</div>
-<p class="stale" id="stale" data-made="{made}" hidden>⚠ 만든 지 {STALE_MIN}분 넘음 — 자동 새로 만들기가 멈췄을 수 있어요(board.py html로 다시 만들기)</p>
-<script>{STALE_JS}</script>
-<nav class="tabs">{tabs}</nav>
+<div class="meta">{e(chief)} · 만든 때 {e(now())} ({e(HOST)}) · {how}{f" · 안 보낸 전달 {unsent_n}건" if unsent_n else ""}{gh}</div>
+{stale}<nav class="tabs">{tabs}</nav>
 <section class="panel" id="{k}">
 {panels[k]}</section>
 </body></html>
 """
+
+    for k, label in TABS:
         out = tab_path(path, k)
         tmp = out.with_suffix(".tmp.html")
-        tmp.write_text(doc, encoding="utf-8")
+        tmp.write_text(page(k, label, False), encoding="utf-8")
         os.replace(tmp, out)
+        if pages is not None:
+            pages[k] = page(k, label, True)
     return path
 
 
@@ -1208,6 +1224,111 @@ def cmd_watch(args):
         if args.once:
             return
         time.sleep(every)
+
+
+# ---------- 상태판 서버(11/26 Q-62) ----------
+# milstart가 백그라운드로 켠다(작업 스케줄러·방화벽 설정 없음). 127.0.0.1에서만 열린다(바깥 기기 접근 없음, functions/serve_screens.py와 같은 원칙).
+# 요청마다 상태판을 새로 읽어 html을 만들고(드라이브 html 파일도 함께 갱신) 그 탭을 돌려준다. gh 결과만 SERVE_GH_SEC초 캐시한다.
+# gh가 안 되면 지난 결과를 보이고 「gh 못 읽음」 한 줄을 적는다. 같은 포트에 board 서버가 이미 있으면 새로 띄우지 않는다.
+SERVE_PORT = 8765
+SERVE_GH_SEC = 25
+SERVE_PATH = {"win": "/", "queue": "/queue", "decide": "/decide", "pr": "/pr"}
+SERVE_PING = "VCC-board"
+_serve_lock = threading.Lock()
+_serve_last = [0.0]          # 마지막 gh 읽기 시각(time.time)
+_GOOD_PRS = []               # 마지막으로 gh가 잘 읽은 결과(없으면 빈 목록)
+
+
+def serve_refresh():
+    """gh 결과를 SERVE_GH_SEC마다 한 번만 새로 읽는다. 못 읽으면 지난 결과로 대신하고 GH_NOTE에 적는다. _serve_lock 안에서 부른다."""
+    global GH_NOTE
+    if time.time() - _serve_last[0] < SERVE_GH_SEC:
+        return
+    _serve_last[0] = time.time()
+    _PRS.clear(); _LIVE.clear()
+    prs = all_prs()
+    if prs is not None:
+        _GOOD_PRS[:] = [prs]
+        GH_NOTE = ""
+    elif _GOOD_PRS:
+        _PRS[0] = _GOOD_PRS[0]
+        GH_NOTE = f"gh 못 읽음 — {now()} 기준 지난 PR 결과 보여 줌"
+    else:
+        GH_NOTE = "gh 못 읽음"
+
+
+class _ServeHandler(BaseHTTPRequestHandler):
+    server_version = "VCC-board"
+
+    def log_message(self, *a):          # 콘솔을 요청마다 어지럽히지 않는다
+        pass
+
+    def do_GET(self):
+        route = self.path.split("?", 1)[0]
+        if route == "/__board":
+            return self._send(200, SERVE_PING, "text/plain")
+        key = next((k for k, p in SERVE_PATH.items() if p == route), None)
+        if key is None:
+            return self._send(404, "없는 주소 — / · /queue · /decide · /pr", "text/plain")
+        try:
+            with _serve_lock:
+                serve_refresh()
+                pages = {}
+                make_html(load(), pages=pages)
+        except Exception as ex:          # 드라이브가 잠깐 안 되면 이 요청만 실패(다음 새로고침에 다시)
+            return self._send(500, f"상태판을 만들지 못함: {ex}", "text/plain")
+        self._send(200, pages[key], "text/html")
+
+    def _send(self, code, body, ctype):
+        data = body.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", f"{ctype}; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+
+class _Server(ThreadingHTTPServer):
+    allow_reuse_address = False        # Windows의 SO_REUSEADDR은 이미 듣는 포트도 잡게 두므로 끈다(중복 서버 방지)
+
+
+def make_server(port):
+    """127.0.0.1에만 묶는다. port 0이면 빈 포트."""
+    return _Server(("127.0.0.1", port), _ServeHandler)
+
+
+def _fetch(port, route):
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))      # 시스템 프록시를 거치지 않는다
+    with opener.open(f"http://127.0.0.1:{port}{route}", timeout=10) as r:
+        return r.read().decode("utf-8", "replace")
+
+
+def _is_board(port):
+    try:
+        return _fetch(port, "/__board").strip() == SERVE_PING
+    except (OSError, ValueError):
+        return False
+
+
+def cmd_serve(args):
+    url = f"http://localhost:{args.port}/"
+    if _is_board(args.port):
+        print(f"이미 켜져 있음: {url} (새로고침하면 최신)")
+        return
+    try:
+        srv = make_server(args.port)
+    except OSError:
+        if _is_board(args.port):                   # 그사이 다른 창이 먼저 켰다
+            print(f"이미 켜져 있음: {url} (새로고침하면 최신)")
+            return
+        print(f"포트 {args.port}은 다른 프로그램이 쓰는 중 — board.py serve --port <다른 번호>", file=sys.stderr)
+        sys.exit(1)
+    print(f"상태판 서버: {url} (127.0.0.1만, 새로고침하면 최신)", flush=True)
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
 
 
 # ---------- 자체 시험 ----------
@@ -1580,6 +1701,41 @@ def cmd_selftest(args):
     run("check", "m.py", code=2)
     run("check", "f.py", first="겹치는 파일 없음")          # 「완료…」는 gh 없이도 끝남
     run("list", has="gh 못 읽음")
+    # 상태판 서버(Q-62): 127.0.0.1만 묶임 · 요청마다 새로 만듦 · 두 번째 serve는 중복으로 안 띄움
+    srv = make_server(0)
+    if srv.server_address[0] != "127.0.0.1":
+        fails.append(f"serve가 127.0.0.1이 아닌 주소에 묶임: {srv.server_address}")
+    srv.server_close()
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        sport = s.getsockname()[1]
+    sv = subprocess.Popen(me + ["serve", "--port", str(sport)], env=env,
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        t0 = time.time()
+        while not _is_board(sport) and time.time() - t0 < 15 and sv.poll() is None:
+            time.sleep(0.2)
+        if not _is_board(sport):
+            fails.append("serve가 켜지지 않음")
+        else:
+            first_pg = _fetch(sport, "/queue")
+            if 'href="/queue"' not in first_pg or 'http-equiv="refresh"' in first_pg:
+                fails.append("serve 페이지: 탭 주소가 /queue가 아니거나 자동 새로 읽기가 남음")
+            if "새 큐 시험" in first_pg:
+                fails.append("serve 시험 전에 없는 큐 줄이 보임")
+            run("queue", "add", "--task", "– 새 큐 시험", "--files", "r.py", "--from", "직접", has="승인")
+            if "새 큐 시험" not in _fetch(sport, "/queue"):
+                fails.append("serve가 큐 변경을 새로고침 뒤에 안 보여 줌")
+            if "http-equiv" in _fetch(sport, "/"):
+                fails.append("serve 페이지에 자동 새로 읽기(meta refresh)가 있음")
+            r2 = subprocess.run(me + ["serve", "--port", str(sport)], env=env, capture_output=True,
+                                text=True, encoding="utf-8", timeout=30)
+            if r2.returncode != 0 or "이미 켜져 있음" not in r2.stdout:
+                fails.append(f"두 번째 serve가 중복 확인 없이 뜸: {r2.returncode} {r2.stdout!r} {r2.stderr!r}")
+            print(f"통과 serve 127.0.0.1:{sport} · 새로고침·중복 확인")
+    finally:
+        sv.kill()
+        sv.wait()
     print(f"임시 폴더: {tmp}")
     if fails:
         print("\n실패 " + str(len(fails)) + "건:\n" + "\n".join(fails))
@@ -1621,6 +1777,9 @@ def main():
     w = sp.add_parser("watch", help="N초마다 html(작업 스케줄러 없이, 백그라운드로)")
     w.add_argument("--every", type=int, default=120, help="초(30 이상)"); w.add_argument("--once", action="store_true")
     w.set_defaults(fn=cmd_watch)
+    sv = sp.add_parser("serve", help="상태판 로컬 서버(127.0.0.1만, 새로고침마다 최신) — milstart가 백그라운드로 켬")
+    sv.add_argument("--port", type=int, default=SERVE_PORT)
+    sv.set_defaults(fn=cmd_serve)
 
     q = sp.add_parser("queue"); q.set_defaults(fn=cmd_queue)
     qs = q.add_subparsers(dest="qcmd")
