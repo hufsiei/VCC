@@ -515,6 +515,109 @@ for q in ("마무리를 어떻게 했어요?", "마르지 않게 보관하는 �
     expect(f"퍼지 반례: 「{q}」는 그대로", askboo.fix_names(q) == q, askboo.fix_names(q))
 expect("퍼지: 3글자 이름(말라가·밀라노)은 퍼지 대상 아님", all(len(t) >= askboo.FUZZY_MIN for c in askboo._FUZZY.values() for t, _, _ in c))
 
+# ── [작업 106] 비교과 이름 넓은 대조 · 근거 0 사실 답 · 유형 단위 질문 (#342 분류표, AI 없음) ─────────────
+import notes  # noqa: E402
+
+EX = {"직무탐색 교육 들을 만해요?": "한국외국어대학교 직무탐색 집중교육",
+      "북플 독서모임 활동하면 뭐 해요?": "[HUFS 북플] 북클럽(독서모임) 활동",
+      "GAT 해 보신 분 어땠어요?": "ISO 국제학생회 GAT 프로그램 수료자",
+      "잡콘서트 가면 뭘 얻어요?": "하계 글로벌 잡콘서트: 글로벌 커리어 로드맵, 재직 동문 선배에게 길을 묻다",
+      "NCS 수리 특강 도움 됐어요?": "[공기업 NCS 실시간 온라인 특강] NCS 수리능력",
+      "BYOI 나가 보신 분 후기요": "Bring Your Own Ideas(BYOI)",
+      "삼성 공채 프로그램 들으면 뭐가 좋아요?": "삼성 공채 대비 취업 프로그램",
+      "국정원 설명회 가 볼 만해요?": "국가정보원 채용설명회",
+      "네덜란드어과 대사관 특강은 뭘 알려 줘요?": "[특교원] 네덜란드 대사관 연계 특강",
+      "독서PT대회 예선 참가비 있어요?": "도서관 (제4회) 독서PT대회 예선",
+      # 사용 로그: 괄호 꼬리를 뗀 이름 · 부제를 뗀 이름(다른 비교과로 가지 않게)
+      "동문 초청 진로 취업 릴레이 특강 어떤 활동 해요?": "동문 초청 진로 취업 릴레이 특강(+한화생명 채용설명회)",
+      "25년 합격 자기소개서 취업특강 진로에 도움 됐어요?": "25년 합격 자기소개서 취업특강(커리어랩)"}
+for q, want in EX.items():
+    expect(f"비교과 넓은 대조: 「{q}」", askboo.match_programs(q) == [want], askboo.match_programs(q))
+for q in ("튜터링 프로그램은 어때요?", "멘토링 프로그램 해 본 사람 후기 있어요?", "취업 특강 중에 뭐가 제일 도움 돼요?",
+          "토익 스터디 비교과 해 보신 분 있어요?", "해커톤 참가 후기 알려 주세요", "예선 통과하려면 뭐 해요?",
+          "네덜란드 생활비 얼마예요?", "선배에게 길을 묻다", "자소서 어떻게 써요?", "교환 가기 전 특강 있어요?"):
+    expect(f"넓은 대조 반례(유형어·없는 활동·보통 말): 「{q}」 → 0개", askboo.extra_loose(q) == [], askboo.extra_loose(q))
+expect("넓은 대조는 교환·인턴 문맥 말이 있으면 안 봄", askboo.extra_loose("마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?") == []
+       and askboo.match_programs("마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?") == [PROGRAM])
+
+GAT = "ISO 국제학생회 GAT 프로그램 수료자"
+cover = notes.NOTES[notes.note_id(GAT)]
+res, calls = run("GAT 해 보신 분 어땠어요?", [], plan=None, answer=None)
+expect("근거 0 비교과 → 사실 답(세부·부서·이수 인원·만족도 + 경험담 없음)", res["status"] == "hold"
+       and f"이수 인원 {cover['completedCount']}명" in res["message"] and f"만족도 {cover['satisfaction']:g}점" in res["message"]
+       and "국제교류·버디 활동" in res["message"] and "국제교류팀" in res["message"] and askboo.EXTRA_NO_STORY in res["message"],
+       res.get("message"))
+expect("사실 답에도 그 노트 링크(noteId) — 노트에 이수 인원·만족도", res.get("noteId") == notes.note_id(GAT), res.get("noteId"))
+expect("사실 답은 답쓰기를 부르지 않음(근거 0)", "답쓰기" not in [c[0] for c in calls], [c[0] for c in calls])
+_saved = dict(cover)
+cover.pop("completedCount")
+cover.pop("satisfaction")
+_sat = askboo.PROGRAMS[GAT].pop("만족도(5점)")
+expect("데이터에 없는 값은 「–」(지어내지 않음)", "이수 인원 – · 만족도 –" in askboo.extra_facts(GAT), askboo.extra_facts(GAT))
+cover.update(_saved)
+askboo.PROGRAMS[GAT]["만족도(5점)"] = _sat
+res, _ = run("GAT 해 보신 분 어땠어요?", [], plan={"의도": "경험질문", "분야": "비교과", "나라": None, "프로그램후보": ["GAT"],
+                                             "제외": [], "칸": None, "정리된질문": "GAT 프로그램 후기"})
+expect("질문정리 길에서도 같은 사실 답(프로그램후보 「GAT」도 대조)", res["status"] == "hold" and askboo.EXTRA_NO_STORY in res["message"],
+       res.get("message"))
+
+TUTOR = {n for n in askboo.EXTRA if "튜터링" in n or "TUTORING" in n}
+res, calls = run("튜터링 프로그램은 어때요?", [], plan=None)
+expect("유형 단위 → 그 유형 비교과 카드(130개 풀, 근거 0이어도)", res["status"] == "notes" and res["notes"]
+       and {c["program"] for c in res["notes"]} == TUTOR and all(c["evidenceCount"] == 0 for c in res["notes"]), res)
+expect("유형 단위 문구: 개수 + 이수 인원 순", res["message"].startswith(f"튜터링 비교과는 {len(TUTOR)}개 있어요.") and "이수 인원" in res["message"],
+       res["message"])
+expect("유형 단위는 AI를 부르지 않음(질문정리 앞에서 코드가 답함)", calls == [], [c[0] for c in calls])
+res, _ = run("독일 튜터링 어때요?", [], plan=None)
+expect("나라 이름 + 유형 말(「독일 튜터링」)은 비교과 유형 길이 아님", res["status"] != "notes"
+       or not any(askboo.is_extra(c["program"]) for c in res["notes"]), res.get("message"))
+res, _ = run("버디 활동은 보통 뭐 해요?", [], plan=None)
+expect("버디 → 국제교류·버디 활동 세부 3개", res["status"] == "notes"
+       and {c["program"] for c in res["notes"]} == {n for n in askboo.EXTRA if askboo.PROGRAMS[n]["세부"] == "국제교류·버디 활동"}, res)
+res, _ = run("취업 특강 중에 뭐가 제일 도움 돼요?", [], plan=None)
+sats = [askboo.extra_sat(c["program"]) for c in res["notes"]]
+expect("「제일 도움」 → 만족도 순, 만족도로 본다고 밝힘", res["status"] == "notes" and sats == sorted(sats, reverse=True)
+       and "만족도로 보여 드려요" in res["message"] and all("취업" in c["program"] for c in res["notes"]), res.get("message"))
+
+res, _ = run("비교과 중에 만족도 제일 높은 건 뭐예요?", [], plan=None)
+best = max(askboo.extra_sat(n) for n in askboo.EXTRA)
+expect("만족도 순위는 코드가 셈(130개 중 최고점)", res["status"] == "notes" and askboo.extra_sat(res["notes"][0]["program"]) == best
+       and f"{best:g}점" in res["message"] and f"{len(askboo.EXTRA)}개 중" in res["message"], res.get("message"))
+res, _ = run("1학년이 들을 만한 비교과 추천해 주세요", [], plan=None)
+g1 = max(askboo._STU_GRADE.get(n, {}).get(1, 0) for n in askboo.EXTRA)
+expect("「1학년 추천」 → 1학년 때 이수한 인원 순(추천 순위는 없다고 밝힘)", res["status"] == "notes"
+       and askboo._STU_GRADE[res["notes"][0]["program"]][1] == g1 and "추천 순위는 따로 없어서" in res["message"], res.get("message"))
+res, _ = run("인적성검사랑 NCS 특강 중에 뭐가 나아요?", [], plan=None)
+expect("비교과 둘 비교 → 이수 인원·만족도 나란히(어느 쪽이 낫다고 하지 않음)", res["status"] == "notes"
+       and "인적성검사" in res["message"] and "NCS 특강 5개" in res["message"] and "말씀드리기 어려워요" in res["message"], res.get("message"))
+
+for plan in (None, {"의도": "사람찾기", "분야": "비교과", "나라": None, "프로그램후보": [], "제외": [], "칸": None, "정리된질문": "토익 스터디"}):
+    res, _ = run("토익 스터디 비교과 해 보신 분 있어요?", [], plan=plan)
+    expect(f"없는 프로그램 → 보류, 카드 없음({'질문정리' if plan else 'v1'})", res["status"] == "hold" and not res.get("notes")
+           and res["message"] == askboo.HOLD_NO_PROGRAM, res)
+# 실서버에서 늘 같은 2장이 나오던 길: 근거 있는 비교과 노트가 있어도 _explore가 그 노트만 고르지 않는다
+_ec = askboo.evidence_count
+askboo.evidence_count = lambda n: 3 if n in ("HUFS 동문멘토링 데이", GAT) else _ec(n)
+res, _ = run("자기계발 프로그램 뭐 있어요?", [], plan={"의도": "탐색", "분야": "비교과", "나라": None, "프로그램후보": [], "제외": [],
+                                              "칸": None, "정리된질문": "자기계발 프로그램 목록"})
+expect("비교과 탐색에 이름·유형이 안 맞으면 근거 있는 2장 대신 보류", res["status"] == "hold" and not res.get("notes"), res)
+res, _ = run("비교과 뭐 있어요?", [], plan={"의도": "탐색", "분야": "비교과", "나라": None, "프로그램후보": [], "제외": [],
+                                       "칸": None, "정리된질문": "비교과 목록"})
+expect("비교과 목록 → 130개 풀 이수 인원 순(근거 있는 노트 수도 말함)", res["status"] == "notes" and len(res["notes"]) == askboo.MAX_NOTES
+       and f"{len(askboo.EXTRA)}개 있어요" in res["message"] and "선배 경험담이 있는 노트는 2개" in res["message"], res.get("message"))
+askboo.evidence_count = _ec
+res, _ = run("비교과는 데이터가 아예 없나요?", [], plan={"의도": "탐색", "분야": "비교과", "나라": None, "프로그램후보": [], "제외": [],
+                                              "칸": None, "정리된질문": "비교과 데이터가 있나요?"})
+expect("「비교과 데이터 없나요?」 → 노트 130개(0개라고 하지 않음)", f"{len(askboo.EXTRA)}개 있어요" in (res.get("message") or ""), res)
+
+# 시연 대본(0:00 답 · 0:40 보류)은 그대로
+res, _ = run("마르부르크 생활비 얼마예요?", [], plan=None, answer=None)
+expect("시연 0:00 생활비 → 마르부르크 근거 답", res["status"] == "ok" and {s["program"] for s in res["sources"].values()} == {PROGRAM}, res.get("status"))
+res, _ = run("마부르크 파견 가려면 지원 서류는 뭘 준비해요?", [], plan=None, answer=None)
+expect("시연 0:00 지원 서류 → 마르부르크 근거 답", res["status"] == "ok" and {s["program"] for s in res["sources"].values()} == {PROGRAM}, res.get("status"))
+res, _ = run("마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?", [], plan=None)
+expect("시연 0:40 학기 중 현지 인턴 → 보류(비교과 사실 답 아님)", res["status"] == "hold" and askboo.EXTRA_NO_STORY not in res["message"], res)
+
 # ── 정리 ──────────────────────────────────────────────────────────────
 print()
 print("실패 %d개" % len(fails) if fails else "전부 통과")

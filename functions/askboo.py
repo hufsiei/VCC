@@ -62,6 +62,7 @@ HOLD_NO_PROGRAM = "질문에 맞는 해봤노트를 찾지 못했어요. 질문�
 HOLD_NO_TOPIC = "{program} 해봤노트에는 아직 이 내용이 없어요. 질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?"
 # [11/23] chat 칩 「질문함에 담기」(force: "hold") — 학생이 직접 담은 것이라 「못 찾았어요」라고 하지 않는다
 HOLD_SAVED = "질문함에 담아 두었어요. 선배가 답하면 알려 드릴게요."
+HOLD_EXTRA_TAIL = "질문함에 담아 두었어요. 닮은 선배에게 물어볼까요?"   # [작업 106] 비교과 사실 답 뒤
 MAX_NOTES = 5        # status "notes"로 보여 주는 노트 카드 수 상한
 
 # [11/23] 사람을 찾는 질문(「네덜란드 교환 다녀온 선배?」) — 주제어가 없으면 답 대신 해봤노트 카드로 안내한다
@@ -411,6 +412,13 @@ def _answer(me, payload, save, trace=None):
     if found:
         trace["route"] = "시기"
         return found
+    # ①⁗″ [11/26 작업 106] 비교과 유형 단위·순위·비교 질문(「튜터링 어때요?」「만족도 제일 높은 비교과」) — 코드가 센다(AI 없음)
+    #     나라 이름이 있으면(「독일 튜터링 어때요?」 — 파견 대학 이야기일 수 있음) 「비교과」라고 말했을 때만
+    found = extra_scope(question, [] if country else programs, excluded) \
+        if not country or EXTRA_WORD_RE.search(question) else None
+    if found:
+        trace["route"] = found.pop("_route")
+        return found
 
     # ① [v2] 질문 정리(AI). 실패하면 plan=None → 아래는 v1 경로 그대로
     plan = clarify(question, history, excluded)
@@ -448,15 +456,17 @@ def _answer(me, payload, save, trace=None):
         if plan["의도"] == "대화":
             return _chat(plan, history)
         if plan["의도"] in ("탐색", "사람찾기"):
-            found = _explore(plan, programs, country or plan["나라"])
+            found = _explore(plan, programs, country or plan["나라"], question)
             if found:
+                found.pop("_route", None)
                 return found
             return _hold(me, question, programs[0] if programs else None, plan["칸"], save, why="탐색 결과 없음",
                          place=_place(country or plan["나라"], programs))
         if not programs and plan["분야"] and plan["제외"]:
             # 「코트라 말고 무역 인턴」처럼 제외하고 남는 프로그램이 없으면 그 분야 노트 목록으로
-            found = _explore(plan, [], country or plan["나라"])
+            found = _explore(plan, [], country or plan["나라"], question)
             if found:
+                found.pop("_route", None)
                 return found
     elif excluded:   # 질문정리 실패(v1 경로)에도 앞에서 뺀 프로그램은 뺀다
         programs = [p for p in programs if p not in excluded]
@@ -695,10 +705,14 @@ def _kinds():
     return sorted({p["세부"] for p in PROGRAMS.values() if p.get("분야") == "현장실습" and p.get("세부")})
 
 
-def _explore(plan, programs, country):
-    """탐색·사람찾기: 답을 만들지 않고 노트 카드(최대 5, 근거 많은 순)로 안내한다. 현장실습을 나라로 물으면 기관 유형 칩."""
+def _explore(plan, programs, country, question=""):
+    """탐색·사람찾기: 답을 만들지 않고 노트 카드(최대 5, 근거 많은 순)로 안내한다. 현장실습을 나라로 물으면 기관 유형 칩.
+    [11/26 작업 106] 비교과는 근거 있는 노트(2개)만 고르지 않는다 — 유형·순위·목록은 extra_scope(130개 풀)가,
+    이름·유형이 하나도 안 맞으면 None(부르는 쪽이 보류). 예전에는 질문과 상관없이 늘 같은 2장이 나왔다(#342)."""
     field = plan["분야"]
     place = country or plan.get("나라원문")
+    if field == "비교과" and not programs:
+        return extra_scope(question, [], plan["제외"], field="비교과")
     if field == "현장실습" and place and not programs:
         # [11/24] 나라 노트 수를 먼저 말한다(코드가 셈). 근거에 그 나라가 나오는 인턴 노트가 있으면 카드로 함께
         mentions = [n for n in intern_mentions(place) if n not in plan["제외"]]
@@ -796,6 +810,11 @@ def _exists(plan, history):
             message += " 현장실습 노트는 기관 유형으로 나뉘어 있어요."   # chat은 유형 칩을 못 보여 줘서 「유형으로 찾아보세요」라고 하지 않는다
     elif program:
         message = f"{program} 해봤노트에는 선배 근거가 {evidence_count(program)}개 있어요. 궁금한 주제를 물어보시면 그 근거로 답해 드릴게요."
+    elif field == "비교과":   # [작업 106] 비교과 노트는 130개 — 근거(선배 경험담)가 0이어도 노트는 있다
+        pool = [n for n in EXTRA if n not in plan["제외"]]
+        k = len([n for n in pool if evidence_count(n)])
+        message = (f"{FIELD_NOUN[field]}는 {len(pool)}개 있어요. 선배 경험담이 있는 노트는 {k}개"
+                   + ("예요" if not k else " 있어요") + ". 노트에서 이수 인원·만족도를 볼 수 있어요.")
     elif field:
         pool = [n for n, p in PROGRAMS.items() if p.get("분야") == field and n not in plan["제외"] and evidence_count(n)]
         lab = _label(plan["제외"])
@@ -834,7 +853,361 @@ def match_programs(question):
     for t, names in sorted(hits, key=lambda h: -len(h[0])):
         names = [names] if isinstance(names, str) else list(names)
         found += [n for n in names if n in PROGRAMS and n not in found]
-    return found[:3]
+    if found:
+        return found[:3]
+    # [11/26 작업 106] 비교과 줄임말·부분 이름(「직무탐색 교육」「GAT」「국정원 설명회」) — 위 대조가 모두 0개일 때만
+    return extra_loose(question)
+
+
+# ── [11/26 작업 106] 비교과 이름 넓은 대조 (코드, AI 없음) ─────────────────────
+# #342 계측: 비교과 구어 질문 27문 중 10문이 줄임말·부분 이름이라 match_programs 0개 → 「해봤노트를 찾지 못했어요」.
+# 정식 이름을 낱말로 쪼개 군더더기(꾸밈 괄호 안 말·「프로그램」「수료자」·유형어)를 빼고, 남은 낱말이 질문에 있는지 본다.
+#   ① 낱말 맞음: 질문(띄어쓰기 지움)에 그 낱말이 들어 있음. 영문은 3자 이상 따로 쓴 낱말만(GAT·BYOI — OT·AI·IT는 안 봄)
+#   ② 앞부분 맞음: 질문 낱말이 이름 낱말의 앞 절반 이상(「수리」 → 수리능력). 이것만으로는 안 잡고 다른 낱말이 하나 더 맞아야 한다
+#   ③ 줄임말: 질문의 한글 3글자가 이름 낱말(4글자 이상)의 첫·끝 글자와 같고 가운데 글자가 그 사이에 있음(「국정원」 → 국가정보원)
+#   잡는 조건: 비교과 2곳 이하에만 있는 낱말(학과·나라 이름은 빼고)이 ①·③으로 맞거나 ②에 다른 낱말이 더해짐.
+#   여럿이면 드문 낱말(1/들어 있는 프로그램 수)의 합이 가장 큰 것, 같으면 3곳까지.
+#   유형어(튜터링·멘토링·특강 등)는 낱말로 세지 않는다 — 「튜터링 어때요?」는 프로그램 하나가 아니라 아래 extra_scope(유형 단위).
+#   교환·인턴 문맥 말(교환·파견·인턴·현장실습·대학교·기숙사 등)이 있으면 보지 않는다(나라·학교·인턴 대조가 먼저).
+#   짧은 낱말(2글자 한글)만 맞으면 비교과 말(특강·교육·활동·모임 등)이 질문에 있을 때만 잡는다(「예선 통과」는 안 잡음).
+EXTRA_TYPE_WORDS = ("특강", "프로그램", "교육", "과정", "활동", "멘토링", "튜터링", "탄뎀", "버디", "강좌", "설명회", "대회", "공모전",
+                    "캠프", "테라피", "코스", "워크숍", "상담", "컨설팅", "강연", "포럼", "세미나", "스터디", "동아리", "검사", "이벤트",
+                    "예술제", "영화제", "취업특강", "취업설명회", "채용설명회", "보충강좌", "집중강좌", "집중교육", "직무특강",
+                    "창업", "자격증", "경연", "독서", "강의")
+EXTRA_FILLER = {"수료자", "신청", "안내", "지원", "온라인", "실시간", "오프라인", "비대면", "집중", "초청", "연계", "현직자", "동문",
+                "취업", "진로", "채용", "대비", "한국외국어대학교", "hufs", "특교원", "서울캠퍼스", "하계", "동계", "여름방학",
+                "겨울방학", "방중", "방과후", "방과", "후", "초급", "중급", "고급", "초급반", "중급반", "초-중급", "중-고급", "반", "선발",
+                "예정", "및", "등", "이수", "참여", "대상", "까지", "선착순", "외국어", "전공", "학과", "학생", "선배", "직무",
+                "취업역량", "역량", "강화", "해외", "글로벌", "현지", "기업", "공기업", "대기업", "실무", "기초", "준비", "the", "and",
+                "for", "de", "em", "para", "program", "프로그램_튜티"}
+EXTRA_TYPE_SET = {_norm(w) for w in EXTRA_TYPE_WORDS}
+EXTRA_CUE_RE = re.compile("|".join(EXTRA_TYPE_WORDS) + r"|비교과|모임|클럽|콘서트|들을|들어|참가|참여|수강|수료|나가|나갔|해\s*보")
+EXTRA_BLOCK_RE = re.compile(r"교환|파견|유학|어학연수|인턴|현장실습|대학교|기숙사|비자|월세|생활비|학점\s*인정")
+_LANG_RE = re.compile(r".+(어과|어)$|^(네덜란드|이탈리아|포르투갈|스칸디나비아|브라질|벨기에|스웨덴|포르투갈어권|중남미|유럽)$")
+_PARTICLE_RE = re.compile(r"(이랑|랑|하고|에서|으로|로|은|는|이|가|을|를|에|도|의|와|과|만|요)$")
+
+
+def _extra_tokens(name):
+    """비교과 이름 → 낱말(소문자, 군더더기·유형어 뺌). 「[HUFS 북플] 북클럽(독서모임) 활동」 → 북플·북클럽·독서모임.
+    「:」 뒤 부제와 < > 안 강연 제목은 보지 않는다(「길을 묻다」「선배에게」 같은 보통 말이 낱말이 되지 않게)."""
+    core = re.sub(r"<[^>]*>", " ", name).split(":")[0]
+    words = re.split(r"[\s\[\]()<>「」『』:/&·․,_+~.!?'\"‐–—\-]+", core.lower())
+    out = []
+    for w in words:
+        w = w.strip()
+        if re.fullmatch(r"[가-힣]{3,}", w):
+            w = _PARTICLE_RE.sub("", w)   # 「선배가」「풀어주는」 → 조사를 뗀 꼴
+        if len(w) < 2 or w in EXTRA_FILLER or w in EXTRA_TYPE_SET or re.fullmatch(r"[\d제회월일차년총시간명팀a-z]{1,2}|\d+.*", w):
+            continue
+        if re.fullmatch(r"[a-z]+", w) and len(w) < 3:
+            continue
+        for t in EXTRA_TYPE_WORDS:   # 「채용설명회」「취업특강」처럼 유형어가 붙은 낱말은 앞말도 낱말로(채용·취업은 군더더기라 빠짐)
+            if w.endswith(t) and len(w) > len(t) + 1 and w[:-len(t)] not in EXTRA_FILLER | EXTRA_TYPE_SET:
+                out.append(w[:-len(t)])
+        out.append(w)
+    return list(dict.fromkeys(out))
+
+
+EXTRA = [n for n, p in PROGRAMS.items() if p.get("분야") == "비교과"]
+EXTRA_TOK = {n: _extra_tokens(n) for n in EXTRA}
+def _extra_core(name):
+    """꾸밈 [ ]·( )·< >와 「:」 뒤 부제를 뗀 핵심 이름(띄어쓰기 지움). 「동문 초청 진로 취업 릴레이 특강(+한화생명 채용설명회)」
+    → 동문초청진로취업릴레이특강. 4글자 미만이면 빈 글자(너무 짧아 보통 말에 걸림)."""
+    core = re.sub(r"\[[^\]]*\]|\([^)]*\)|<[^>]*>", " ", name).split(":")[0]
+    core = _norm(core)
+    return core if len(core) >= 4 else ""
+
+
+EXTRA_CORE = {n: _extra_core(n) for n in EXTRA}
+EXTRA_ALL = {n: {w for w in re.split(r"[\s\[\]()<>「」:/&·․,_+~.!?\-]+", n.lower()) if len(w) >= 2} for n in EXTRA}
+_EXTRA_DF = {}
+for _toks in EXTRA_TOK.values():
+    for _t in _toks:
+        _EXTRA_DF[_t] = _EXTRA_DF.get(_t, 0) + 1
+
+
+def _q_words(question):
+    """질문 낱말(소문자) + 조사를 뗀 꼴."""
+    out = []
+    for w in re.findall(r"[가-힣]+|[A-Za-z]+", question.lower()):
+        out.append(w)
+        s = _PARTICLE_RE.sub("", w)
+        if s and s != w:
+            out.append(s)
+    return out
+
+
+def _extra_scores(question):
+    """[(점수, 프로그램, 잡을 만한가)] — 점수가 0인 것은 뺀다."""
+    q = _norm(fix_names(question))
+    words = _q_words(question)
+    hangul = [w for w in words if re.fullmatch(r"[가-힣]+", w)]
+    latin = set(w for w in words if re.fullmatch(r"[a-z]+", w))
+    out = []
+    for name in EXTRA:
+        hits = []   # (낱말, 종류)
+        for t in EXTRA_TOK[name]:
+            if re.fullmatch(r"[a-z]+", t):
+                if t in latin:
+                    hits.append((t, "낱말"))
+            elif t in q and (len(t) > 2 or t in hangul):   # 2글자는 따로 쓴 낱말만(「데이터」의 데이는 아님)
+                hits.append((t, "낱말"))
+            elif any(len(w) >= 2 and len(w) * 2 >= len(t) and t.startswith(w) and w not in EXTRA_TYPE_SET
+                     and w not in EXTRA_FILLER and w not in _EXTRA_DF for w in hangul):
+                hits.append((t, "앞"))
+            elif len(t) >= 4 and re.fullmatch(r"[가-힣]+", t) and any(
+                    len(w) == 3 and w[0] == t[0] and w[2] == t[-1] and w[1] in t[1:-1] for w in hangul):
+                hits.append((t, "줄임"))
+        if not hits:
+            continue
+        rare = [(t, k) for t, k in hits if _EXTRA_DF.get(t, 9) <= 2 and not _LANG_RE.match(t)]
+        strong = any(k in ("낱말", "줄임") for _, k in rare) or (rare and len(hits) >= 2)
+        # 짧은 낱말(한글 2글자)만 드물게 맞았으면 비교과 말이 질문에 있어야 한다
+        if strong and all(len(t) <= 2 and re.fullmatch(r"[가-힣]+", t) and k == "낱말" for t, k in rare) \
+                and not EXTRA_CUE_RE.search(question):
+            strong = False
+        score = sum((0.5 if _LANG_RE.match(t) else 1.0) / _EXTRA_DF.get(t, 1) for t, _ in hits)
+        # 같은 점수를 가르는 작은 덤: 이름의 낱말(유형어·군더더기 포함)이 질문에 든 수(「북플 독서모임 활동」 → 「… 활동」 쪽)
+        score += 0.01 * sum(1 for w in EXTRA_ALL[name] if w in q)
+        out.append((score, name, bool(strong)))
+    return out
+
+
+def extra_loose(question, relaxed=False):
+    """비교과 넓은 대조. relaxed: 비교 질문의 한쪽(「NCS 특강」)처럼 드문 낱말이 없어도 가장 많이 맞은 것들(5곳까지).
+    교환·인턴 문맥 말이 있으면 빈 목록."""
+    if not question or EXTRA_BLOCK_RE.search(question):
+        return []
+    q = _norm(fix_names(question))
+    cores = [(c, n) for n, c in EXTRA_CORE.items() if c and c in q]
+    cores = [(c, n) for c, n in cores if not any(c != c2 and c in c2 for c2, _ in cores)]   # 긴 이름이 먼저
+    if cores and len(cores) <= 3:
+        return sorted(n for _, n in cores)
+    scored = [s for s in _extra_scores(question) if s[2] or relaxed]
+    if not scored:
+        return []
+    top = max(s[0] for s in scored)
+    best = sorted(n for sc, n, _ in scored if abs(sc - top) < 1e-9)
+    limit = MAX_NOTES if relaxed else 3
+    return best if len(best) <= limit else []
+
+
+# ── [11/26 작업 106] 비교과 사실 답 (코드, AI 없음 — 미리 결정 A) ──────────────────
+# 비교과 130개는 선배 근거 문단이 0이다(#342). 「경험한 선배가 없어요」만 말하지 않고 코드가 가진 사실
+# (세부 유형·운영 부서·이수 인원·만족도)을 말한 뒤 「선배 경험담은 아직 없어요」를 덧붙인다. 데이터에 없는 값은 「–」.
+# 이수 인원·만족도는 노트 커버(notes.json completedCount·satisfaction — 해봤노트 화면과 같은 값).
+_STU_GRADE = {}   # 프로그램 → {이수 당시 학년: 인원}
+for _r in _json("extracurricular.json", []):
+    if _r.get("프로그램명") and isinstance(_r.get("이수 당시 학년"), int):
+        _g = _STU_GRADE.setdefault(_r["프로그램명"], {})
+        _g[_r["이수 당시 학년"]] = _g.get(_r["이수 당시 학년"], 0) + 1
+
+
+def _cover(name):
+    return notes.NOTES.get(notes.note_id(name)) or {}
+
+
+def extra_count(name):
+    v = _cover(name).get("completedCount")
+    return v if isinstance(v, int) else None
+
+
+def extra_sat(name):
+    v = _cover(name).get("satisfaction")
+    if not isinstance(v, (int, float)):
+        v = PROGRAMS.get(name, {}).get("만족도(5점)")
+    return float(v) if isinstance(v, (int, float)) else None
+
+
+def _num(v, unit=""):
+    return "–" if v is None else (f"{v:,}{unit}" if isinstance(v, int) else f"{v:g}{unit}")
+
+
+def short_name(name, cap=32):
+    """문구용 짧은 이름: 꾸밈 [ ]·괄호 ( )를 떼고 「:」「<」 앞까지(「Bring Your Own Ideas(BYOI)」 → Bring Your Own Ideas).
+    카드에는 정식 이름 그대로."""
+    s = re.sub(r"^\s*(?:\[[^\]]*\]\s*)+", "", name)
+    s = re.sub(r"\s*\([^()]*\)", "", s)
+    s = re.split(r"\s*[:<]", s)[0].strip() or name
+    s = re.sub(r"\s{2,}", " ", s)
+    return s if len(s) <= cap else s[:cap].rstrip() + "…"
+
+
+def is_extra(name):
+    return PROGRAMS.get(name, {}).get("분야") == "비교과"
+
+
+def extra_facts(name):
+    """「직무탐색 집중교육은 1회성 비교과예요. 진로취업지원센터에서 운영하고, 이수 인원 109명 · 만족도 4.6점(5점 만점)이에요.」"""
+    p = PROGRAMS.get(name, {})
+    s = short_name(name)
+    kind = p.get("세부")
+    dept = DEPTS.get(p.get("운영부서코드"), {}).get("부서명")
+    head = f"{s}{_josa('은는', s)} " + (f"{kind} 비교과예요." if kind else "비교과예요.")
+    run = f" {dept}에서 운영하고," if dept else ""
+    return f"{head}{run} 이수 인원 {_num(extra_count(name), '명')} · 만족도 {_num(extra_sat(name), '점')}(5점 만점)이에요."
+
+
+EXTRA_NO_STORY = "선배 경험담은 아직 없어요."
+
+
+def _extra_cards(names):
+    """비교과 카드 — 근거가 0이어도 보여 준다(해봤노트 화면에 이수 인원·만족도가 있다). _notes와 같은 모양."""
+    return [{"noteId": notes.note_id(n), "program": n, "country": None, "evidenceCount": evidence_count(n),
+             "oneLine": _cover(n).get("oneLine", ""), "type": _cover(n).get("type") or notes._kind(n)}
+            for n in names][:MAX_NOTES]
+
+
+# 유형 단위 질문 — 질문의 말 → 그 유형의 비교과(이름에 든 말 또는 세부). 한 프로그램이 아니라 묶음이다
+EXTRA_TYPES = [
+    ("튜터링", re.compile(r"튜터링|튜터|튜티|tutoring", re.I), r"튜터링|tutoring", None),
+    ("멘토링", re.compile(r"멘토링|멘토(?!스)"), r"멘토링", None),
+    ("탄뎀", re.compile(r"탄뎀|언어\s*교환"), r"탄뎀", None),
+    ("버디", re.compile(r"버디|buddy|국제\s*학생회", re.I), None, "국제교류·버디 활동"),
+    ("특강", re.compile(r"특강|강연|설명회"), r"특강|강연|설명회", None),
+    ("창업", re.compile(r"창업"), r"창업", "창업 활동"),
+    ("공모전·대회", re.compile(r"공모전|대회|경연"), None, "공모전·대회"),
+    ("외국어 강좌", re.compile(r"어학\s*강좌|외국어\s*강좌|집중\s*강좌|보충\s*강좌|방과\s*후\s*강좌|테라피"), None, "외국어·전공 집중강좌"),
+    ("상담·컨설팅", re.compile(r"상담|컨설팅"), r"상담|컨설팅", "진로·취업 상담·컨설팅"),
+    ("자격증", re.compile(r"자격증"), None, "자격증·기타 역량개발"),
+    ("캠프", re.compile(r"캠프"), r"캠프", None),
+    ("독서 모임", re.compile(r"독서|북클럽|책\s*모임"), r"독서|북클럽", None),
+]
+EXTRA_WORD_RE = re.compile(r"비교과")
+EXTRA_RANK_SAT = re.compile(r"만족도|(제일|가장|젤|최고로)\s*(좋|도움|괜찮|나아|낫|유익|만족|알찬|추천)")
+EXTRA_RANK_CNT = re.compile(r"인기|많이\s*(듣|들|이수|참여|신청|하는|한)|이수\s*인원|사람\s*(이\s*)?많")
+EXTRA_GRADE = re.compile(r"([1-4])\s*학년")
+EXTRA_LIST = re.compile(r"추천|들을\s*만|할\s*만|뭐\s*(가|이)?\s*(있|들)|어떤\s*(게|것|거|프로그램)?\s*(이\s*)?있|무엇이\s*있|종류|목록|어때|어땠|후기|해\s*본|해\s*보신|뭐\s*해")
+EXTRA_PROXY = re.compile(r"도움|좋|괜찮|나아|낫|유익|알찬|추천")
+EXTRA_SIDES = re.compile(r"^(.+?)\s*(?:이랑|랑|하고|vs\.?|VS\.?|와|과)\s+(.+?)\s*(?:둘\s*)?중(?:에|에서)?\s*(?:뭐|무엇|어느|어떤|어디)")
+
+
+def _type_pool(question, excluded=()):
+    """질문의 유형 말 → (유형 이름들, 그 유형 비교과). 유형 말이 없으면 ([], []).
+    여럿이면 질문의 다른 말(「취업」 특강)이 이름에 가장 많이 든 것으로 좁히고, 그 말을 유형 이름 앞에 붙인다."""
+    labels, pool = [], []
+    for label, rx, name_rx, kind in EXTRA_TYPES:
+        if not rx.search(question):
+            continue
+        labels.append(label)
+        for n in EXTRA:
+            if n in excluded or n in pool:
+                continue
+            if (name_rx and re.search(name_rx, n, re.I)) or (kind and PROGRAMS[n].get("세부") == kind):
+                pool.append(n)
+    if len(pool) > 1:   # 「취업 특강」 — 질문의 다른 말이 이름에 든 것으로 좁힌다(없으면 유형 전체)
+        words = [w for w in _q_words(question) if len(w) >= 2 and _norm(w) not in EXTRA_TYPE_SET
+                 and not any(rx.search(w) for _, rx, _, _ in EXTRA_TYPES)]
+        words = list(dict.fromkeys(words))
+        hit = {n: [w for w in words if w in n.lower()] for n in pool}
+        most = max((len(v) for v in hit.values()), default=0)
+        if most:
+            pool = [n for n in pool if len(hit[n]) == most]
+            used = [w for w in words if any(w in hit[n] for n in pool)]
+            if labels and used:
+                labels = [" ".join(used[:2]) + " " + labels[0]] + labels[1:]
+    return labels, pool
+
+
+def _side_text(names, said=""):
+    """비교 한쪽 사실: 하나면 「이수 n명 · 만족도 x점」, 여럿이면 「(학생이 한 말) n개 · 이수 합 n명 · 만족도 a~b점」."""
+    if len(names) == 1:
+        return f"{short_name(names[0])} 이수 {_num(extra_count(names[0]), '명')} · 만족도 {_num(extra_sat(names[0]), '점')}"
+    cnt = [extra_count(n) for n in names if extra_count(n) is not None]
+    sat = [extra_sat(n) for n in names if extra_sat(n) is not None]
+    rng = "–" if not sat else (f"{min(sat):g}점" if min(sat) == max(sat) else f"{min(sat):g}~{max(sat):g}점")
+    return f"{said + ' ' if said else ''}{len(names)}개 · 이수 합 {_num(sum(cnt) if cnt else None, '명')} · 만족도 {rng}"
+
+
+def extra_scope(question, programs, excluded=(), field=None):
+    """비교과 유형 단위·순위·비교·없는 프로그램 질문 → 코드가 세어 답한다(AI 없음). 해당 없으면 None(아래 길 그대로).
+    field: 질문정리가 「비교과」로 정리했으면 "비교과"(질문에 「비교과」 말이 없어도 본다).
+    프로그램 하나를 이름으로 부른 질문(T1)은 여기서 답하지 않는다 — 아래 길에서 근거를 찾고, 없으면 _hold가 사실 답."""
+    if EXTRA_BLOCK_RE.search(question):
+        return None
+    named = [p for p in programs if p in PROGRAMS]
+    if named and not all(is_extra(p) for p in named):
+        return None
+    # ① 비교 「인적성검사랑 NCS 특강 중에 뭐가 나아요?」 — 두 쪽 모두 비교과면 이수 인원·만족도를 나란히
+    m = EXTRA_SIDES.search(question)
+    if m:
+        a, b = (extra_loose(s, relaxed=True) or _type_pool(s, excluded)[1] for s in (m.group(1), m.group(2)))
+        a = [n for n in a if n not in excluded]
+        b = [n for n in b if n not in excluded and n not in a]
+        if a and b:
+            stories = sum(evidence_count(n) for n in a + b)
+            head = ("두 쪽 모두 선배 경험담은 아직 없어서 어느 쪽이 나은지는 말씀드리기 어려워요." if not stories else
+                    "여러 프로그램을 맞대 본 선배 경험담은 없어서 어느 쪽이 나은지는 말씀드리기 어려워요.")
+            said = [_PARTICLE_RE.sub("", g.strip()) for g in (m.group(1), m.group(2))]
+            message = (f"{head} 이수 인원·만족도로 보면 {_side_text(a, said[0])}, {_side_text(b, said[1])}이에요. "
+                       f"노트를 열어 보거나 하나를 골라 물어봐 주세요.")
+            return _extra_notes(a[:2] + b[:3], message, "비교과 비교")
+    if named:
+        return None
+    labels, pool = _type_pool(question, excluded)
+    asked_extra = bool(EXTRA_WORD_RE.search(question)) or field == "비교과"
+    if not pool and not asked_extra:
+        return None
+    grade = EXTRA_GRADE.search(question)
+    by_sat = bool(EXTRA_RANK_SAT.search(question))
+    by_cnt = bool(EXTRA_RANK_CNT.search(question))
+    if not pool:
+        # 유형 말 없이 「비교과」만: 순위·목록을 묻는 말이면 130개 전체. 아니면(「토익 스터디 비교과」 — 이름·세부가 하나도
+        # 안 맞음) None → 부르는 쪽이 「없는 프로그램」으로 보류한다(근거 있는 노트 카드를 대신 보여 주지 않는다)
+        if not (grade or by_sat or by_cnt or (EXTRA_LIST.search(question) and not _content_words(question))):
+            return None
+        pool = [n for n in EXTRA if n not in excluded]
+    label = "·".join(labels) + " 비교과" if labels else "비교과"
+    total = len(pool)
+    stories = [n for n in pool if evidence_count(n)]
+    if grade:
+        g = int(grade.group(1))
+        order = sorted(pool, key=lambda n: (-_STU_GRADE.get(n, {}).get(g, 0), -(extra_count(n) or 0), n))
+        order = [n for n in order if _STU_GRADE.get(n, {}).get(g)]
+        if not order:
+            message = f"{label} {total}개 가운데 {g}학년 때 이수한 선배 기록이 있는 프로그램은 없어요."
+            return _extra_notes([], message, "비교과 학년")
+        top = order[:3]
+        message = (f"추천 순위는 따로 없어서, {g}학년 때 이수한 선배가 많은 {label}를 보여 드려요. "
+                   + " · ".join(f"{short_name(n)} {_STU_GRADE[n][g]}명" for n in top) + " 순이에요.")
+        return _extra_notes(order, message, "비교과 학년")
+    if by_sat and not by_cnt:
+        order = sorted(pool, key=lambda n: (-(extra_sat(n) or 0), -(extra_count(n) or 0), n))
+        best = extra_sat(order[0])
+        if best is None:
+            return _extra_notes(order, f"{label} {total}개의 만족도 기록이 없어요.", "비교과 만족도")
+        ties = [n for n in order if extra_sat(n) == best]
+        names = " · ".join(short_name(n) for n in ties[:3]) + (f" 등 {len(ties)}개" if len(ties) > 3 else "")
+        proxy = ("도움이 됐는지는 선배 경험담이 아직 없어 말하기 어려워서, 만족도로 보여 드려요. "
+                 if EXTRA_PROXY.search(question) and not re.search(r"만족도", question) else "")
+        message = (f"{proxy}{label} {total}개 중 만족도가 가장 높은 건 {names}(5점 만점에 {best:g}점)이에요. "
+                   f"만족도가 높은 순서로 보여 드려요.")
+        return _extra_notes(order, message, "비교과 만족도")
+    order = sorted(pool, key=lambda n: (-(extra_count(n) or 0), -(extra_sat(n) or 0), n))
+    top = order[:3]
+    tail = ("아직 선배 경험담은 없어서" if not stories else f"선배 경험담이 있는 노트는 {len(stories)}개이고,")
+    message = (f"{label}{_josa('은는', label)} {total}개 있어요. {tail} 이수 인원이 많은 순서로 보여 드려요: "
+               + " · ".join(f"{short_name(n)} {_num(extra_count(n), '명')}" for n in top) + ".")
+    if total == 1:
+        message = f"{label}{_josa('은는', label)} 1개예요. {extra_facts(order[0])} {EXTRA_NO_STORY if not stories else ''}".strip()
+    return _extra_notes(order, message, "비교과 유형" if labels else "비교과 목록")
+
+
+# 「없는 프로그램」을 가를 때 빼는 말(묻는 말투·흔한 말). 이것 말고 남는 말이 있으면 그 활동 이름을 말한 것으로 본다
+_EXTRA_STOP = re.compile(r"^(비교과|프로그램|활동|해|해본|해보신|보신|본|분|사람|선배|후기|있어요|있나요|있어|있을까요|있는|어때요|어땠어요"
+                         r"|뭐|뭐가|뭐예요|무엇|어떤|게|건|거|중에|중|제일|가장|좋은|좋아요|추천|추천해|주세요|들을|만한|할|만해요|알려|"
+                         r"줘|줘요|요|좀|혹시|학교|우리|외대|들으면|들어|하면|있으면|관련|종류|목록|보통|해요|하는|궁금해요|궁금)$")
+
+
+def _content_words(question):
+    ws = [w for w in re.findall(r"[가-힣]+|[A-Za-z]+", question) if not _EXTRA_STOP.match(_PARTICLE_RE.sub("", w) or w)
+          and not _EXTRA_STOP.match(w) and not EXTRA_GRADE.search(w) and not re.fullmatch(r"\d*학년\S*", w)]
+    return ws
+
+
+def _extra_notes(order, message, route):
+    return {"status": "notes", "lines": [], "sources": {}, "notes": _extra_cards(order), "suggestSenior": True,
+            "message": message, "_route": route}
 
 
 # 「대」 단독은 「대로」 앞에서 뺀다 — 「순서대로·제대로·생각대로」는 학교 이름이 아니다
@@ -1755,12 +2128,14 @@ def _hold(me, question, program, section, save, why="", place=None):
         message = HOLD_NO_TOPIC.format(program=place)
     elif evidence_count(program):     # 노트는 있는데 이 내용만 없다 → 그 노트로 갈 수 있게 noteId도 준다
         message = HOLD_NO_TOPIC.format(program=program)
+    elif is_extra(program):           # [작업 106] 근거 0 비교과 — 「없어요」만 말하지 않고 코드가 가진 사실부터(AI 없음)
+        message = f"{extra_facts(program)} {EXTRA_NO_STORY} {HOLD_EXTRA_TAIL}"
     else:
         message = HOLD_MESSAGE
     out = {"status": "hold", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": True, "message": message,
            "_program": program}
-    if program and evidence_count(program) and not place and why != "담기":   # 담기 응답에는 노트 링크를 붙이지 않는다
-        out["noteId"] = notes.note_id(program)
+    if program and (evidence_count(program) or is_extra(program)) and not place and why != "담기":
+        out["noteId"] = notes.note_id(program)   # 담기 응답에는 노트 링크를 붙이지 않는다. 비교과는 근거 0이어도 노트(이수 인원·만족도)로
     if not save:
         out["_why"] = why   # 평가 스크립트에서만 보이는 보류 이유
     return out
