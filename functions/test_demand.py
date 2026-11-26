@@ -150,6 +150,42 @@ q = next(q for q in store.load("questions", []) if q["id"] == hold)
 expect("같은 질문 행에 맥락만 붙고 질문함은 늘지 않음", s3.get("ok") and s3["questionIds"] == [hold]
        and len(store.load("questions", [])) == n_before and q["시기"] == "1년 뒤" and q["수요"] is True)
 
+# ── 5-1. [11/26 P11] 칸 없이 보류된 질문 → 질문 문장으로 칸 미리 채움(코드만) ─────────
+DEMO_Q = "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?"   # 시연 0:40 보류 질문(askBoo는 칸 없이 담을 수 있다)
+demo = rf.add_question(JUNIOR, DEMO_Q, MARBURG, None, status="hold")
+expect("시연 보류 질문은 질문함에 칸 없이 저장될 수 있음", not next(q for q in store.load("questions", []) if q["id"] == demo).get("칸"))
+r = demandNext(JUNIOR, {"state": {"fromQuestionId": demo}})
+expect("시연 질문: 칸 없이 보류돼도 칸(생활) 미리 채움 → 칸 고르기 없이 시기부터",
+       r["step"] == "when" and r["state"]["section"] == "생활" and r["state"]["program"] == MARBURG
+       and r["state"]["question"] == DEMO_Q)
+r, seen = walk(JUNIOR, {"_start": {"fromQuestionId": demo}, "when": "다음 학기",
+                        "situation": "2학년이고 독일어 B1이에요. 어학 점수를 준비하고 있어요",
+                        "hope": "외국어로 일상을 꾸려 본 자신감", "more": None})
+expect("시연 흐름: 시기 → 상황 → 바라는 것 → 더 궁금한 것(칸 질문 없음)",
+       r.get("done") and seen == ["when", "situation", "hope", "more"])
+saveDemand(JUNIOR, {"state": r["state"], "consent": True})
+expect("저장하면 그 질문 행에 칸이 적힘(들려주기가 AI 없이 그 칸을 씀)",
+       next(q for q in store.load("questions", []) if q["id"] == demo)["칸"] == "생활")
+
+q_cost = rf.add_question(OTHER, "마르부르크 한 달 생활비 얼마예요?", MARBURG, None, status="hold")
+expect("askBoo 주제어 표로도 정함(생활비 → 비용)",
+       demandNext(OTHER, {"state": {"fromQuestionId": q_cost}})["state"].get("section") == "비용")
+q_bad = rf.add_question(OTHER, DEMO_Q, MARBURG, "근무조건", status="hold")
+expect("틀 밖 칸(교환에 근무조건)도 질문 문장으로 다시 정함",
+       demandNext(OTHER, {"state": {"fromQuestionId": q_bad}})["state"].get("section") == "생활")
+q_keep = rf.add_question(OTHER, DEMO_Q, MARBURG, "팁", status="hold")
+expect("이미 틀 안 칸이 있으면 그대로(팁)",
+       demandNext(OTHER, {"state": {"fromQuestionId": q_keep}})["state"].get("section") == "팁")
+q_none = rf.add_question(OTHER, "마르부르크 가 본 선배 계세요?", MARBURG, None, status="hold")
+r = demandNext(OTHER, {"state": {"fromQuestionId": q_none}})
+expect("못 정하면 지금처럼 칸 질문", r["step"] == "section" and "section" not in r["state"])
+expect("남의 칸 없는 보류 질문으로는 시작 못 함", "error" in demandNext(OTHER, {"state": {"fromQuestionId": demo}}))
+INTERN = next((n for n, p in demand.notes.PROGRAMS.items() if p.get("분야") == "현장실습"), None)
+if INTERN:
+    q_pay = rf.add_question(OTHER, "여기 월급은 얼마 정도 받아요?", INTERN, None, status="hold")
+    expect("현장실습: 월급 질문 → 근무조건",
+           demandNext(OTHER, {"state": {"fromQuestionId": q_pay}})["state"].get("section") == "근무조건")
+
 # ── 6. 경험 나눔: 답변 3 + 공유 1문장 ─────────────────────────────────
 mid = rf.save_my_note(SENIOR1, MARBURG, "D-9001", {"sections": []}, {"sections": []}, answered=2)
 store.load("noteLines", []).append({"myNoteId": mid, "sourceId": "S-1"})

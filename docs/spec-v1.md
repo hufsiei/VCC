@@ -542,6 +542,7 @@ payload `{id, changed: [{section, index, text}]}` — `index`는 `getMyNote`의 
 - 답변 단계: `state[step] = 쓴 문장`, `more`는 `state.more = [..., 문장]`. **유효 답변** = 10자 이상, 「몰라요」류·같은 글자 반복 아님, `check_message`(학번·연락처·비방) 통과. 아니면 같은 단계 + `retry`(문구).
 - `progress.answered`는 유효 답변 수(칩은 세지 않음), `need`는 3.
 - **물어보기에서 이어 하기**: askBoo가 보류(`hold`)한 내 질문으로 시작하면 `state = { fromQuestionId: "Q-0001" }` → 분야·세부·프로그램·칸·질문 문장이 미리 채워져 `when`부터 묻는다(답변 1개가 이미 있음). 남의 질문이면 `{"error": "볼 수 없는 기록이에요"}`.
+  - **[11/26 P11]** 질문 행에 칸이 없거나 그 노트 틀(`data/frames.json`) 밖이면 질문 문장으로 칸을 정한다 — 코드만, AI 없음(`demand.guess_section`: askBoo 주제어 표 `TOPICS_EXCHANGE`→`SECTION_BY_ITEM`, 보류 주제 「인턴·아르바이트·병행」→생활, 현장실습 급여·근무 질문→근무조건). 시연 0:40 「학기 중 현지 인턴 병행할 수 있어요?」→생활. 못 정하면 지금처럼 `section` 단계를 묻는다. 정한 칸은 `saveDemand`가 그 질문 행 `칸`에 적는다. 응답 모양은 그대로.
 ```json
 { "done": false, "step": "detail", "question": "어느 나라가 궁금해요?",
   "options": [ { "value": "프랑스", "label": "프랑스" }, { "value": "독일", "label": "독일" }, { "value": null, "label": "아직 정하지 않았어요" } ],
