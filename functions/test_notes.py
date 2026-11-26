@@ -291,5 +291,16 @@ reportStatement(JUNIOR, {"lineId": rep_line["lineId"], "reason": "기타"})
 top2, chips2, _ = ev_note()
 expect("P3 보고서 문장 신고 뒤: 상단·카드 −1, 여전히 칸 칩의 합", top2 == top - 1 == chips2 == ev_card())
 
+# [11/26 작업 121] 검색 별칭·오타 — 그대로 안 맞으면 학교 이름 오타를 고쳐(askboo.fix_names) 한 번 더 대조
+def found(q):
+    return [c["id"] for c in notes.listNotes(JUNIOR, {"filter": {"q": q}})["notes"]]
+
+
+expect("검색 별칭 「마부르크」", found("마부르크") == ["N-marburg"])
+expect("검색 오타 「마브루크」", found("마브루크") == ["N-marburg"])
+expect("검색 오타 「마르브루크」", found("마르브루크") == ["N-marburg"])
+expect("「함부르크」는 마르부르크로 잡지 않음", "N-marburg" not in found("함부르크"))
+expect("3글자 말 「말라고」는 0건", found("말라고") == [])
+
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)

@@ -229,12 +229,41 @@ function errorBox(onRetry) {
 
 // 검색(7-③, 11/24): 띄어쓰기·대소문자 무시하고 프로그램명·한 줄 요약·추천 대상·나라·기관유형·종류·분야 글자에 들어 있으면 남긴다.
 // 서버 listNotes q와 같은 방식이지만, 분야 필터처럼 전체를 한 번 받아 화면에서 거른다(글자마다 서버를 부르지 않음, mock에서도 동작).
+// 하나도 안 맞을 때만 서버에 묻는다(별칭·오타, 아래 serverSearch).
 // 검색어를 굵게·밑줄로 강조하지 않는다(디자인 규칙 12절).
 const norm = (s) => String(s || "").replace(/\s+/g, "").toLowerCase();
 function matchesQuery(n, q) {
   if (!q) return true;
   const words = [n.program, n.oneLine, n.forWhom, n.country, n.kind, n.type, KIND_NAME[n.type], CATEGORY_NAME[CATEGORY[n.type]]];
   return words.some((w) => norm(w).includes(q));
+}
+
+// 별칭·오타(작업 121): 카드에는 별칭이 없으니, 화면에서 0개이고 검색어에 한글이 2글자 이상이면 잠시 뒤
+// listNotes({ q })를 한 번 부른다. 결과는 검색어별로 담아 두고 지금 검색어의 것만 그린다(늦은 응답이 덮지 않게).
+const SERVER_SEARCH_DELAY = 300;
+const serverHits = new Map(); // 검색어(norm) → 서버가 맞다고 한 노트 id Set
+let serverTimer = 0;
+
+const needsServer = (q) => (q.match(/[가-힣]/g) || []).length >= 2 && !allNotes.some((n) => matchesQuery(n, q));
+
+function serverSearch(q, raw) {
+  clearTimeout(serverTimer);
+  serverTimer = setTimeout(async () => {
+    let ids = [];
+    let failed = false;
+    try {
+      const res = await listNotes({ q: raw });
+      const notes = Array.isArray(res && res.notes) ? res.notes : [];
+      // mock은 q를 무시하고 전체를 준다 — 전체 목록과 같으면 맞는 것이 없는 것
+      if (notes.length < allNotes.length) ids = notes.map((n) => n.id);
+    } catch (err) {
+      console.error(err);
+      failed = true;
+    }
+    serverHits.set(q, new Set(ids));
+    if (norm(currentQuery) === q) renderList();
+    if (failed) serverHits.delete(q); // 실패는 담아 두지 않는다(다시 치면 다시 묻는다)
+  }, SERVER_SEARCH_DELAY);
 }
 
 // [11/23 주제별 묶기] spec listNotes groups: 분야·검색으로 거른 뒤, 나라·기관 유형으로 거르기 전 카드로 센다
@@ -269,10 +298,29 @@ function renderGroupChips(base) {
   groupEl.replaceChildren(chip("", `${g.label} 전체`), ...groups.map(([name, count]) => chip(name, `${name} ${count}`)));
 }
 
+function skeletons() {
+  return [0, 1, 2].map(() => el("div", { className: "skeleton note-skeleton", attrs: { "aria-hidden": "true" } }));
+}
+
 function renderList() {
-  listEl.setAttribute("aria-busy", "false");
+  clearTimeout(serverTimer);
   const q = norm(currentQuery);
-  const base = allNotes.filter((n) => (!currentCat || CATEGORY[n.type] === currentCat) && matchesQuery(n, q));
+  let matches = (n) => matchesQuery(n, q);
+  if (needsServer(q)) {
+    const ids = serverHits.get(q);
+    if (!ids) {
+      // 서버 답을 기다리는 동안은 로딩(6-3). 고른 나라·기관 유형 칩은 풀지 않는다
+      listEl.setAttribute("aria-busy", "true");
+      countEl.textContent = "";
+      groupEl.hidden = true;
+      listEl.replaceChildren(...skeletons());
+      serverSearch(q, currentQuery.trim());
+      return;
+    }
+    matches = (n) => ids.has(n.id);
+  }
+  listEl.setAttribute("aria-busy", "false");
+  const base = allNotes.filter((n) => (!currentCat || CATEGORY[n.type] === currentCat) && matches(n));
   renderGroupChips(base);
   const g = GROUP_BY_CAT[currentCat];
   const notes = g && currentGroup ? base.filter((n) => n[g.key] === currentGroup) : base;
@@ -307,7 +355,7 @@ async function loadList() {
   loaded = false;
   listEl.setAttribute("aria-busy", "true");
   countEl.textContent = "";
-  listEl.replaceChildren(...[0, 1, 2].map(() => el("div", { className: "skeleton note-skeleton", attrs: { "aria-hidden": "true" } })));
+  listEl.replaceChildren(...skeletons());
   try {
     const res = await listNotes({});
     allNotes = Array.isArray(res && res.notes) ? res.notes : [];
