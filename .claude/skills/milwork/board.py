@@ -10,14 +10,15 @@
 #   잠금(board-<이름>.lock)과 HTML(board-<이름>.html, 탭 파일 board-<이름>-queue|decide|pr.html)도 상태판과 같은 폴더·같은 이름.
 #   이전: 드라이브에 사람 이름 없는 board.md(11/25 #249, 미리 것)가 있으면 미리가 처음 실행할 때 board-미리.md로 이름을 바꾼다
 #     (다른 사람은 건드리지 않는다). 새 파일이 없고 옛 C:\dev\VCC-board.md가 있으면 옮기고 옛 파일은 VCC-board-이전.md로.
-# 파일 모양: 맨 위 「총괄: <세션이름> (<PC>, MM/DD HH:MM)」 → 「마지막 번호: Q-n · D-n」(줄을 지워도 번호를 이어 가려고) → 창 표 → 「## 대기 작업」 표 → 「## 결정요망」 표.
+# 파일 모양: 맨 위 「총괄: <세션이름> (<PC>, MM/DD HH:MM)」 → 「마지막 번호: Q-n · D-n」(줄을 지워도 번호를 이어 가려고) → 창 표(10칸 고정)
+#   → 「## 창 덧칸」 표(폴더·창 제목·세션 — 옛 board.py가 창 표를 읽게 따로) → 「## 대기 작업」 표 → 「## 결정요망」 표.
 # 드라이브 동기화가 늦으니 두 PC가 같은 시각에 쓰면 한쪽이 질 수 있다(한 PC씩 쓰는 전제).
 #
 # 쓰는 법 (항상 python -X utf8 C:/dev/VCC/.claude/skills/milwork/board.py …):
 #   list                                            창 표(진행 중 → 검토 대기 → 닫아도 돼요 순) + 이 PC의 폴더 없는 줄·상태판에 없는 worktree 표시
 #                                                   「PR #n」은 gh 한 번으로 병합·닫힘·열림을 대조해 보여 준다(파일은 안 바꿈, gh 안 되면 그대로)
-#   add <폴더> --branch B --who W --task T [--files a,b] [--title 창 제목]   (PC는 자동 기록)
-#   set <폴더> [--status S] [--files a,b] [--files-set a,b] [--handoff H] [--sent] [--task T] [--title 창 제목]
+#   add <폴더> --branch B --who W --task T [--files a,b] [--title 창 제목] [--session 세션이름]   (PC는 자동 기록)
+#   set <폴더> [--status S] [--files a,b] [--files-set a,b] [--handoff H] [--sent] [--task T] [--title 창 제목] [--session 세션이름]
 #                                                   (--files는 추가, --files-set은 통째로 바꿈, --handoff는 덮어씀=안 보냄,
 #                                                    --sent는 지금 답장을 「보냄 MM/DD HH:MM」으로 표시)
 #   pending                                         아직 안 보낸 답장만(밀종료·밀시작이 본다)
@@ -28,7 +29,9 @@
 #   chief                                           머리의 총괄 세션 이름 출력(없으면 빈 줄, 종료코드 1)
 #   chief --set <세션이름|–>                         총괄 세션 이름 쓰기(–면 비움)
 #   html                                            같은 폴더에 board-<이름>.html 생성(상태판을 바꾸는 명령 뒤 자동 실행)
-#                                                   탭 4개 = 파일 4개(board-<이름>.html 창 · -queue · -decide · -pr .html), 스크립트 없음
+#                                                   탭 4개 = 파일 4개(board-<이름>.html 창 · -queue · -decide · -pr .html), 스크립트는 묵은 경고 하나
+#                                                   끝난 창은 이 PC에서 그 세션이 열려 있을 때만 카드, 나머지는 접힌 「지난 창」(11/26 Q-61)
+#   schedule [--install [--every 2] | --remove]     작업 스케줄러로 html 자동 새로 만들기(등록은 미리 승인 뒤) · watch [--every 120] 백그라운드 대안
 #   queue                                           대기 작업 표 출력
 #   queue add --task "<작업번호 또는 –> <제목>" --files a,b --from milstart|파생|PR|직접 [--session <이름>] [--note "…"]
 #                                                   → 「Q-n 제안」(--from 직접은 「Q-n 승인」. 옛 값 「미리」도 직접과 같게 받음)
@@ -63,7 +66,11 @@ OLD_BOARD = DEV / "VCC-board.md"
 TEAM = {"미리": ("미리", "mirikang"), "민지": ("민지", "minji"), "원우": ("원우", "wwk")}  # 「나」 짐작의 원본(스킬 문서들이 이것을 가리킨다)
 OLD_COLS = ["폴더", "브랜치", "요청", "작업", "파일", "상태", "갱신", "전달 대기"]
 BASE_COLS = ["폴더", "브랜치", "요청", "작업", "파일", "상태", "갱신", "PC", "결정요망", "전달 대기"]
-COLS = BASE_COLS + ["창 제목"]          # 11/26 끝에 추가(없는 옛 줄은 「작업」에서 슬러그를 뺀 글)
+COLS = BASE_COLS                        # 창 표는 이 10칸 그대로 쓴다 — #349 이전 board.py는 머리 줄이 정확히 같아야 읽는다
+# 새 칸은 창 표 뒤 「## 창 덧칸」 표에 둔다(11/26 Q-61). #349(11칸 창 표)가 만든 파일도 읽는다.
+# 옛 board.py는 덧칸 표를 모르는 표로 건너뛰고, 저장하면 덧칸만 잃는다(창 줄은 남는다). 칸을 더하면 XCOLS 끝에.
+XCOLS = ["폴더", "창 제목", "세션"]
+XKEYS = XCOLS[1:]
 QCOLS = ["번호", "작업", "파일", "출처", "상태", "세션", "폴더", "메모", "갱신"]
 DCOLS = ["번호", "폴더", "세션", "질문", "선택지", "답", "답한 때", "올린 때"]
 SEP = "; "
@@ -78,7 +85,7 @@ ME = ""
 # ---------- 나 ----------
 def _git_config(key):
     try:
-        r = subprocess.run(["git", "-C", str(REPO), "config", key], capture_output=True, text=True,
+        r = subprocess.run(["git", "-C", str(REPO), "config", key], capture_output=True, text=True, **NOWIN,
                            encoding="utf-8", errors="replace", timeout=15)
         return r.stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
@@ -202,7 +209,7 @@ def header_key(cells):
     t = tuple(cells)
     if t == tuple(OLD_COLS):
         return "rows"
-    for cols, key in ((BASE_COLS, "rows"), (QCOLS, "queue"), (DCOLS, "decide")):
+    for cols, key in ((BASE_COLS, "rows"), (QCOLS, "queue"), (DCOLS, "decide"), (XCOLS[:2], "extra")):
         if t[:len(cols)] == tuple(cols):
             return key
     return None
@@ -210,7 +217,7 @@ def header_key(cells):
 
 def parse(text):
     st = {"chief": None, "rows": [], "queue": [], "decide": [], "last": {"Q": 0, "D": 0}}
-    cur = None
+    cur, extra = None, []
     for line in text.splitlines():
         m = re.match(r"^총괄: (.*)$", line)
         if m and st["chief"] is None:
@@ -241,8 +248,18 @@ def parse(text):
         if key == "rows":
             d.setdefault("PC", HOST)
             d.setdefault("결정요망", "–")
-            d.setdefault("창 제목", "–")
+            for k in XKEYS:
+                d.setdefault(k, "–")
+        if key == "extra":
+            extra.append(d)
+            continue
         st[key].append(d)
+    for x in extra:                     # 덧칸은 창 표 뒤에 있으니 다 읽은 다음 폴더로 붙인다
+        r = find(st["rows"], x["폴더"])
+        if r:
+            for k in XKEYS:
+                if x.get(k, "–") not in EMPTY:
+                    r[k] = x[k]
     bump_last(st)
     return st
 
@@ -275,6 +292,8 @@ def save(st, path=None, html=True):
              "팀원 답장은 그 대화창이 바로 쓰고 「전달 대기」에 요점을 적는다. 미리가 보내면 `--sent`로 「보냄」 표시. "
              "총괄 대화창은 대기 작업을 승인하고 결정요망에 답한다. 병합된 줄과 폴더, 완료·반려 하루 지난 줄과, 답한 지 하루 지나고 작업이 끝난 결정요망은 `milend`가 지운다(가장 큰 번호 줄은 남김).", ""]
     lines += table(COLS, st["rows"])
+    lines += ["", "## 창 덧칸", "", "창 표와 폴더로 짝짓는 칸(창 제목·세션). 옛 board.py가 창 표를 읽게 따로 둔다.", ""]
+    lines += table(XCOLS, st["rows"])
     lines += ["", "## 대기 작업", ""] + table(QCOLS, st["queue"])
     lines += ["", "## 결정요망", ""] + table(DCOLS, st["decide"])
     tmp = p.with_suffix(".tmp")
@@ -314,7 +333,7 @@ class locked:
 
 def worktrees():
     try:
-        r = subprocess.run(["git", "-C", str(REPO), "worktree", "list", "--porcelain"],
+        r = subprocess.run(["git", "-C", str(REPO), "worktree", "list", "--porcelain"], **NOWIN,
                            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
     except (OSError, subprocess.TimeoutExpired):
         return {}
@@ -393,7 +412,7 @@ def _read_prs():
         return None
     try:
         r = subprocess.run(["gh", "pr", "list", "-R", "hufsiei/VCC", "--state", "all", "--limit", "100",
-                            "--json", PR_FIELDS],
+                            "--json", PR_FIELDS], **NOWIN,
                            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20)
         if r.returncode != 0:
             return None
@@ -457,19 +476,134 @@ def title_of(r):
     return task or r.get("폴더", "")
 
 
+def row_of_q(st, x):
+    """큐 줄이 가리키는 창 줄: 폴더가 같은 줄, 폴더가 비었으면 세션이 같은 줄 하나(둘 이상이면 모름)."""
+    if x.get("폴더", "–") not in EMPTY:
+        return find(st["rows"], x["폴더"])
+    s = x.get("세션", "–")
+    hit = [r for r in st["rows"] if s not in EMPTY and r.get("세션") == s]
+    return hit[0] if len(hit) == 1 else None
+
+
+def q_of_row(st, r):
+    """창 줄을 맡은 큐 줄(폴더가 같은 것 중 마지막)."""
+    hit = [x for x in st["queue"] if x.get("폴더") == r["폴더"]]
+    return hit[-1] if hit else None
+
+
 def queue_view(st, states):
-    """보일 때만: 맡은 창 줄이 끝난(병합·닫힘·완료) 「시작됨」 큐 줄을 「완료」로. 파일은 그대로(queue done이 닫는다)."""
+    """보일 때만(파일은 그대로, queue done이 닫는다): 맡은 창 줄이 끝났으면(병합·닫힘·완료) 「시작됨」 큐 줄을 「완료」로,
+    PR이 열려 있으면 「검토 대기」로. 11/26 Q-50이 시작됨에 남은 것은 PR 병합 뒤 HTML을 다시 만들지 않아서였다(4번 자동 새로 만들기)."""
     out = []
     for x in st["queue"]:
         y = dict(x)
-        if x["상태"] == "시작됨" and x.get("폴더", "–") not in EMPTY:
-            r = find(st["rows"], x["폴더"])
-            if r and ended(r, states):
+        r = row_of_q(st, x) if x["상태"] == "시작됨" else None
+        if r:
+            ph, shown = phase(r, states)
+            memo = f" · {x['메모']}" if x.get("메모", "–") not in EMPTY else ""
+            if ph == "done":
                 y["상태"] = "완료"
-                y["메모"] = f"{phase(r, states)[1]}(보기만 완료 — queue done으로 닫기)" + \
-                    (f" · {x['메모']}" if x.get("메모", "–") not in EMPTY else "")
+                y["메모"] = f"{shown}(보기만 완료 — queue done으로 닫기){memo}"
+            elif ph == "review":
+                y["상태"] = "검토 대기"
+                y["메모"] = f"{shown}{memo}"
         out.append(y)
     return out
+
+
+# ---------- 창이 살아 있나(11/26 Q-61) ----------
+# Claude Code는 열린 세션마다 ~/.claude/sessions/<pid>.json(name·pid·procStart·pidDomain "win32:<PC>")을 두고 닫으면 지운다.
+# 이 PC 것(pidDomain의 PC = HOST)만, 그 pid의 프로세스가 지금 있고 시작 시각(FILETIME)이 procStart와 같을 때 살아 있다고 본다
+# (pid가 다른 프로그램에 다시 쓰인 경우를 거른다). 창 줄의 세션 = 「세션」 칸, 없으면 그 폴더를 맡은 큐 줄의 세션.
+# 판별을 못 하면(Windows 아님·기록 폴더 없음) None → 대안: 이 PC 줄 + 작업 폴더 있음 + 갱신 12시간 이내.
+# VCC_BOARD_LIVE="a,b"면 그 이름만 살아 있다고 본다(selftest, "?"면 판별 못 함).
+NOWIN = {"creationflags": 0x08000000} if os.name == "nt" else {}     # pythonw(작업 스케줄러)에서 gh·git 콘솔 창이 안 뜨게
+FALLBACK_HOURS = 12
+_LIVE = []
+
+
+def _proc_start(pid):
+    """살아 있는 프로세스의 시작 시각(FILETIME 정수), 없거나 끝났으면 None."""
+    import ctypes
+    from ctypes import wintypes
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.OpenProcess.restype = wintypes.HANDLE
+    k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    k.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+    k.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    k.CloseHandle.argtypes = [wintypes.HANDLE]
+    h = k.OpenProcess(0x1000, False, int(pid))      # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return None
+    try:
+        code = wintypes.DWORD()
+        if not k.GetExitCodeProcess(h, ctypes.byref(code)) or code.value != 259:     # STILL_ACTIVE
+            return None
+        t = [wintypes.FILETIME() for _ in range(4)]
+        if not k.GetProcessTimes(h, *[ctypes.byref(x) for x in t]):
+            return None
+        return (t[0].dwHighDateTime << 32) | t[0].dwLowDateTime
+    finally:
+        k.CloseHandle(h)
+
+
+def live_sessions():
+    """이 PC에서 지금 열린 Claude Code 세션 이름 집합. 판별 못 하면 None."""
+    if _LIVE == []:
+        _LIVE.append(_read_live())
+    return _LIVE[0]
+
+
+def _read_live():
+    if "VCC_BOARD_LIVE" in os.environ:
+        v = os.environ["VCC_BOARD_LIVE"].strip()
+        return None if v == "?" else set(split_ids(v))
+    d = Path.home() / ".claude" / "sessions"
+    if os.name != "nt" or not d.is_dir():
+        return None
+    out = set()
+    try:
+        files = list(d.glob("*.json"))
+    except OSError:
+        return None
+    for f in files:
+        try:
+            j = json.loads(f.read_text(encoding="utf-8"))
+            if str(j.get("pidDomain", "")).split(":", 1)[-1].lower() != HOST.lower() or not j.get("name"):
+                continue
+            got = _proc_start(j["pid"])
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            continue
+        if got is not None and str(got) == str(j.get("procStart", got)):
+            out.add(j["name"])
+    return out
+
+
+def session_of(st, r):
+    s = r.get("세션", "–")
+    if s not in EMPTY:
+        return s
+    x = q_of_row(st, r)
+    return x.get("세션", "–") if x else "–"
+
+
+def window_open(st, r, live=None, at=None):
+    """끝난 창을 창 탭에 보일지: 이 PC에서 그 세션이 살아 있을 때만. 판별 못 하면 대안(폴더 있음 + 12시간 이내)."""
+    if not mine(r):
+        return False
+    live = live_sessions() if live is None else live
+    if live is not None:
+        return session_of(st, r) in live
+    a = age(r.get("갱신", ""), at)
+    return (DEV / r["폴더"]).is_dir() and a is not None and a < timedelta(hours=FALLBACK_HOURS)
+
+
+def shown_rows(st, states):
+    """창 탭: (보일 줄 by_phase 순서, 지난 창 줄). 진행 중·검토 대기는 다 보이고, 끝난 창은 열린 것만."""
+    keep, past = [], []
+    for r in by_phase(st["rows"], states):
+        (keep if phase(r, states)[0] != "done" or window_open(st, r) else past).append(r)
+    return keep, past
 
 
 # ---------- 창 표 명령 ----------
@@ -485,9 +619,10 @@ def cmd_list(args):
         else:
             flag = f"  (다른 PC: {r['PC']})"
         ph, shown = phase(r, states)
-        mark = {"run": "", "review": f" → {shown} · 검토 대기", "done": f" → {shown} · 닫아도 돼요"}[ph]
+        close = "닫아도 돼요" if window_open(st, r) else ("지난 창(창 닫힘)" if mine(r) else "지난 창")
+        mark = {"run": "", "review": f" → {shown} · 검토 대기", "done": f" → {shown} · {close}"}[ph]
         if ph == "done" and shown == r["상태"]:
-            mark = " → 닫아도 돼요"
+            mark = f" → {close}"
         print(f"[{r['폴더']}] {r['브랜치']} · {r['요청']} · {r['작업']}{flag}")
         print(f"    상태: {r['상태']}{mark} ({r['갱신']}) · 파일: {r['파일']}"
               + (f" · 결정요망: {r['결정요망']}" if r.get("결정요망", "–") not in EMPTY else ""))
@@ -500,8 +635,10 @@ def cmd_list(args):
             print(f"[{name}] {br}  ← 상태판에 없음(milwork 전에 만든 폴더. add로 적거나 지운다)")
     if rows:
         n = {k: sum(1 for r in rows if phase(r, states)[0] == k) for k in PHASES}
-        print(f"창: 진행 중 {n['run']} · 검토 대기 {n['review']} · 닫아도 돼요 {n['done']}"
-              + ("" if states is not None else " (gh 못 읽음 — PR 병합 여부 모름)"))
+        past = len(shown_rows(st, states)[1])
+        print(f"창: 진행 중 {n['run']} · 검토 대기 {n['review']} · 닫아도 돼요 {n['done'] - past} · 지난 창 {past}"
+              + ("" if states is not None else " (gh 못 읽음 — PR 병합 여부 모름)")
+              + ("" if live_sessions() is not None else f" (창 생존 판별 못 함 — 폴더 있음 + {FALLBACK_HOURS}시간 이내로 봄)"))
     q = sum(1 for x in st["queue"] if x["상태"] in ("제안", "승인"))
     d = sum(1 for x in st["decide"] if x["답"] in EMPTY)
     if q or d:
@@ -517,7 +654,7 @@ def cmd_add(args):
         st["rows"].append({"폴더": name, "브랜치": args.branch, "요청": args.who, "작업": args.task,
                            "파일": SEP.join(split_files(args.files)) or "–", "상태": args.status or "시작",
                            "갱신": now(), "PC": HOST, "결정요망": "–", "전달 대기": "–",
-                           "창 제목": clean(args.title or "") or "–"})
+                           "창 제목": clean(args.title or "") or "–", "세션": clean(args.session or "") or "–"})
         save(st)
     print(f"추가: {name} ({args.branch})")
     cmd_check(argparse.Namespace(files=split_files(args.files), me=name))
@@ -535,6 +672,8 @@ def cmd_set(args):
             r["작업"] = args.task
         if args.title is not None:
             r["창 제목"] = clean(args.title) or "–"
+        if args.session is not None:
+            r["세션"] = clean(args.session) or "–"
         if args.branch:
             r["브랜치"] = args.branch
         if args.files_set is not None:
@@ -839,11 +978,12 @@ h2{font-size:16px;color:#002B5C;margin:24px 0 8px}
 .card.done dl{color:#666}
 .card h3{font-size:18px;line-height:1.35;margin:0 0 6px;color:#002B5C}
 .card.done h3{color:#3d4a5a}
-.sub{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:0 0 8px;font-size:13px;color:#555}
-.badge{display:inline-block;font-size:13px;font-weight:700;padding:2px 10px;border-radius:12px}
-.badge.run{color:#002B5C;background:#e3eaf4}
-.badge.review{color:#7a4d00;background:#fdf0d3}
-.badge.done{color:#1f6a40;background:#dcefe3}
+.ids{margin:0 0 6px;font-size:13px;color:#555}
+.st{margin:0 0 6px;font-size:13px;font-weight:700}
+.st.run{color:#002B5C}
+.st.review{color:#7a4d00}
+.ok{color:#1f6a40;font-weight:700}
+.stale{margin:12px 0 0;padding:10px 14px;border:2px solid #B7791F;border-radius:8px;background:#fff;color:#7a4d00;font-weight:700}
 .card dl{display:grid;grid-template-columns:72px 1fr;gap:2px 8px;margin:0;font-size:13px}
 .card dt{color:#666}.card dd{margin:0;word-break:break-all}
 .warn{color:#002B5C;font-weight:700}
@@ -856,6 +996,16 @@ details{margin-top:16px}
 summary{cursor:pointer;min-height:44px;line-height:44px;font-size:14px;color:#002B5C;font-weight:700}
 .none{color:#777;font-size:13px}
 """
+
+
+# 묵은 경고(11/26 Q-61): 정적 HTML은 지금 시각을 모르고, 60초 새로 읽기는 같은 파일을 다시 읽어 CSS 타이머도 매번 처음부터라
+# 브라우저 시계로 「만든 때」와 비교하는 짧은 인라인 스크립트 하나만 둔다(바깥 자원·fetch·innerHTML 없음, 문구는 textContent).
+STALE_MIN = 5
+STALE_JS = ("(function(){var p=document.getElementById('stale');if(!p)return;var t=+p.getAttribute('data-made');"
+            "function f(){var m=Math.floor((Date.now()-t)/60000);if(m>=" + str(STALE_MIN) + "){p.hidden=false;"
+            "p.textContent='⚠ '+m+'분 전 내용 — 자동 새로 만들기가 멈췄어요. "
+            "board.py html로 다시 만들거나 작업 스케줄러(board.py schedule)를 확인하세요';}}"
+            "f();setInterval(f,30000);})();")
 
 
 def e(s):
@@ -884,23 +1034,32 @@ def stamp(iso):
         return str(iso or "–")
 
 
-def card_html(r, states):
+def ids_line(st, r):
+    """창 제목 밑 한 줄: 「PR #345 · VCC-login-limit · Q-53」(없는 것은 뺌)."""
+    m = PR_RE.search(r.get("상태", ""))
+    q = q_of_row(st, r)
+    return " · ".join(x for x in (f"PR #{m.group(1)}" if m else "", r["폴더"], q["번호"] if q else "") if x)
+
+
+def card_html(st, r, states):
+    """카드 = 제목 + 한 줄(PR·폴더·Q). 끝난 창은 그 한 줄 앞에 「✓ 병합됨」만(왼쪽 초록 띠 + ✓ + 글 — 색만으로 가르지 않음).
+    진행 중·검토 대기는 상태 한 줄 + 파일, 남은 할 일(결정요망·안 보낸 전달)이 있을 때만 그 칸."""
     ph, shown = phase(r, states)
-    items = [("상태", r["상태"]), ("요청", r["요청"]), ("작업", r["작업"]), ("파일", r["파일"]),
-             ("브랜치", r["브랜치"]), ("갱신", r["갱신"]), ("PC", r.get("PC", "–")),
-             ("결정요망", r.get("결정요망", "–")), ("전달 대기", r["전달 대기"])]
-    if ph == "done":        # 끝난 창은 짧게 — 남은 할 일(결정요망·안 보낸 전달)이 있을 때만 그 칸을 보인다
-        items = [(k, v) for k, v in items if k in ("작업", "갱신") or (k == "결정요망" and v not in EMPTY)
-                 or (k == "전달 대기" and unsent(r))]
-    dl = "".join(f"<dt>{e(k)}</dt><dd{' class=warn' if (k == '전달 대기' and unsent(r)) or (k == '결정요망' and v not in EMPTY) else ''}>{e(v)}</dd>"
-                 for k, v in items)
-    note = f"<span>{e(shown)}</span>" if ph != "run" else ""
-    if not mine(r):
-        note += f"<span>다른 PC: {e(r.get('PC'))}</span>"
-    cls = f"card {ph}"
-    return (f'<div class="{cls}" data-folder="{e(r["폴더"])}"><h3>{e(title_of(r))}</h3>'
-            f'<div class="sub"><span class="badge {ph}">{e(BADGE[ph])}</span>{note}<span>{e(r["폴더"])}</span></div>'
-            f"<dl>{dl}</dl></div>")
+    ids = e(ids_line(st, r))
+    alerts = [(k, r.get(k, "–")) for k in ("결정요망", "전달 대기")
+              if (k == "결정요망" and r.get(k, "–") not in EMPTY) or (k == "전달 대기" and unsent(r))]
+    if ph == "done":
+        word = "병합됨" if "병합됨" in shown else ("닫힘(병합 안 함)" if "닫힘" in shown else "완료")
+        body = f'<p class="ids"><span class="ok">✓ {e(word)}</span> · {ids}</p>'
+        items = alerts
+    else:
+        where = "" if mine(r) else f" · {r.get('PC', '–')}"
+        st_txt = f"{BADGE[ph]} · {shown if ph == 'review' else r['상태']} · {r['갱신']}{where}"
+        body = f'<p class="ids">{ids}</p><p class="st {ph}">{e(st_txt)}</p>'
+        items = [("파일", r["파일"])] + alerts
+    dl = "".join(f"<dt>{e(k)}</dt><dd{' class=warn' if k != '파일' else ''}>{e(v)}</dd>" for k, v in items)
+    return (f'<div class="card {ph}" data-folder="{e(r["폴더"])}"><h3>{e(title_of(r))}</h3>{body}'
+            + (f"<dl>{dl}</dl>" if dl else "") + "</div>")
 
 
 def make_html(st, path=None):
@@ -908,11 +1067,13 @@ def make_html(st, path=None):
     rows = st["rows"]
     states = pr_states(rows)
     prs = all_prs()
-    groups = {k: [r for r in by_phase(rows, states) if phase(r, states)[0] == k] for k in PHASES}
+    keep, past = shown_rows(st, states)
+    groups = {k: [r for r in keep if phase(r, states)[0] == k] for k in PHASES}
     view = queue_view(st, states)
     qorder = {"시작됨": 0, "승인": 1, "제안": 2}
     qtop = sorted([x for x in view if x["상태"] in qorder], key=lambda x: qorder[x["상태"]])
-    qend = [x for x in view if x["상태"] not in qorder]
+    qrev = [x for x in view if x["상태"] == "검토 대기"]
+    qend = [x for x in view if x["상태"] not in qorder and x["상태"] != "검토 대기"]
     waitq = [x for x in view if x["상태"] in ("제안", "승인")]
     opend = [x for x in st["decide"] if x["답"] in EMPTY]
     answered = [x for x in st["decide"] if x["답"] not in EMPTY]
@@ -924,18 +1085,27 @@ def make_html(st, path=None):
     tab_n = {"win": len(groups["run"]), "queue": len(waitq), "decide": len(opend),
              "pr": "–" if open_list is None else len(open_list)}
     tab_sub = {"win": f"진행 중 · 검토 대기 {len(groups['review'])} · 닫아도 돼요 {len(groups['done'])}",
-               "queue": f"제안·승인 · 시작됨 {sum(1 for x in view if x['상태'] == '시작됨')}",
+               "queue": f"제안·승인 · 시작됨 {sum(1 for x in view if x['상태'] == '시작됨')} · 검토 대기 {len(qrev)}",
                "decide": f"답 기다림 · 답함 {len(answered)}",
                "pr": "팀 전체" if open_list is not None else "gh 못 읽음"}
+    live = live_sessions()
+    done_head = ("닫아도 돼요 — 이 PC에서 열린 창 · 병합·닫힘·완료" if live is not None
+                 else f"닫아도 돼요 — 병합·닫힘·완료 (창 생존 판별 못 함: 폴더 있음 + {FALLBACK_HOURS}시간 이내)")
     win = []
-    for k, head in (("run", "진행 중"), ("review", "검토 대기 — PR 열림"), ("done", "닫아도 돼요 — 병합·닫힘·완료")):
+    for k, head in (("run", "진행 중"), ("review", "검토 대기 — PR 열림"), ("done", done_head)):
         win.append(f"<h2>{e(head)} {len(groups[k])}</h2>")
-        win.append('<div class="cards">' + "".join(card_html(r, states) for r in groups[k]) + "</div>"
+        win.append('<div class="cards">' + "".join(card_html(st, r, states) for r in groups[k]) + "</div>"
                    if groups[k] else '<p class="none">–</p>')
+    if past:
+        prow = [{"창 제목": title_of(r), "한 줄": ids_line(st, r), "상태": phase(r, states)[1], "갱신": r["갱신"],
+                 "PC": r.get("PC", "–")} for r in past]
+        win.append(f"<details><summary>지난 창 {len(past)}개 — 이미 닫혔거나 다른 PC 창(정리는 milend)</summary>"
+                   f"{html_table(['창 제목', '한 줄', '상태', '갱신', 'PC'], prow, lambda x: 'done')}</details>")
     if states is None and any(PR_RE.search(r["상태"]) for r in rows):
         win.insert(0, '<p class="none">gh를 못 읽어 PR 병합 여부를 대조하지 못했어요(「PR #n 올림」은 검토 대기로 둠).</p>')
 
-    qend_html = (f"<details><summary>완료·반려 {len(qend)}줄 보기</summary>{html_table(QCOLS, qend, lambda x: 'done')}</details>"
+    qrev_html = (f"<h2>검토 대기 — PR 열림 {len(qrev)}</h2>\n{html_table(QCOLS, qrev, lambda x: '')}" if qrev else "")
+    qend_html =(f"<details><summary>완료·반려 {len(qend)}줄 보기</summary>{html_table(QCOLS, qend, lambda x: 'done')}</details>"
                  if qend else "")
     dec_html = html_table(DCOLS, opend) + (
         f"<details><summary>답한 것 {len(answered)}줄 보기</summary>{html_table(DCOLS, answered, lambda x: 'done')}</details>"
@@ -956,10 +1126,11 @@ def make_html(st, path=None):
 
     panels = {
         "win": "".join(win),
-        "queue": f"<h2>대기 작업 — 시작됨 · 승인 · 제안</h2>\n{html_table(QCOLS, qtop, lambda x: '')}\n{qend_html}",
+        "queue": f"<h2>대기 작업 — 시작됨 · 승인 · 제안</h2>\n{html_table(QCOLS, qtop, lambda x: '')}\n{qrev_html}\n{qend_html}",
         "decide": f"<h2>결정요망 — 답 기다림</h2>\n{dec_html}",
         "pr": f"<h2>열린 PR</h2>\n{pr_html}",
     }
+    made = int(time.time() * 1000)
     for k, label in TABS:
         tabs = "".join(
             f'<a class="tab{" on" if j == k else ""}" href="{quote(tab_path(path, j).name)}" data-tab="{j}">'
@@ -971,6 +1142,8 @@ def make_html(st, path=None):
 <title>VCC 상태판 · {e(ME or path.stem)} · {e(label)}</title><style>{CSS}</style></head><body>
 <h1>VCC 상태판 · {e(ME or path.stem)}</h1>
 <div class="meta">{e(chief)} · 만든 때 {e(now())} ({e(HOST)}) · 60초마다 새로 읽음(고른 탭 그대로){f" · 안 보낸 전달 {unsent_n}건" if unsent_n else ""}</div>
+<p class="stale" id="stale" data-made="{made}" hidden>⚠ 만든 지 {STALE_MIN}분 넘음 — 자동 새로 만들기가 멈췄을 수 있어요(board.py html로 다시 만들기)</p>
+<script>{STALE_JS}</script>
 <nav class="tabs">{tabs}</nav>
 <section class="panel" id="{k}">
 {panels[k]}</section>
@@ -988,6 +1161,55 @@ def cmd_html(args):
     print(f"만듦: {p}")
 
 
+# ---------- 자동 새로 만들기(11/26 Q-61) ----------
+# 상태판 md는 명령이 돌 때만 바뀌지만 PR 병합·창 닫힘은 그 밖에서 일어나니, html을 주기적으로 다시 만든다.
+#   schedule --install [--every 2]  Windows 작업 스케줄러에 「VCC-board-html」(N분마다 pythonw board.py html, gh 1번) 등록
+#   schedule --remove / schedule    지우기 / 등록 상태와 등록 명령 보기     (등록은 시스템 설정 — 미리 승인 뒤에만)
+#   watch [--every 120]            작업 스케줄러 없이 이 창(백그라운드)에서 N초마다 html. 창을 닫으면 멈춘다
+TASK_NAME = "VCC-board-html"
+
+
+def schedule_cmd(every):
+    pyw = Path(sys.executable).with_name("pythonw.exe")
+    exe = pyw if pyw.exists() else Path(sys.executable)
+    me = REPO / ".claude" / "skills" / "milwork" / "board.py"     # worktree가 아니라 본 저장소 것(병합되면 저절로 새 판)
+    return ["schtasks", "/create", "/f", "/tn", TASK_NAME, "/sc", "minute", "/mo", str(every),
+            "/tr", f'"{exe}" -X utf8 "{me}" html']
+
+
+def cmd_schedule(args):
+    if os.name != "nt":
+        raise SystemExit("작업 스케줄러는 Windows에서만 — 다른 OS는 board.py watch를 쓴다")
+    if args.install:
+        r = subprocess.run(schedule_cmd(args.every), capture_output=True, text=True, errors="replace", **NOWIN)
+        print((r.stdout or r.stderr).strip())
+        sys.exit(0 if r.returncode == 0 else 1)
+    if args.remove:
+        r = subprocess.run(["schtasks", "/delete", "/f", "/tn", TASK_NAME], capture_output=True, text=True,
+                           errors="replace", **NOWIN)
+        print((r.stdout or r.stderr).strip())
+        sys.exit(0 if r.returncode == 0 else 1)
+    r = subprocess.run(["schtasks", "/query", "/tn", TASK_NAME, "/fo", "list"], capture_output=True, text=True,
+                       errors="replace", **NOWIN)
+    print(f"{TASK_NAME}: " + ("등록됨" if r.returncode == 0 else "등록 안 됨"))
+    print("등록 명령: board.py schedule --install --every 2   (내부: " + " ".join(schedule_cmd(2)) + ")")
+
+
+def cmd_watch(args):
+    every = max(30, args.every)
+    print(f"{every}초마다 html 새로 만들기 (멈추려면 이 창의 백그라운드 작업을 끈다)", flush=True)
+    while True:
+        _PRS.clear()
+        _LIVE.clear()
+        try:
+            make_html(load())
+        except Exception as ex:          # 드라이브·gh가 잠깐 안 돼도 다음 차례에 다시
+            print(f"{now()} 못 만듦: {ex}", flush=True)
+        if args.once:
+            return
+        time.sleep(every)
+
+
 # ---------- 자체 시험 ----------
 def cmd_selftest(args):
     tmp = Path(tempfile.mkdtemp(prefix="vcc-board-"))
@@ -998,7 +1220,7 @@ def cmd_selftest(args):
         subprocess.run(["git", "-C", str(repo), "config", key, val], check=True, capture_output=True)
 
     gitc("vcc.me", "미리"); gitc("user.name", "nobody"); gitc("user.email", "n@example.invalid")
-    env = dict(os.environ, VCC_BOARD=str(tmp), VCC_BOARD_NOGH="1", PYTHONUTF8="1", VCC_REPO=str(repo))
+    env = dict(os.environ, VCC_BOARD=str(tmp), VCC_BOARD_NOGH="1", PYTHONUTF8="1", VCC_REPO=str(repo), VCC_BOARD_LIVE="")
     me = [sys.executable, "-X", "utf8", str(Path(__file__).resolve())]
     fails = []
 
@@ -1076,8 +1298,8 @@ def cmd_selftest(args):
                  "gh를 못 읽음"):
         if need not in h:
             fails.append(f"board.html에 {need!r} 없음")
-    if re.search(r"<script|fetch\(|https?://", h, re.I):
-        fails.append("board.html에 스크립트·바깥 자원")
+    if re.search(r"<script|fetch\(|https?://", h.replace(f"<script>{STALE_JS}</script>", ""), re.I):
+        fails.append("board.html에 묵은 경고 밖의 스크립트·바깥 자원")
     if re.search(r"font(-size)?:[^;}]*\b([0-9]|1[01])px", h):
         fails.append("board.html에 12px 미만 글자")
     run("chief", "--set", "–")
@@ -1209,10 +1431,17 @@ def cmd_selftest(args):
                                   ("VCC-t-rev", "PR #11 올림", "v.py", []),
                                   ("VCC-t-cls", "PR #12 올림", "c.py", []),
                                   ("VCC-t-fin", "완료: 재배포 abc(PR 없음)", "f.py", []),
-                                  ("VCC-t-run", "고치는 중", "r.py", ["--title", "진행 창 제목"])):
+                                  ("VCC-t-run", "고치는 중", "r.py", ["--title", "진행 창 제목"]),
+                                  ("VCC-t-off", "PR #10 올림", "o.py", ["--session", "s-off"])):
         run("add", fo, "--branch", "miri/" + fo[4:], "--who", "미리", "--task", f"{fo[4:]} {fo[6:]} 작업 글",
             "--files", fl, "--status", status, *extra)
     run("set", "VCC-t-rev", "--title", "검토 창 제목")
+    run("set", "VCC-t-mrg", "--session", "s-mrg")             # 세션 칸(덧칸 표)
+    st = load(tb / "board-미리.md")
+    find(st["rows"], "VCC-t-off")["PC"] = "사무실"             # 다른 PC의 끝난 창
+    save(st, tb / "board-미리.md", html=False)
+    # 세션이 살아 있는 끝난 창만 보인다: s-mrg(창 줄 세션), s-fin(큐 줄 세션), s-off는 다른 PC라 살아 있어도 안 보임
+    env["VCC_BOARD_LIVE"] = "s-mrg,s-fin,s-off,s-rev"
     for fl in ("m.py", "c.py", "f.py"):
         run("check", fl, first="겹치는 파일 없음")          # 끝난 창 줄은 겹침 아님
     run("check", "v.py", code=2)                              # 열린 PR은 아직 겹침
@@ -1221,24 +1450,42 @@ def cmd_selftest(args):
     run("queue", "approve", "Q-1", first="Q-1 승인")         # #303처럼 병합된 줄이 막지 않음
     run("queue", "add", "--task", "– 병합될 일", "--files", "-", "--from", "직접", first="Q-2 승인")
     run("queue", "take", "Q-2", "--folder", "VCC-t-mrg", first="Q-2 시작됨 → VCC-t-mrg")
+    run("queue", "add", "--task", "– 끝난 재배포", "--files", "-", "--from", "직접", first="Q-3 승인")
+    run("queue", "take", "Q-3", "--folder", "VCC-t-fin", "--session", "s-fin", first="Q-3 시작됨 → VCC-t-fin")
+    run("queue", "add", "--task", "– 검토 중인 일", "--files", "-", "--from", "직접", first="Q-4 승인")
+    run("queue", "take", "Q-4", "--folder", "VCC-t-rev", first="Q-4 시작됨 → VCC-t-rev")
+    run("queue", "add", "--task", "– 진행 중인 일", "--files", "-", "--from", "직접", first="Q-5 승인")
+    run("queue", "take", "Q-5", "--folder", "VCC-t-run", first="Q-5 시작됨 → VCC-t-run")
     lst = run("list")
     if "PR #10 올림 → PR #10 병합됨 · 닫아도 돼요" not in lst or "→ PR #11 열림 · 검토 대기" not in lst \
-            or "창: 진행 중 1 · 검토 대기 1 · 닫아도 돼요 3" not in lst:
+            or "창: 진행 중 1 · 검토 대기 1 · 닫아도 돼요 2 · 지난 창 2" not in lst \
+            or "PR #12 닫힘(병합 안 함) · 지난 창(창 닫힘)" not in lst:
         fails.append(f"list 진행상황: {lst}")
     if lst.index("[VCC-t-run]") > lst.index("[VCC-t-rev]") or lst.index("[VCC-t-rev]") > lst.index("[VCC-t-mrg]"):
         fails.append("list 순서: 진행 중 → 검토 대기 → 끝남 아님")
     run("html")
     h = (tb / "board-미리.html").read_text(encoding="utf-8")
-    cards = {m.group(1): m.group(0) for m in re.finditer(r'<div class="card [^"]*" data-folder="([^"]+)">.*?</dl></div>', h)}
-    for fo in ("VCC-t-mrg", "VCC-t-cls", "VCC-t-fin"):
+    cards = {m.group(1): m.group(0) for m in re.finditer(r'<div class="card [^"]*" data-folder="([^"]+)">.*?</div>', h)}
+    # 닫힌 창은 안 보인다: 세션 없는 cls, 다른 PC의 off → 카드 없음, 접힌 「지난 창 2개」에만
+    if "VCC-t-cls" in cards or "VCC-t-off" in cards or "지난 창 2개" not in h \
+            or h.index("지난 창 2개") > h.index("VCC-t-cls") or h.index("VCC-t-cls") < h.index("<details>"):
+        fails.append(f"닫힌 창·다른 PC 끝난 창이 카드로 보이거나 「지난 창 2개」 아래에 없음: {sorted(cards)}")
+    # 카드 한 줄: 제목 밑 「PR #n · 폴더 · Q-n」, 끝난 창은 「✓ 병합됨」 한 줄, 풍선(badge)·「닫아도 돼요」 글 없음
+    for fo, line in (("VCC-t-mrg", "✓ 병합됨</span> · PR #10 · VCC-t-mrg · Q-2"),
+                     ("VCC-t-fin", "✓ 완료</span> · VCC-t-fin · Q-3")):
         cd = cards.get(fo, "")
-        if not ("닫아도 돼요" in cd and "✓" in cd and 'class="card done' in cd):
-            fails.append(f"끝난 창 {fo}: 「✓ 닫아도 돼요」·done 색 없음")
-    if "검토 대기" not in cards.get("VCC-t-rev", "") or "닫아도" in cards.get("VCC-t-rev", ""):
-        fails.append("열린 PR 창: 「검토 대기」 아님")
-    if "닫아도" in cards.get("VCC-t-run", "") or "<h3>진행 창 제목</h3>" not in cards.get("VCC-t-run", ""):
-        fails.append("진행 중 창: 제목·표시 틀림")
-    if "<h3>검토 창 제목</h3>" not in cards.get("VCC-t-rev", "") or "<h3>mrg 작업 글</h3>" not in cards.get("VCC-t-mrg", ""):
+        if not (line in cd and 'class="card done' in cd and "badge" not in cd and "닫아도" not in cd
+                and "<dl>" not in cd and cd.count("<p ") == 1):
+            fails.append(f"끝난 창 {fo}: 한 줄 카드 아님 {cd!r}")
+    if "badge" in h:
+        fails.append("html에 풍선(badge)이 남음")
+    rv = cards.get("VCC-t-rev", "")
+    if "◐ 검토 대기 · PR #11 열림" not in rv or '<p class="ids">PR #11 · VCC-t-rev · Q-4</p>' not in rv or "닫아도" in rv:
+        fails.append(f"열린 PR 창: 「검토 대기」·한 줄 틀림 {rv!r}")
+    rn = cards.get("VCC-t-run", "")
+    if "닫아도" in rn or "<h3>진행 창 제목</h3>" not in rn or '<p class="ids">VCC-t-run · Q-5</p>' not in rn:
+        fails.append(f"진행 중 창: 제목·한 줄 틀림 {rn!r}")
+    if "<h3>검토 창 제목</h3>" not in rv or "<h3>mrg 작업 글</h3>" not in cards.get("VCC-t-mrg", ""):
         fails.append("창 제목: --title 또는 옛 줄 대신 글(슬러그 뺌) 틀림")
     if not (h.index('data-folder="VCC-t-run"') < h.index('data-folder="VCC-t-rev"') < h.index('data-folder="VCC-t-mrg"')):
         fails.append("html 창 순서: 진행 중 → 검토 대기 → 끝남 아님")
@@ -1258,8 +1505,15 @@ def cmd_selftest(args):
             fails.append(f"{p.name}: 패널이 자기 탭 하나가 아님")
         if 'http-equiv="refresh" content="60">' not in hp:
             fails.append(f"{p.name}: 60초 새로 읽기 없음(자기 파일을 다시 읽어야 탭 유지)")
-        if re.search(r"<script|\bon\w+=|fetch\(|https?://", hp, re.I):
-            fails.append(f"{p.name}: 스크립트·바깥 자원")
+        scripts = re.findall(r"<script([^>]*)>(.*?)</script>", hp, re.S | re.I)
+        if len(scripts) != 1 or scripts[0][0].strip() or scripts[0][1] != STALE_JS \
+                or re.search(r"\bon\w+=|fetch\(|https?://|innerHTML|insertAdjacentHTML", hp, re.I):
+            fails.append(f"{p.name}: 묵은 경고 스크립트 하나 밖의 스크립트·바깥 자원")
+        # 묵은 경고: 처음엔 숨김, 만든 때(밀리초)가 지금과 같고, 5분 기준
+        mm = re.search(r'<p class="stale" id="stale" data-made="(\d+)" hidden>', hp)
+        if not mm or abs(int(mm.group(1)) / 1000 - time.time()) > 120 or f"if(m>={STALE_MIN})" not in hp \
+                or STALE_MIN != 5 or "textContent" not in hp:
+            fails.append(f"{p.name}: 묵은 경고(만든 때·5분·textContent) 틀림")
         if re.search(r"font(-size)?:[^;}]*\b([0-9]|1[01])px", hp):
             fails.append(f"{p.name}: 12px 미만 글자")
     pr_part = pages["pr"].read_text(encoding="utf-8")
@@ -1267,22 +1521,60 @@ def cmd_selftest(args):
             or "병합된 일" in pr_part:
         fails.append("열린 PR 탭 내용 틀림")
     q_part = pages["queue"].read_text(encoding="utf-8")
-    if "보기만 완료" not in q_part or q_part.index("Q-1") > q_part.index("<details>"):
+    top, _, rest = q_part.partition("<h2>검토 대기 — PR 열림")
+    if "보기만 완료" not in q_part or ">Q-1<" not in top:
         fails.append("대기 작업 탭: 병합된 시작됨 줄이 완료(아래)로 안 보이거나 승인 줄이 위가 아님")
-    if by_id(load(tb / "board-미리.md")["queue"], "Q-2")["상태"] != "시작됨":
-        fails.append("Q-2: 보이기만 완료여야 하는데 파일이 바뀜")
-    # 새 칸 「창 제목」은 끝에 붙는다 + 칸 없는 옛 10열 파일도 읽는다
+    # 큐 연동: 병합 PR(Q-2)·완료 창(Q-3) → 완료(접힌 곳), 열린 PR(Q-4) → 「검토 대기」(위 목록에서 빠짐), 진행 중(Q-5)은 위
+    done_part = rest.partition("<details>")[2]
+    if not rest or "Q-4" in top or "Q-4" not in rest.partition("<details>")[0] or "검토 대기</td>" not in rest \
+            or "Q-5" not in top or any(f">{i}<" in top for i in ("Q-2", "Q-3")) \
+            or not all(f">{i}<" in done_part for i in ("Q-2", "Q-3")):
+        fails.append("대기 작업 탭: 병합·완료 → 완료, 열린 PR → 검토 대기(위 목록 밖), 진행 중 → 위 가 아님")
+    qs = {x["번호"]: x["상태"] for x in load(tb / "board-미리.md")["queue"]}
+    if [qs[i] for i in ("Q-2", "Q-3", "Q-4")] != ["시작됨"] * 3:
+        fails.append(f"큐 연동은 보이기만이어야 하는데 파일이 바뀜: {qs}")
+    # md 호환: 창 표 머리 줄은 #349 이전 10칸 그대로(옛 board.py가 읽음), 새 칸은 덧칸 표에
     text = (tb / "board-미리.md").read_text(encoding="utf-8")
-    if "| " + " | ".join(COLS) + " |" not in text or COLS[-1] != "창 제목":
-        fails.append("창 표 머리 줄에 「창 제목」이 끝에 없음")
+    heads = [ln for ln in text.splitlines() if ln.startswith("| 폴더 |")]
+    if heads != ["| " + " | ".join(BASE_COLS) + " |", "| " + " | ".join(XCOLS) + " |"]:
+        fails.append(f"md 머리 줄: 창 표 10칸 + 덧칸 표가 아님 {heads}")
+    old_tables = {tuple(OLD_COLS), tuple(BASE_COLS), tuple(QCOLS), tuple(DCOLS)}     # #349 이전 board.py가 아는 머리 줄
+    if sum(1 for ln in text.splitlines() if ln.startswith("| ")
+           and tuple(c.strip() for c in ln.strip().strip("|").split("|")) in old_tables) != 3:
+        fails.append("옛 board.py가 창·대기 작업·결정요망 표를 못 알아봄")
+    back = load(tb / "board-미리.md")
+    if find(back["rows"], "VCC-t-mrg")["세션"] != "s-mrg" or find(back["rows"], "VCC-t-rev")["창 제목"] != "검토 창 제목":
+        fails.append("덧칸 표(세션·창 제목)를 다시 못 읽음")
     ten = parse("| " + " | ".join(BASE_COLS) + " |\n|" + "---|" * 10 +
                 "\n| VCC-ten | miri/ten | 미리 | ten-slug 열 칸 줄 | a.py | 시작 | 11/26 10:00 | PC | – | – |\n")
     if not ten["rows"] or ten["rows"][0]["창 제목"] != "–" or title_of(ten["rows"][0]) != "열 칸 줄":
         fails.append(f"옛 10열 파일 읽기: {ten['rows']}")
-    more = parse("| " + " | ".join(COLS + ["나중 칸"]) + " |\n|" + "---|" * 12 +
+    more = parse("| " + " | ".join(BASE_COLS + ["창 제목", "나중 칸"]) + " |\n|" + "---|" * 12 +
                  "\n| VCC-m | b | 미리 | 작업 | a.py | 시작 | 11/26 10:00 | PC | – | – | 제목 | x |\n")
     if not more["rows"] or title_of(more["rows"][0]) != "제목":
-        fails.append("끝에 칸이 더 붙은 파일 읽기 실패")
+        fails.append("#349가 만든 11칸 창 표(끝에 칸이 더 붙은 파일) 읽기 실패")
+    # 창 생존 판별: 진짜 판별기는 이 프로세스를 살아 있다고 본다(Windows), 판별 못 하면 대안(폴더 있음 + 12시간 이내)
+    if os.name == "nt" and _proc_start(os.getpid()) is None:
+        fails.append("_proc_start: 이 프로세스를 못 찾음")
+    if os.name == "nt" and _proc_start(2 ** 31 - 2) is not None:
+        fails.append("_proc_start: 없는 pid를 살아 있다고 봄")
+    fb = {"폴더": str(tmp), "PC": HOST, "갱신": now(), "세션": "–"}
+    old_fb = dict(fb, 갱신=(datetime.now() - timedelta(hours=13)).strftime("%m/%d %H:%M"))
+    gone_fb = dict(fb, 폴더=str(tmp / "없음"))
+    nost = {"rows": [], "queue": []}
+    saved = os.environ.get("VCC_BOARD_LIVE")
+    os.environ["VCC_BOARD_LIVE"] = "?"
+    _LIVE.clear()
+    if not window_open(nost, fb) or window_open(nost, old_fb) or window_open(nost, gone_fb):
+        fails.append("판별 못 할 때 대안(폴더 있음 + 12시간 이내) 틀림")
+    _LIVE.clear()
+    if saved is None:
+        os.environ.pop("VCC_BOARD_LIVE")
+    else:
+        os.environ["VCC_BOARD_LIVE"] = saved
+    if "/sc minute /mo 2" not in " ".join(schedule_cmd(2)) or "board.py\" html" not in schedule_cmd(2)[-1]:
+        fails.append(f"schedule 등록 명령 틀림: {schedule_cmd(2)}")
+    run("watch", "--once", has="초마다 html")
     # gh를 못 읽으면 예전처럼: 「PR #n 올림」은 겹침으로 세고, 오류로 멈추지 않는다
     env.pop("VCC_BOARD_PRS")
     run("check", "m.py", code=2)
@@ -1303,11 +1595,12 @@ def main():
     a.add_argument("folder"); a.add_argument("--branch", required=True); a.add_argument("--who", required=True)
     a.add_argument("--task", required=True); a.add_argument("--files", default=""); a.add_argument("--status")
     a.add_argument("--title", help="창 제목: 지시문 첫 줄에서 슬러그 뒤 글(VS Code 탭 「milwork …」에 보이는 글)")
+    a.add_argument("--session", help="이 창의 세션 이름(ListAgents 첫 줄 「This session is <이름>」). 끝난 창이 열려 있는지 보는 데 쓴다")
     a.set_defaults(fn=cmd_add)
     s = sp.add_parser("set")
     s.add_argument("folder"); s.add_argument("--status"); s.add_argument("--files"); s.add_argument("--handoff")
     s.add_argument("--files-set", help="파일 목록을 통째로 바꿈(잘못 적은 것 고칠 때)")
-    s.add_argument("--task"); s.add_argument("--branch"); s.add_argument("--title")
+    s.add_argument("--task"); s.add_argument("--branch"); s.add_argument("--title"); s.add_argument("--session")
     s.add_argument("--sent", action="store_true", help="지금 「전달 대기」 답장을 보냄으로 표시")
     s.set_defaults(fn=cmd_set)
     sp.add_parser("pending").set_defaults(fn=cmd_pending)
@@ -1321,6 +1614,13 @@ def main():
     ch = sp.add_parser("chief"); ch.add_argument("--set", help="총괄 세션 이름(–면 비움)")
     ch.set_defaults(fn=cmd_chief)
     sp.add_parser("html").set_defaults(fn=cmd_html)
+    sc = sp.add_parser("schedule", help="작업 스케줄러로 html 자동 새로 만들기(등록은 미리 승인 뒤)")
+    sc.add_argument("--install", action="store_true"); sc.add_argument("--remove", action="store_true")
+    sc.add_argument("--every", type=int, default=2, help="분")
+    sc.set_defaults(fn=cmd_schedule)
+    w = sp.add_parser("watch", help="N초마다 html(작업 스케줄러 없이, 백그라운드로)")
+    w.add_argument("--every", type=int, default=120, help="초(30 이상)"); w.add_argument("--once", action="store_true")
+    w.set_defaults(fn=cmd_watch)
 
     q = sp.add_parser("queue"); q.set_defaults(fn=cmd_queue)
     qs = q.add_subparsers(dest="qcmd")
