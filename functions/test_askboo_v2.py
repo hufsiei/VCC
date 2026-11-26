@@ -494,6 +494,27 @@ for q, h, want in (("일본 도쿄 한달 생활비 얼마에요?", [], "도시 
     expect(f"기록 route = {want}", logged and logged[-1] == want, logged[-1:])
 askboo._log_answer = _orig
 
+# ── [작업 105] 학교 이름 오타·변형 퍼지 대조 ───────────────────────────────
+# 국제처 검토(11/26): 7변형 중 마브루크·마부루크·마르브루크·마르브루쿠가 보류로 빠짐
+MARBURG_7 = ("마부르크", "마브루크", "마부루크", "마르부르크필립스", "마르부르크", "마르브루크", "마르브루쿠")
+for v in MARBURG_7:
+    expect(f"퍼지: 「{v}」 → 마르부르크", askboo.match_programs(f"{v} 기숙사 어땠어요?") == [PROGRAM],
+           askboo.match_programs(f"{v} 기숙사 어땠어요?"))
+expect("퍼지: 조사가 붙어도(마르브루쿠에서·마브루크대학교)",
+       askboo.match_programs("마르브루쿠에서 생활비 얼마예요?") == [PROGRAM] == askboo.match_programs("마브루크대학교 수업 어때요?"))
+res, _ = run("마브루크 기숙사 어땠어요?", [], plan=None, answer=None)
+expect("퍼지: 답 경로도 마르부르크 근거(보류 아님)", res["status"] == "ok"
+       and {s.get("program") for s in (res.get("sources") or {}).values()} == {PROGRAM}, res.get("status"))
+res, row = saved_row("마르브루쿠 기숙사 어땠어요?")
+expect("퍼지: 고친 글은 대조에만 — 원문 그대로 저장", "마르브루쿠 기숙사 어땠어요?" in row.values() and row["프로그램명"] == PROGRAM, row)
+expect("퍼지: 다른 학교 별칭 「함부르크」(자모 2개 차이)는 함부르크", askboo.match_programs("함부르크 기숙사 어때요?") == ["함부르크 대학교"])
+expect("퍼지: 뒤에 학교 종류 말 → 다른 학교(마브루크공과대학교)",
+       PROGRAM not in askboo.match_programs("마브루크공과대학교 기숙사 어때요?"))
+for q in ("마무리를 어떻게 했어요?", "마르지 않게 보관하는 법", "마지막으로 하나만요", "마르세유 생활비 알려줘", "말라고 했어요",
+          "밀리니까 힘들었어요", "레지던시 프로그램", "레이어로 나눠 정리", "마트에서 장보기", "마부장님께 여쭤봐도"):
+    expect(f"퍼지 반례: 「{q}」는 그대로", askboo.fix_names(q) == q, askboo.fix_names(q))
+expect("퍼지: 3글자 이름(말라가·밀라노)은 퍼지 대상 아님", all(len(t) >= askboo.FUZZY_MIN for c in askboo._FUZZY.values() for t, _, _ in c))
+
 # ── 정리 ──────────────────────────────────────────────────────────────
 print()
 print("실패 %d개" % len(fails) if fails else "전부 통과")
