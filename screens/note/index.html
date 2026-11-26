@@ -61,7 +61,7 @@
   /* 배운점: 선배 말을 그대로 옮긴 인용 */
   .line--quote .line__text { padding-left: 12px; border-left: 3px solid var(--color-border); }
   .detail-skeleton { height: 120px; }
-  /* 칸별 요약 문단(작업 78): 소제목 → 문단(문장 끝 출처 연도) → 원문 접기 */
+  /* 칸별 요약 문단(작업 78): 소제목 → 문단(문장 끝 출처 연도). 원문 접기는 11/25 삭제(#266) */
   .summary {
     display: flex;
     flex-direction: column;
@@ -74,24 +74,6 @@
   .summary__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
   .summary__text { line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; }
   .summary__from { font-size: var(--font-size-caption); color: var(--color-text-muted); white-space: nowrap; }
-  .summary-fold__head {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    min-height: 44px;
-    font-size: var(--font-size-secondary);
-    font-weight: 600;
-    color: var(--color-hufs-navy);
-    cursor: pointer;
-    list-style: none;
-  }
-  .summary-fold__head::-webkit-details-marker { display: none; }
-  .summary-fold__head .icon { width: 16px; height: 16px; transition: transform .15s; }
-  .summary-fold[open] .summary-fold__head .icon { transform: rotate(180deg); }
-  .summary-fold__open { display: none; }
-  .summary-fold[open] .summary-fold__open { display: inline; }
-  .summary-fold[open] .summary-fold__closed { display: none; }
-  .summary-fold__body { display: flex; flex-direction: column; gap: 12px; }
   .summary-new__title {
     display: flex;
     align-items: center;
@@ -102,7 +84,33 @@
     color: var(--color-heading);
   }
   .summary-new__title .icon { width: 16px; height: 16px; color: var(--color-ai); }
-  @media (prefers-reduced-motion: reduce) { .summary-fold__head .icon { transition: none; } }
+  /* [11/25 #266] 요약 문장 신고: 문장 키보드 포커스, 안내 한 줄, 선택 끝 「신고하기」 풍선(위험 버튼 색, 5-4) */
+  .summary__sentence:focus-visible { outline: none; border-radius: 4px; box-shadow: var(--focus-ring); }
+  .summary__hint { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--font-size-caption); color: var(--color-text-muted); }
+  .summary__hint .icon { width: 14px; height: 14px; flex: none; }
+  .report-bubble {
+    position: absolute;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-height: 44px;
+    padding: 0 var(--space-md);
+    border: 1px solid var(--status-error-fg);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    color: var(--status-error-fg);
+    font: inherit;
+    font-size: var(--font-size-secondary);
+    font-weight: 600;
+    box-shadow: var(--shadow-float);
+    cursor: pointer;
+  }
+  .report-bubble[hidden] { display: none; }
+  .report-bubble .icon { width: 16px; height: 16px; }
+  .report-bubble:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  /* 신고 시트: 무엇을 신고하는지 문장을 인용으로 */
+  .report-quote { padding: 12px var(--space-md); border-left: 3px solid var(--color-border); background: var(--color-background); border-radius: 0 var(--radius-card) var(--radius-card) 0; font-size: var(--font-size-secondary); line-height: 1.5; word-break: keep-all; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -181,6 +189,7 @@
       <div class="sheet__handle" aria-hidden="true"></div>
       <h2 class="sheet__title" id="reportTitle">이 문장을 신고할까요?</h2>
       <div class="sheet__body">
+        <p class="report-quote" id="reportQuote" hidden></p>
         <p class="sub">신고하면 이 문장은 바로 숨겨지고, 담당 부서가 확인해요.</p>
         <div class="choice-list" id="reportReasons" role="group" aria-label="신고 사유"></div>
       </div>
