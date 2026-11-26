@@ -12,7 +12,8 @@
 # - 원가: ai-calls.jsonl에서 각 측정이 돈 시간대(파일명의 시각 ~ 파일 수정 시각)의 호출을 모아
 #   ai_usage의 단가로 계산한다. 같은 시간대에 다른 호출이 섞이면 부정확 — 측정 중에는 다른 AI 작업을 하지 않는다.
 #   시간대가 틀리면 --old-window / --new-window "2026-11-28T10:00,2026-11-28T10:40"으로 직접 준다.
-#   [주의] 캐시 읽기·쓰기 토큰은 ai_usage 단가에 아직 없다. A안에서 캐싱을 켜면 로그 칸과 단가를 먼저 맞출 것.
+#   캐시 쓰기·읽기 토큰은 ai_usage 단가에 들어 있다(#306). 원가 칸 끝의 「캐시적중」은 Claude 입력 중
+#   캐시에서 읽은 비율 — A안(VCC_ASK_FULL=1)은 같은 프로그램 질문이 5분 안에 이어질수록 오른다. 옛 길은 0%.
 # 결과: <out>/compare_요약_<시각>.csv · compare_질문별_<시각>.csv (기본 out = 새 길 csv가 있는 폴더)
 import argparse, csv, re, sys
 from datetime import datetime
@@ -69,10 +70,17 @@ def cost(log, win, n):
     calls, failed = ai_usage.load_calls(ai_usage.read_log(log), *win)
     if not calls:
         return "– (그 시간대 호출 없음)"
-    claude = sum(1 for c in calls if not ai_usage._is_hcx(c["모델"]))
-    hcx = len(calls) - claude
+    cl = [c for c in calls if not ai_usage._is_hcx(c["모델"])]
+    hcx = len(calls) - len(cl)
     text = ai_usage.money(ai_usage._avg(calls, n), krw=1400)
-    return f"{text} · 1건 평균 Claude {claude / n:.2f}회·HCX {hcx / n:.2f}회" + (f" · 실패 {sum(failed.values())}" if failed else "")
+    return (f"{text} · 1건 평균 Claude {len(cl) / n:.2f}회·HCX {hcx / n:.2f}회 · 캐시적중 {cache_hit(cl)}"
+            + (f" · 실패 {sum(failed.values())}" if failed else ""))
+
+
+def cache_hit(calls):
+    """Claude 입력 토큰(캐시 밖 + 쓰기 + 읽기) 중 캐시 읽기 비율."""
+    total = sum(c["tin"] + c.get("cw", 0) + c.get("cr", 0) for c in calls)
+    return f"{sum(c.get('cr', 0) for c in calls) / total:.0%}" if total else "–"
 
 
 def summary(name, rows, cost_text):
