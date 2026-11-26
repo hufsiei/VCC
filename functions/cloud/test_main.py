@@ -95,6 +95,8 @@ token = (out.get("user") or {}).get("token", "")
 check("login → 토큰", out.get("ok") and token)
 check("VCC_LOGIN_PW 객체 → JSON 문자열 환경변수", json.loads(os.environ["VCC_LOGIN_PW"]) == {"H0143": "test-pw"})
 check("액션 로그 경로는 /tmp", Path(sys.modules["paths"].LOGS).as_posix().endswith("/tmp/vcc-logs"))
+main._set_env({**PARAMS, "VCC_ASK_FULL": "1"})
+check("VCC_ASK_FULL 파라미터 → 환경변수", os.environ.pop("VCC_ASK_FULL", None) == "1")
 
 r, out = call("/getMe", token=token)
 check("getMe(토큰) → 응답", "error" not in out)

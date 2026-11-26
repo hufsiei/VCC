@@ -368,8 +368,8 @@ function evidenceBlock(lines, sources, reportName) {
   const latest = items.map((i) => i.src.semester).filter(Boolean).sort((a, b) => semesterKey(b) - semesterKey(a))[0];
   const num = (n) => (n > 0 ? el("span", { className: "evidence__num", text: n }) : DASH);
 
-  // 근거 적음 라벨(6-1 v4.3): 1~2건이면 고정 문구 「선배 1명의 경험이에요」(lines.length로 판단, spec 5장).
-  // [11/26 #295] 문장 수 ≠ 선배 수이고 서버에 사람 수 값이 없어 숫자를 넣지 않는다
+  // 근거 적음 라벨(6-1 v4.3): 1~2건이면 고정 문구 「선배 1명의 경험이에요」(lines.length로 판단, spec)
+  // [11/26 #295] 문장 수 ≠ 선배 수(서버에 사람 수 없음)라 「선배 2명」으로 세지 않는다
   const few = lines.length <= 2 ? statusLabel("neutral", "user", "선배 1명의 경험이에요") : null;
 
   return el("details", { className: "evidence" }, [
@@ -438,7 +438,8 @@ function lineCard(line, src, { quote = false } = {}) {
 
 // ---------------------------------------------------------------------------
 // 5-1. 칸별 요약 문단(작업 78, spec getNote [v2] summary·[11/23] newLines)
-//   소제목 → 요약 문단(문장 끝 출처 연도 + official이면 「개인 경험」) → 「원문 N건 보기」 접기 → 「새로 더해진 선배 이야기 N건」.
+//   소제목 → 요약 문단(문장 끝 출처 연도 + official이면 「개인 경험」) → 「새로 더해진 선배 이야기 N건」.
+//   [11/25 #266] 「원문 N건 보기」 접기는 없앴다 — 근거는 요약 문장 끝 출처, 신고는 요약 문장에(5-2 신고 풍선).
 //   summary가 없으면 이 부분을 안 쓰고 원문 목록 그대로. 배운점은 서버가 summary를 보내지 않는다.
 // ---------------------------------------------------------------------------
 
@@ -477,7 +478,7 @@ function summaryParagraph(section, sources, reportName) {
   const parts = [];
   section.summary.forEach((item, i) => {
     if (i) parts.push(" ");
-    parts.push(el("span", { className: "summary__sentence", text: item.text }));
+    parts.push(summarySentence(item));
     const from = summarySourceText(item, sources, reportName);
     if (from) parts.push(" ", el("span", { className: "summary__from", text: from }));
     // 규정에 닿는 요약 문장(official) — 칸 문장과 같은 중립 라벨 「개인 경험」(디자인 규칙 8-1)
@@ -486,28 +487,30 @@ function summaryParagraph(section, sources, reportName) {
   return el("p", { className: "summary__text" }, parts);
 }
 
-// 「원문 N건 보기」 접기: 요약을 만든 원문(새 이야기 제외)
-function originalFold(lines, sources) {
-  return el("details", { className: "summary-fold" }, [
-    el("summary", { className: "summary-fold__head" }, [
-      el("span", { className: "summary-fold__closed", text: `원문 ${lines.length}건 보기` }),
-      el("span", { className: "summary-fold__open", text: "원문 접기" }),
-      icon("chevron-down"),
-    ]),
-    el("div", { className: "summary-fold__body" }, lines.map((l) => lineCard(l, sources[l.sourceId] || {}))),
-  ]);
+// 요약 문장 하나. lineId(「S-…」)가 있으면 신고할 수 있다 — 선택하면 풍선(5-2), 키보드는 Tab → Enter
+const sentenceItem = new WeakMap(); // 문장 span → summary 항목
+function summarySentence(item) {
+  const span = el("span", { className: "summary__sentence", text: item.text });
+  if (item.lineId) {
+    sentenceItem.set(span, item);
+    span.tabIndex = 0;
+    span.setAttribute("aria-label", `${item.text} — Enter를 누르면 이 문장을 신고할 수 있어요`);
+    span.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); openReportSheet({ ...item, kind: "summary" }); }
+    });
+  }
+  return span;
 }
 
 function summaryBlock(section, sources, reportName) {
   const lines = section.lines || [];
   const fresh = newLineCount(section);
-  const original = lines.slice(0, lines.length - fresh);
   const added = lines.slice(lines.length - fresh);
   const out = [
     el("div", { className: "summary" }, [
       el("h3", { className: "summary__title", text: section.name }),
       summaryParagraph(section, sources, reportName),
-      original.length ? originalFold(original, sources) : null,
+      el("p", { className: "summary__hint" }, [icon("flag"), el("span", { text: "틀린 문장은 길게 누르거나 드래그해서 신고할 수 있어요" })]),
     ]),
   ];
   if (added.length) {
@@ -515,6 +518,16 @@ function summaryBlock(section, sources, reportName) {
     out.push(...added.map((l) => lineCard(l, sources[l.sourceId] || {})));
   }
   return out;
+}
+
+// 신고한 요약 문장만 뺀다(원문 lines는 그대로, spec reportStatement). 하나도 안 남으면 그 칸은 원문 목록으로
+function hideSummaryInSection(section, lineId) {
+  if (!Array.isArray(section.summary)) return;
+  section.summary = section.summary.filter((s) => s.lineId !== lineId);
+  if (!section.summary.length) {
+    delete section.summary;
+    delete section.newLines;
+  }
 }
 
 // 신고로 숨긴 문장을 요약·newLines에도 맞춘다(서버 규칙과 같게: 그 문장을 sources에 든 요약 문장은 뺀다)
@@ -731,14 +744,19 @@ const sheet = document.getElementById("reportSheet");
 const reasonsEl = document.getElementById("reportReasons");
 const submitBtn = document.getElementById("reportSubmit");
 const reasonHint = document.getElementById("reportReason");
+const reportQuote = document.getElementById("reportQuote");
 let reportTarget = null;
 let reportChoice = null;
 let lastFocus = null;
 
+// target: 원문 문장(line, lineId 「L-…」) 또는 요약 문장({ lineId 「S-…」, text, kind: "summary" })
 function openReportSheet(line) {
+  hideReportBubble();
   reportTarget = line;
   reportChoice = null;
   lastFocus = document.activeElement;
+  reportQuote.textContent = line.text || "";
+  reportQuote.hidden = !line.text;
   reasonsEl.replaceChildren(...REPORT_REASONS.map((r) => {
     const chip = el("button", { className: "choice-chip", text: r, attrs: { type: "button", "aria-pressed": "false" } });
     chip.addEventListener("click", () => {
@@ -769,8 +787,11 @@ submitBtn.addEventListener("click", async () => {
   try {
     const res = await reportStatement(reportTarget.lineId, reportChoice);
     if (!res || !res.ok) throw new Error((res && res.error) || "신고 실패");
-    // 신고한 문장은 바로 숨긴다(spec: 즉시 숨김)
-    for (const s of detailNote.sections) hideLineInSection(s, reportTarget);
+    // 신고한 문장은 바로 숨긴다(spec: 즉시 숨김). 요약 문장이면 그 요약 문장만
+    for (const s of detailNote.sections) {
+      if (reportTarget.kind === "summary") hideSummaryInSection(s, reportTarget.lineId);
+      else hideLineInSection(s, reportTarget);
+    }
     closeReportSheet();
     renderSection(document.getElementById("sectionPanel"));
     toast("신고했어요. 이 문장은 숨겼어요");
@@ -785,6 +806,60 @@ sheet.querySelector(".sheet-scrim").addEventListener("click", closeReportSheet);
 sheet.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeReportSheet();
 });
+
+// ---------------------------------------------------------------------------
+// 8-1. 요약 문장 신고 풍선(spec reportStatement 화면, 디자인 규칙 8-1 ③) — 11/25 #266
+//   요약 문장을 길게 누르거나(모바일: 글자 선택) 드래그하면(PC) 선택 끝에 「신고하기」 풍선 → 위 신고 시트.
+//   선택이 여러 문장에 걸치면 선택이 끝난 문장을 신고한다.
+// ---------------------------------------------------------------------------
+
+const bubble = el("button", { className: "report-bubble", attrs: { type: "button" } }, [icon("flag"), el("span", { text: "신고하기" })]);
+bubble.hidden = true;
+document.body.append(bubble);
+let bubbleItem = null;
+
+function sentenceOf(node) {
+  const elNode = node && (node.nodeType === 1 ? node : node.parentElement);
+  const span = elNode && elNode.closest(".summary__sentence");
+  return span && sentenceItem.has(span) ? span : null;
+}
+
+function hideReportBubble() {
+  bubble.hidden = true;
+  bubbleItem = null;
+}
+
+function placeReportBubble() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount || viewDetail.hidden) return hideReportBubble();
+  const span = sentenceOf(sel.focusNode) || sentenceOf(sel.anchorNode);
+  if (!span) return hideReportBubble();
+  const rects = sel.getRangeAt(0).getClientRects();
+  const last = rects[rects.length - 1] || span.getBoundingClientRect();
+  bubbleItem = sentenceItem.get(span);
+  bubble.hidden = false;
+  drawIcons();
+  // 선택 블록 오른쪽 끝 아래. 화면 밖으로 나가지 않게 좌우 16px 안으로
+  const w = bubble.offsetWidth;
+  const left = Math.min(Math.max(16, last.right - w), document.documentElement.clientWidth - w - 16);
+  bubble.style.left = `${left + window.scrollX}px`;
+  bubble.style.top = `${last.bottom + window.scrollY + 8}px`;
+}
+
+let bubbleTick = 0;
+document.addEventListener("selectionchange", () => {
+  cancelAnimationFrame(bubbleTick);
+  bubbleTick = requestAnimationFrame(placeReportBubble);
+});
+// 풍선을 누를 때 선택이 풀려 풍선이 먼저 사라지지 않게 mousedown 기본 동작을 막는다
+bubble.addEventListener("mousedown", (e) => e.preventDefault());
+bubble.addEventListener("click", () => {
+  if (!bubbleItem) return;
+  const item = bubbleItem;
+  window.getSelection().removeAllRanges();
+  openReportSheet({ ...item, kind: "summary" });
+});
+window.addEventListener("resize", hideReportBubble);
 
 // ---------------------------------------------------------------------------
 // 9. 시작

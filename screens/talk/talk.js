@@ -1037,10 +1037,13 @@ function draftOffer(prev) {
           if (tell.step || tell.busy) return;
           done();
           tellUser("이어서 할게요");
+          // 불러온 지난 답은 지금 시각이 아니라 「지난번」으로 보인다(서버 초안에 시각이 없음, 디자인 규칙 5-8)
+          replayAt = "지난번";
           for (const a of prev) {
             tellBoo(a.asked || a.question || `${a.section} 이야기`);
             tellUser(a.skipped ? "경험이 없어요" : a.answer);
           }
+          replayAt = null;
           tell.answers = prev;
           saveKeep();
           askNext();
@@ -1475,11 +1478,12 @@ function restoreTell(kept) {
 }
 
 // 「아까 이야기를 이어서 할게요」(spec) + 다른 경험으로 바꾸기
+// [11/26] 다 물은 뒤(done)면 바로 위 done 안내와 겹치지 않게 「이어서 쓸 수 있어요. …」(spec 9장 1단계)
 function resumeMessage() {
   const { msg, body } = booMessage();
   body.append(el("p", {
     className: "msg__bubble",
-    text: tell.step.done ? "아까 이야기를 이어서 할게요. 더 들려줄 칸을 고르거나 AI 요약을 눌러 주세요." : "아까 이야기를 이어서 할게요.",
+    text: tell.step.done ? "이어서 쓸 수 있어요. 더 들려줄 칸을 고르거나 AI 요약을 눌러 주세요." : "아까 이야기를 이어서 할게요.",
   }));
   if (tell.experiences.length > 1) {
     body.append(el("div", { className: "msg__actions" }, [
