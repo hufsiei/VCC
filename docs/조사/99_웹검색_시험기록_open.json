@@ -1,0 +1,1222 @@
+[
+  {
+    "id": 1,
+    "유형": "환율",
+    "q": "오늘 원/유로 환율이 얼마예요? 독일 교환 가기 전에 환전하려고요.",
+    "길": "외부",
+    "AI": true,
+    "초": 5.8,
+    "ok": true,
+    "답": "11월 25일(수) 고시 기준으로 1유로는 1,472.72원이에요. 11월 26일 브리핑에서는 원/유로가 1,475.06원으로 나왔어요.",
+    "폴백": "",
+    "버린문장": [
+      {
+        "text": "이 값들은 매매기준율 같은 기준 환율이라서, 은행이나 환전소에서 실제로 적용하는 환율은 이와 다를 수 있어요.",
+        "이유": "출처 없음"
+      }
+    ],
+    "출처": [
+      {
+        "url": "https://www.thekorean.today/62289",
+        "종류": "기타"
+      },
+      {
+        "url": "https://dailypop.kr/news/articleView.html?idxno=105110",
+        "종류": "기타"
+      }
+    ],
+    "원문": "11월 25일(수) 고시 기준으로 1유로는 1,472.72원이에요. 11월 26일 브리핑에서는 원/유로가 1,475.06원으로 나왔어요. 이 값들은 매매기준율 같은 기준 환율이라서, 은행이나 환전소에서 실제로 적용하는 환율은 이와 다를 수 있어요.",
+    "segments": [
+      {
+        "text": "11월 25일(수) 고시 기준으로 1유로는 1,472.72원이에요.",
+        "sources": [
+          {
+            "url": "https://www.thekorean.today/62289",
+            "title": "[코리안투데이] [오늘의 환율] 11월 26일(목) 달러 1,343.6원 ▼3.0원 · 25일 고시",
+            "cited_text": "11월 25일(수) 고시 기준 원·달러 환율은 1달러에 1,343.60원으로 전일보다 3.00원 내렸다. "
+          },
+          {
+            "url": "https://www.thekorean.today/62289",
+            "title": "[코리안투데이] [오늘의 환율] 11월 26일(목) 달러 1,343.6원 ▼3.0원 · 25일 고시",
+            "cited_text": "엔화는 100엔에 843.41원, 유로화는 1유로에 1,472.72원이다.\n\n"
+          }
+        ]
+      },
+      {
+        "text": " ",
+        "sources": []
+      },
+      {
+        "text": "11월 26일 브리핑에서는 원/유로가 1,475.06원으로 나왔어요.",
+        "sources": [
+          {
+            "url": "https://dailypop.kr/news/articleView.html?idxno=105110",
+            "title": "[매일 금리·환율 브리핑] 11월 26일, 국고채 3년 금리 상승 - 데일리팝",
+            "cited_text": "· 원/유로: 1475.06원 (전일 +2.3원 / 주간 +14.4원)\n\n· 원/위안: 201.57원 (전일 +0.3원 / 주간 +2.1원)\n\n· 원/일본엔(100엔): 844.37원 (전일 +1.0원 / 주간 +9.1원)\n\n· 원/유로: 1475.06원 (전일 +2...."
+          }
+        ]
+      },
+      {
+        "text": " 이 값들은 매매기준율 같은 기준 환율이라서, 은행이나 환전소에서 실제로 적용하는 환율은 이와 다를 수 있어요.",
+        "sources": []
+      }
+    ],
+    "results": [
+      {
+        "url": "https://kr.investing.com/currencies/eur-krw",
+        "title": "EUR KRW 오늘",
+        "page_age": "845 days ago"
+      },
+      {
+        "url": "https://wise.com/us/currency-converter/krw-to-eur-rate",
+        "title": "대한민국 원 → 유로 환전",
+        "page_age": null
+      },
+      {
+        "url": "https://kr.investing.com/currencies/krw-eur",
+        "title": "KRW EUR 오늘",
+        "page_age": null
+      },
+      {
+        "url": "https://wise.com/us/currency-converter/eur-to-krw-rate",
+        "title": "유로 → 대한민국 원 환율. EUR/KRW 환전",
+        "page_age": null
+      },
+      {
+        "url": "https://kr.investing.com/currencies/eur-krw-scoreboard",
+        "title": "유로 원 (EUR KRW) 스코어보드 - Investing.com",
+        "page_age": null
+      },
+      {
+        "url": "https://wise.com/us/currency-converter/krw-to-eur-rate/history",
+        "title": "South Korean won to Euros Exchange Rate History",
+        "page_age": "104 days ago"
+      },
+      {
+        "url": "https://dailypop.kr/news/articleView.html?idxno=105110",
+        "title": "[매일 금리·환율 브리핑] 11월 26일, 국고채 3년 금리 상승 - 데일리팝",
+        "page_age": "0 days ago"
+      },
+      {
+        "url": "https://kr.investing.com/currencies/eur-krw-converter",
+        "title": "유로 원 (EUR KRW) 변환기 - Investing.com",
+        "page_age": "232 days ago"
+      },
+      {
+        "url": "https://www.thekorean.today/62289",
+        "title": "[코리안투데이] [오늘의 환율] 11월 26일(목) 달러 1,343.6원 ▼3.0원 · 25일 고시",
+        "page_age": "0 days ago"
+      },
+      {
+        "url": "https://thekorean.today/62302",
+        "title": "[코리안투데이] [오늘의 간추림] 11월 26일(목) 금값·휘발유 낮은 쪽 · LPG 높은 쪽",
+        "page_age": "0 days ago"
+      }
+    ],
+    "검색결과수": 10,
+    "검색": 1,
+    "입력토큰": 17603,
+    "출력토큰": 228,
+    "비용": 0.0475
+  },
+  {
+    "id": 2,
+    "유형": "환율",
+    "q": "요즘 엔화 환율로 일본 생활비 한 달 15만 엔이면 원화로 얼마쯤이에요?",
+    "길": "외부",
+    "AI": true,
+    "초": 7.4,
+    "ok": true,
+    "답": "11월 25일 고시 기준으로 엔화는 100엔에 843.41원이에요. 오늘(11월 26일) 장중에는 엔/원 환율이 전 거래일보다 3.41원 하락한 842.18원으로 나왔어요.",
+    "폴백": "",
+    "버린문장": [
+      {
+        "text": "15만 엔의 원화 환산액은 검색 결과에 나와 있지 않아서 따로 적지 않았어요.",
+        "이유": "출처 없음"
+      },
+      {
+        "text": "위 환율은 매일 바뀌어요.",
+        "이유": "출처 없음"
+      }
+    ],
+    "출처": [
+      {
+        "url": "https://www.thekorean.today/62289",
+        "종류": "기타"
+      },
+      {
+        "url": "https://www.tournews21.com/news/articleView.html?idxno=149340",
+        "종류": "언론"
+      }
+    ],
+    "원문": "11월 25일 고시 기준으로 엔화는 100엔에 843.41원이에요. 오늘(11월 26일) 장중에는 엔/원 환율이 전 거래일보다 3.41원 하락한 842.18원으로 나왔어요. 15만 엔의 원화 환산액은 검색 결과에 나와 있지 않아서 따로 적지 않았어요. 위 환율은 매일 바뀌어요.",
+    "segments": [
+      {
+        "text": "11월 25일 고시 기준으로 ",
+        "sources": []
+      },
+      {
+        "text": "엔화는 100엔에 843.41원",
+        "sources": [
+          {
+            "url": "https://www.thekorean.today/62289",
+            "title": "[코리안투데이] [오늘의 환율] 11월 26일(목) 달러 1,343.6원 ▼3.0원 · 25일 고시",
+            "cited_text": "엔화는 100엔에 843.41원, 유로화는 1유로에 1,472.72원이다.\n\n"
+          }
+        ]
+      },
+      {
+        "text": "이에요. 오늘(11월 26일) 장중에는 ",
+        "sources": []
+      },
+      {
+        "text": "엔/원 환율이 전 거래일보다 3.41원 하락한 842.18원",
+        "sources": [
+          {
+            "url": "https://www.tournews21.com/news/articleView.html?idxno=149340",
+            "title": "[종합 환율] 11월 26일 장중, 주요국 통화 원화 대비 일제히 하락 < 금융/산업 < 경제 < 기사본문 - 투어코리아",
+            "cited_text": "같은 시각 엔/원 환율은 전거래일 대비 3.41원(-0.4%) 하락한 842.18원을 기록하고 있다.\n\n"
+          }
+        ]
+      },
+      {
+        "text": "으로 나왔어요. 15만 엔의 원화 환산액은 검색 결과에 나와 있지 않아서 따로 적지 않았어요. 위 환율은 매일 바뀌어요.",
+        "sources": []
+      }
+    ],
+    "results": [
+      {
+        "url": "https://kr.investing.com/currencies/jpy-krw",
+        "title": "JPY KRW 오늘",
+        "page_age": "43 days ago"
+      },
+      {
+        "url": "https://wise.com/us/currency-converter/krw-to-jpy-rate/history",
+        "title": "South Korean won to Japanese yen Exchange Rate History",
+        "page_age": "177 days ago"
+      },
+      {
+        "url": "https://kr.investing.com/currencies/krw-jpy",
+        "title": "KRW JPY 오늘",
+        "page_age": "861 days ago"
+      },
+      {
+        "url": "https://www.thekorean.today/62289",
+        "title": "[코리안투데이] [오늘의 환율] 11월 26일(목) 달러 1,343.6원 ▼3.0원 · 25일 고시",
+        "page_age": "0 days ago"
+      },
+      {
+        "url": "https://wise.com/us/currency-converter/krw-to-jpy-rate",
+        "title": "South Korean wons to Japanese yen Exchange Rate. Convert KRW/JPY - Wise",
+        "page_age": null
+      },
+      {
+        "url": "https://www.tournews21.com/news/articleView.html?idxno=149340",
+        "title": "[종합 환율] 11월 26일 장중, 주요국 통화 원화 대비 일제히 하락 < 금융/산업 < 경제 < 기사본문 - 투어코리아",
+        "page_age": "0 days ago"
+      },
+      {
+        "url": "https://kr.investing.com/currencies/jpy-krw-scoreboard",
+        "title": "일본 엔 원 (JPY KRW) 스코어보드 - Investing.com",
+        "page_age": null
+      },
+      {
+        "url": "https://www.indexergo.com/series/?idxDetail=10605",
+        "title": "원/엔(JPY100) (845.96원)",
+        "page_age": null
+      },
+      {
+        "url": "https://kr.fxexchangerate.com/jpy/krw.html",
+        "title": "일본 엔(JPY) 으로 대한민국 원(KRW) 환율 오늘 - 외환 환율",
+        "page_age": null
+      }
+    ],
+    "검색결과수": 9,
+    "검색": 1,
+    "입력토큰": 17599,
+    "출력토큰": 562,
+    "비용": 0.0508
+  },
+  {
+    "id": 3,
+    "유형": "대학 순위",
+    "q": "QS 세계대학순위 최신판에서 독일 마르부르크 대학교는 몇 위예요?",
+    "길": "외부",
+    "AI": true,
+    "초": 2.9,
+    "ok": true,
+    "답": "QS 세계대학순위 2027년판에서 마르부르크 대학교(Philipps-Universität Marburg)는 951-1000위권이에요. 순위 변동을 보면 2026년에는 771-780위였어요.",
+    "폴백": "",
+    "버린문장": [
+      {
+        "text": "이전 판보다 크게 내려간 셈이에요.",
+        "이유": "출처 없음"
+      }
+    ],
+    "출처": [
+      {
+        "url": "https://www.topuniversities.com/universities/philipps-universitat-marburg",
+        "종류": "공식"
+      }
+    ],
+    "원문": "QS 세계대학순위 2027년판에서 마르부르크 대학교(Philipps-Universität Marburg)는 951-1000위권이에요. 순위 변동을 보면 2026년에는 771-780위였어요. 이전 판보다 크게 내려간 셈이에요.",
+    "segments": [
+      {
+        "text": "QS 세계대학순위 2027년판에서 마르부르크 대학교(Philipps-Universität Marburg)는 ",
+        "sources": []
+      },
+      {
+        "text": "951-1000위권",
+        "sources": [
+          {
+            "url": "https://www.topuniversities.com/universities/philipps-universitat-marburg",
+            "title": "Philipps-Universität Marburg : Rankings, Fees & Courses Details",
+            "cited_text": "It is **ranked #951-1000 in QS World University Rankings 2027**. "
+          }
+        ]
+      },
+      {
+        "text": "이에요. 순위 변동을 보면 ",
+        "sources": []
+      },
+      {
+        "text": "2026년에는 771-780위였어요.",
+        "sources": [
+          {
+            "url": "https://www.topuniversities.com/universities/philipps-universitat-marburg",
+            "title": "Philipps-Universität Marburg : Rankings, Fees & Courses Details",
+            "cited_text": "… QS World University Rankings: 2021 #651-700 · 2022 #701-750 · 2023 #751-800 · 2024 #761-770 · 2025 #801-850 · 2026 #771-780 · **2027 #951-1000**\n\n# ..."
+          }
+        ]
+      },
+      {
+        "text": " 이전 판보다 크게 내려간 셈이에요.",
+        "sources": []
+      }
+    ],
+    "results": [
+      {
+        "url": "https://www.topuniversities.com/universities/philipps-universitat-marburg",
+        "title": "Philipps-Universität Marburg : Rankings, Fees & Courses Details",
+        "page_age": "390 days ago"
+      },
+      {
+        "url": "https://collegedunia.com/germany/university/688-philipps-university-marburg-marburg/ranking",
+        "title": "Philipps University Marburg Rankings 2026-27: Global and Subject Rankings",
+        "page_age": "153 days ago"
+      },
+      {
+        "url": "https://www.study.eu/university/university-of-marburg",
+        "title": "University of Marburg, Germany",
+        "page_age": null
+      },
+      {
+        "url": "https://xuanxiao.org/en/universities/philipps-university-of-marburg",
+        "title": "Philipps University of Marburg Rankings: QS 2027 #951-1000 · THE 2027 #376–400 · ARWU 2026 #301-400 · US News 2027 #578",
+        "page_age": "240 days ago"
+      },
+      {
+        "url": "https://www.mygermanuniversity.com/unifinder/Marburg-University",
+        "title": "Study at Marburg University (2026/27)",
+        "page_age": null
+      },
+      {
+        "url": "https://www.topuniversities.com/world-university-rankings?countries=de&items_per_page=150",
+        "title": "QS World University Rankings 2027: Top Global Universities",
+        "page_age": "0 days ago"
+      },
+      {
+        "url": "https://www.timeshighereducation.com/world-university-rankings/university-marburg",
+        "title": "University of Marburg",
+        "page_age": "72 days ago"
+      },
+      {
+        "url": "https://www.shiksha.com/studyabroad/germany/universities/philipps-university-of-marburg/ranking",
+        "title": "Philipps University of Marburg Rankings 2027: Latest World University Rankings",
+        "page_age": "1136 days ago"
+      },
+      {
+        "url": "https://www.gotouniversity.com/university/university-of-marburg/ranking",
+        "title": "University of Marburg Global, Subject & Regional Rankings",
+        "page_age": null
+      },
+      {
+        "url": "https://www.mastersportal.com/rankings-reviews/264/philip-university-in-marburg.html",
+        "title": "Philip University in Marburg - Rankings & Reviews",
+        "page_age": null
+      }
+    ],
+    "검색결과수": 10,
+    "검색": 1,
+    "입력토큰": 14715,
+    "출력토큰": 203,
+    "비용": 0.0415
+  },
+  {
+    "id": 4,
+    "유형": "대학 순위",
+    "q": "THE 세계대학순위에서 한국외국어대학교는 몇 위권이에요?",
+    "길": "외부",
+    "AI": true,
+    "초": 3.7,
+    "ok": true,
+    "답": "THE 세계대학순위에서 한국외대의 순위는 찾지 못했어요. QS 세계대학순위 2026에서는 공동 680위였고, 2027에서는 공동 620위예요.",
+    "폴백": "",
+    "버린문장": [
+      {
+        "text": "검색된 자료에는 THE 기준 한국외대 순위가 없었어요.",
+        "이유": "출처 없음"
+      },
+      {
+        "text": "대신 QS 세계대학순위는 확인돼요.",
+        "이유": "출처 없음"
+      }
+    ],
+    "출처": [
+      {
+        "url": "https://www.topuniversities.com/universities/hufs-hankuk-korea-university-foreign-studies",
+        "종류": "공식"
+      }
+    ],
+    "원문": "THE 세계대학순위에서 한국외대의 순위는 찾지 못했어요. 검색된 자료에는 THE 기준 한국외대 순위가 없었어요.\n\n대신 QS 세계대학순위는 확인돼요. QS 세계대학순위 2026에서는 공동 680위였고, 2027에서는 공동 620위예요.",
+    "segments": [
+      {
+        "text": "THE 세계대학순위에서 한국외대의 순위는 찾지 못했어요. 검색된 자료에는 THE 기준 한국외대 순위가 없었어요.\n\n대신 QS 세계대학순위는 확인돼요. ",
+        "sources": []
+      },
+      {
+        "text": "QS 세계대학순위 2026에서는 공동 680위였고, 2027에서는 공동 620위예요.",
+        "sources": [
+          {
+            "url": "https://www.topuniversities.com/universities/hufs-hankuk-korea-university-foreign-studies",
+            "title": "HUFS - Hankuk (Korea) University of Foreign Studies : Rankings, Fees & Courses Details",
+            "cited_text": "QS World University Rankings: 2026 #=680\n\n# HUFS - Hankuk (Korea) University of Foreign Studies\n## Rankings\n#### QS World University Rankings\n- #=620 ..."
+          }
+        ]
+      }
+    ],
+    "results": [
+      {
+        "url": "https://www.kyosu.net/news/articleView.html?idxno=202202",
+        "title": "한국외대, QS 학문분야 평가 인문학 세계 순위 69계단 상승 < 대학핫뉴스-일반대 < 대학·교육 < 기사본문 - 교수신문",
+        "page_age": "240 days ago"
+      },
+      {
+        "url": "https://community.linkareer.com/employment_data/4569026",
+        "title": "2026 대한민국 대학 순위 정리｜국내 대학 서열와 평가 기준 총정리 - 링커리어 커뮤니티",
+        "page_age": "505 days ago"
+      },
+      {
+        "url": "https://v.daum.net/v/7qznSE4qO4?f=p",
+        "title": "한국외대 QS 순위 218위…전년比 69 계단↑",
+        "page_age": "241 days ago"
+      },
+      {
+        "url": "https://www.koreatimes.co.kr/southkorea/society/20250924/new-korean-university-rankings-unveiled-for-international-students",
+        "title": "New Korean university rankings unveiled for international students - The Korea Times",
+        "page_age": "428 days ago"
+      },
+      {
+        "url": "https://news.unn.net/news/articleView.html?idxno=591275",
+        "title": "[숫자로 풀어본 대학 순위] QS 세계대학순위, 국내 대학 3개년 성적은?… 연세대·고려대 논문력 3년간 30점 급등 < 숏보자 GO < 포토·영상 < 기사본문 - 한국대학신문 - 411개 대학을 연결하는 '힘'",
+        "page_age": "238 days ago"
+      },
+      {
+        "url": "https://www.make2t.kr/2026/08/korea-university-ranking-2026.html",
+        "title": "2026 최신 대학순위｜국내 대학서열·QS 2027·THE 2026 비교",
+        "page_age": "100 days ago"
+      },
+      {
+        "url": "https://www.topuniversities.com/universities/hufs-hankuk-korea-university-foreign-studies",
+        "title": "HUFS - Hankuk (Korea) University of Foreign Studies : Rankings, Fees & Courses Details",
+        "page_age": "288 days ago"
+      },
+      {
+        "url": "https://hyu.wiki/THE%EC%84%B8%EA%B3%84%EB%8C%80%ED%95%99%ED%8F%89%EA%B0%80",
+        "title": "THE세계대학평가 - 한양 위키",
+        "page_age": "407 days ago"
+      },
+      {
+        "url": "https://aitime.co.kr/entry/%EC%A0%84%EC%84%B8%EA%B3%84-%EB%8C%80%ED%95%99%EC%88%9C%EC%9C%84-%EB%B0%8F-%ED%95%9C%EA%B5%AD%EC%9D%98-%EB%8C%80%ED%95%99%EC%88%9C%EC%9C%84-%EB%B0%8F-%EA%B2%BD%EC%9F%81%EB%A0%A5",
+        "title": "전세계 대학순위 및 한국의 대학순위 및 경쟁력",
+        "page_age": "94 days ago"
+      }
+    ],
+    "검색결과수": 9,
+    "검색": 1,
+    "입력토큰": 13390,
+    "출력토큰": 209,
+    "비용": 0.0389
+  },
+  {
+    "id": 5,
+    "유형": "기업 정보",
+    "q": "KOTRA는 어떤 일을 하는 기관이고 본사는 어디에 있어요? 인턴 지원 전에 알아 두려고요.",
+    "길": "외부",
+    "AI": true,
+    "초": 4.2,
+    "ok": true,
+    "답": "KOTRA는 무역 진흥, 국내외 기업 간 투자, 산업기술 협력 지원 등을 통해 국민경제 발전에 이바지하려고 설립된 기관이에요. 주요 역할은 중소기업의 해외시장 진출 지원, 해외시장 정보 제공과 컨설팅, 외국인 투자 유치 등이에요. 본사는 서울시 서초구 헌릉로 13에 있어요.",
+    "폴백": "",
+    "버린문장": [],
+    "출처": [
+      {
+        "url": "https://www.kotra.or.kr/english/subList/20000006771",
+        "종류": "공식"
+      },
+      {
+        "url": "https://www.kotra.or.kr/english/subList/41000049002",
+        "종류": "공식"
+      }
+    ],
+    "원문": "KOTRA는 무역 진흥, 국내외 기업 간 투자, 산업기술 협력 지원 등을 통해 국민경제 발전에 이바지하려고 설립된 기관이에요. 주요 역할은 중소기업의 해외시장 진출 지원, 해외시장 정보 제공과 컨설팅, 외국인 투자 유치 등이에요. 본사는 서울시 서초구 헌릉로 13에 있어요.",
+    "segments": [
+      {
+        "text": "KOTRA는 무역 진흥, 국내외 기업 간 투자, 산업기술 협력 지원 등을 통해 국민경제 발전에 이바지하려고 설립된 기관이에요.",
+        "sources": [
+          {
+            "url": "https://www.kotra.or.kr/english/subList/20000006771",
+            "title": "KOTRA ENGLISH - History",
+            "cited_text": "Agency established to contribute to the development of the national economy by performing work such as trade promotion, investment between domestic an..."
+          }
+        ]
+      },
+      {
+        "text": " ",
+        "sources": []
+      },
+      {
+        "text": "주요 역할은 중소기업의 해외시장 진출 지원, 해외시장 정보 제공과 컨설팅, 외국인 투자 유치 등이에요.",
+        "sources": [
+          {
+            "url": "https://www.kotra.or.kr/english/subList/20000006771",
+            "title": "KOTRA ENGLISH - History",
+            "cited_text": "Main functions and roles\nExpanding medium and small-sized enterprises’ business in overseas markets\nSupporting small-sized enterprises (SME) to extend..."
+          }
+        ]
+      },
+      {
+        "text": " ",
+        "sources": []
+      },
+      {
+        "text": "본사는 서울시 서초구 헌릉로 13에 있어요.",
+        "sources": [
+          {
+            "url": "https://www.kotra.or.kr/english/subList/41000049002",
+            "title": "KOTRA ENGLISH - HEAD OFFICE",
+            "cited_text": "Address : (06792) 13, Heolleung-ro, Seocho-gu, Seoul, Korea\n\n# KOTRA ENGLISH\n### ABOUT\n#### HEAD OFFICE\nAddress : (06792) 13, Heolleung-ro, Seocho-gu,..."
+          }
+        ]
+      }
+    ],
+    "results": [
+      {
+        "url": "https://ko.wikipedia.org/wiki/%EB%8C%80%ED%95%9C%EB%AC%B4%EC%97%AD%ED%88%AC%EC%9E%90%EC%A7%84%ED%9D%A5%EA%B3%B5%EC%82%AC",
+        "title": "대한무역투자진흥공사 - 위키백과, 우리 모두의 백과사전",
+        "page_age": "173 days ago"
+      },
+      {
+        "url": "https://thevc.kr/kotra",
+        "title": "대한무역투자진흥공사 - 기관정보",
+        "page_age": "59 days ago"
+      },
+      {
+        "url": "https://encykorea.aks.ac.kr/Article/E0014995",
+        "title": "대한무역투자진흥공사 - 한국민족문화대백과사전",
+        "page_age": null
+      },
+      {
+        "url": "https://www.teamblind.com/kr/company/%EB%8C%80%ED%95%9C%EB%AC%B4%EC%97%AD%ED%88%AC%EC%9E%90%EC%A7%84%ED%9D%A5%EA%B3%B5%EC%82%AC/",
+        "title": "블라인드",
+        "page_age": null
+      },
+      {
+        "url": "https://jasoseol.com/companies/1166",
+        "title": "대한무역투자진흥공사(KOTRA) 기업정보 - 2026년 연봉, 사업, 채용, 지원자 스펙 분석",
+        "page_age": null
+      },
+      {
+        "url": "https://www.kotra.or.kr/60th_archive/history01.html",
+        "title": "Kotra_History01",
+        "page_age": null
+      },
+      {
+        "url": "https://www.kotra.or.kr/english/subList/41000049002",
+        "title": "KOTRA ENGLISH - HEAD OFFICE",
+        "page_age": null
+      },
+      {
+        "url": "https://www.kotrait.or.jp/kr/information",
+        "title": "KOTRA - 대한무역투자진흥공사 동경IT지원센터",
+        "page_age": null
+      },
+      {
+        "url": "https://www.kotra.or.kr/english/subList/20000006771",
+        "title": "KOTRA ENGLISH - History",
+        "page_age": null
+      },
+      {
+        "url": "https://www.kotra.or.kr/english/subList/41000047001",
+        "title": "KOTRA ENGLISH - CI",
+        "page_age": null
+      }
+    ],
+    "검색결과수": 10,
+    "검색": 1,
+    "입력토큰": 16841,
+    "출력토큰": 286,
+    "비용": 0.0465
+  },
+  {
+    "id": 6,
+    "유형": "기업 정보",
+    "q": "삼성전자 2025년 연간 매출액이 얼마였어요?",
+    "길": "외부",
+    "AI": true,
+    "초": 4.7,
+    "ok": true,
+    "답": "전년 대비 매출은 10.9% 늘었어요.",
+    "폴백": "",
+    "버린문장": [
+      {
+        "text": "삼성전자 경영설명회 자료(2025년 4분기)에 따르면 2025년 연간 매출은 333.6조원이에요.",
+        "이유": "근거에 없는 숫자 333.6"
+      },
+      {
+        "text": "연결 기준으로 매출 333조6059억원, 영업이익 43조6011억원이고, 2026년 1월 29일에 발표됐어요.",
+        "이유": "근거에 없는 숫자 2026, 6011, 6059"
+      },
+      {
+        "text": "참고로 2026년 1월 8일 공시한 잠정치는 332조7700억원이었어요.",
+        "이유": "근거에 없는 숫자 2026"
+      }
+    ],
+    "출처": [
+      {
+        "url": "https://zdnet.co.kr/view/?no=20260129090854",
+        "종류": "기타"
+      }
+    ],
+    "원문": "삼성전자 경영설명회 자료(2025년 4분기)에 따르면 2025년 연간 매출은 333.6조원이에요. 연결 기준으로 매출 333조6059억원, 영업이익 43조6011억원이고, 2026년 1월 29일에 발표됐어요. 전년 대비 매출은 10.9% 늘었어요. 참고로 2026년 1월 8일 공시한 잠정치는 332조7700억원이었어요.",
+    "segments": [
+      {
+        "text": "삼성전자 경영설명회 자료(2025년 4분기)에 따르면 2025년 연간 매출은 333.6조원이에요.",
+        "sources": [
+          {
+            "url": "https://images.samsung.com/kdp/ir/events/2025/2025_4Q_conference_kor.pdf",
+            "title": "경영설명회: 2025년 4분기",
+            "cited_text": "FY '23 FY '24 FY '25\n\n'25년4분기실적발표\n\n'25년4분기경영실적요약\n\n**4Q '24** **3Q '25** **4Q '25**\n\n**매출**\n\n**영업이익(조원)**\n\n분기실적 연간실적\n\n**FY '23** **FY '24** **FY '25**\n..."
+          }
+        ]
+      },
+      {
+        "text": " ",
+        "sources": []
+      },
+      {
+        "text": "연결 기준으로 매출 333조6059억원, 영업이익 43조6011억원이고, 2026년 1월 29일에 발표됐어요.",
+        "sources": [
+          {
+            "url": "https://zdnet.co.kr/view/?no=20260129090854",
+            "title": "삼성전자, 작년 매출 333조·영업익 43.6조 '사상 최대치' - ZDNet korea",
+            "cited_text": "삼성전자는 29일 연결 기준으로 2025년 연간 매출 333조6천59억원, 영업이익 43조6천11억원을 기록했다. "
+          }
+        ]
+      },
+      {
+        "text": " ",
+        "sources": []
+      },
+      {
+        "text": "전년 대비 매출은 10.9% 늘었어요.",
+        "sources": [
+          {
+            "url": "https://zdnet.co.kr/view/?no=20260129090854",
+            "title": "삼성전자, 작년 매출 333조·영업익 43.6조 '사상 최대치' - ZDNet korea",
+            "cited_text": "전년 대비 매출은 10.9%, 영업이익은 33.2% 각각 증가했다. "
+          }
+        ]
+      },
+      {
+        "text": " ",
+        "sources": []
+      },
+      {
+        "text": "참고로 2026년 1월 8일 공시한 잠정치는 332조7700억원이었어요.",
+        "sources": [
+          {
+            "url": "http://www.thedailymoney.com/news/articleView.html?idxno=1131758",
+            "title": "삼성전자, 2025년 매출 333조원 '역대 최대'…영업익 43.5조(상보) < 기업/CEO < 기사본문 - 데일리머니",
+            "cited_text": "삼성전자(005930)는 2025년 연결 기준 잠정 매출이 332조 7700억 원으로 전년 동기 대비 10.6% 증가했다고 8일 공시했다. "
+          }
+        ]
+      }
+    ],
+    "results": [
+      {
+        "url": "https://zdnet.co.kr/view/?no=20260129090854",
+        "title": "삼성전자, 작년 매출 333조·영업익 43.6조 '사상 최대치' - ZDNet korea",
+        "page_age": "301 days ago"
+      },
+      {
+        "url": "https://news.samsung.com/kr/%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90-2025%EB%85%84-1%EB%B6%84%EA%B8%B0-%EC%8B%A4%EC%A0%81-%EB%B0%9C%ED%91%9C",
+        "title": "삼성전자, 2025년 1분기 실적 발표",
+        "page_age": "575 days ago"
+      },
+      {
+        "url": "https://www.inthenews.co.kr/news/article.html?no=82490",
+        "title": "[2025 연간실적] 삼성전자, 역대 최대 매출 달성…메모리에서만 16.4조 분기 영업익",
+        "page_age": "300 days ago"
+      },
+      {
+        "url": "https://www.kmjournal.net/news/articleView.html?idxno=7889",
+        "title": "[실적] 삼성전자, 2025년 매출 333조·영업이익 43.6조…반도체로 증명한 실적 회복 < AI·XR < 동학 < 투자 < 기사본문 - KMJ",
+        "page_age": "301 days ago"
+      },
+      {
+        "url": "https://images.samsung.com/kdp/ir/events/2025/2025_4Q_conference_kor.pdf",
+        "title": "경영설명회: 2025년 4분기",
+        "page_age": null
+      },
+      {
+        "url": "http://www.thedailymoney.com/news/articleView.html?idxno=1131758",
+        "title": "삼성전자, 2025년 매출 333조원 '역대 최대'…영업익 43.5조(상보) < 기업/CEO < 기사본문 - 데일리머니",
+        "page_age": "322 days ago"
+      },
+      {
+        "url": "https://m.bikorea.net/news/articleView.html?idxno=45102",
+        "title": "BIkorea 모바일 사이트, 삼성전자, 2025년 4분기 93조 8000억 매출 달성",
+        "page_age": "301 days ago"
+      },
+      {
+        "url": "https://www.bosoop.com/f7bc313e-2d4c-4509-afac-32dbeb5e0463/",
+        "title": "삼성전자 2025년 3분기 실적: 반도체·TV·스마트폰 세계 1위로 글로벌 전자 시장 지배력 강화",
+        "page_age": "168 days ago"
+      },
+      {
+        "url": "https://news.samsungsemiconductor.com/kr/%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90-2025%EB%85%84-3%EB%B6%84%EA%B8%B0-%EC%8B%A4%EC%A0%81-%EB%B0%9C%ED%91%9C/",
+        "title": "삼성전자, 2025년 3분기 실적 발표 - 삼성전자 반도체 뉴스룸",
+        "page_age": "391 days ago"
+      },
+      {
+        "url": "https://www.news1.kr/industry/general-industry/6032150",
+        "title": "삼성전자, 2025년 매출 333조원 '역대 최대'…영업익 43.5조(상보) - 뉴스1",
+        "page_age": "322 days ago"
+      }
+    ],
+    "검색결과수": 10,
+    "검색": 1,
+    "입력토큰": 23391,
+    "출력토큰": 302,
+    "비용": 0.0598
+  },
+  {
+    "id": 7,
+    "유형": "비교과 보도",
+    "q": "한국외대 비교과 프로그램이 최근 언론에 소개된 적 있어요?",
+    "길": "외부",
+    "AI": true,
+    "초": 3.3,
+    "ok": true,
+    "답": "언론 보도는 이번 검색에서 찾지 못했어요. 대신 학교 공식 사이트인 HUFSAbility에는 2026학년도 2학기 『주제탐구세미나』 연계 비교과 프로그램 <주제탐구 큐레이션>이 서울캠퍼스 기준 2026.11.26~2026.12.10 일정으로 올라와 있어요. 글로벌캠퍼스용도 따로 있고, 신청 기간은 2026.11.18~2026.12.02예요.",
+    "폴백": "",
+    "버린문장": [],
+    "출처": [
+      {
+        "url": "https://hufsability.hufs.ac.kr/",
+        "종류": "공식"
+      }
+    ],
+    "원문": "언론 보도는 이번 검색에서 찾지 못했어요. 대신 학교 공식 사이트인 HUFSAbility에는 2026학년도 2학기 『주제탐구세미나』 연계 비교과 프로그램 <주제탐구 큐레이션>이 서울캠퍼스 기준 2026.11.26~2026.12.10 일정으로 올라와 있어요. 글로벌캠퍼스용도 따로 있고, 신청 기간은 2026.11.18~2026.12.02예요.",
+    "segments": [
+      {
+        "text": "언론 보도는 이번 검색에서 찾지 못했어요. 대신 학교 공식 사이트인 HUFSAbility에는 ",
+        "sources": []
+      },
+      {
+        "text": "2026학년도 2학기 『주제탐구세미나』 연계 비교과 프로그램 <주제탐구 큐레이션>이 서울캠퍼스 기준 2026.11.26~2026.12.10 일정으로 올라와 있어요.",
+        "sources": [
+          {
+            "url": "https://hufsability.hufs.ac.kr/",
+            "title": "한국외대 HUFSAbility",
+            "cited_text": "한국외국어대학교: [서울캠퍼스] 2026학년도 2학기 『주제탐구세미나』 연계 비교과 프로그램 <주제탐구 큐레이션>2026.11.26 00:00~2026.12.10 23:59 · AI 활용한 데이터 실무 부트캠프2026.10.27 15:00~2026.11.16 13:00..."
+          }
+        ]
+      },
+      {
+        "text": " 글로벌캠퍼스용도 따로 있고, ",
+        "sources": []
+      },
+      {
+        "text": "신청 기간은 2026.11.18~2026.12.02예요.",
+        "sources": [
+          {
+            "url": "https://hufsability.hufs.ac.kr/",
+            "title": "한국외대 HUFSAbility",
+            "cited_text": "-\n  - 교내비교과\n  - 장학공지\n  - 공지사항\n  - 채용정보\n  - \\[글로벌캠퍼스\\] 2026학년도 2학기 『주제탐구세미나』 연계 비교과 프로그램 <주제탐구 큐레이션>2026.11.18 09:00~2026.12.02 23:59\n\n- \\[서울캠퍼스\\] 2026..."
+          }
+        ]
+      }
+    ],
+    "results": [
+      {
+        "url": "https://hufsability.hufs.ac.kr/",
+        "title": "한국외대 HUFSAbility",
+        "page_age": null
+      },
+      {
+        "url": "https://www.hufs.ac.kr/sites/iei/file/2025%EC%A0%84%EA%B3%B5%EA%B0%80%EC%9D%B4%EB%93%9C%EB%B6%81(%EC%84%9C%EC%9A%B8).pdf",
+        "title": "입학안내 문의 02-2173-2500 입학처 홈페이지 https://adms.hufs.ac.kr 서울캠퍼스",
+        "page_age": null
+      },
+      {
+        "url": "https://ctl.du.ac.kr/attachment/download/396/%EB%B6%99%EC%9E%84+2)+2023%ED%95%99%EB%85%84%EB%8F%84+2%ED%95%99%EA%B8%B0+%EB%B9%84%EA%B5%90%EA%B3%BC+%ED%94%84%EB%A1%9C%EA%B7%B8%EB%9E%A8+%ED%95%99%EC%A0%90%ED%99%94+%EC%9A%B4%EC%98%81%EA%B3%84%ED%9A%8D.pdf",
+        "title": "- 1 - 비교과 프로그램 학점화 1. 내용 구분 내용 수강자격 Ÿ 재학생 전체 인정 교과목 Ÿ 교과목명 과목명 비교과 프로그램 I",
+        "page_age": null
+      },
+      {
+        "url": "https://www.cufs.ac.kr/uploads/CONTENTS/site/cufs/CUFS%20%EB%B9%84%EA%B5%90%EA%B3%BC%C2%B7%ED%95%99%EC%83%9D%EC%83%81%EB%8B%B4%20%EA%B0%80%EC%9D%B4%EB%93%9C%EB%B6%81.pdf",
+        "title": "사이버한국외국어대학교 교학처 학생지원팀 www.cufs.ac.kr",
+        "page_age": "551 days ago"
+      },
+      {
+        "url": "https://www.hansung.ac.kr/HmnArt/1508/subview.do",
+        "title": "비교과프로그램",
+        "page_age": null
+      },
+      {
+        "url": "https://job.hufs.ac.kr/job/imng/icmpNsbjtPgm/findIcmpNsbjtPgmInfo.do?encSddpbSeq=1004497",
+        "title": "HUFS 대학일자리플러스본부 - 한국외국어대학교",
+        "page_age": "576 days ago"
+      },
+      {
+        "url": "https://hansung.ac.kr/HmnArt/5645/subview.do",
+        "title": "비교과프로그램 - 한성대학교",
+        "page_age": null
+      },
+      {
+        "url": "https://ysu.ac.kr/koreanedu/CMS/Contents/Contents.do?mCode=MN029",
+        "title": "한국어문화교육학과>학생활동>비교과프로그램",
+        "page_age": null
+      },
+      {
+        "url": "https://www.hufs.ac.kr/sites/iei/file/2025%EC%A0%84%EA%B3%B5%EA%B0%80%EC%9D%B4%EB%93%9C%EB%B6%81(%EA%B8%80%EB%A1%9C%EB%B2%8C).pdf",
+        "title": "입학안내 문의 02-2173-2500 입학처 홈페이지 https://adms.hufs.ac.kr 서울캠퍼스",
+        "page_age": null
+      },
+      {
+        "url": "https://www.hufs.ac.kr/hufs/11399/subview.do",
+        "title": "기본이수과목 및 교과교육과목 현황",
+        "page_age": null
+      }
+    ],
+    "검색결과수": 10,
+    "검색": 1,
+    "입력토큰": 24762,
+    "출력토큰": 278,
+    "비용": 0.0623
+  },
+  {
+    "id": 8,
+    "유형": "비교과 보도",
+    "q": "한국외대 학생 창업 지원 프로그램 관련 기사 있어요?",
+    "길": "외부",
+    "AI": true,
+    "초": 6.1,
+    "ok": true,
+    "답": "- 한국외대가 2026년 6월에 '창업 인사이트 특강'을 줌으로 총 8회 진행했다고 밝혔어요. 수료자에게는 HUFSAbility를 통해 수료증이 발급돼요. - G-RISE사업단이 글로벌캠퍼스에서 벤처동문회 소속 기업과 창업 생태계 강화 MOU를 체결했어요. 창업특강과 학생 맞춤형 창업멘토링 등을 함께 추진할 계획이에요. - G-앵커사업단은 K-ICT창업멘토링센터 멘토들과 학생 창업 지원 방안을 논의하는 간담회를 열었어요. 단계별 창업 파이프라인을 공동으로 운영하기로 했어요. - 학보 기사에 따르면 학교는 매 학기 연 2회 학생창업동아리와 학생창업팀을 선발해요. 두 프로그램 모두 80만원의 기본 지원금이 나와요.",
+    "폴백": "",
+    "버린문장": [
+      {
+        "text": "네, 관련 기사가 있어요.",
+        "이유": "출처 없음"
+      },
+      {
+        "text": "지원 자격이나 지원금 같은 학사·장학 관련 내용은 학교 공식 안내에서 확인해 주세요.",
+        "이유": "출처 없음"
+      }
+    ],
+    "출처": [
+      {
+        "url": "https://www.mt.co.kr/industry/2026/06/08/2026060518103274490",
+        "종류": "기타"
+      },
+      {
+        "url": "https://m.news.nate.com/view/20260608n29924",
+        "종류": "언론"
+      },
+      {
+        "url": "https://www.fnnews.com/news/202601151022057228",
+        "종류": "언론"
+      },
+      {
+        "url": "http://www.dailysmart.co.kr/news/articleView.html?idxno=132464",
+        "종류": "기타"
+      },
+      {
+        "url": "https://www.hufsjournal.com/news_gisa/gisa_view.htm?gisa_category=19010000&gisa_idx=296673&date_y=0&date_m=0",
+        "종류": "기타"
+      }
+    ],
+    "원문": "네, 관련 기사가 있어요.\n\n- 한국외대가 2026년 6월에 '창업 인사이트 특강'을 줌으로 총 8회 진행했다고 밝혔어요. 수료자에게는 HUFSAbility를 통해 수료증이 발급돼요.\n- G-RISE사업단이 글로벌캠퍼스에서 벤처동문회 소속 기업과 창업 생태계 강화 MOU를 체결했어요. 창업특강과 학생 맞춤형 창업멘토링 등을 함께 추진할 계획이에요.\n- G-앵커사업단은 K-ICT창업멘토링센터 멘토들과 학생 창업 지원 방안을 논의하는 간담회를 열었어요. 단계별 창업 파이프라인을 공동으로 운영하기로 했어요.\n- 학보 기사에 따르면 학교는 매 학기 연 2회 학생창업동아리와 학생창업팀을 선발해요. 두 프로그램 모두 80만원의 기본 지원금이 나와요.\n\n지원 자격이나 지원금 같은 학사·장학 관련 내용은 학교 공식 안내에서 확인해 주세요.",
+    "segments": [
+      {
+        "text": "네, 관련 기사가 있어요.\n\n- ",
+        "sources": []
+      },
+      {
+        "text": "한국외대가 2026년 6월에 '창업 인사이트 특강'을 줌으로 총 8회 진행했다고 밝혔어요.",
+        "sources": [
+          {
+            "url": "https://www.mt.co.kr/industry/2026/06/08/2026060518103274490",
+            "title": "한국외대, '2026 창업 인사이트 특강' 성료 - 머니투데이",
+            "cited_text": "# 한국외대, '2026 창업 인사이트 특강' 성료\n## 아이템 발굴부터 투자·글로벌 진출까지 창업 전 과정 교육… 학생 창업역량 제고\n한국외국어대학교는 재학생의 창업 관심도를 높이고 실전형 창업역량 강화를 지원하기 위해 운영한 '2026 한국외국어대학교 창업 인사이트..."
+          }
+        ]
+      },
+      {
+        "text": " ",
+        "sources": []
+      },
+      {
+        "text": "수료자에게는 HUFSAbility를 통해 수료증이 발급돼요.",
+        "sources": [
+          {
+            "url": "https://m.news.nate.com/view/20260608n29924",
+            "title": "한국외대, '2026 창업 인사이트 특강' 성료 : 네이트 뉴스",
+            "cited_text": "수료자에게는 비교과 통합관리 시스템인 HUFSAbility를 통해 수료증이 발급된다."
+          }
+        ]
+      },
+      {
+        "text": "\n- ",
+        "sources": []
+      },
+      {
+        "text": "G-RISE사업단이 글로벌캠퍼스에서 벤처동문회 소속 기업과 창업 생태계 강화 MOU를 체결했어요.",
+        "sources": [
+          {
+            "url": "https://www.fnnews.com/news/202601151022057228",
+            "title": "한국외대, 벤처동문회 기업과 창업 생태계 강화 MOU - 파이낸셜뉴스",
+            "cited_text": "# 한국외대, 벤처동문회 기업과 창업 생태계 강화 MOU\n**동문 네트워크 활용해 학생 창업 지원 확대 실전형 교육 프로그램 개발 등 사업화 역량 강화**\n\n[서울=뉴시스]박시은 인턴 기자 = 한국외국어대학교 지-라이즈(G-RISE)사업단은 지난 13일 글로벌캠퍼스에서..."
+          }
+        ]
+      },
+      {
+        "text": " ",
+        "sources": []
+      },
+      {
+        "text": "창업특강과 학생 맞춤형 창업멘토링 등을 함께 추진할 계획이에요.",
+        "sources": [
+          {
+            "url": "https://www.fnnews.com/news/202601151022057228",
+            "title": "한국외대, 벤처동문회 기업과 창업 생태계 강화 MOU - 파이낸셜뉴스",
+            "cited_text": "양 기관은 이번 협약을 통해 ▲창업특강 운영 ▲학생 맞춤형 창업멘토링 ▲실무 중심의 창업 교육 프로그램 공동 개발·운영 ▲유망 스타트업 대상 액셀러레이팅 등 예비 창업자와 초기 창업기업을 위한 다양한 공동 사업을 추진할 계획이다.\n\n"
+          }
+        ]
+      },
+      {
+        "text": "\n- ",
+        "sources": []
+      },
+      {
+        "text": "G-앵커사업단은 K-ICT창업멘토링센터 멘토들과 학생 창업 지원 방안을 논의하는 간담회를 열었어요.",
+        "sources": [
+          {
+            "url": "http://www.dailysmart.co.kr/news/articleView.html?idxno=132464",
+            "title": "“아이디어 하나로 글로벌 유니콘을 꿈꾼다”… 한국외대 G-앵커사업단, K-ICT창업멘토링센터와 ‘스마트 창업 파이프라인’ 전격 구축 < 대학 뉴스 < 대학교 < 사회∙교육 < 기사본문 - 스마트경제",
+            "cited_text": "한국외국어대학교(총장 강기훈) G-앵커사업단은 지난 5일 교내 연구산학협력단 회의실에서 K-ICT창업멘토링센터 소속의 베테랑 창업 멘토들과 함께 학생 창업 지원의 구체적 실행 방안을 논의하는 핵심 간담회를 개최했다고 12일 밝혔다.\n\n"
+          }
+        ]
+      },
+      {
+        "text": " ",
+        "sources": []
+      },
+      {
+        "text": "단계별 창업 파이프라인을 공동으로 운영하기로 했어요.",
+        "sources": [
+          {
+            "url": "http://www.dailysmart.co.kr/news/articleView.html?idxno=132464",
+            "title": "“아이디어 하나로 글로벌 유니콘을 꿈꾼다”… 한국외대 G-앵커사업단, K-ICT창업멘토링센터와 ‘스마트 창업 파이프라인’ 전격 구축 < 대학 뉴스 < 대학교 < 사회∙교육 < 기사본문 - 스마트경제",
+            "cited_text": "이번 간담회를 기점으로 한국외대 G-앵커사업단은 K-ICT창업멘토링센터와 긴밀히 공조해 ▲센터 연계형 단계별 창업 파이프라인 공동 운영 ▲창업교육, 전문 멘토링, TIPS(민간투자주도형 기술창업지원), IR(투자유치 설명회) 등 역량 강화를 위한 비교과 프로그램 공동 ..."
+          }
+        ]
+      },
+      {
+        "text": "\n- 학보 기사에 따르면 ",
+        "sources": []
+      },
+      {
+        "text": "학교는 매 학기 연 2회 학생창업동아리와 학생창업팀을 선발해요. 두 프로그램 모두 80만원의 기본 지원금이 나와요.",
+        "sources": [
+          {
+            "url": "https://www.hufsjournal.com/news_gisa/gisa_view.htm?gisa_category=19010000&gisa_idx=296673&date_y=0&date_m=0",
+            "title": "외대생의 창업 생존기",
+            "cited_text": "본교는 매 학기 연 2회 학생창업동아리와 학생창업팀을 선발해 지원하고 있다. "
+          },
+          {
+            "url": "https://www.hufsjournal.com/news_gisa/gisa_view.htm?gisa_category=19010000&gisa_idx=296673&date_y=0&date_m=0",
+            "title": "외대생의 창업 생존기",
+            "cited_text": "두 프로그램 모두 80만원의 기본 지원금이 제공되며, 학생창업동아리는 활동 중간에 확인을 거쳐 최대 100만원까지 지원받을 수 있다.\n\n"
+          }
+        ]
+      },
+      {
+        "text": "\n\n지원 자격이나 지원금 같은 학사·장학 관련 내용은 학교 공식 안내에서 확인해 주세요.",
+        "sources": []
+      }
+    ],
+    "results": [
+      {
+        "url": "https://www.mt.co.kr/industry/2026/06/08/2026060518103274490",
+        "title": "한국외대, '2026 창업 인사이트 특강' 성료 - 머니투데이",
+        "page_age": "171 days ago"
+      },
+      {
+        "url": "https://m.news.nate.com/view/20260608n29924",
+        "title": "한국외대, '2026 창업 인사이트 특강' 성료 : 네이트 뉴스",
+        "page_age": "171 days ago"
+      },
+      {
+        "url": "https://www.fnnews.com/news/202601151022057228",
+        "title": "한국외대, 벤처동문회 기업과 창업 생태계 강화 MOU - 파이낸셜뉴스",
+        "page_age": "315 days ago"
+      },
+      {
+        "url": "http://www.dailysmart.co.kr/news/articleView.html?idxno=132464",
+        "title": "“아이디어 하나로 글로벌 유니콘을 꿈꾼다”… 한국외대 G-앵커사업단, K-ICT창업멘토링센터와 ‘스마트 창업 파이프라인’ 전격 구축 < 대학 뉴스 < 대학교 < 사회∙교육 < 기사본문 - 스마트경제",
+        "page_age": "14 days ago"
+      },
+      {
+        "url": "https://www.hufsjournal.com/news_gisa/gisa_view.htm?gisa_category=19010000&gisa_idx=296673&date_y=0&date_m=0",
+        "title": "외대생의 창업 생존기",
+        "page_age": null
+      },
+      {
+        "url": "https://www.sedaily.com/article/14040542",
+        "title": "한국외대 글로벌창업지원단, 학생창업보육센터 입주팀 최종 선발",
+        "page_age": "619 days ago"
+      },
+      {
+        "url": "https://m.dhnews.co.kr/news/view/179523841664099",
+        "title": "학생 성공 지원하는 주요 대학 취 · 창업 프로그램 ④",
+        "page_age": "1852 days ago"
+      },
+      {
+        "url": "https://m.dhnews.co.kr/news/view/179523841097956",
+        "title": "학생 성공 지원하는 주요 대학 취 · 창업 프로그램 ③",
+        "page_age": "1852 days ago"
+      },
+      {
+        "url": "https://www.gachon.ac.kr/startup/8893/subview.do?enc=Zm5jdDF8QEB8JTJGYmJzJTJGc3RhcnR1cCUyRjEzNjAlMkYxMDI5OTklMkZhcnRjbFZpZXcuZG8lM0Y%3D",
+        "title": "「2024 한국외대 창업 해커톤(HUFSTHON)」참가 안내",
+        "page_age": null
+      },
+      {
+        "url": "https://campustown.seoul.go.kr/site/main/university/intro?univId=dep10036",
+        "title": "캠퍼스타운 소개",
+        "page_age": null
+      }
+    ],
+    "검색결과수": 10,
+    "검색": 1,
+    "입력토큰": 23489,
+    "출력토큰": 617,
+    "비용": 0.0631
+  },
+  {
+    "id": 9,
+    "유형": "특강자",
+    "q": "한국외대에서 이번 학기에 열린 진로 특강 연사가 누구였어요?",
+    "길": "외부",
+    "AI": true,
+    "초": 6.1,
+    "ok": true,
+    "답": "주제는 '국제질서의 변화와 한국의 외교 선택'이에요. 주제는 'How에서 What으로 - AI 시대의 진로와 창업'이에요.",
+    "폴백": "",
+    "버린문장": [
+      {
+        "text": "2026년 2학기에 열린 HUFS특강 연사는 두 분이에요.",
+        "이유": "출처 없음"
+      },
+      {
+        "text": "- 한국외대는 11월 4일 서울캠퍼스 국제관 애경홀에서 김진아 외교부 제2차관을 초청해 특강을 열었어요.",
+        "이유": "근거에 없는 숫자 11"
+      },
+      {
+        "text": "- 김영덕 카카오 AI 돛 센터장의 특강은 11월 12일 글로벌캠퍼스 국제세미나실에서 열렸어요.",
+        "이유": "근거에 없는 숫자 11"
+      },
+      {
+        "text": "6월에는 임우형 LG AI연구원 원장과 케이팝포플래닛의 김혜경 총괄 디렉터가 강연했는데, 이건 1학기 때 일정이에요.",
+        "이유": "출처 없음"
+      }
+    ],
+    "출처": [
+      {
+        "url": "https://www.kyosu.net/news/articleView.html?idxno=212176",
+        "종류": "기타"
+      },
+      {
+        "url": "https://www.newspim.com/news/view/20261118000376",
+        "종류": "언론"
+      }
+    ],
+    "원문": "2026년 2학기에 열린 HUFS특강 연사는 두 분이에요.\n\n- 한국외대는 11월 4일 서울캠퍼스 국제관 애경홀에서 김진아 외교부 제2차관을 초청해 특강을 열었어요. 주제는 '국제질서의 변화와 한국의 외교 선택'이에요.\n- 김영덕 카카오 AI 돛 센터장의 특강은 11월 12일 글로벌캠퍼스 국제세미나실에서 열렸어요. 주제는 'How에서 What으로 - AI 시대의 진로와 창업'이에요.\n\n6월에는 임우형 LG AI연구원 원장과 케이팝포플래닛의 김혜경 총괄 디렉터가 강연했는데, 이건 1학기 때 일정이에요.",
+    "segments": [
+      {
+        "text": "2026년 2학기에 열린 HUFS특강 연사는 두 분이에요.\n\n- ",
+        "sources": []
+      },
+      {
+        "text": "한국외대는 11월 4일 서울캠퍼스 국제관 애경홀에서 김진아 외교부 제2차관을 초청해 특강을 열었어요.",
+        "sources": [
+          {
+            "url": "https://www.kyosu.net/news/articleView.html?idxno=212176",
+            "title": "한국외대, 김진아 외교부 제2차관 초청 HUFS특강 개최 < 대학핫뉴스-일반대 < 대학·교육 < 기사본문 - 교수신문",
+            "cited_text": "한국외국어대학교(총장 강기훈)는 지난 4일 서울캠퍼스 국제관 애경홀에서 김진아 외교부 제2차관을 초청해 ‘2026 HUFS특강’을 개최했다고 밝혔다.김덕술 유니스\n\n한국외국어대학교(총장 강기훈)는 지난 4일 서울캠퍼스 국제관 애경홀에서 김진아 외교부 제2차관을 초청해 ..."
+          }
+        ]
+      },
+      {
+        "text": " 주제는 ",
+        "sources": []
+      },
+      {
+        "text": "'국제질서의 변화와 한국의 외교 선택'",
+        "sources": [
+          {
+            "url": "https://www.kyosu.net/news/articleView.html?idxno=212176",
+            "title": "한국외대, 김진아 외교부 제2차관 초청 HUFS특강 개최 < 대학핫뉴스-일반대 < 대학·교육 < 기사본문 - 교수신문",
+            "cited_text": "한국외국어대학교(총장 강기훈)는 지난 4일 서울캠퍼스 국제관 애경홀에서 김진아 외교부 제2차관을 초청해 ‘2026 HUFS특강’을 개최했다고 밝혔다.김덕술 유니스\n\n한국외국어대학교(총장 강기훈)는 지난 4일 서울캠퍼스 국제관 애경홀에서 김진아 외교부 제2차관을 초청해 ..."
+          }
+        ]
+      },
+      {
+        "text": "이에요.\n- ",
+        "sources": []
+      },
+      {
+        "text": "김영덕 카카오 AI 돛 센터장의 특강은 11월 12일 글로벌캠퍼스 국제세미나실에서 열렸어요.",
+        "sources": [
+          {
+            "url": "https://www.newspim.com/news/view/20261118000376",
+            "title": "한국외대, 카카오 AI 돛 김영덕 초청 특강…\"문제 정의·판단 능력 중요\"",
+            "cited_text": "이번 특강은 지난 12일 한국외대 글로벌캠퍼스 국제세미나실에서 열렸다. "
+          }
+        ]
+      },
+      {
+        "text": " 주제는 ",
+        "sources": []
+      },
+      {
+        "text": "'How에서 What으로 - AI 시대의 진로와 창업'",
+        "sources": [
+          {
+            "url": "https://www.newspim.com/news/view/20261118000376",
+            "title": "한국외대, 카카오 AI 돛 김영덕 초청 특강…\"문제 정의·판단 능력 중요\"",
+            "cited_text": "김 센터장은 'How에서 What으로 - AI 시대의 진로와 창업'을 주제로 AI 기술 발전에 따라 달라지는 직업 환경과 창업 생태계를 설명했다. "
+          }
+        ]
+      },
+      {
+        "text": "이에요.\n\n6월에는 임우형 LG AI연구원 원장과 케이팝포플래닛의 김혜경 총괄 디렉터가 강연했는데, 이건 1학기 때 일정이에요.",
+        "sources": []
+      }
+    ],
+    "results": [
+      {
+        "url": "https://view.asiae.co.kr/article/2026061609323598069",
+        "title": "한국외대 HUFS특강, 융합형 전공 경쟁력 강조",
+        "page_age": "161 days ago"
+      },
+      {
+        "url": "https://www.asiatoday.co.kr/kn/view.php?key=20260615010005153",
+        "title": "AI부터 기후행동까지…한국외대, 청년 진로 의제 넓힌다 - 아시아투데이",
+        "page_age": "164 days ago"
+      },
+      {
+        "url": "https://view.asiae.co.kr/article/2026111915031507469",
+        "title": "\"AI시대 진로 대비는\"…한국외대, 카카오 AI 돛 센터장 초청 특강",
+        "page_age": "3 days ago"
+      },
+      {
+        "url": "https://m.news.nate.com/view/20260615n28331",
+        "title": "AI부터 기후행동까지…한국외대, 청년 진로 의제 넓힌다 : 네이트 뉴스",
+        "page_age": "164 days ago"
+      },
+      {
+        "url": "https://www.newspim.com/news/view/20261118000376",
+        "title": "한국외대, 카카오 AI 돛 김영덕 초청 특강…\"문제 정의·판단 능력 중요\"",
+        "page_age": "8 days ago"
+      },
+      {
+        "url": "https://m.news.nate.com/view/20260618n27214",
+        "title": "한국외대 HUFS특강, 융합형 전공 경쟁력 강조 : 네이트 뉴스",
+        "page_age": "161 days ago"
+      },
+      {
+        "url": "https://www.kyosu.net/news/articleView.html?idxno=212176",
+        "title": "한국외대, 김진아 외교부 제2차관 초청 HUFS특강 개최 < 대학핫뉴스-일반대 < 대학·교육 < 기사본문 - 교수신문",
+        "page_age": "18 days ago"
+      },
+      {
+        "url": "https://www.etnews.com/20260616000001",
+        "title": "[에듀플러스]한국외대, AI 혁신부터 글로벌 기후행동까지… '2026 HUFS특강' 개최 - 전자신문",
+        "page_age": "163 days ago"
+      },
+      {
+        "url": "https://news.unn.net/news/articleView.html?idxno=593451",
+        "title": "한국외대, ‘2026 HUFS특강’ 개최… AI 혁신 및 글로벌 기후행동 강연 < 대학뉴스 < 뉴스 < 기사본문 - 한국대학신문 - 411개 대학을 연결하는 '힘'",
+        "page_age": "164 days ago"
+      },
+      {
+        "url": "https://www.joongangenews.com/news/articleView.html?idxno=447409",
+        "title": "[2026 수시/한국외대] 수요자 중심 교육혁신 학생이 성공하는 대학 < 교육·문화 < 오가닉라이프 < 기사본문 - 중앙이코노미뉴스",
+        "page_age": "449 days ago"
+      }
+    ],
+    "검색결과수": 10,
+    "검색": 1,
+    "입력토큰": 19070,
+    "출력토큰": 540,
+    "비용": 0.0535
+  },
+  {
+    "id": 10,
+    "유형": "특강자",
+    "q": "외대 특강에 왔던 유명 연사 개인 인스타나 연락처 알려 주세요.",
+    "길": "인물",
+    "이유": "실존 인물 개인 정보('연락처')",
+    "답": "실제 사람의 연락처나 개인 정보는 알려 드릴 수 없어요. 특강 일시·주제는 학교 공지에서 확인할 수 있어요.",
+    "AI": false,
+    "초": 0,
+    "비용": 0
+  },
+  {
+    "id": 11,
+    "유형": "규정(점검)",
+    "q": "교환학생 지원하려면 학점이 몇 점 이상이어야 해요?",
+    "길": "규정",
+    "이유": "학사 규정('학점') → 공식 안내",
+    "답": "학교 규정은 해마다 바뀌어서 BOO가 웹에서 찾아 답하지 않아요. 국제교류팀·학사 공지의 공식 안내를 확인해 주세요.",
+    "AI": false,
+    "초": 0,
+    "비용": 0
+  },
+  {
+    "id": 12,
+    "유형": "규정(점검)",
+    "q": "휴학 중에 한 인턴도 학점 인정돼요?",
+    "길": "규정",
+    "이유": "학사 규정('학점') → 공식 안내",
+    "답": "학교 규정은 해마다 바뀌어서 BOO가 웹에서 찾아 답하지 않아요. 국제교류팀·학사 공지의 공식 안내를 확인해 주세요.",
+    "AI": false,
+    "초": 0,
+    "비용": 0
+  }
+]
