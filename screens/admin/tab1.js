@@ -18,7 +18,7 @@ const TOP_COLLEGES = 8;
 
 const KPIS = [
   { key: "questions", name: "질문 수", icon: "message-circle" },
-  { key: "unanswered", name: "미답변 질문", icon: "clock", goodWhenDown: true },
+  { key: "unanswered", name: "미답변 질문", icon: "clock" },
   { key: "newDemand", name: "신규 수요", icon: "info" },
   { key: "improvements", name: "개선 요청", icon: "triangle-alert" },
 ];
@@ -59,18 +59,18 @@ function kpiRow(kpi, basis) {
       el("p", { className: "kpi__name" }, [icon(k.icon), el("span", { text: k.name })]),
       el("p", { className: "kpi__value" }, [el("span", { text: fmt(v.value) }), el("span", { className: "kpi__unit", text: "건" })]),
       k.key === "unanswered" ? el("p", { className: "kpi__sub", text: `보류율 ${fmt(v.holdRate)}%` }) : null,
-      deltaBadge(v.delta, basis, k.goodWhenDown),
+      deltaBadge(v.delta, basis),
     ]);
   }));
 }
 
-// 증감 배지(3-4): 기본 중립색. 미답변 질문이 줄었을 때만 긍정색. 비교할 값이 없으면 「비교 없음」
-function deltaBadge(delta, basis, goodWhenDown) {
+// 증감 배지(3-4): 늘 중립색(방향은 화살표·문구로만). 비교할 값이 없으면 「비교 없음」
+// [11/26 #292] 미답변 감소 때 긍정색(초록)을 쓰던 것을 뺌 — 증감 배지는 기본 중립색
+function deltaBadge(delta, basis) {
   if (delta === null || delta === undefined || !Number.isFinite(delta)) return statusLabel("neutral", "minus", "비교 없음");
   if (delta === 0) return statusLabel("neutral", "minus", `0% ${basis}`);
   const down = delta < 0;
-  const kind = goodWhenDown && down ? "success" : "neutral";
-  const badge = statusLabel(kind, down ? "arrow-down" : "arrow-up", `${Math.abs(delta)}% ${basis}`);
+  const badge = statusLabel("neutral", down ? "arrow-down" : "arrow-up", `${Math.abs(delta)}% ${basis}`);
   badge.setAttribute("aria-label", `${basis} ${Math.abs(delta)}% ${down ? "감소" : "증가"}`);
   return badge;
 }

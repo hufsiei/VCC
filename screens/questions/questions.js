@@ -570,14 +570,21 @@ async function loadMyNote(id) {
   }
 }
 
+// 같은 질문(asked)에 답한 문장이 이어지면 첫 문장에만 Q 인용을 붙인다
+function firstOfQuestion(lines, i) {
+  const asked = lines[i].asked;
+  return Boolean(asked) && (i === 0 || lines[i - 1].asked !== asked);
+}
+
 function myNoteRow(section) {
   const row = el("div", { className: "summary-row" }, [el("span", { className: "summary-row__name", text: section.name })]);
   const lines = section.lines || [];
   if (!lines.length) row.append(el("p", { className: "summary-row__empty", text: DASH }));
   lines.forEach((line, index) => {
     const key = `${section.name}|${index}`;
-    // 후배 질문에 답한 문장(spec [v2]: 칸은 질문의 칸): 앞에 작은 인용 「Q. 질문 원문」 + A(내 답)
-    if (line.asked) row.append(el("span", { className: "msg__quote", text: `Q. ${line.asked}` }));
+    // 후배 질문에 답한 문장(spec [v2]: 칸은 질문의 칸): 앞에 작은 인용 「Q. 질문 원문」 + A(내 답).
+    // [11/26 #295] Q는 같은 질문이 이어지는 문장의 첫 문장에만(common/consent.js firstOfQuestion과 같은 규칙)
+    if (firstOfQuestion(lines, index)) row.append(el("span", { className: "msg__quote", text: `Q. ${line.asked}` }));
     if (editing === key) {
       row.append(lineEditor(section.name, index, line));
       return;
@@ -750,14 +757,14 @@ function emptyEvidence(message) {
   ]);
 }
 
-// 근거 블록(6-1) — 해봤노트 상세와 같은 모양. 출처는 연도만, 1~2건이면 「선배 N명의 경험이에요」
+// 근거 블록(6-1) — 해봤노트 상세와 같은 모양. 출처는 연도만, 1~2건이면 고정 문구 「선배 1명의 경험이에요」(spec 5장, #295)
 function evidenceBlock(lines, sources) {
   const items = lines.map((l) => sources[l.sourceId] || {});
   const reports = items.filter((s) => s.docType && s.docType !== "인터뷰").length;
   const interviews = items.filter((s) => s.docType === "인터뷰").length;
   const latest = items.map((s) => s.semester).filter(Boolean).sort((a, b) => semesterKey(b) - semesterKey(a))[0];
   const num = (n) => (n > 0 ? el("span", { className: "evidence__num", text: n }) : DASH);
-  const few = lines.length <= 2 ? statusLabel("neutral", "user", `선배 ${lines.length}명의 경험이에요`) : null;
+  const few = lines.length <= 2 ? statusLabel("neutral", "user", "선배 1명의 경험이에요") : null;
   return el("details", { className: "evidence" }, [
     el("summary", { className: "evidence__head" }, [
       el("span", { className: "evidence__summary" }, [
