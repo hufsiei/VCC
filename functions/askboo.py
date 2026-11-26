@@ -289,6 +289,12 @@ def askBoo(me, payload, save=True):
     trace = {}
     out = _answer(me, payload, save, trace)
     program = out.pop("_program", None)   # _hold·_official이 넘긴 프로그램(기록용, 응답에는 없음)
+    # [11/26 작업 104] 비자·보험·지원 서류·파견 대학 규정 → 답(또는 보류) 끝에 「꼭 확인」 안내 + 담당 연락처. 담기는 빼고
+    if out.get("status") in ("ok", "hold") and trace.get("route") != "담기":
+        progs = [s.get("program") for s in (out.get("sources") or {}).values()] or ([program] if program else [])
+        check = official_check((payload.get("question") or "").strip(), [p for p in progs if p in PROGRAMS])
+        if check:
+            out["officialCheck"] = check
     if save and "error" not in out:
         history = clean_history(payload.get("history"))
         _log_answer((payload.get("question") or "").strip(), out, program, trace=trace,
@@ -396,6 +402,13 @@ def _answer(me, payload, save, trace=None):
     if city and not city[2]:
         trace["route"] = "도시 범위 밖"
         return _city_none(city[0], city[1], excluded)
+    # ①⁗″′ [11/26 작업 104] 한 도시에 노트 있는 학교가 둘 이상(「리옹 대학 생활비」 → 리옹2·리옹3·리옹카톨릭)이고 학교를
+    #     특정하지 않았으면 근거를 섞어 답하지 않고 학교를 고르게 한다(A안 측정 51번). 「뤼미에르 리옹 2대학」처럼 부르면 city가 None
+    #     도시 자체 이야기(「파리 치안은 어때요?」 — 날씨·치안·물가·생활 환경)는 학교와 상관없어 그 도시 학교 근거로 그대로 답한다.
+    #     단 「리옹 대학」「파리에 있는 학교」처럼 학교를 말했으면 주제와 상관없이 고르게 한다
+    if city and len(city[2]) >= 2 and (SCHOOL_WORD_RE.search(rest) or not CITY_TOPIC_RE.search(rest)):
+        trace["route"] = "도시 학교 고르기"
+        return _city_pick(city[0], city[1], city[2])
     # 「○○ 말고 일본 대학 전체의 노트에도 없나요?」 → 빼고 남은 그 나라(분야) 노트 수(AI 없음)
     found = exclude_scope(question, rest, excluded)
     if found:
@@ -1392,6 +1405,10 @@ CITIES = {
 }
 CITY_COUNTRY = {c: k for k, cs in CITIES.items() if k in COUNTRIES for c in cs}
 CITY_END = r"(?=에서|으로|에|은|는|의|이|가|도|로|랑|\s|[?!.,~]|$)"
+# 「○○대학교·○○대학·○○대」의 ○○(띄어 쓴 「리옹 대학」은 ○○ 없음 — 잡지 않음). 뒤는 SCHOOL_NAME과 같은 경계
+SCHOOL_WORD_RE = re.compile(r"대학|학교")
+CITY_TOPIC_RE = re.compile(r"날씨|기후|치안|소매치기|위험|안전|물가|생활\s*환경|도시\s*(분위기|환경)")   # [작업 104] 도시 자체 이야기
+SCHOOL_STEM_RE = re.compile(r"(\S+?)(?:대학교|대학|대(?!로))(?=\s|에서|에|은|는|이|가|을|를|의|로|$)")
 
 
 def _in_city(name, city):
@@ -1411,6 +1428,10 @@ def city_scope(text, programs, country):
             k = CITY_COUNTRY[city]
             if country and k != country:   # 「독일 파리」처럼 나라와 안 맞으면 나라를 따른다
                 return None
+            # [11/26 작업 104] 목록에 없는 학교 이름(「뤼미에르 리옹 음악대학」「파리 국립대학」)이면 도시로 넓히지 않는다 —
+            #   match_country의 SCHOOL_NAME 규칙(함정 53)과 같은 뜻. 「리옹대학교」「리옹 대학」처럼 도시 + 대학만이면 그대로
+            if any(m.group(1) != city for m in SCHOOL_STEM_RE.finditer(text)):
+                return None
             named = sorted([n for n in COUNTRIES[k] if _in_city(n, city) and evidence_count(n)], key=evidence_count, reverse=True)
             return city, k, named
     return None
@@ -1426,6 +1447,15 @@ def _city_none(city, country, excluded=()):
         return {"status": "notes", "lines": [], "sources": {}, "notes": [], "suggestSenior": True,
                 "message": head + f"{country} 교환·파견 해봤노트도 아직 없어요."}
     found["message"] = head + f"{country} 교환·파견 해봤노트는 {len(pool)}개 있어요. 노트를 열어 보거나 그 학교로 물어봐 주세요."
+    return found
+
+
+def _city_pick(city, country, named):
+    """status "notes": 그 도시 학교 노트 카드 + 「어느 학교인지 골라 주세요」. 질문함에 저장하지 않는다(답할 수 있는 질문 — 학교만 모름)."""
+    found = _notes(named, country)
+    names = f"({'·'.join(named)})" if len(named) <= 3 else ""
+    found["message"] = (f"{city}에는 해봤노트가 있는 학교가 {len(named)}곳 있어요{names}. "
+                        "학교마다 선배 이야기가 달라서 섞어 답하지 않을게요. 어느 학교인지 골라 주세요.")
     return found
 
 
@@ -2099,16 +2129,77 @@ _STYLE_OK = {"해요", "돼요", "있어", "없어", "좋아", "거예", "이에
 
 
 # ── 응답 만들기 ───────────────────────────────────────────────────────
-def _official(me, question, programs, save):
+def _dept(question, programs):
+    """담당 부서(departments.json 한 줄): 프로그램의 운영부서코드 → 없으면 질문 말로(현장실습·인턴 D02, 특교원·탄뎀 D03, 그 외 D01)."""
     code = PROGRAMS.get(programs[0], {}).get("운영부서코드") if programs else None
     if not code:
         code = "D02" if re.search(r"현장실습|인턴", question) else "D03" if re.search(r"특교원|탄뎀", question) else "D01"
-    dept = DEPTS.get(code, {})
+    return DEPTS.get(code, {})
+
+
+def _contact(dept):
+    """[11/26 작업 104] 「문의: 국제교류팀 02-2173-9999」 — 대표전화(가상)가 없으면 빈 글(문구도 officialPhone도 없음)."""
+    phone = (dept.get("대표전화(가상)") or "").strip()
+    return f"문의: {dept.get('부서명', '담당 부서')} {phone}" if phone else ""
+
+
+def _official(me, question, programs, save):
+    dept = _dept(question, programs)
     qid = _save(me, question, programs[0] if programs else None, None, "official", save)
-    return {"status": "official", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": False,
-            "_program": programs[0] if programs else None,
-            "officialUrl": dept.get("공식안내URL", ""),
-            "message": f"학교 규정에 관한 질문이라 {dept.get('부서명', '담당 부서')} 공식 안내에서 정확한 내용을 확인해 주세요."}
+    contact = _contact(dept)
+    out = {"status": "official", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": False,
+           "_program": programs[0] if programs else None,
+           "officialUrl": dept.get("공식안내URL", ""),
+           "message": f"학교 규정에 관한 질문이라 {dept.get('부서명', '담당 부서')} 공식 안내에서 정확한 내용을 확인해 주세요."
+                      + (f" {contact}" if contact else "")}
+    if contact:   # [작업 104] 국제처 피드백(#331) — 값이 없으면 필드를 넣지 않는다
+        out["officialPhone"] = dept["대표전화(가상)"].strip()
+    return out
+
+
+# ── [11/26 작업 104] 선배 답 + 「꼭 확인」 안내 (코드 고정 문구, AI 없음) ─────────────
+# 국제처 피드백(#331 요청 1): 비자·보험·지원 서류·파견 대학 규정은 선배 경험이 있어도 나라·해마다 바뀐다.
+# 경계: 외대 제도(학점 인정 신청·외대 장학금·선발·기한·자격 — OFFICIAL_RE·OFFICIAL_WIDE_RE)는 지금처럼 official(선배 답 없음).
+#       나머지 넷은 선배 경험이 근거로 있으므로(보고서 1-1·1-2 칸) 답은 그대로 주고, 답 끝에 확인 안내 + 담당 연락처만 붙인다.
+#   ① 비자·보험·체류 허가·거주 등록 → 「대사관과 ○○팀」
+#   ② 파견 대학 지원 서류·입학 허가·지원 절차 → 「모집 요강과 ○○팀」
+#   ③ 파견·현지 대학 규정(local_scope가 규정에서 뺀 질문: 현지 장학금·현지 수강 학점 등) → 「그 대학 안내와 ○○팀」
+#   생활비·기숙사·수업·교통 같은 생활 질문에는 붙이지 않는다(과잉 안내 0 — test_askboo_v2). 걸리는 말이 있을 때만.
+CHECK_VISA_RE = re.compile(r"비자|보험|체류\s*허가|거주\s*(허가|등록)|레지던스\s*퍼밋|외국인\s*등록")
+CHECK_APPLY_RE = re.compile(r"입학\s*허가|지원\s*(서류|절차)|(파견|교환|지원|제출)\s*서류|서류\s*(는|를|가|은)?\s*(뭐|뭘|무엇|어떤|준비|내|챙)"
+                            r"|원서|지원하려면|지원\s*방법|지원\s*과정")
+CHECK_TEXT = {
+    "비자": "비자·보험은 나라와 시기마다 규정이 바뀌어요. 선배 경험은 참고만 하고, 대사관과 {부서}에서 꼭 확인해 주세요.",
+    "지원": "지원 서류와 절차는 해마다 바뀔 수 있어요. 선배 경험은 참고만 하고, 모집 요강과 {부서}에서 꼭 확인해 주세요.",
+    "규정": "파견 대학의 규정은 학교와 해마다 달라요. 선배 경험은 참고만 하고, 그 대학 안내와 {부서}에서 꼭 확인해 주세요.",
+}
+
+
+def check_kind(question):
+    """확인 안내가 필요한 질문이면 "비자"|"지원"|"규정", 아니면 None."""
+    if CHECK_VISA_RE.search(question):
+        return "비자"
+    if CHECK_APPLY_RE.search(question):
+        return "지원"
+    # 수강 경험 말투(「파견 대학에서 몇 학점 수강했어요?」)는 규정을 묻는 말이 아니라 빼고, 주체가 현지인 것만(현지 장학금 등)
+    if local_scope(question) and not COURSE_TONE_RE.search(question) \
+            and (OFFICIAL_RE.search(question) or OFFICIAL_WIDE_RE.search(question)):
+        return "규정"
+    return None
+
+
+def official_check(question, programs):
+    """ok·hold 응답에 붙일 officialCheck {message, officialUrl, officialPhone?} 또는 None."""
+    kind = check_kind(question)
+    if not kind:
+        return None
+    dept = _dept(question, programs)
+    contact = _contact(dept)
+    out = {"message": CHECK_TEXT[kind].format(부서=dept.get("부서명", "담당 부서")) + (f" {contact}" if contact else ""),
+           "officialUrl": dept.get("공식안내URL", "")}
+    if contact:
+        out["officialPhone"] = dept["대표전화(가상)"].strip()
+    return out
 
 
 def _place(country, programs):
