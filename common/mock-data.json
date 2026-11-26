@@ -246,7 +246,13 @@
       "questionId": "Q-0002",
       "suggestSenior": false,
       "officialUrl": "https://oia.hufs.ac.kr",
-      "message": "학교 규정에 관한 질문이라 국제교류팀 공식 안내에서 정확한 내용을 확인해 주세요."
+      "officialPhone": "02-2173-9999",
+      "message": "학교 규정에 관한 질문이라 국제교류팀 공식 안내에서 정확한 내용을 확인해 주세요. 문의: 국제교류팀 02-2173-9999"
+    },
+    "officialCheck": {
+      "message": "비자·보험은 나라와 시기마다 규정이 바뀌어요. 선배 경험은 참고만 하고, 대사관과 국제교류팀에서 꼭 확인해 주세요. 문의: 국제교류팀 02-2173-9999",
+      "officialUrl": "https://oia.hufs.ac.kr",
+      "officialPhone": "02-2173-9999"
     }
   },
   "interviewNext": {

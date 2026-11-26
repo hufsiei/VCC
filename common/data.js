@@ -268,7 +268,9 @@ function pickMock(m, name, p) {
       if (/어디\s*(에)?\s*있|추천해|어떤\s*(게|곳이|데가)\s*있/.test(p.question || "") && !/기숙사|비용|수업|서류|학점|팁|조언|어땠/.test(p.question || "")) return m.askBoo.notes;
       // [11/23] 사람을 찾는 질문(주제어 없음) → 해봤노트 카드(status "notes")
       if (/(다녀온|갔다\s*온|가\s*본|경험한)\s*(선배|사람|분)|선배\s*(있|계|없|\?|$)/.test(p.question || "") && !/기숙사|비용|수업|서류|학점|팁|조언|어땠/.test(p.question || "")) return m.askBoo.notes;
-      return /교환|파견|독일|마르부르크/.test(p.question || "") ? m.askBoo.exchange : m.askBoo.hold;
+      if (!/교환|파견|독일|마르부르크/.test(p.question || "")) return m.askBoo.hold;
+      // [11/26 작업 104] 비자·보험 질문은 선배 답 + 「꼭 확인」 안내(officialCheck, 명세 4장)
+      return /비자|보험/.test(p.question || "") ? { ...m.askBoo.exchange, officialCheck: m.askBoo.officialCheck } : m.askBoo.exchange;
     case "interviewNext": {
       const step = mockInterview(m, p); // 고른 경험(program)에 맞는 노트 틀로 묻는다
       // [v2 작업 90] 서버처럼 내 경험노트가 있는 프로그램의 첫 응답(answers 없음)에 resumed·myNoteId

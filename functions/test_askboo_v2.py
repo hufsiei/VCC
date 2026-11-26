@@ -618,6 +618,78 @@ expect("시연 0:00 지원 서류 → 마르부르크 근거 답", res["status"]
 res, _ = run("마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?", [], plan=None)
 expect("시연 0:40 학기 중 현지 인턴 → 보류(비교과 사실 답 아님)", res["status"] == "hold" and askboo.EXTRA_NO_STORY not in res["message"], res)
 
+# ── [11/26 작업 104] 공식 안내 연락처 · 「꼭 확인」 안내 · 도시 학교 고르기 ─────────────
+D01 = askboo.DEPTS["D01"]
+PHONE = D01.get("대표전화(가상)", "").strip()
+res, calls = run("파견 장학금은 얼마 받아요?", [], plan=None)
+expect("official 문구 끝에 「문의: 국제교류팀 <대표전화(가상)>」", res["status"] == "official" and PHONE
+       and res["message"].endswith(f"문의: 국제교류팀 {PHONE}"), res.get("message"))
+expect("official 응답에 officialPhone(departments.json 값 그대로)", res.get("officialPhone") == PHONE, res)
+res, _ = run("국내 인턴십 학점 인정 신청은 언제까지예요?", [], plan=None)
+expect("현장실습 규정 → 현장실습지원센터 연락처", res.get("officialPhone") == askboo.DEPTS["D02"]["대표전화(가상)"].strip()
+       and "문의: 현장실습지원센터" in res["message"], res.get("message"))
+_dept_saved = dict(D01)
+D01.pop("대표전화(가상)", None)
+res, _ = run("파견 장학금은 얼마 받아요?", [], plan=None)
+expect("대표전화(가상)가 없으면 officialPhone 필드·「문의」 문구 없음", "officialPhone" not in res and "문의" not in res["message"], res)
+res, _ = run("마르부르크 비자는 어떻게 받아요?", [], plan=None)
+expect("전화 없으면 officialCheck에도 officialPhone 없음", res.get("officialCheck") and "officialPhone" not in res["officialCheck"]
+       and "문의" not in res["officialCheck"]["message"], res.get("officialCheck"))
+D01.update(_dept_saved)
+
+# 경계: 비자·보험·지원 서류·파견 대학 규정 = 선배 답 그대로 + officialCheck. 외대 제도(학점 인정 신청·장학금·선발)는 official 그대로
+for q, kind in [("마르부르크 비자는 어떻게 받아요?", "비자"), ("마르부르크 유학생 보험은 어떻게 했어요?", "비자"),
+                ("겐트대학교 비자랑 보험은 어떻게 준비했어요?", "비자"),
+                ("마부르크 파견 가려면 지원 서류는 뭘 준비해요?", "지원"), ("이날코 입학허가서 신청할 때 유의할 점은?", "지원")]:
+    res, _ = run(q, [], plan=None)
+    chk = res.get("officialCheck") or {}
+    expect(f"{kind}: 「{q}」 → 선배 답(ok) + 「꼭 확인」 안내 + 연락처", res["status"] == "ok" and "꼭 확인해 주세요" in chk.get("message", "")
+           and chk.get("officialPhone") == PHONE and chk.get("officialUrl") == D01["공식안내URL"]
+           and ("대사관" in chk["message"]) == (kind == "비자"), (res["status"], chk))
+expect("「꼭 확인」 안내는 lines에 넣지 않음(근거 번호 없는 문장이 답에 섞이지 않게)",
+       all("꼭 확인" not in ln["text"] for ln in run("마르부르크 비자는 어떻게 받아요?", [], plan=None)[0]["lines"]))
+res, _ = run("독일에서 교환학생 장학금 받은 사람이 있나? 독일 현지 대학교에서 주는 장학금 말이야", [], plan=None)
+expect("현지 대학 장학금(Q-38 근거 길) → 「그 대학 안내」 확인 안내", res["status"] != "official"
+       and "그 대학 안내" in (res.get("officialCheck") or {}).get("message", ""), (res["status"], res.get("officialCheck")))
+res, _ = run("하이델베르크대학교 파견 서류 뭐 내요?", [], plan=None)
+expect("보류여도 지원 서류 질문이면 확인 안내", res["status"] == "hold" and res.get("officialCheck"), res)
+askboo.callAI = make_fake()
+res = askboo.askBoo("H0143", {"question": "마르부르크 비자는 어떻게 받아요?", "force": "hold"}, save=False)
+expect("「질문함에 담기」(force hold)에는 확인 안내 없음", "officialCheck" not in res, res)
+# 과잉 안내 0: 생활·수업·경험 질문(규정 말이 없음)에는 붙지 않는다
+for q in ["마르부르크 가면 한 달 생활비 얼마나 들어요?", "마르부르크 기숙사비 한 달에 얼마예요?", "이날코 교환학생 기숙사 있어요?",
+          "마르부르크 수강신청은 어떻게 해요?", "마르부르크대 공항에서 학교까지 어떻게 가요?", "볼로냐대학교 교환 가기 전에 알아 두면 좋은 팁 있어요?",
+          "리스본종합대학교 방 구할 때 예산은요?", "마르부르크에서 학기 중 현지 인턴 병행할 수 있어요?", "파견 대학에서 몇 학점 수강했어요?",
+          "보통 독일 대학교에서 몇학점 들어?", "리옹3 대학 학점 인정 받을 때 챙길 서류 있어요?", "코임브라대학교 공항에서 학교까지 교통편은?"]:
+    res, _ = run(q, [], plan=None)
+    expect(f"과잉 안내 없음: 「{q}」", "officialCheck" not in res, res.get("officialCheck"))
+expect("official 응답에는 officialCheck 없음(문구에 이미 연락처)", "officialCheck" not in run("파견 장학금은 얼마 받아요?", [], plan=None)[0])
+
+# 도시 학교 고르기(A안 측정 51번)
+LYON = [n for n in askboo.COUNTRIES["프랑스"] if "리옹" in n and askboo.evidence_count(n)]
+for plan in (None, P("경험질문", "국제교류", "프랑스", q="리옹 대학 한 달 생활비")):
+    res, calls = run("리옹 대학 생활비 한 달에 얼마예요?", [], plan=plan)
+    expect(f"「리옹 대학 생활비」 → 섞어 답하지 않고 리옹 학교 카드({'질문정리' if plan else 'v1'})",
+           res["status"] == "notes" and {c["program"] for c in res["notes"]} == set(LYON) and len(LYON) >= 2
+           and res["message"].endswith("어느 학교인지 골라 주세요.") and not res["lines"], res)
+    expect("도시 학교 고르기는 AI를 부르지 않고 질문함에 저장하지 않음", calls == [] and "questionId" not in res, calls)
+res, _ = run("리옹에서 기숙사 어때요?", [], plan=None)
+expect("「리옹에서 기숙사」 → 고르기", res["status"] == "notes" and "어느 학교인지" in res["message"], res.get("message"))
+for q, prog in [("뤼미에르 리옹 2대학 생활비는요?", "뤼미에르 리옹 2대학"), ("리옹3 대학 학점 인정 받을 때 챙길 서류 있어요?", "쟝 물랑 리옹 3 대학")]:
+    res, _ = run(q, [], plan=None)
+    expect(f"학교를 특정하면 그 학교로 답: 「{q}」", res["status"] == "ok" and {s["program"] for s in res["sources"].values()} == {prog},
+           (res["status"], res.get("message")))
+res, _ = run("뤼미에르 리옹 음악대학 수강신청 팁 있어요?", [], plan=None)
+expect("목록에 없는 학교(「리옹 음악대학」) → 도시로 넓히지 않고 보류(함정 55)", res["status"] == "hold"
+       and res["message"] == askboo.HOLD_NO_PROGRAM, res)
+res, _ = run("리옹 물가 어때요?", [], plan=None)
+expect("도시 자체 이야기(물가·치안)는 고르기 없이 그 도시 학교 근거로", res["status"] == "ok"
+       and {s["program"] for s in res["sources"].values()} <= set(LYON), (res["status"], res.get("message")))
+res, _ = run("리옹에 있는 학교 물가 어때요?", [], plan=None)
+expect("학교를 말하면 주제와 상관없이 고르기", res["status"] == "notes" and "어느 학교인지" in res["message"], res.get("message"))
+res, _ = run("일본 도쿄 한달 생활비 얼마예요?", [], plan=None)
+expect("도시 학교 0개(도쿄)는 지금처럼 「0개예요」", res["status"] == "notes" and "도쿄에 있는 학교 해봤노트는 0개" in res["message"], res.get("message"))
+
 # ── 정리 ──────────────────────────────────────────────────────────────
 print()
 print("실패 %d개" % len(fails) if fails else "전부 통과")
