@@ -110,6 +110,11 @@ interview.evidence_stats = real_stats
 # 1-3) 인턴·비교과도 깊이 질문이 틀의 칸에 담긴다
 for kind, frame in (("인턴", interview.FRAMES["인턴"]["칸"]), ("비교과", interview.FRAMES["비교과"]["칸"])):
     expect(f"{kind} 깊이 질문 칸은 틀 안에", all(s in frame for s, *_ in interview.DEPTH_QUESTIONS[kind]))
+extra = {q: s for s, q, _ in interview.DEPTH_QUESTIONS["비교과"]}
+expect("비교과 기대 질문은 열린 질문", "기대와 비교해 실제로 얻은 건 뭐였어요?" in extra)
+expect("비교과 학년 질문은 배운점 칸", extra.get("이 프로그램을 몇 학년 때 듣는 게 가장 좋을까요? 왜요?") == "배운점")
+expect("비교과 기대 질문 칩은 모두 이어 쓰기", all(c.endswith("…") and interview.bare_stem(c)
+       for c in interview.DEPTH_QUESTIONS["비교과"][0][2]))
 intern = next(p for p in interview.askboo.PROGRAMS if interview.kind_of(p) == "인턴")
 expect("인턴 깊이 질문은 2개", len(interview.depth_questions(intern, interview.FRAMES["인턴"]["칸"])) == 2)
 
