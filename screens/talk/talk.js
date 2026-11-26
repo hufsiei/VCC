@@ -134,8 +134,12 @@ function addTo(chat, node) {
 
 // 마지막 말풍선이 고정 입력줄 위에 보이도록 화면을 맨 아래까지 내린다
 // (본문 아래 여백 = 입력줄 높이라서, 맨 아래까지 내리면 가려지지 않음)
+// [작업 107] 휴대폰 키보드가 열린 동안은 "auto" — 부드러운 스크롤이 키보드에 따라 바뀌는 화면 높이와 겹쳐 흔들렸다
 function scrollToLatest() {
-  requestAnimationFrame(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" }));
+  requestAnimationFrame(() => {
+    const instant = document.body.classList.contains("keyboard-open") || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: instant ? "auto" : "smooth" });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -253,14 +257,24 @@ function fillExample(ex) {
   composerInput.setSelectionRange(end, end); // 말머리 뒤에 바로 이어 쓰게
 }
 
+// 입력줄 상태: typing = 이 단계에서 글을 쓸 수 있는가(입력창 켜기), busy = 답을 기다리는 중(전송만 막기).
+// [작업 107] 기다리는 동안 입력창을 끄면(disabled) 휴대폰 키보드가 닫혔다가 답이 오면 다시 열려 매 턴 하단 탭이
+// 나타났다 사라졌다 — 그래서 입력창은 켜 두고 전송만 막는다. 보낼 수 없는 단계(칩을 고르는 단계 등)는 전처럼 끈다.
+function composerState() {
+  if (mode === "ask") {
+    // 궁금한 것 정리하기 중에는 입력줄이 정리 답변 칸이다. 칩을 고르는 단계·끝난 뒤에는 위에서 고르게 막는다
+    return { typing: !demand.active || demandTyping(), busy: ask.busy || demand.busy };
+  }
+  // 질문이 끝난 뒤에도 칸을 고르면 이어서 쓸 수 있다
+  return { typing: mode === "tell" && !!tell.step && (!tell.step.done || !!tell.extra), busy: tell.busy };
+}
+const canSend = () => { const s = composerState(); return s.typing && !s.busy; };
+
 // 입력줄: 모드별 안내 문구, 보낼 수 있을 때만 전송 버튼 활성
 function updateComposer() {
-  // 질문이 끝난 뒤에도 칸을 고르면 이어서 쓸 수 있다
-  const tellReady = mode === "tell" && tell.step && !tell.busy && (!tell.step.done || tell.extra);
-  // 궁금한 것 정리하기 중에는 입력줄이 정리 답변 칸이다. 칩을 고르는 단계·끝난 뒤에는 위에서 고르게 막는다
-  const askReady = !ask.busy && !demand.busy && (!demand.active || demandTyping());
-  const enabled = mode === "ask" ? askReady : tellReady;
-  composerInput.disabled = !enabled;
+  const { typing } = composerState();
+  const enabled = canSend();
+  composerInput.disabled = !typing;
   const examples = currentExamples();
   const tabHint = canTab && examples.length ? " · Tab" : "";
   composerInput.placeholder = mode === "ask"
@@ -293,7 +307,7 @@ composerInput.addEventListener("keydown", (e) => {
 composer.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = composerInput.value.trim();
-  if (!text) return;
+  if (!text || !canSend()) return; // 답을 기다리는 중(Enter 포함)에는 보내지 않고 쓴 글도 그대로 둔다
   composerInput.value = "";
   if (mode === "ask") {
     if (demandTyping()) sendDemandAnswer(text);
@@ -313,7 +327,7 @@ function measureDock() {
   const rect = visibleDock.getBoundingClientRect();
   toastHost.style.bottom = `${Math.max(0, window.innerHeight - rect.top) + 16}px`;
 }
-window.addEventListener("resize", measureDock);
+// 화면 크기가 바뀔 때 다시 재는 일은 아래 「휴대폰 키보드」의 처리기 하나(onViewport)가 한다
 
 // 「맨 위로」(디자인 규칙 5-8, 11/25 민지): 한 화면보다 더 내려가면 입력줄 위 오른쪽에 보이고, 누르면 맨 위로.
 // 대화가 길어지면 위쪽 안내·세그먼트(들려주기/물어보기)·처음 질문으로 돌아가기 어렵기 때문.
@@ -337,9 +351,29 @@ toTopBtn.addEventListener("click", () => {
 // [11/26 민지] 휴대폰 키보드(안드로이드에서 확인): 입력창을 누르면 키보드가 입력줄·하단 탭을 덮거나 밀어 올려
 // 마지막 말풍선까지 내려 볼 수 없었다. 입력창에 포커스가 있는 동안 하단 탭을 숨기고 입력줄을 키보드 바로 위에 붙인다.
 // 안드로이드는 viewport의 interactive-widget=resizes-content로 화면이 키보드만큼 줄고(--kb 0),
-// 그 설정을 모르는 브라우저는 visualViewport로 키보드 높이를 재서 --kb만큼 올린다.
+// 그 설정을 모르는 브라우저(아이폰)는 visualViewport로 키보드 높이를 재서 --kb만큼 올린다.
+// [작업 107 미리] 흔들림 고침:
+//  · 「키보드 열림」은 포커스가 아니라 실제로 화면이 줄었을 때(KB_MIN px 넘게)로 정한다. 포커스 순간 탭을 숨기고
+//    입력줄을 바닥으로 내렸다가 키보드가 올라오며 다시 밀어 올려 「내려갔다 올라오던」 것을 없앤다.
+//  · 처리기는 onViewport 하나(requestAnimationFrame으로 한 프레임에 한 번). 전에는 resize 처리기 3개가 각자
+//    맨 아래로 부드러운 스크롤을 다시 시작했다. 맨 아래 스크롤은 키보드가 자리 잡은 뒤 한 번만, "auto"로.
+//  · 아이폰은 화면을 밀 때 visualViewport scroll만 오므로 그때도 --kb를 다시 잰다.
 const touchDevice = window.matchMedia("(pointer: coarse)").matches;
-let keepLatest = false; // 키보드를 열 때 맨 아래를 보고 있었으면 열린 뒤에도 맨 아래를 보여 준다
+const KB_MIN = 120;      // 이보다 적게 줄면 주소창이 접히고 펴진 것으로 본다(키보드 아님)
+const KB_SETTLE_MS = 150; // 화면 높이가 이만큼 안 바뀌면 키보드가 자리 잡은 것
+let keepLatest = false;   // 키보드를 열 때 맨 아래를 보고 있었으면 열린 뒤에도 맨 아래를 보여 준다
+let kbOpen = false;
+let kbInset = -1;
+let fullHeight = 0;       // 키보드 없을 때 화면 높이(가장 컸던 값, 폭이 바뀌면 다시 잰다)
+let fullWidth = 0;
+let viewportTick = false;
+let settleTimer = 0;
+
+// 확대(핀치)로 visualViewport가 줄어든 것은 키보드로 치지 않게 배율을 곱한다
+function viewportHeight() {
+  const vv = window.visualViewport;
+  return vv ? vv.height * vv.scale : window.innerHeight;
+}
 
 function keyboardInset() {
   const vv = window.visualViewport;
@@ -347,25 +381,57 @@ function keyboardInset() {
 }
 
 function syncKeyboard() {
-  const open = touchDevice && document.activeElement === composerInput;
-  document.body.classList.toggle("keyboard-open", open);
-  document.body.style.setProperty("--kb", `${open ? keyboardInset() : 0}px`);
+  viewportTick = false;
+  const h = viewportHeight();
+  const focused = document.activeElement === composerInput;
+  if (window.innerWidth !== fullWidth) { fullWidth = window.innerWidth; fullHeight = h; } // 처음·화면 돌림: 다시 잰다
+  fullHeight = Math.max(fullHeight, h);
+  // 입력창을 누른 뒤 화면이 줄면 열림. 닫힐 때는 화면이 다시 커질 때까지 열림으로 둔다(blur 순간 탭이 먼저 튀어나오지 않게)
+  const onMain = !document.getElementById("viewMain").hidden;
+  const open = touchDevice && onMain && fullHeight - h > KB_MIN && (focused || kbOpen);
+  const inset = open ? keyboardInset() : 0;
+  if (open !== kbOpen) {
+    kbOpen = open;
+    document.body.classList.toggle("keyboard-open", open);
+    if (!open) { keepLatest = false; clearTimeout(settleTimer); }
+  }
+  if (inset !== kbInset) {
+    kbInset = inset;
+    document.body.style.setProperty("--kb", `${inset}px`);
+  }
   measureDock();
-  if (open && keepLatest) scrollToLatest();
+  // 키보드가 자리 잡으면(높이 변화가 멎으면) 맨 아래로 한 번
+  if (open && keepLatest) {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      if (!kbOpen || !keepLatest) return;
+      keepLatest = false;
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
+    }, KB_SETTLE_MS);
+  }
+}
+
+function onViewport() {
+  if (!viewportTick) { viewportTick = true; requestAnimationFrame(syncKeyboard); }
 }
 
 composerInput.addEventListener("focus", () => {
   const root = document.documentElement;
   keepLatest = window.scrollY + window.innerHeight >= root.scrollHeight - window.innerHeight / 2;
-  syncKeyboard();
+  onViewport();
 });
-composerInput.addEventListener("blur", () => {
-  keepLatest = false;
-  syncKeyboard();
-});
-window.addEventListener("resize", () => { if (document.body.classList.contains("keyboard-open")) syncKeyboard(); });
+composerInput.addEventListener("blur", onViewport);
+window.addEventListener("resize", onViewport);
 if (window.visualViewport) {
-  window.visualViewport.addEventListener("resize", () => { if (document.body.classList.contains("keyboard-open")) syncKeyboard(); });
+  window.visualViewport.addEventListener("resize", onViewport);
+  window.visualViewport.addEventListener("scroll", onViewport);
+}
+onViewport(); // 키보드 없을 때 화면 높이를 처음에 재 둔다
+
+// 답이 온 뒤 입력창으로 돌아가기(PC). 휴대폰은 기다리는 동안에도 입력창을 켜 두어 포커스가 그대로라
+// 다시 부르지 않는다 — 누르지 않았는데 키보드가 열리거나 탭이 사라지지 않게(작업 107)
+function focusComposer() {
+  if (!touchDevice) composerInput.focus({ preventScroll: true });
 }
 // 전송 버튼을 눌러도 입력창 포커스(키보드)를 그대로 둔다 — 누르는 순간 키보드가 닫히며 버튼이 움직여 눌림이 빗나가지 않게
 sendBtn.addEventListener("pointerdown", (e) => {
@@ -739,7 +805,7 @@ function showDemandStep(res) {
   logAsk({ t: "d-step", step: res });
   addTo(askChat, demandStepMessage(res));
   updateComposer();
-  if (demandTyping()) composerInput.focus({ preventScroll: true });
+  if (demandTyping()) focusComposer();
 }
 
 // 한 단계 말풍선: (다시 묻기 문구) + 질문 + 칩 또는 예시 칩 + 「답변 n/3」 + 넘어가기·그만두기
@@ -1198,7 +1264,7 @@ async function askNext() {
   saveKeep();
   renderChips();
   updateComposer();
-  if (!res.done) composerInput.focus({ preventScroll: true });
+  if (!res.done) focusComposer();
 }
 
 // 첫 화면 안내(7-①): pendingQuestions ≥ 1이면 「후배 N명이 이 경험을 기다리고 있어요」
