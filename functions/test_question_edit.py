@@ -33,6 +33,26 @@ off = add_question(JUNIOR, "장학금 받을 수 있어요?", program=PROGRAM, s
 
 expect("ROUTES에 두 함수", ROUTES.get("deleteQuestion") is deleteQuestion and ROUTES.get("updateQuestion") is updateQuestion)
 
+# 0) [11/26 작업 117] getInbox 질문의 program·type·section
+import notes
+
+nowhere = add_question(OTHER, "해외 경험은 언제부터 준비해요?")
+legacy = add_question(OTHER, "마르부르크 가 본 선배 계세요?", program=PROGRAM, section=notes.QUESTION_SECTION)
+unknown = add_question(OTHER, "목록에 없는 곳은 어때요?", program="없는대학교")
+mine = {q["questionId"]: q for q in getInbox(JUNIOR, {})["questions"]}
+others = {q["questionId"]: q for q in getInbox(OTHER, {})["questions"]}
+ctx = lambda q: (q["program"], q["type"], q["section"])
+expect("프로그램 있는 질문: program·type·section", ctx(mine[hold]) == (PROGRAM, "교환", "생활"))
+expect("official 질문: 칸 없으면 section null", ctx(mine[off]) == (PROGRAM, "교환", None))
+expect("프로그램 없는 질문: 셋 다 null", ctx(others[nowhere]) == (None, None, None))
+expect("옛 「후배 질문」 칸은 section null", ctx(others[legacy]) == (PROGRAM, "교환", None))
+expect("목록에 없는 프로그램: type null", ctx(others[unknown]) == ("없는대학교", None, None))
+cards = {n["program"]: n["type"] for n in notes.NOTES.values()}
+by_type = {t: next(p for p, k in cards.items() if k == t) for t in ("교환", "파견", "인턴", "비교과")}
+typed = {add_question(SENIOR, f"{t} 질문이에요", program=p): t for t, p in by_type.items()}
+got = {q["questionId"]: q["type"] for q in getInbox(SENIOR, {})["questions"]}
+expect("type은 해봤노트 카드와 같은 값(교환·파견·인턴·비교과)", all(got[i] == t for i, t in typed.items()))
+
 # 1) 고치기
 r = updateQuestion(JUNIOR, {"questionId": hold, "text": "  마르부르크 기숙사 인터넷은\n 언제 신청해요?  "})
 expect("고치기: 공백 정리 + editedAt", r.get("ok") and r["text"] == "마르부르크 기숙사 인터넷은 언제 신청해요?" and r.get("editedAt"))

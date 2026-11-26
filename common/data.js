@@ -465,6 +465,7 @@ export const respondRequest = (threadId, accept) => call("respondRequest", { thr
 export const cancelRequest = (threadId) => call("respondRequest", { threadId, cancel: true });
 // [11/23] 쪽지 대화 ⋮ 메뉴 신고·차단. reason만 → 신고, block: true → 차단(양쪽 다 더 못 보냄, 상대에게 알림 없음). 둘 다 가능
 export const reportThread = (threadId, reason, block = false) => call("reportThread", { threadId, reason, block });
+// [11/26 작업 117] questions[]마다 program · type(교환|파견|인턴|비교과) · section — 없으면 null. program이 null이면 선배에게 전달되지 않은 질문
 export const getInbox = () => call("getInbox");
 // [v2 작업 91] 내 보관함 질문 상세의 「질문 삭제」·「질문 고치기」. 본인 hold 질문만(answered·official·남의 것은 { error })
 //   deleteQuestion → { ok, questionId, status: "deleted" } (목록에서 빠짐) · updateQuestion → { ok, questionId, text, editedAt } | { error, reason? }

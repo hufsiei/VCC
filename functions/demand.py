@@ -368,6 +368,8 @@ def saveDemand(me, p):
         if src:                      # 보류 질문에서 시작: 그 질문 행에 맥락만 붙인다(질문함 중복 없음)
             src["질문"] = s["question"]
             src.update({"칸": s["section"], "시기": s["when"], "수요": True})
+            if s.get("program") and src.get("프로그램명") not in notes.PROGRAMS:   # [11/26 작업 117] 프로그램 없던 질문
+                src["프로그램명"] = s["program"]                                  #   → 고른 프로그램(그 선배에게 전달됨)
             qids.append(src["id"])
             store.save("questions")
             texts = texts[1:]
