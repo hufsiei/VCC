@@ -254,6 +254,8 @@ function pickMock(m, name, p) {
     case "login":
       // mock은 비번을 대조하지 않는다(공개 코드에 비번을 두지 않음). 시연 아이디 모양이고 비번이 비어 있지 않으면 성공
       if (!p.pw) return m.login.fail;
+      // [v2 작업 90] 이어 쓰기 시연·시험용: H0469(마르부르크 이수)만 자기 학번으로 — getMe mock이 갈린다
+      if (m.getMeByStudent[p.id]) return { ok: true, user: { colreg_no: p.id, status: "학생" } };
       if (p.id === "staff01") return m.login.staff; // 총괄 관리자
       if (p.id === "staff02") return m.login.staffDept; // 부서 담당자
       return /^H\d{4}$/.test(String(p.id || "")) ? m.login.student : m.login.fail;
@@ -267,8 +269,12 @@ function pickMock(m, name, p) {
       // [11/23] 사람을 찾는 질문(주제어 없음) → 해봤노트 카드(status "notes")
       if (/(다녀온|갔다\s*온|가\s*본|경험한)\s*(선배|사람|분)|선배\s*(있|계|없|\?|$)/.test(p.question || "") && !/기숙사|비용|수업|서류|학점|팁|조언|어땠/.test(p.question || "")) return m.askBoo.notes;
       return /교환|파견|독일|마르부르크/.test(p.question || "") ? m.askBoo.exchange : m.askBoo.hold;
-    case "interviewNext":
-      return mockInterview(m, p); // 고른 경험(program)에 맞는 노트 틀로 묻는다
+    case "interviewNext": {
+      const step = mockInterview(m, p); // 고른 경험(program)에 맞는 노트 틀로 묻는다
+      // [v2 작업 90] 서버처럼 내 경험노트가 있는 프로그램의 첫 응답(answers 없음)에 resumed·myNoteId
+      return p.program === m.getMyNote.program && !(p.answers || []).length
+        ? { ...step, resumed: true, myNoteId: m.getMyNote.id } : step;
+    }
     case "getNote":
       return m.getNote[p.id] || m.getNote["N-marburg"];
     case "scrapNote":
@@ -317,7 +323,7 @@ function pickMock(m, name, p) {
       return /\d{8,}/.test(p.text || "") ? m.checkMessage.blocked : m.checkMessage.ok;
     // ── 선배 추천 열림(11/22) ──
     case "getMe":
-      return { ...m.getMe, recommend: mockStatus(), recommendable: sessionStorage.getItem("mockRecommendable") !== "0" };
+      return { ...m.getMe, ...m.getMeByStudent[(currentUser() || {}).colreg_no], recommend: mockStatus(), recommendable: sessionStorage.getItem("mockRecommendable") !== "0" };
     case "setRecommendable": // [11/23] 이 탭에서만 기억(mock)
       if (typeof p.on !== "boolean") return { error: "켜기·끄기를 골라 주세요" };
       sessionStorage.setItem("mockRecommendable", p.on ? "1" : "0");
@@ -331,7 +337,8 @@ function pickMock(m, name, p) {
     case "summarizeInterview": {
       const out = { ...m.summarizeInterview, ...mockSummaryFromTranscript(m, p.transcript), program: p.program || m.summarizeInterview.program, answered: countInterview(p.transcript), need: NEED };
       sessionStorage.removeItem(`mockDraft:${p.program}`); // [작업 79] 요약하면 미완성 초안을 지운다(서버와 같게)
-      return p.append === true ? mockAppend(m, out) : out;
+      // 서버처럼 같은 프로그램의 내 경험노트가 있을 때만 덧붙인다(화면은 늘 append: true를 보냄)
+      return p.append === true && out.program === m.getMyNote.program ? mockAppend(m, out) : out;
     }
     case "saveConsent": {
       const before = mockReady();
