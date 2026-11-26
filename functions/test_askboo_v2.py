@@ -395,6 +395,42 @@ expect("「마르부르크 생활비」는 그대로 답(도시 판정 안 탐)"
 res, calls = run("독일 교환 어디 있어요?", [], plan=None)
 expect("「독일 교환 어디 있어요?」는 그대로 독일 노트", res["status"] == "notes" and "독일" in res["message"], res.get("message"))
 
+# ── [11/26 Q-38] 규정 판별 좁히기 + 나라 단위 보류 문구 ─────────────────
+Q1 = "독일에서 교환학생 하면서 장학금 받은 사람이 있나? 독일 현지 대학교에서 주는 장학금 말이야"
+Q2 = "보통 독일 대학교에서 몇학점 들어?"
+Q3 = "독일 학비 알려줘"
+for q in (Q1, Q2, Q3, "그 학교 자체 장학금 있어요?", "파견 대학에서 몇 학점 수강했어요?"):
+    expect(f"규정 아님(현지·수강 경험): {q}", not askboo.is_official(q))
+for q in ("외대 장학금 받으려면 평점 몇 점?", "학점 인정 신청 언제까지?", "장학금 얼마예요?", "교환학생 장학금 신청 방법 알려 주세요",
+          "현지에서 들은 학점 인정받을 수 있어요?", "파견 대학 배정 결과 발표는 언제 나와요?", "독일 대학 다녀와서 초과학기 등록금 내요?",
+          "이중전공 과목도 파견대학에서 인정받을 수 있어요?", "현장실습 하면 몇 학점 받아요?"):
+    expect(f"그대로 규정: {q}", askboo.is_official(q))
+
+GERMANY = askboo.match_country("독일")[1]
+PLAN_DE = {"의도": "경험질문", "분야": "국제교류", "나라": "독일", "프로그램후보": [], "제외": [], "칸": "비용", "정리된질문": "x"}
+# ① 근거에 장학 문장이 없음 → 답쓰기가 비움 → 보류, 문구는 나라 단위 · 한 학교 링크 없음
+res, calls = run(Q1, [], plan=dict(PLAN_DE, 의도="규정"), answer={"답": []})
+expect("① 질문정리가 규정이라 해도 현지 대학 장학금은 근거 길", res["status"] == "hold" and "질문정리" in [c[0] for c in calls], res.get("status"))
+expect("① 보류 문구 = 「독일 해봤노트에는」", "독일 해봤노트에는 아직 이 내용이 없어요" in res.get("message", ""), res.get("message"))
+expect("① 나라 단위 보류에는 한 학교 noteId 없음", "noteId" not in res, res.get("noteId"))
+res, calls = run(Q1, [], plan=dict(PLAN_DE, 의도="사람찾기"), answer={"답": []})
+expect("① 질문정리가 사람찾기라 해도 주제어(장학)가 있으면 근거 길 → 보류", res["status"] == "hold", res.get("status"))
+res, calls = run("독일 교환 다녀온 선배 있어요?", [], plan=dict(PLAN_DE, 의도="사람찾기", 칸=None))
+expect("주제어 없는 사람 찾기는 그대로 노트 카드", res["status"] == "notes", res.get("status"))
+# ② 학점 칸(2-2 수강신청·2-3 수업) 근거
+cands, section, _ = askboo.extract(Q2, GERMANY)
+expect("② 몇 학점 들어 → 학점 칸 근거", section == "학점" and cands, (section, len(cands)))
+# ③ 학비·학기 등록 → 비용 칸 + 2-2의 「학기 등록만 하면 교통권」 문장이 후보에
+cands, section, _ = askboo.extract(Q3, GERMANY)
+expect("③ 학비 → 비용 칸", section == "비용", section)
+expect("③ 학기 등록 문장이 후보에", any("학기 등록" in c["text"] for c in cands), len(cands))
+# 학교 하나를 부른 질문의 보류 문구는 그대로 학교 이름
+res, calls = run("마르부르크에서 아르바이트 했어요?", [],
+                 plan={"의도": "경험질문", "분야": "국제교류", "나라": None, "프로그램후보": [PROGRAM], "제외": [], "칸": None, "정리된질문": "x"},
+                 answer={"답": []})
+expect("학교 하나 보류 문구는 학교 이름 + noteId", res["status"] == "hold" and f"{PROGRAM} 해봤노트에는" in res.get("message", "")
+       and res.get("noteId"), (res.get("message"), res.get("noteId")))
+
 # 기록 route에 새 길 이름
 logged = []
 _orig = askboo._log_answer
