@@ -151,17 +151,64 @@ def latest_when(me):
 
 
 # ---------- 수요 인터뷰 ----------
-def _details(field):
+# [11/26] 칩 순서: 우리 학과(crs_nm) 선배가 많이 다녀온 순 → 전교 선배 순 → (분류는 프로그램 수 순) → 이름.
+#   학적(data/students.json)의 경험 열이 programs.json의 세부·프로그램명과 같은 값이다(원우 데이터, 11/26 대조 100%).
+#   인원은 칩에 보여 주지 않는다(학과 + 나라 + 1명이면 사람이 짐작된다). 순서에만 쓴다.
+HISTORY = {   # (분야, 단계) → 학적 열
+    ("국제교류", "detail"): "파견국가", ("국제교류", "program"): "파견대학",
+    ("현장실습", "detail"): "기관 유형(가상)", ("현장실습", "program"): "기관명(가상)",
+    ("비교과", "detail"): "비교과 유형", ("비교과", "program"): "이수 비교과 프로그램",
+}
+_history = None
+
+
+def _values(col, cell):
+    """한 학생의 한 열 → 값 집합. 비교과는 「1회성(4), 진로·취업 교육과정(1)」·「A / B」처럼 여럿이 한 칸에 있다."""
+    if not cell:
+        return set()
+    if col == "비교과 유형":
+        return {re.sub(r"\(\d+\)$", "", x.strip()) for x in str(cell).split(", ") if x.strip()}
+    if col == "이수 비교과 프로그램":
+        return {x.strip() for x in str(cell).split(" / ") if x.strip()}
+    return {str(cell).strip()}
+
+
+def _seniors():
+    """{(분야, 단계): {"all": {값: 인원}, "dept": {학과: {값: 인원}}}} — 처음 쓸 때 한 번 센다."""
+    global _history
+    if _history is None:
+        _history = {k: {"all": {}, "dept": {}} for k in HISTORY}
+        for s in notes._json("students.json", []):
+            if not str(s.get("colreg_no", "")).startswith("H"):
+                continue
+            for k, col in HISTORY.items():
+                dept = _history[k]["dept"].setdefault(s.get("crs_nm"), {})
+                for v in _values(col, s.get(col)):
+                    _history[k]["all"][v] = _history[k]["all"].get(v, 0) + 1
+                    dept[v] = dept.get(v, 0) + 1
+    return _history
+
+
+def _ranked(me, field, step, names, tie=None):
+    """우리 학과 인원 ↓ → 전교 인원 ↓ → tie(이름별 보조 수) ↓ → 이름. 학과가 없으면(직원 등) 전교 순."""
+    from runtime_fns import student   # runtime_fns가 이 파일을 불러오므로 여기서
+    h = _seniors().get((field, step), {"all": {}, "dept": {}})
+    mine = h["dept"].get(student(me).get("crs_nm"), {}) if me else {}
+    tie = tie or {}
+    return sorted(names, key=lambda n: (-mine.get(n, 0), -h["all"].get(n, 0), -tie.get(n, 0), n))
+
+
+def _details(me, field):
     counts = {}
     for p in notes.PROGRAMS.values():
         if p.get("분야") == field and p.get("세부"):
             counts[p["세부"]] = counts.get(p["세부"], 0) + 1
-    return sorted(counts, key=lambda d: (-counts[d], d))
+    return _ranked(me, field, "detail", counts, tie=counts)
 
 
-def _programs(field, detail):
-    return sorted(p["프로그램명"] for p in notes.PROGRAMS.values()
-                  if p.get("분야") == field and (detail is None or p.get("세부") == detail))
+def _programs(me, field, detail):
+    return _ranked(me, field, "program", [p["프로그램명"] for p in notes.PROGRAMS.values()
+                                          if p.get("분야") == field and (detail is None or p.get("세부") == detail)])
 
 
 def _sections(field, program):
@@ -231,7 +278,7 @@ def _step(s, step, **kw):
     return {"done": False, "step": step, "state": s, "progress": {"answered": valid_count(s), "need": NEED}, **kw}
 
 
-def next_step(s):
+def next_step(s, me=None):
     """state → 다음 단계. 칩 단계(explore·field·detail·program·section·when) → 답변 단계(situation·question·hope) → more."""
     field = s.get("field")
     if field == UNSURE and not s.get("explored"):
@@ -240,10 +287,10 @@ def next_step(s):
         return _step(s, "field", question=QUESTIONS["field"], options=FIELDS + [UNSURE])
     if "detail" not in s:
         return _step(s, "detail", question=QUESTIONS["detail"][field],
-                     options=[{"value": d, "label": DETAIL_LABEL.get(d, d)} for d in _details(field)] + [{"value": None, "label": NOT_YET}])
+                     options=[{"value": d, "label": DETAIL_LABEL.get(d, d)} for d in _details(me, field)] + [{"value": None, "label": NOT_YET}])
     if "program" not in s:
         return _step(s, "program", question=QUESTIONS["program"],
-                     options=_programs(field, s.get("detail")) + [NOT_YET])
+                     options=_programs(me, field, s.get("detail")) + [NOT_YET])
     sections = _sections(field, s.get("program"))
     if s.get("section") not in sections:
         q = QUESTIONS["section"] if s.get("program") else             QUESTIONS["sectionNotYet"].replace("{i}", label_of(field, s.get("detail")))
@@ -298,7 +345,7 @@ def demandNext(me, p):
     s = _state(me, p)
     if s is None:
         return {"error": "볼 수 없는 기록이에요"}
-    return next_step(s)
+    return next_step(s, me)
 
 
 def saveDemand(me, p):
@@ -307,7 +354,7 @@ def saveDemand(me, p):
     s = _state(me, p)
     if s is None:
         return {"error": "볼 수 없는 기록이에요"}
-    nxt = next_step(s)
+    nxt = next_step(s, me)
     if not nxt.get("done") or valid_count(s) < NEED:
         return {"ok": False, "message": "아직 정리가 끝나지 않았어요", "next": nxt}
 

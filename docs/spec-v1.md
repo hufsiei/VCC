@@ -93,7 +93,7 @@ const FN_BASE = "http://localhost:8787";
 | getMyNote [11/22] | `getMyNote` 하나(M-0001, 일부 공유 예시). 받은 `id`를 그대로 넣어 돌려준다 |
 | updateMyNote [11/23 고치기] | `getMyNote`에 `changed`를 적용해 `ok: true`와 함께 돌려준다(기억하지 않음). 빈 문장·없는 문장은 서버와 같은 `error` |
 | 선배 추천 열림 [11/22 열림] | mock 기본은 **열림**. 주소에 `?locked=1`이면 잠김: `getMe.recommend.ready: false`, `recommendSeniors`·`previewNickname` → `locked`, `sendMessage` → `reason: "잠김"`. mock `saveDemand`·`saveConsent`를 부르면 그 탭은 열린다(sessionStorage `mockUnlocked`) |
-| demandNext·saveDemand [11/22 열림] | `data.js`의 `mockDemand`가 서버(`demand.py`)와 같은 순서로 `programs.json`·`frames.json`에서 칩을 만든다. `fromQuestionId`는 마르부르크·생활 보류 질문으로 채운다 |
+| demandNext·saveDemand [11/22 열림] | `data.js`의 `mockDemand`가 서버(`demand.py`)와 같은 단계로 `programs.json`·`frames.json`에서 칩을 만든다(**[11/26]** 칩 순서는 서버만 학과 선배 순, mock은 분류 = 프로그램 수 순 · 프로그램 = 가나다순). `fromQuestionId`는 마르부르크·생활 보류 질문으로 채운다 |
 | summarizeInterview [11/22 열림] | `summarizeInterview` + transcript로 센 `answered`, `need: 3`. **[v2]** `append: true`면 `getMyNote` 문장 뒤에 새 문장을 붙인 모양 |
 | deleteQuestion·updateQuestion [v2] | 받은 값으로 `ok: true`를 돌려준다(기억하지 않음). `getInbox.questions`의 `answered`·`official` id면 서버와 같은 `error` |
 | saveInterviewDraft·getInterviewDraft [v2] | 이 탭에서만 기억(sessionStorage `mockDraft:<program>`) |
@@ -538,6 +538,7 @@ payload `{id, changed: [{section, index, text}]}` — `index`는 `getMyNote`의 
 ### demandNext(state) [11/22 열림]
 「궁금한 것 정리하기」(수요 인터뷰) 다음 단계 하나. **AI 없음** — 칩과 규칙만(`functions/demand.py`). interviewNext처럼 서버는 기억하지 않고, 화면이 응답의 `state`를 들고 다니다 고른 값·쓴 답을 넣어 다시 보낸다.
 순서: `field`(국제교류·현장실습·비교과·잘 모르겠어요) → (`explore`: 「잘 모르겠어요」면 고민 칩으로 분야·분류를 정함) → `detail`(국제교류 = 나라, 현장실습 = 기관 유형, 비교과 = 프로그램 분류, `programs.json` `세부`) → `program`(그 분류의 프로그램 + 「아직 정하지 않았어요」) → `section`(노트 틀 칸) → `when`(이번 학기·다음 학기·1년 뒤·아직 몰라요) → **답변 3개** `situation`(지금 내 상황) · `question`(고른 칸에 대해 선배에게 묻고 싶은 것) · `hope`(이 경험이 남겨 줬으면 하는 것) → `more`(더 궁금한 것 최대 2개, `canSkip` — 건너뛰려면 `state.moreDone = true`).
+- **[11/26] 칩 순서**(`detail`·`program`): **우리 학과(`crs_nm`) 선배가 많이 다녀온 순 → 전교 선배 순 → 이름**(분류는 그다음 프로그램 수 순). 학적 `data/students.json`을 센다 — 국제교류 `파견국가`·`파견대학`, 현장실습 `기관 유형(가상)`·`기관명(가상)`, 비교과 `비교과 유형`(「1회성(4)」의 횟수는 떼고 사람 수)·`이수 비교과 프로그램`. 학과가 없는 계정(직원)은 전교 순. 「아직 정하지 않았어요」는 늘 끝. **인원은 칩에 보여 주지 않는다**(학과 + 나라 + 1명이면 사람이 짐작됨). 응답 모양은 그대로.
 - 칩 단계의 값: `state[step] = 고른 값`. `detail` 칩은 `{value, label}`이고 「아직 정하지 않았어요」는 `value: null`. `explore`는 `state.explore = 고른 label`(state.field는 「잘 모르겠어요」 그대로).
 - 답변 단계: `state[step] = 쓴 문장`, `more`는 `state.more = [..., 문장]`. **유효 답변** = 10자 이상, 「몰라요」류·같은 글자 반복 아님, `check_message`(학번·연락처·비방) 통과. 아니면 같은 단계 + `retry`(문구).
 - `progress.answered`는 유효 답변 수(칩은 세지 않음), `need`는 3.
