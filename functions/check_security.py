@@ -99,7 +99,7 @@ def check_access_and_tokens():
         # 남의 쪽지 접근도 「쪽지가 없어서」 거절되는 헛 통과가 된다. 보낸 사람·남(other) 둘 다 열어 둬서 거절 이유를 소유자 검사로 좁힌다.
         store.load("demands", []).extend({"id": f"R-{h}", "owner": h} for h in ("H0143", "H0745"))
         # 후배1 → 선배1 쪽지 요청, 후배1 내 경험노트 초안 하나
-        sent = call(base, "sendMessage", {"to": "H0469", "text": "마르부르크 파견 준비가 궁금해요."}, junior)
+        sent = call(base, "sendMessage", {"to": runtime_fns.peer_ref("H0143", "H0469"), "text": "마르부르크 파견 준비가 궁금해요."}, junior)
         tid = sent.get("threadId")
         runtime_fns.save_my_note("H0143", "마르부르크필립스대학교", "D-test", {"sections": []},
                                  {"sections": [{"name": "생활", "lines": [{"lineId": "L1", "text": "기숙사가 편했어요."}]}]})

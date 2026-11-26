@@ -62,7 +62,7 @@ def fake_s3(method, key="", body=b"", query=None, extra=None):
 store._s3 = fake_s3
 
 import runtime_fns as rf  # noqa: E402
-from runtime_fns import getMessages, recommendSeniors, respondRequest, sendMessage  # noqa: E402
+from runtime_fns import getMessages, recommendSeniors, respondRequest  # noqa: E402
 rf._call_ai = lambda *a, **k: {"ok": True, "json": {"ok": True}}   # 시험은 실제 AI를 부르지 않는다(쪽지검사 연결, 작업 27)
 
 JUNIOR, SENIOR1 = "H0143", "H0469"
@@ -78,6 +78,12 @@ rf.now = lambda: clock[0].isoformat(timespec="seconds")
 
 def later(seconds=1):
     clock[0] += timedelta(seconds=seconds)
+
+
+# [작업 38 D-1] 응답의 상대 값은 학번이 아니라 불투명 값(peer_ref). 이 시험은 학번으로 쓰고, 서버에는 화면처럼
+# 불투명 값으로 보내고 받은 값은 학번으로 되돌려 본다. 불투명 값 자체는 test_messages.py 9절.
+def sendMessage(me, p):
+    return rf.sendMessage(me, {**p, "to": rf.peer_ref(me, p["to"])})
 
 
 def expect(name, cond):

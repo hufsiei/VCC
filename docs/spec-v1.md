@@ -16,6 +16,7 @@
 > **11/23 개정 ②(작업 29 실사용, 미리 결정)**: ① `askBoo`에 새 `status: "notes"` — 사람을 찾는 질문(「네덜란드 교환 다녀온 선배?」)이나 나라만 말한 질문에 주제어가 없으면 답 대신 해봤노트 카드(`notes[]`)로 안내한다. 프로그램명이 없으면 **나라 이름**(`programs.json` `세부`)으로 그 나라 프로그램을 찾는다. `hold` 문구를 이유별로 나누고(노트가 있는데 「경험한 선배가 없어요」라고 하지 않음), 노트가 있으면 `hold`에도 `noteId`. ② 닮은선배 **추천받기 끄기** — 새 함수 **`setRecommendable(on)`**, `getMe.recommendable`, `sendMessage`의 `reason: "추천 제외"`. 경험자는 기본으로 후보이고, 끈 선배는 추천·새 쪽지 요청에서 빠진다. 바뀐 곳은 **[11/23 노트]**·**[11/23 추천]** 표시.
 > **11/25 개정(작업 33, 미리 결정)**: ① 해봤노트의 「원문 N건 보기」 접기를 없애고 **신고를 요약 문장으로** 옮긴다 — `getNote` `sections[].summary[].lineId`(「S-…」), `reportStatement`는 그 id를 받고 **사유(`reason`) 필수**. ② `askBoo`가 질문과 답을 `runtime/askLog.json`에 남긴다(사람 칸 없음). ③ 기록을 `functions/export_runtime.py`가 드라이브 엑셀(`@VCC/로그/VCC-로그.xlsx`)로 내보낸다(글은 마스킹, 학번 칸 없음). 바뀐 곳은 **[11/25 신고·기록]** 표시.
 > **11/26 개정(칸 유형별 보기 — 국제처 피드백, 미리 결정)**: 해봤노트 요약 문단을 화면에서 **개조식**(문장마다 한 줄 + 출처·「선배 N명」 칩 — 그 문장 `sources`의 서로 다른 문서 수, Q-38에서 고침)으로 바꾸고, `getNote`에 필드 하나를 더한다. **AI 호출 없음**(`tools/build_notes.py` 사전 생성, 키워드 매칭). **생활·지원 칸만** `summary[].topic`(요약 문장 키워드 매칭) — 화면은 라벨로 묶는다. 없으면 생략 → 지금 모양 그대로. 비용 칸 금액 분포(`sections[].stats`)는 **보류(로드맵)**. 바뀐 곳은 **[11/26 칸유형]** 표시.
+> **11/26 개정 ②(작업 38 D-1, 미리 결정 B)**: `recommendSeniors.studentId`·`getMessages.withId`는 학번이 아니라 **불투명 값**(`p` + 16자리, 보는 사람·상대별로 늘 같음, 보는 사람마다 다름). 화면은 이 값을 `sendMessage`·`previewNickname`의 `to`로 그대로 돌려주고, 서버가 학번으로 푼다. 학번·남에게 나간 값·엉터리 값은 거절. 비밀은 `VCC_PEER_SECRET`. 필드 이름·쓰는 법은 그대로. 바뀐 곳은 **[11/26 상대 값]** 표시.
 > **11/23 개정(작업 28, 민지 요청)**: 쪽지 대화 ⋮ 메뉴용 새 함수 **`reportThread(threadId, reason, block)`** — 신고(`threadReports.json`)·차단(`status: "blocked"`, 양쪽 다 더 못 보냄). `sendMessage`에 `reason: "차단"`, `getMessages`에 `blockedByMe`. 바뀐 곳은 **[11/23 차단]** 표시.
 > **11/23 개정 ⑤(askBoo v2 검토안, 팀 합의 — `docs/askBoo-v2 반영 검토안 (2026-11-23, 상의용).md`)**: ① `askBoo`에 **`history`**(최근 대화 4턴)와 서버의 **질문 정리**(의도·프로그램·제외·칸, Sonnet) → 의도가 `대화`면 새 **`status: "chat"`**(질문함 저장 없음), `탐색`이면 `notes`(카드에 `oneLine`, 현장실습은 `kinds`). `ok` 답은 **답 쓰기**(Sonnet, 2~4문장)로 만들고 문장마다 **`cites`**(인용한 sourceId)가 붙는다 — 근거 번호 없는 문장·근거에 없는 숫자·이름은 코드가 버리고, 다 버려지면 지금 방식(원문 인용) 폴백. 고르기는 HCX 그대로(상한 8). ② **노트 틀에서 「후배 질문」 칸 삭제**(교환·파견 6칸, 인턴 5칸, 비교과 2칸). 후배 질문은 `interviewNext`가 여전히 먼저 묻되(`junior: true`) 답은 **질문이 속한 칸**에 들어간다. 해봤노트 문장의 `answersQuestionId`는 유지(화면 라벨 「후배 질문에 답한 문장」), Q·A 쌍은 질문자의 내 보관함 질문 상세에서만. ③ **이어 쓰기**: `interviewNext`가 내 경험노트의 칸을 답한 것으로 치고, `summarizeInterview`에 `append`. ④ 새 함수 **`deleteQuestion`·`updateQuestion`**(hold만, 소프트 삭제), **`saveInterviewDraft`·`getInterviewDraft`**(미완성 초안 7일, P1-여건 79). ⑤ (**[11/23] P0**, 작업 78 — 전체 노트 적용) `getNote` 칸별 **`summary`**(사전 생성 요약 문단, 문장마다 `sources`). 바뀐 곳은 **[v2]** 표시. 화면 반영은 민지, 데이터(frames.json)는 원우, 서버는 미리.
 > **11/23 개정 ④(쪽지 읽음, 미리 결정)**: `getMessages()`는 목록만 돌려주고 **읽음으로 바꾸지 않는다**(닮은선배 화면이 버튼 상태를 볼 때 안 읽음이 사라지던 것). 대화창을 열 때 `getMessages(threadId)`(payload `{read: threadId}`)로 부르면 그 대화만 읽음. 바뀐 곳은 **[11/23 읽음]** 표시.
@@ -391,11 +392,12 @@ payload `{noteId, more?: true}`. `nickname`은 서버가 만든 선배 표시명
 - 목록에서 밀려난 선배는 보관함에 남기지 않는다. **쪽지를 주고받은 선배만** 「닮은선배 · 내 쪽지」에 남는다(**[11/23]** 쪽지 목록은 내 보관함이 아니라 닮은선배 안)(「선배 저장」 최대 9명은 P1).
 - 글자는 `nicknames.json`에 만난 순서대로 따로 기억하므로, 목록에서 빠졌다가 다시 나타나도 같은 사람은 같은 글자다(I 다음은 J, K…).
 - 받는 한도: 선배의 수락 대기(`waiting`) 요청이 **5건**이면 그 선배 카드에 `requestsFull: true`. 화면은 「지금은 요청이 많아요」를 보이고 쪽지 버튼 대신 「질문함으로 묻기」를 둔다(sendMessage 요청 한도 참고).
+- **[11/26 상대 값]** `studentId`는 학번이 아니라 이 사람에게만 쓰는 불투명 값이다. 같은 선배는 `getMessages`의 `withId`와 같은 값이라 화면이 둘을 맞춰 버튼 상태를 정한다. 쪽지를 보낼 때 `to`로 그대로 넘긴다.
 - **[11/24 retryAt]** 내가 쪽지 요청을 **취소한** 선배이고 아직 7일이 지나지 않았으면 그 카드에 `retryAt`(다시 보낼 수 있는 시각, ISO KST `+09:00`, 취소 시각 + 7일)이 붙는다. 7일이 지났거나 취소한 적이 없으면 필드가 없다. 화면은 쪽지 버튼을 비활성으로 두고 「11월 30일부터 다시 보낼 수 있어요」처럼 날짜를 보인다. 거절(`declined`)·만료(`expired`)에는 붙지 않는다 — 거절은 다시 보낼 수 없고, 만료는 바로 다시 보낼 수 있다.
 ```json
-{ "seniors": [ { "studentId": "H0469", "nickname": "독일어과 선배 A", "score": 14, "requestsFull": false,
+{ "seniors": [ { "studentId": "p3f9c1a07b2e4d815", "nickname": "독일어과 선배 A", "score": 14, "requestsFull": false,
                  "reasons": ["희망 프로그램을 경험했어요", "같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음", "한국외국어대학교 직무탐색 집중교육 함께 이수"] },
-               { "studentId": "H0241", "nickname": "독일어과 선배 B", "score": 12, "requestsFull": false,
+               { "studentId": "p8a20e6c94f1b3d72", "nickname": "독일어과 선배 B", "score": 12, "requestsFull": false,
                  "reasons": ["희망 프로그램을 경험했어요", "같은 서양어대학", "같은 독일어과", "이중전공 경영학 같음"],
                  "retryAt": "2026-11-30T09:00:00+09:00" } ],
   "shown": 2, "hasMore": false, "newCount": 0 }
@@ -411,7 +413,7 @@ payload `{text}`. 연락처·학번은 코드(정규식), 비방은 AI 판정. *
 reason: `연락처` | `학번` | `비방`
 
 ### sendMessage(to, text)
-payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청이 된다.
+payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청이 된다. **[11/26 상대 값]** `to`는 `recommendSeniors.studentId` 또는 `getMessages.withId`(불투명 값) 그대로 — 학번·다른 사람에게 나간 값·엉터리 값이면 `{ "error": "받는 사람과 내용을 확인해 주세요" }`(대화를 만들지 않음). `previewNickname(to)`도 같고, 틀리면 `{ "error": "받는 선배가 없어요" }`.
 **요청 한도(11/18):** 같은 선배에게 열린 대화가 이미 있으면 새 요청을 만들지 않고 그 대화에 붙인다(선배 한 명당 요청 1건). 보낸 사람이 **수락 전(`status: "waiting"`)인 요청을 3건** 가지고 있으면 `{ "ok": false, "reason": "한도", "message": "답을 기다리는 쪽지가 3건이에요. 기다리는 요청을 취소하거나 선배가 답하면 더 보낼 수 있어요." }`. 닮은선배 추천 수를 제한하지 않는 대신 쪽지는 여기서 막는다.
 **[11/23 차단]** 차단된 대화(누가 차단했든)에는 양쪽 모두 `{ "ok": false, "reason": "차단", "message": "더 이어 갈 수 없는 대화예요" }`. 한 쌍에 대화는 하나이므로 차단당한 사람이 새 요청을 보내도 같은 응답이다.
 **[11/20] 받는 한도:** 받는 선배의 수락 대기 요청이 이미 **5건**이면 `{ "ok": false, "reason": "선배한도", "message": "지금은 이 선배에게 요청이 많아요. 질문함에 남기면 선배 인터뷰 때 함께 물어볼게요." }`. 인기 선배에게 쪽지가 몰리지 않게 하고, 같은 질문은 질문함 → 인터뷰(작업 74) → 해봤노트로 한 번에 답하게 한다. 「당분간 쪽지 쉬기」 스위치는 P1.
@@ -435,13 +437,14 @@ payload `{to}`. 이 선배에게 보낼 대화의 내 닉네임을 정해 돌려
 
 ### getMessages(read?)
 **[11/23 읽음]** payload `{}` 또는 `{read: threadId}`. 그냥 부르면 목록만 돌려주고 **읽음으로 바꾸지 않는다**(닮은선배 버튼 상태·내 쪽지 목록). 대화창을 열 때 `{read: threadId}`로 부르면 그 대화만 내 쪽 읽음으로 바꾼다. `unread`는 읽음 처리 전, 상대가 보낸 글 중 안 읽은 수. 내가 보내면(`sendMessage`) 그 대화는 읽음.
+**[11/26 상대 값]** `withId`는 상대 학번이 아니라 불투명 값(같은 상대면 `recommendSeniors.studentId`와 같음). 선배가 답장할 때도 이 값을 `sendMessage`의 `to`로 넘긴다.
 `role`은 이 대화에서 내 역할: `asker`(쪽지를 보낸 사람) | `senior`(받은 선배). `nickname`은 **상대**의 이름으로, 내가 asker면 `"독일어과 선배 A"`, senior면 `"용감한 수달"`. `askerInfo`는 senior에게만 온다(학과 없음). **[11/22 열림]** `관심`은 보낸 사람의 수요 인터뷰·질문함에서 최근 것부터 최대 2개, 「분야·세부」 형식(국제교류는 「교환학생·독일」, 현장실습은 「현장실습·공공기관」, 비교과는 「비교과·진로·취업 교육과정」). `시기`는 수요 인터뷰에서 고른 것(「아직 몰라요」면 없음). 상황·바라는 것 답변 원문은 선배에게 보내지 않는다.
 ```json
 { "threads": [
-  { "threadId": "T-0001", "role": "asker", "withId": "H0469", "nickname": "독일어과 선배 A", "myNickname": "용감한 수달",
+  { "threadId": "T-0001", "role": "asker", "withId": "p3f9c1a07b2e4d815", "nickname": "독일어과 선배 A", "myNickname": "용감한 수달",
     "status": "accepted", "requestedAt": "2026-11-20T10:00:00+09:00", "unread": 1,
     "messages": [ { "from": "me", "text": "...", "at": "..." }, { "from": "them", "text": "...", "at": "..." } ] },
-  { "threadId": "T-0002", "role": "senior", "withId": "H0102", "nickname": "조용한 고래",
+  { "threadId": "T-0002", "role": "senior", "withId": "p5c7d0b13e9a2f468", "nickname": "조용한 고래",
     "askerInfo": { "학년": 2, "관심": ["교환학생·독일"], "시기": "다음 학기" },
     "status": "waiting", "requestedAt": "2026-11-21T09:00:00+09:00", "unread": 1,
     "messages": [ { "from": "them", "text": "...", "at": "..." } ] } ],
@@ -660,4 +663,4 @@ currentUser() · logout()   // sessionStorage "me" 읽기·지우기 (login()이
 - 현장실습후기는 `후기` 한 칸 자유 서술이다. **[11/19] 문장 단위**로 쪼개 한 문장이 한 건이 되고(`id`는 `I001-1`, `I001-2`…) `칸`은 비워 둔다 → 작업 50(문장 자동 분류)이 `지원동기`·`업무내용`·`배운점` 중 하나를 채우고 `autoClassified: true`를 붙인다. 문단 단위로 두면 한 문단에 업무·배운점이 섞여 칸 하나로 뭉개진다(11/19 샘플 확인). 분류 정확도는 원우의 정답 칸으로 측정(작업 50).
 - **[11/19]** `intern-keywords.json`(원우, 작업 81): `{ "직군": {"전시·행사 지원": ["KOTRA 해외무역관(유럽 권역)", …]}, "기관유형": {...}, "약칭": {"코트라": "KOTRA 해외무역관(유럽 권역)"} }`. 값은 모두 `programs.json`의 프로그램명과 글자 그대로 같아야 한다.
 - **[11/19]** `notes.json`(원우, 작업 26 `tools/build_notes.py`): getNote 응답 모양(4장) 그대로, 프로그램별 1건. `runtime/noteLines.json`과 합치는 것은 서버.
-- 함수 응답(4장)의 `studentId`, `withId`, `to`는 `colreg_no` 값을 가리킨다.
+- 함수 응답(4장)의 `studentId`, `withId`, `to`는 `colreg_no`를 가리키지만 **[11/26 상대 값]** 값은 학번이 아니라 서버가 만든 불투명 값(`functions/runtime_fns.py` `peer_ref`·`resolve_peer`)이다. 저장 기록(`runtime/*.json`)에는 학번 그대로.
