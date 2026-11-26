@@ -30,6 +30,16 @@ CLAUDE_PRICES = {
 # HCX 단가: 아직 확인 못 함(11/24). NCP 요금표를 확인하면 $ per 1M 토큰 (입력, 출력)으로 환산해 채운다.
 # None이면 HCX는 금액에 넣지 않고 회수·토큰만 보여 준다. CLOVA는 11/24부터 대회 크레딧에서 차감.
 HCX_PRICE = None
+# [11/26] 프롬프트 캐시: 쓰기는 입력 단가 × 1.25(5분 TTL), 읽기는 모델별 $ per 1M(Sonnet 5.5 0.10, Opus 5.5 0.20).
+# 로그의 입력토큰은 캐시 밖 나머지라 세 칸을 따로 곱한다(ai.py _기록의 캐시쓰기토큰·캐시읽기토큰).
+CACHE_WRITE_RATE = 1.25
+CACHE_READ_PRICES = {"claude-sonnet-5-5": 0.10, "claude-opus-5-5": 0.20}
+
+
+def _usd(model, price, tin, tout, cw=0, cr=0):
+    """한 호출(또는 합)의 추정 $. 캐시 읽기 단가가 표에 없으면 입력 단가의 0.1배로 친다."""
+    read = CACHE_READ_PRICES.get(model, price[0] * 0.1)
+    return (tin * price[0] + tout * price[1] + cw * price[0] * CACHE_WRITE_RATE + cr * read) / 1_000_000
 
 
 def _is_hcx(model):
@@ -50,6 +60,7 @@ def summarize(lines, day):
             continue
         model = d.get("모델", "")
         tin, tout = int(d.get("입력토큰") or 0), int(d.get("출력토큰") or 0)
+        cw, cr = int(d.get("캐시쓰기토큰") or 0), int(d.get("캐시읽기토큰") or 0)
         if _is_hcx(model):
             s["hcx_calls"] += 1
             hcx_in += tin
@@ -60,7 +71,7 @@ def summarize(lines, day):
         if price is None:
             s["unpriced"][model] = s["unpriced"].get(model, 0) + 1
             continue
-        s["usd"] += (tin * price[0] + tout * price[1]) / 1_000_000
+        s["usd"] += _usd(model, price, tin, tout, cw, cr)
     s["hcx_tokens"] = hcx_in + hcx_out
     if HCX_PRICE is not None:
         s["hcx_usd"] = (hcx_in * HCX_PRICE[0] + hcx_out * HCX_PRICE[1]) / 1_000_000
@@ -164,6 +175,7 @@ def load_calls(lines, since=None, until=None):
         ms = int(d.get("ms") or 0)
         ok.append({"작업": task, "모델": str(d.get("모델") or "?"),
                    "tin": int(d.get("입력토큰") or 0), "tout": int(d.get("출력토큰") or 0),
+                   "cw": int(d.get("캐시쓰기토큰") or 0), "cr": int(d.get("캐시읽기토큰") or 0),
                    "ms": ms, "start": end - timedelta(milliseconds=ms), "end": end})
     ok.sort(key=lambda c: c["start"])
     return ok, failed
@@ -182,7 +194,7 @@ def _avg(calls, n):
             s["unpriced_tokens"] += c["tin"] + c["tout"]
             unpriced.add(c["모델"])
         else:
-            s["usd"] += (c["tin"] * p[0] + c["tout"] * p[1]) / 1_000_000
+            s["usd"] += _usd(c["모델"], p, c["tin"], c["tout"], c.get("cw", 0), c.get("cr", 0))
     n = n or 1
     return {**{k: v / n for k, v in s.items()}, "unpriced": sorted(unpriced)}
 

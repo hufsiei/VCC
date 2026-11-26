@@ -27,9 +27,16 @@
 #   ④  AI(변환): 고른 문장 하나씩 해요체 한 문장 {"1":"..."}
 #   ⑤  코드: 사후 검증 — 원문에 없는 숫자·영문·고유명사·새 내용어가 있으면 그 문장을 버리고 원문 인용(fallback)
 #
+# [11/26 A안, 플래그 VCC_ASK_FULL=1 — 기본 0은 위 길 그대로. 11/29 측정으로 확정, 그때까지 옛 길 코드는 지우지 않는다]
+#   ②′ 코드: 추출·고르기(HCX)를 건너뛰고 프로그램 근거 전문(보고서·후기 문단 + 공개 동의 인터뷰 문장, full_evidence)을
+#        두 단계 번호(문단 [3], 문장 [3-1])로 답쓰기-전문(Sonnet)에 넘긴다. 근거 전문은 프롬프트 캐시(ai.py cache, 5분).
+#   ⑥′ 코드 검사(verify_facts) 대조 원문 = 지목 문장 + 같은 문단 앞뒤 한 문장. Opus 답검사 = 문단 전체, 지목 문장에 ▶.
+#        다 버려지면 답쓰기가 가리킨 원문 문장을 인용(fallback_lines → 변환 HCX). 답쓰기가 실패하면 위 옛 길로.
+#
 # AI는 ai.py의 callAI로만 부른다. 프롬프트 원문은 docs/prompts/askBoo-고르기.txt, askBoo-변환.txt.
 # hold·official 질문은 runtime_fns.add_question으로 질문함에 저장한다.
 import json
+import os
 import re
 from pathlib import Path
 
@@ -42,6 +49,8 @@ DATA = ROOT / "data"
 MAX_LINES = 3        # 폴백(원문 인용) 문장 수 상한 (spec 8장: 출처 달린 문장 3개)
 MAX_PICK = 8         # [v2] 고르기가 고르는 문장 수 상한 — 답쓰기에 넣는 근거
 MAX_ANSWER_LINES = 4 # [v2] 답쓰기 문장 수 상한
+MAX_ANSWER_LINES_FULL = 6   # [11/26 A안] 전문 길의 답 문장 수 상한(질문에 맞게 2~6)
+FULL_CHAR_CAP = 20000       # [11/26 A안] 전문 길 근거 글자 수 안전 상한(가장 큰 프로그램 약 1.5만 자). 넘으면 오래된 학기부터 뺀다
 MAX_HISTORY = 4      # [v2] 질문정리에 넣는 이전 대화 수
 INTENTS = ("경험질문", "탐색", "대화", "규정", "사람찾기")
 FIELDS = ("국제교류", "현장실습", "비교과")
@@ -346,6 +355,15 @@ def _answer(me, payload, save, trace=None):
         if found:
             return found
 
+    # ②′ [11/26 A안] VCC_ASK_FULL=1: 추출·고르기를 건너뛰고 프로그램 근거 전문을 답쓰기-전문에 넘긴다.
+    #     답쓰기가 실패(형식·호출)하면 None → 아래 옛 길(추출 → 고르기 → 답쓰기 → 원문 인용) 그대로
+    if ask_full():
+        trace["route"] = (trace.get("route") or "") + "·전문"
+        found = _answer_full(me, question, effective, programs, plan, save)
+        if found is not None:
+            return found
+        trace["route"] += "→옛 길"
+
     # ②/③ 근거 추출 (정리된 질문 + 원래 질문의 주제어·겹침을 모두 본다)
     cands, section, why = extract(effective if effective == question else f"{question} {effective}", programs,
                                   section_hint=plan["칸"] if plan else None)
@@ -365,6 +383,25 @@ def _answer(me, payload, save, trace=None):
     if out is None:
         out = fallback_lines(picked)
     out["noteId"] = notes.note_id(picked[0]["program"])
+    out["suggestSenior"] = False
+    return out
+
+
+def _answer_full(me, question, effective, programs, plan, save):
+    """[11/26 A안] 전문 길. 돌려주는 값: 응답 사전, 또는 None(답쓰기 실패 — 부르는 쪽이 옛 길로)."""
+    paras, why = full_evidence(effective if effective == question else f"{question} {effective}", programs)
+    section = "근무조건" if why.startswith("인터뷰로만") else (plan["칸"] if plan else None)
+    if not paras:
+        return _hold(me, question, programs[0], section, save, why=why)
+    out, quotes = compose_full(effective, paras)
+    if out is EMPTY_ANSWER:
+        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음")
+    if out is None:
+        if not quotes:          # 답쓰기 호출·형식 실패 → 옛 길
+            return None
+        out = fallback_lines(quotes)   # 답쓰기가 가리킨 원문 문장을 인용(다 버려진 경우)
+    first = out["lines"][0]["sourceId"] if out["lines"] else None
+    out["noteId"] = notes.note_id(out["sources"].get(first, {}).get("program") or programs[0])
     out["suggestSenior"] = False
     return out
 
@@ -1205,16 +1242,21 @@ def compose(question, picked, max_lines=MAX_ANSWER_LINES, on_empty=None):
         cited = [picked[n - 1] for n in nums]
         if verify_facts(text, " ".join(c["text"] for c in cited)):
             continue
-        todo.append((text, cited))
+        todo.append((text, cited, " ".join(c["text"] for c in cited)))
         if len(todo) >= max_lines:
             break
+    return _match_lines(todo, max_lines)
+
+
+def _match_lines(todo, max_lines):
+    """todo: [(답 문장, 인용 근거 목록, 답검사에 줄 원문)] → 답검사(Opus)를 통과한 줄로 응답. 없으면 None. compose·compose_full 공통."""
     if not todo:
         return None
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_lines) as pool:   # 일치검사는 문장별로 동시에(인터뷰 요약과 같은 방식)
-        matched = list(pool.map(lambda tc: match_check(" ".join(c["text"] for c in tc[1]), tc[0]), todo))
+        matched = list(pool.map(lambda t: match_check(t[2], t[0]), todo))
     lines, sources, used = [], {}, set()
-    for (text, cited), ok in zip(todo, matched):
+    for (text, cited, _), ok in zip(todo, matched):
         if not ok:
             continue
         cites = []
@@ -1227,6 +1269,169 @@ def compose(question, picked, max_lines=MAX_ANSWER_LINES, on_empty=None):
     if not lines:
         return None
     return {"status": "ok", "lines": lines, "sources": sources, "singleSenior": _single_senior(used)}
+
+
+# ── ②′ [11/26 A안] 전문 길: 근거 전문 + 두 단계 번호 ─────────────────────
+def ask_full():
+    """플래그 VCC_ASK_FULL=1이면 전문 길. 부를 때마다 읽는다(평가 스크립트가 환경변수로 두 길을 바꿔 돌린다)."""
+    return os.environ.get("VCC_ASK_FULL", "0").strip() == "1"
+
+
+_SEASON_RANK = {"1": 1, "여름": 2, "2": 3, "겨울": 4}
+
+
+def _semester_key(sem):
+    """'2026-1' → (2026, 1), '2026-여름' → (2026, 2). 학기를 모르는 줄(인터뷰 등)은 가장 최근으로 친다."""
+    m = re.match(r"(\d{4})-(.+)$", str(sem or ""))
+    return (int(m.group(1)), _SEASON_RANK.get(m.group(2), 0)) if m else (9999, 9)
+
+
+def _para_label(r):
+    """문단 머리의 칸 이름: 보고서는 문항(번호 뺌), 후기·인터뷰는 칸."""
+    if r.get("docType") == "귀국보고서" and r.get("문항"):
+        return re.sub(r"^\s*[\d-]+\.\s*", "", r["문항"])
+    return r.get("칸") or ""
+
+
+def full_evidence(question, programs, cap=FULL_CHAR_CAP):
+    """프로그램(들)의 보고서·후기 문단 + 공개 동의 인터뷰 문장 전부(문단은 쪼개지 않는다).
+    돌려주는 값: (문단 목록, 보류 이유). 문단: {n, sourceId, docType, program, semester, label, sents}.
+    정렬은 프로그램 순서 → 최근 학기 먼저. 글자 수가 cap을 넘으면 오래된 학기 문단부터 뺀다.
+    현장실습 근무조건 질문(INTERVIEW_ONLY_INTERN)은 옛 길처럼 인터뷰의 근무조건·지원·선발 칸만 쓴다."""
+    rows, why = [], ""
+    for pi, name in enumerate(programs):
+        iv = notes.interview_lines(name)
+        if PROGRAMS.get(name, {}).get("분야") == "현장실습" and INTERVIEW_ONLY_INTERN.search(question):
+            got = [r for r in iv if r["칸"] in ("근무조건", "지원·선발")]
+            if not got:
+                why = why or "인터뷰로만 채우는 칸(근무조건)"
+        else:
+            got = iv + EVIDENCE.get(name, [])
+        for r in got:
+            sents = split_sentences(r["text"])
+            if sents:
+                rows.append({"pi": pi, "order": len(rows), "row": r, "sents": sents,
+                             "key": _semester_key(r.get("semester"))})
+    total = sum(len(x["row"]["text"]) for x in rows)
+    if total > cap:   # 오래된 학기부터, 같은 학기면 뒤 문단부터 뺀다
+        for x in sorted(rows, key=lambda x: (x["key"], -x["order"])):
+            if total <= cap:
+                break
+            x["drop"] = True
+            total -= len(x["row"]["text"])
+        rows = [x for x in rows if not x.get("drop")]
+    rows.sort(key=lambda x: (x["pi"], -x["key"][0], -x["key"][1], x["order"]))
+    paras = [{"n": i, "sourceId": x["row"]["id"], "docType": x["row"]["docType"], "program": x["row"]["프로그램명"],
+              "semester": x["row"].get("semester"), "label": _para_label(x["row"]), "sents": x["sents"]}
+             for i, x in enumerate(rows, 1)]
+    if not paras:
+        why = why or "근거 없음"
+    return paras, ("" if paras else why)
+
+
+def render_evidence(paras):
+    """답쓰기-전문에 넣는 근거 글. 호출마다 글자가 같아야 캐시가 맞는다(시각·임의 값을 넣지 않는다).
+    [3] 보고서 · 2025 · 선배A · 기숙사 정보
+      [3-1] …   [3-2] …"""
+    letters, out, cur = {}, ["근거:"], None
+    for p in paras:
+        if p["program"] != cur:
+            cur = p["program"]
+            out.append(f"## {cur} (문단 {sum(1 for q in paras if q['program'] == cur)}개)")
+        who = _person_of(p["sourceId"])
+        if who not in letters:
+            letters[who] = chr(ord("A") + len(letters)) if len(letters) < 26 else str(len(letters) + 1)
+        year = str(p.get("semester") or "")[:4] or "–"
+        out.append(f"[{p['n']}] {DOC_WORD.get(p['docType'], p['docType'])} · {year} · 선배{letters[who]}"
+                   + (f" · {p['label']}" if p["label"] else ""))
+        out += [f"  [{p['n']}-{j}] {s}" for j, s in enumerate(p["sents"], 1)]
+    return "\n".join(out)
+
+
+_REF_RE = re.compile(r"^\s*\[?\s*(\d+)\s*(?:[-‐–]\s*(\d+))?\s*\]?\s*$")
+
+
+def parse_ref(x):
+    """근거 번호 → (문단, 문장|None). "3-2" → (3, 2) · "3"·3 → (3, None)(옛 번호: 문단 전체). 모양이 틀리면 None."""
+    if isinstance(x, bool):
+        return None
+    if isinstance(x, int):
+        return (x, None)
+    if isinstance(x, float) and x.is_integer():
+        return (int(x), None)
+    if isinstance(x, str):
+        m = _REF_RE.match(x)
+        if m:
+            return (int(m.group(1)), int(m.group(2)) if m.group(2) else None)
+    return None
+
+
+def full_sources(refs, by_n):
+    """인용 번호들 → (코드 검사 원문, 답검사 원문, 인용 문단 목록).
+    코드 검사: 지목 문장 + 같은 문단 앞뒤 한 문장(문단 번호만 대면 문단 전체).
+    답검사: 문단 전체, 지목 문장 앞에 ▶. 같은 문단을 여러 번 가리키면 한 번만 싣는다."""
+    groups = {}
+    for pn, sn in refs:
+        groups.setdefault(pn, set()).add(sn)
+    verify_parts, check_parts, cited = [], [], []
+    for pn, g in groups.items():
+        p = by_n[pn]
+        sents = p["sents"]
+        if None in g:
+            idx = range(len(sents))
+        else:
+            idx = sorted({i for s in g for i in range(max(0, s - 2), min(len(sents), s + 1))})
+        verify_parts.append(" ".join(sents[i] for i in idx))
+        marked = {s - 1 for s in g if s is not None}
+        check_parts.append(" ".join(("▶ " if i in marked else "") + s for i, s in enumerate(sents)))
+        cited.append({k: p[k] for k in ("sourceId", "docType", "program", "semester")})
+    return " ".join(verify_parts), "\n".join(check_parts), cited
+
+
+def compose_full(question, paras, max_lines=MAX_ANSWER_LINES_FULL):
+    """AI(답쓰기-전문) → 문장마다 두 단계 번호로 원문 대조 → 답검사. 돌려주는 값: (응답|None|EMPTY_ANSWER, 원문 인용 후보).
+    원문 인용 후보: 답쓰기가 가리킨 문장(문단만 가리키면 그 문단 첫 문장), 처음 가리킨 순서. 다 버려졌을 때 폴백에 쓴다."""
+    system, shots = load_prompt("askBoo-답쓰기-전문")
+    try:   # 지침·예시·근거 전문이 캐시(고정), 질문만 가변
+        r = callAI("답쓰기-전문", shots + [{"role": "user", "content": f"질문: {question}\n출력:"}],
+                   system=system, cache=render_evidence(paras))
+    except Exception:
+        return None, []
+    j = r.get("json") if r.get("ok") else None
+    answers = j.get("답") if isinstance(j, dict) else None
+    if not isinstance(answers, list):
+        return None, []
+    if not answers:
+        return EMPTY_ANSWER, []
+    by_n = {p["n"]: p for p in paras}
+    todo, quotes, seen = [], [], set()
+    for a in answers:
+        if not isinstance(a, dict):
+            continue
+        refs = []
+        for x in a.get("근거") if isinstance(a.get("근거"), list) else []:
+            ref = parse_ref(x)
+            p = by_n.get(ref[0]) if ref else None
+            if not p or (ref[1] is not None and not 1 <= ref[1] <= len(p["sents"])):   # 없는 번호는 버린다
+                continue
+            if ref not in refs:
+                refs.append(ref)
+        for pn, sn in refs:
+            if (pn, sn or 1) not in seen:
+                seen.add((pn, sn or 1))
+                p = by_n[pn]
+                quotes.append({"text": p["sents"][(sn or 1) - 1],
+                               **{k: p[k] for k in ("sourceId", "docType", "program", "semester")}})
+        text = a.get("text").strip() if isinstance(a.get("text"), str) else ""
+        if not text or not refs or not POLITE_END.search(text):   # 근거 번호 없는 문장·반말은 버린다
+            continue
+        verify_src, check_src, cited = full_sources(refs, by_n)
+        if verify_facts(text, verify_src):
+            continue
+        todo.append((text, cited, check_src))
+        if len(todo) >= max_lines:
+            break
+    return _match_lines(todo, max_lines), quotes
 
 
 # ── ④ 변환 + ⑤ 사후 검증 ─────────────────────────────────────────────
