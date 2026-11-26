@@ -38,9 +38,10 @@ board.py list
 ```
 git -C C:/dev/VCC fetch -q origin
 git -C C:/dev/VCC worktree add -b <브랜치> C:/dev/VCC-<슬러그> origin/main
-board.py add VCC-<슬러그> --branch <브랜치> --who <요청자> --task "<슬러그> <제목>" --title "<창 제목>" --files <예상 파일,…>
+board.py add VCC-<슬러그> --branch <브랜치> --who <요청자> --task "<슬러그> <제목>" --title "<창 제목>" --session <내 세션이름> --files <예상 파일,…>
 ```
 `--title`(창 제목, 11/26): 지시문 첫 줄에서 요청자·슬러그 뒤 글을 `Q-n`만 빼고 그대로 쓴다(예: `milwork 미리 board-tabs 상태판 HTML 개선 Q-57` → `--title "상태판 HTML 개선"`). VS Code 탭이 「milwork <첫 줄 앞부분>」으로 보이니 상태판 HTML 카드 맨 위 큰 글과 탭 글이 같아져 어느 탭을 닫을지 찾기 쉽다. 이어 하는 창에 없으면 `board.py set <폴더> --title "…"`.
+`--session`(11/26 Q-61, **꼭 적는다**): ListAgents 첫 줄 「This session is <이름>」의 이름(예: `vcc-ee`). 총괄이 그 창을 찾고(SendMessage), 상태판 HTML이 끝난 창을 **이 PC에서 그 세션이 아직 열려 있을 때만** 「닫아도 돼요」에 보이는 데 쓴다(닫혔거나 다른 PC 창은 접힌 「지난 창」으로). 빠뜨렸으면 `board.py set <폴더> --session <이름>`.
 `C:\dev\VCC`가 main이고 깨끗하면 `git -C C:/dev/VCC pull --ff-only -q`도 해 둔다(아니면 건너뛰고 이유만 알린다).
 
 ## 4. 보고 (3~4줄)
