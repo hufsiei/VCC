@@ -794,6 +794,12 @@ def reportStatement(me, p):
 # ---------- 내 경험노트 [11/22, 작업 23 민지 요청] ----------
 # 카드(getInbox.myNotes)와 상세(getMyNote)가 같은 계산을 쓴다.
 # 공유 상태는 share(private | partial | shared) 셋뿐 — saveConsent가 바로 반영하므로 「반영 중」은 없다(11/22 미리 결정).
+def _card_type(program):
+    """[11/26 작업 117] 화면에 내려주는 type = 해봤노트 카드(notes.json)의 값(교환|파견|인턴|비교과).
+    사전 생성 노트가 없는 프로그램은 notes._kind. 노트 틀 칸은 _kind로 고른다(교환·파견 틀은 같다)."""
+    return (notes.NOTES.get(notes.note_id(program)) or {}).get("type") or notes._kind(program)
+
+
 def _my_note_view(mid, v, detail=False):
     program = v["program"]
     kind = notes._kind(program)
@@ -804,7 +810,7 @@ def _my_note_view(mid, v, detail=False):
     mine = {s["name"]: s.get("lines", []) for s in (v.get("myNote") or {}).get("sections", [])}
     pub = {s["name"]: s.get("lines", []) for s in (v.get("publicDraft") or {}).get("sections", [])}
     names = frame + [n for n in mine if n not in frame]          # 틀에 없는 칸(틀이 바뀐 경우)은 뒤에
-    view = {"id": mid, "program": program, "type": kind, "noteId": notes.note_id(program),
+    view = {"id": mid, "program": program, "type": _card_type(program), "noteId": notes.note_id(program),
             "share": v.get("share", "private"),
             "filled": sum(1 for n in frame if mine.get(n)), "total": len(frame),
             "sharedLines": len(shared_ids & {ln.get("lineId") for ls in pub.values() for ln in ls}),
@@ -877,14 +883,11 @@ def getMyNote(me, p):
 
 
 def _question_context(q):
-    """[11/26 작업 117] 질문 카드용 program·type·section(없으면 None). type은 해봤노트 카드(notes.json)와 같은 값 —
-    사전 생성 노트가 없는 프로그램은 notes._kind. 프로그램 목록에 없는 이름은 type을 정하지 않는다."""
+    """[11/26 작업 117] 질문 카드용 program·type·section(없으면 None). type은 _card_type.
+    프로그램 목록에 없는 이름은 type을 정하지 않는다."""
     program = q.get("프로그램명") or None
-    kind = None
-    if program in notes.PROGRAMS:
-        kind = (notes.NOTES.get(notes.note_id(program)) or {}).get("type") or notes._kind(program)
     section = q.get("칸")
-    return {"program": program, "type": kind,
+    return {"program": program, "type": _card_type(program) if program in notes.PROGRAMS else None,
             "section": section if section and section != notes.QUESTION_SECTION else None}
 
 

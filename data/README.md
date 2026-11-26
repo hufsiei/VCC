@@ -402,7 +402,7 @@
 | 필드 | 형식 | 뜻 |
 |---|---|---|
 | myNotes[].id / noteId | 글자 | 내 경험노트 번호(`M-…`), 공유되는 해봤노트 번호 |
-| myNotes[].program / type | 글자 | 프로그램, 종류 |
+| myNotes[].program / type | 글자 | 프로그램, 종류(**[11/26]** 해봤노트 카드 `type`과 같음 — `교환`·`파견`·`인턴`·`비교과`) |
 | myNotes[].share [11/22] | 글자 | `private`(나만 보기) · `partial`(일부 공유) · `shared`(공유됨). 「반영 중」은 없음 |
 | myNotes[].filled / total [11/22] | 숫자 | 내 문장이 있는 칸 수 / 노트 틀 전체 칸 수(「노트 틀 4/7」) |
 | myNotes[].sharedLines [11/22] | 숫자 | 지금 해봤노트에 보이는 내 문장 수(신고로 숨긴 것 제외) |

@@ -9,7 +9,8 @@ import store
 store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"
 
 import interview
-from runtime_fns import ROUTES, add_question, deleteQuestion, getInbox, publish_lines, updateQuestion
+from runtime_fns import (ROUTES, add_question, deleteQuestion, getInbox, getMyNote, publish_lines, save_my_note,
+                         updateQuestion)
 
 PROGRAM = "마르부르크필립스대학교"
 JUNIOR, OTHER, SENIOR = "H0143", "H0745", "H0469"
@@ -52,6 +53,11 @@ by_type = {t: next(p for p, k in cards.items() if k == t) for t in ("교환", "�
 typed = {add_question(SENIOR, f"{t} 질문이에요", program=p): t for t, p in by_type.items()}
 got = {q["questionId"]: q["type"] for q in getInbox(SENIOR, {})["questions"]}
 expect("type은 해봤노트 카드와 같은 값(교환·파견·인턴·비교과)", all(got[i] == t for i, t in typed.items()))
+mid = save_my_note(SENIOR, by_type["파견"], "D-T117", {"sections": []}, {"sections": []})
+card = next(n for n in getInbox(SENIOR, {})["myNotes"] if n["id"] == mid)
+expect("내 경험노트도 파견 학교는 파견(카드·상세), 칸 수는 교환 틀과 같음",
+       card["type"] == "파견" and getMyNote(SENIOR, {"id": mid})["type"] == "파견"
+       and card["total"] == len(notes.frame_sections("교환")))
 
 # 1) 고치기
 r = updateQuestion(JUNIOR, {"questionId": hold, "text": "  마르부르크 기숙사 인터넷은\n 언제 신청해요?  "})
