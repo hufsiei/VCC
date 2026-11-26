@@ -53,7 +53,6 @@ PROVIDER = {
     "개선제안": "sonnet",  # 관리자 콘솔 개선 제안 (사전 생성·캐시) — 11/21 작업 67: 묶음 32개 사후 검증 32/32 통과(FAQ 오탐 수정 후)
     "리포트요약": "sonnet", # 관리자 리포트 요약 한 단락 — 11/21 작업 67: 전체·국제교류팀 2건 실호출 통과, 실패 시 템플릿
     "채점":     "opus",    # [11/25 Q-13] 실사용 askLog 한 건 → 답했나·근거·길 1~5점 + 이유(judge_asklog.py, 하루 한 번 몰아서. 답할 때 부르지 않음)
-    "외부정보": "sonnet",  # [작업 99 초안·시험만] 환율·순위·기업·보도 질문 → Claude 웹 검색 도구로 답 + 출처(URL). 서비스 코드는 아직 부르지 않음
 }
 
 # ── 2. 작업별 설정 ─────────────────────────────────────────────────
@@ -77,13 +76,7 @@ SETTINGS = {
     "개선제안": {"max_tokens": 2000, "effort": "medium"},
     "리포트요약": {"max_tokens": 2000, "effort": "medium"},
     "채점":     {"max_tokens": 2000, "effort": "low"},     # 출력은 점수 3개 + 이유 한 줄. 건당 비용을 낮게(하루 몰아서 수십 건)
-    # [작업 99] web_search가 있으면 call_claude_web으로 간다. 검색 1회 $0.01 + 검색 결과가 입력 토큰으로 붙는다.
-    # allowed_callers ["direct"] = 동적 필터링(코드 실행) 끔: 빠르고 ZDR 대상. timeout은 NCP 함수 60초 안에서 끝내려는 상한.
-    "외부정보": {"max_tokens": 3000, "effort": "low", "timeout": 40,
-                 "web_search": {"max_uses": 2, "allowed_callers": ["direct"]}},
 }
-
-WEB_SEARCH_TOOL = "web_search_20260318"   # 11/26 확인한 최신 버전(claude-api 문서). 동적 필터링·response_inclusion 지원
 
 CLOVA_URL = os.environ.get("CLOVA_URL", "https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-005")
 CLAUDE_MODELS = {"sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
@@ -114,16 +107,11 @@ def callAI(작업명, messages, system=None, 측정모델=None, 측정설정=Non
     system = mask(system) if system else system
     시작 = time.time()
     try:
-        web = None
         if 모델 == "hcx":
             text, usage = call_hcx(messages, system, 설정)
-        elif "web_search" in 설정:   # [작업 99] 도구를 받는 길. 이 설정이 없는 작업은 아래 기존 길 그대로
-            text, usage, web = call_claude_web(messages, system, 설정, claude_model_id(모델))
         else:
             text, usage = call_claude(messages, system, 설정, claude_model_id(모델))
         out = {"ok": True, "text": text, "json": first_json(text), "model": 모델}
-        if web is not None:
-            out.update(web)   # segments(글 조각+출처)·sources·searches·usage(시험 스크립트가 비용 계산)
     except Exception as e:  # 실패해도 서버가 죽지 않게. 화면은 폴백 문구를 보여 준다
         usage = {}
         out = {"ok": False, "text": "", "json": None, "model": 모델, "error": f"{type(e).__name__}: {e}"}
@@ -203,58 +191,6 @@ def call_claude(messages, system, 설정, model_id):
     return text, {"input": u.input_tokens, "output": u.output_tokens,
                   "cache_write": getattr(u, "cache_creation_input_tokens", None) or 0,
                   "cache_read": getattr(u, "cache_read_input_tokens", None) or 0}
-
-
-def call_claude_web(messages, system, 설정, model_id):
-    """[작업 99 초안] Claude + 웹 검색 서버 도구. 검색은 Anthropic 서버 안에서 돌아 우리 쪽 바깥 연결은 api.anthropic.com 하나.
-    돌려주는 값: (text, usage, web)
-      web.segments — 글 조각 순서대로 [{"text", "sources": [{"url", "title", "cited_text"}]}]. 출처 없는 조각은 sources=[]
-                     (출처는 문장 중간 조각에 붙으므로, 문장으로 나눠 출처 없는 문장을 버리는 일은 부르는 쪽이 한다)
-      web.sources  — 검색 결과 목록 [{"url", "title", "page_age"}] / web.searches — 검색 횟수(1회 $0.01)
-    출력은 JSON이 아니라 글 + 도구가 붙인 출처다(출처를 모델이 적는 번호가 아니라 API가 붙이므로)."""
-    import anthropic
-
-    client = anthropic.Anthropic(timeout=설정.get("timeout", 40), max_retries=0)  # 60초 함수 안에서 재시도로 늘어지지 않게
-    tool = {"type": WEB_SEARCH_TOOL, "name": "web_search", **설정["web_search"]}
-    kwargs = dict(
-        model=model_id,
-        max_tokens=설정.get("max_tokens", 3000),
-        tools=[tool],
-        output_config={"effort": 설정.get("effort", "low")},
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-    )
-    if system:
-        kwargs["system"] = system
-    msgs = list(messages)
-    content, usage = [], {"input": 0, "output": 0, "cache_write": 0, "cache_read": 0, "searches": 0}
-    for _ in range(3):   # pause_turn이면 받은 내용을 그대로 붙여 이어 부른다(최대 2번 더)
-        response = client.beta.messages.create(messages=msgs, **kwargs)
-        u = response.usage
-        usage["input"] += u.input_tokens
-        usage["output"] += u.output_tokens
-        usage["cache_write"] += getattr(u, "cache_creation_input_tokens", None) or 0
-        usage["cache_read"] += getattr(u, "cache_read_input_tokens", None) or 0
-        stu = getattr(u, "server_tool_use", None)
-        usage["searches"] += (getattr(stu, "web_search_requests", None) or 0) if stu else 0
-        content += list(response.content)
-        if response.stop_reason != "pause_turn":
-            break
-        msgs = msgs + [{"role": "assistant", "content": response.content}]
-    if response.stop_reason == "refusal":
-        raise RuntimeError("Claude가 요청을 거절했습니다(refusal)")
-    if response.stop_reason == "max_tokens":
-        raise RuntimeError(f"max_tokens({kwargs['max_tokens']})에 걸려 답이 잘렸습니다")
-    segments, sources = [], []
-    for b in content:
-        if b.type == "text":
-            cs = [{"url": c.url, "title": c.title, "cited_text": c.cited_text}
-                  for c in (getattr(b, "citations", None) or []) if getattr(c, "type", "") == "web_search_result_location"]
-            segments.append({"text": b.text, "sources": cs})
-        elif b.type == "web_search_tool_result" and isinstance(b.content, list):   # 오류면 content가 목록이 아니라 객체
-            sources += [{"url": r.url, "title": r.title, "page_age": getattr(r, "page_age", None)} for r in b.content]
-    text = "".join(s["text"] for s in segments)
-    return text, usage, {"segments": segments, "sources": sources, "searches": usage["searches"], "usage": dict(usage)}
 
 
 def with_cache_block(messages, fixed, blocks=True):
@@ -341,8 +277,6 @@ def _기록(작업명, 모델, usage, 시작, ok, error=None):
         }
         if "cache_write" in usage:   # [11/26] Claude 호출만. 입력토큰은 캐시 밖 나머지, 이 두 칸이 캐시 쓰기·읽기
             row["캐시쓰기토큰"], row["캐시읽기토큰"] = usage["cache_write"], usage["cache_read"]
-        if usage.get("searches"):   # [작업 99] 웹 검색 횟수(1회 $0.01, 토큰 값과 따로)
-            row["웹검색"] = usage["searches"]
         if error:
             row["error"] = mask(error)[:200]  # 오류 문구에 요청 내용이 섞일 수 있어 가린 뒤 자른다
         line = json.dumps(row, ensure_ascii=False) + "\n"
