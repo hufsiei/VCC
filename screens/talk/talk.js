@@ -758,11 +758,7 @@ function demandStepMessage(res) {
     res.retry ? el("p", { className: "demand-retry" }, [icon("triangle-alert"), res.retry]) : null,
     el("p", { className: "msg__bubble", text: res.question || "" }),
     !typing && Array.isArray(res.options) && res.options.length ? demandOptions(res) : null,
-    typing && Array.isArray(res.examples) && res.examples.length
-      ? el("div", { className: "chip-row" }, res.examples.slice(0, 3).map((ex) => el("button", {
-          className: "btn btn--secondary", text: ex, attrs: { type: "button" }, on: { click: () => fillExample(ex) }, // 바로 보내지 않음(5-7)
-        })))
-      : null,
+    typing && Array.isArray(res.examples) && res.examples.length ? demandExamples(res.examples) : null,
     el("div", { className: "demand-foot" }, [
       statusLabel("neutral", null, `답변 ${Number(progress.answered) || 0}/${Number(progress.need) || 3}`),
       actions,
@@ -770,6 +766,17 @@ function demandStepMessage(res) {
     el("span", { className: "msg__time", text: timeText() }),
   );
   return msg;
+}
+
+// 직접 쓰는 단계의 예시 칩(#331-2): 고르는 칩(demandOptions)과 모양이 같아 선택지로 보이므로
+// 안내 한 줄 + 칩 글자 앞 「예: 」. 누르면 입력칸에 채우고 바로 보내지 않는다(5-7)
+function demandExamples(examples) {
+  return el("div", { className: "demand-examples" }, [
+    el("p", { className: "demand-examples__hint" }, [icon("pencil"), "아래 입력칸에 직접 써 주세요. 예시를 누르면 채워져요"]),
+    el("div", { className: "chip-row" }, examples.slice(0, 3).map((ex) => el("button", {
+      className: "btn btn--secondary", text: `예: ${ex}`, attrs: { type: "button" }, on: { click: () => fillExample(ex) },
+    }))),
+  ]);
 }
 
 // 칩 단계: 옵션은 문자열 또는 {value, label}(detail — 「아직 정하지 않았어요」는 value: null)
