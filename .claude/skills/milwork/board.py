@@ -36,7 +36,7 @@
 #   decide                                          결정요망 표 출력(답 없는 것 위)
 #   decide add --folder VCC-x --session <이름> --q "질문" --options "A(추천) …; B …"   → 「D-n」, 그 폴더 줄 결정요망에 D-n
 #   decide answer D-n --a "A"                       답·시각 기록, 그 폴더 줄에서 D-n 제거. 출력 첫 줄은 그 D-n의 세션 이름
-#   clean [--days 1]                                「갱신」이 N일 넘게 지난 완료·반려 대기 작업 줄 + 답한 결정요망 줄을 지운다(밀종료)
+#   clean [--days 1]                                「갱신」이 N일 넘게 지난 완료·반려 대기 작업 줄 + 「답한 때」가 N일 넘게 지난 결정요망 줄을 지운다(밀종료)
 #   selftest                                        임시 폴더에서 위 명령 왕복, 틀리면 종료코드 1
 # <폴더>는 "VCC-xxx" 또는 "C:\dev\VCC-xxx" 어느 쪽이든 된다.
 import argparse
@@ -259,7 +259,7 @@ def save(st, path=None, html=True):
     lines = [chief_line(st), "", last, "", f"# VCC 상태판 — {ME or p.stem} (두 PC 공용 · 갱신 {now()} {HOST})", "",
              "작업 대화창은 `milwork`로 줄을 만들고 진행에 따라 「상태」「파일」「전달 대기」를 고친다. "
              "팀원 답장은 그 대화창이 바로 쓰고 「전달 대기」에 요점을 적는다. 미리가 보내면 `--sent`로 「보냄」 표시. "
-             "총괄 대화창은 대기 작업을 승인하고 결정요망에 답한다. 병합된 줄과 폴더, 하루 지난 완료·반려 줄과 답한 결정요망은 `milend`가 지운다.", ""]
+             "총괄 대화창은 대기 작업을 승인하고 결정요망에 답한다. 병합된 줄과 폴더, 완료·반려·답한 지 하루 지난 줄은 `milend`가 지운다.", ""]
     lines += table(COLS, st["rows"])
     lines += ["", "## 대기 작업", ""] + table(QCOLS, st["queue"])
     lines += ["", "## 결정요망", ""] + table(DCOLS, st["decide"])
@@ -658,14 +658,14 @@ def cmd_decide_answer(args):
 def cmd_clean(args):
     limit = timedelta(days=args.days)
 
-    def old(x):
-        a = age(x["갱신"])
-        return x["상태"] in ("완료", "반려") and a is not None and a > limit
+    def old(stamp):
+        a = age(stamp)
+        return a is not None and a > limit
 
     with locked():
         st = load()
-        q = [x["번호"] for x in st["queue"] if old(x)]
-        d = [x["번호"] for x in st["decide"] if x["답"] not in EMPTY]
+        q = [x["번호"] for x in st["queue"] if x["상태"] in ("완료", "반려") and old(x["갱신"])]
+        d = [x["번호"] for x in st["decide"] if x["답"] not in EMPTY and old(x["답한 때"])]
         if q or d:
             st["queue"] = [x for x in st["queue"] if x["번호"] not in q]
             st["decide"] = [x for x in st["decide"] if x["번호"] not in d]
@@ -942,14 +942,17 @@ def cmd_selftest(args):
     run("decide", "add", "--folder", a, "--session", "s", "--q", "1?", "--options", "A; B", first="D-1")
     run("decide", "add", "--folder", a, "--session", "s", "--q", "2?", "--options", "A; B", first="D-2")
     run("decide", "answer", "D-2", "--a", "A", first="s")
+    run("decide", "add", "--folder", a, "--session", "s", "--q", "방금?", "--options", "A; B", first="D-3")
+    run("decide", "answer", "D-3", "--a", "A", first="s")      # 방금 답함 → 남김
     st = load(f)
+    by_id(st["decide"], "D-2")["답한 때"] = past
     for x in st["queue"]:
         if x["번호"] != "Q-5":              # Q-3·Q-4는 오래됐어도 승인 상태라 남김
             x["갱신"] = past
     save(st, f, html=False)
     run("clean", "--days", "1", first="정리: 대기 작업 2줄 · 결정요망 1줄 (Q-1, Q-2, D-2)")
     left = [x["번호"] for x in load(f)["queue"] + load(f)["decide"]]
-    if left != ["Q-3", "Q-4", "Q-5", "D-1"]:
+    if left != ["Q-3", "Q-4", "Q-5", "D-1", "D-3"]:
         fails.append(f"clean 뒤 남은 줄: {left}")
     run("clean", first="정리: 대기 작업 0줄 · 결정요망 0줄")
     for i in ("Q-3", "Q-4"):
@@ -959,17 +962,19 @@ def cmd_selftest(args):
     st = load(f)
     for x in st["queue"]:                    # 분 단위라 방금 줄은 --days 0에서도 남을 수 있음
         x["갱신"] = past
+    for x in st["decide"]:
+        x["답한 때"] = past
     save(st, f, html=False)
     run("clean")
-    if load(f)["queue"] or load(f)["decide"] or "마지막 번호: Q-5 · D-2" not in f.read_text(encoding="utf-8"):
+    if load(f)["queue"] or load(f)["decide"] or "마지막 번호: Q-5 · D-3" not in f.read_text(encoding="utf-8"):
         fails.append("clean: 다 지운 뒤 줄이 남았거나 마지막 번호 머리 없음")
     run("queue", "add", "--task", "– 이어서", "--from", "직접", first="Q-6 승인")
-    run("decide", "add", "--folder", a, "--session", "s", "--q", "3?", "--options", "A; B", first="D-3")
+    run("decide", "add", "--folder", a, "--session", "s", "--q", "4?", "--options", "A; B", first="D-4")
     # 머리 줄이 없는 옛 상태판
     text = f.read_text(encoding="utf-8")
     f.write_text(re.sub(r"(?m)^마지막 번호: .*\n", "", text), encoding="utf-8")
     run("queue", "add", "--task", "– 옛 판", "--from", "직접", first="Q-7 승인")
-    if "마지막 번호: Q-7 · D-3" not in f.read_text(encoding="utf-8"):
+    if "마지막 번호: Q-7 · D-4" not in f.read_text(encoding="utf-8"):
         fails.append("옛 상태판: 마지막 번호 머리를 새로 쓰지 않음")
     print(f"임시 폴더: {tmp}")
     if fails:
@@ -1031,7 +1036,7 @@ def main():
     dn.set_defaults(fn=cmd_decide_answer)
 
     cn = sp.add_parser("clean")
-    cn.add_argument("--days", type=int, default=1, help="완료·반려가 된 지 N일 넘은 대기 작업 줄을 지움")
+    cn.add_argument("--days", type=int, default=1, help="완료·반려·답한 지 N일 넘은 대기 작업·결정요망 줄을 지움")
     cn.set_defaults(fn=cmd_clean)
 
     sp.add_parser("selftest").set_defaults(fn=cmd_selftest)
