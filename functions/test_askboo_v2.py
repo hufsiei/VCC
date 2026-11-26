@@ -319,6 +319,14 @@ res, _ = run("마르부르크 몇 명 갔어요?", [])
 expect("한 학교 인원", res["message"].startswith("마르부르크필립스대학교 다녀온 선배는 5명") and len(res["notes"]) == 1, res.get("message"))
 res, _ = run("뷔르츠부르크 말고 독일에서 제일 많이 간 곳", [])
 expect("「말고」로 뺀 학교는 세지 않음", "뷔르츠부르크" not in res["message"] and "뷔르츠부르크 대학교" not in [c["program"] for c in res["notes"]], res.get("message"))
+# [Q-40] 「순서대로」의 「서대로」를 학교 이름으로 읽지 않는다
+res, calls = run("독일 7+1 파견학생 간 사람들이 가장 많이 간 대학교를 순서대로 말해줘", [])
+expect("「…대학교를 순서대로」→ 인원 답(학교별 N명, AI 없음)", res["status"] == "notes" and calls == []
+       and res["message"].startswith("독일 7+1 파견 다녀온 선배는") and "마르부르크필립스대학교 3명" in res["message"], res.get("message"))
+for q in ("순서대로 알려줘", "제대로 알려줘", "생각대로 됐어?"):
+    expect(f"학교 이름 아님: {q}", not askboo.SCHOOL_NAME.search(q))
+for q in ("서울대 어때?", "외대에서 갔어?", "서울대·외대에서 간 곳", "남스웨덴공과대학교로 갔어?"):
+    expect(f"학교 이름 그대로: {q}", askboo.SCHOOL_NAME.search(q))
 _saved = askboo.ABROAD
 askboo.ABROAD = _saved + [("본대학교", "교환학생")] * 9   # 본대학교를 1등으로 만들고 노트가 없다고 친다
 _ev = askboo.evidence_count

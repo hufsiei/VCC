@@ -742,7 +742,8 @@ def match_programs(question):
     return found[:3]
 
 
-SCHOOL_NAME = re.compile(r"\S(?:대학교|대학|대)(?:\s|에서|에|은|는|이|가|을|를|의|로|$)|university", re.I)
+# 「대」 단독은 「대로」 앞에서 뺀다 — 「순서대로·제대로·생각대로」는 학교 이름이 아니다
+SCHOOL_NAME = re.compile(r"\S(?:대학교|대학|대(?!로))(?:\s|에서|에|은|는|이|가|을|를|의|로|$)|university", re.I)
 
 
 def match_country(question):
