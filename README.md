@@ -10,7 +10,7 @@
 - 로컬 서버 함수(각자 PC. AI 키는 미리 PC에만, 11/25): `functions/local_fn.py` 실행 후 `http://localhost:8787`. 서버는 공개 주소가 기본이고, 로컬 서버는 미리가 서버 코드를 고칠 때 쓰는 개발용입니다(11/25).
 - 공개 주소(GitHub Pages, `main` 루트): <https://hufsiei.github.io/VCC/screens/login/>
   - 저장소 루트는 `https://hufsiei.github.io/VCC/`이고, 각 화면은 그 아래 `screens/<화면>/`입니다.
-  - 기본은 `USE_MOCK=true`(mock 데이터)입니다. 주소 끝에 `?server=all`을 붙인 탭만 서버 함수(NCP Cloud Functions, 작업 58)로 갑니다. 배포·콘솔 구성은 [운영노트](docs/운영노트.md) 5장 「배포」.
+  - **공개 주소는 서버 함수(NCP Cloud Functions, 작업 58)가 기본**입니다(11/26 — 아무것도 안 붙여도 `?server=all`과 같음). mock 데이터로 보려면 주소 끝에 `?server=mock`(그 탭만). localhost는 지금처럼 mock 기본입니다. 배포·콘솔 구성은 [운영노트](docs/운영노트.md) 5장 「배포」.
   - 저장소가 공개라서 `data/`·`common/` 등 올린 파일은 누구나 볼 수 있습니다. 가상 데이터만 올리고, 키는 `.env`(커밋 금지)와 NCP 콘솔 기본 파라미터에만 둡니다. `.env`에 넣을 항목은 [.env.example](.env.example)(AI 키, 로그인 비번 표 `VCC_LOGIN_PW`)를 보세요.
 
 ## 가상 계정
@@ -42,9 +42,9 @@ python functions/serve_screens.py
 서버는 공개 주소(NCP Cloud Functions)입니다. 아래 한 바퀴만 합니다. 시연 중 서버 장애에 대비한 것은 사전 녹화 영상입니다(11/25 — 각자 PC 로컬 서버 시험은 하지 않음).
 
 ① 공개 주소 `?server=all` 한 바퀴 (11/25) — 키·설치 필요 없음
-1. 브라우저에서 <https://hufsiei.github.io/VCC/screens/login/?server=all> 을 엽니다(그 탭만 서버로 감).
+1. 브라우저에서 <https://hufsiei.github.io/VCC/screens/login/> 을 엽니다(11/26부터 공개 주소는 서버가 기본 — `?server=all`을 붙여도 같음).
 2. 로그인 H0143 → 인터BOO 2문항 → 들려주기 3답 → 해봤노트 → 닮은선배 → 쪽지 요청. (선배 쪽은 H0469 → 인터BOO → 들려주기 → 내 보관함 → 쪽지.)
-3. 문제는 「화면·계정·시각·재현 순서·캡처」로 단톡에. 끝나면 주소 끝에 `?server=`를 붙여 해제합니다.
+3. 문제는 「화면·계정·시각·재현 순서·캡처」로 단톡에. mock으로 돌아가려면 주소 끝에 `?server=mock`.
 - 쓰기 기록(쪽지·질문함·동의)은 공용 버킷 `vcc-runtime`에 남습니다. 리허설 전 초기화는 [운영노트](docs/운영노트.md) 5장 「배포」.
 
 ## push 전 검사
