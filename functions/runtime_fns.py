@@ -612,26 +612,30 @@ def _merge_sections(old, new, order):
     return {"sections": [{"name": n, "lines": lines[n]} for n in names]}
 
 
-def save_my_note(me, program, draft_id, my_note, public_draft, answered=0, asked=None, append=False):
+def save_my_note(me, program, draft_id, my_note, public_draft, answered=0, asked=None, append=False,
+                 asked_depth=None):
     """summarizeInterview(작업 21)가 부른다. 같은 사람·같은 프로그램이면 같은 myNoteId를 갱신.
     answered = 이번 인터뷰의 유효 답변 수(demand.count_interview_answers) — 이어 쓰면 큰 값을 남긴다(추천 열림).
-    [v2 작업 90] asked = 이번 인터뷰에서 물은 질문 글(interviewNext가 깊이 질문을 다시 묻지 않게).
-    append=True면 기존 myNote·publicDraft를 지우지 않고 칸 뒤에 덧붙이고(asked도 합침), 아니면 통째로 바꾼다.
+    [v2 작업 90] asked = 이번 인터뷰에서 물은 질문 글. [작업 108] asked_depth = 물은 깊이 질문 번호(interview.DEPTH_QUESTIONS)
+    — interviewNext가 깊이 질문을 다시 묻지 않게 이 번호로 대조한다(문구가 바뀌어도 그대로).
+    append=True면 기존 myNote·publicDraft를 지우지 않고 칸 뒤에 덧붙이고(asked·askedDepth도 합침), 아니면 통째로 바꾼다.
     돌려주는 값: myNoteId. 합친 결과는 find_my_note로 읽는다."""
     with store.lock():
         notes = store.load("myNotes", {})
         mid = next((k for k, v in notes.items() if v["owner"] == me and v["program"] == program), None)
         mid = mid or store.next_id("M")
         old = notes.get(mid, {})
-        asked = list(asked or [])
+        asked, asked_depth = list(asked or []), list(asked_depth or [])
         if append and old:
             order = notes_frame(program)
             my_note = _merge_sections(old.get("myNote"), my_note, order)
             public_draft = _merge_sections(old.get("publicDraft"), public_draft, order)
             asked = list(dict.fromkeys(list(old.get("asked") or []) + asked))
+            asked_depth = list(dict.fromkeys(list(old.get("askedDepth") or []) + asked_depth))
         notes[mid] = {"owner": me, "program": program, "draftId": draft_id, "myNote": my_note,
                       "publicDraft": public_draft, "share": old.get("share", "private"), "updatedAt": now(),
-                      "answered": max(int(old.get("answered", 0)), int(answered)), "asked": asked}
+                      "answered": max(int(old.get("answered", 0)), int(answered)), "asked": asked,
+                      "askedDepth": asked_depth}
         store.save("myNotes")
         return mid
 

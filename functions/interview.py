@@ -10,7 +10,7 @@
 #        답은 그 칸에 담기고 progress.filled에 센다. [11/26] 답이 부족하면(③과 같은 판정) 그 질문에 꼬리 질문 1회.
 #        꼬리 답도 같은 questionId·칸에 담겨 처음 답과 함께 요약된다(후배에게 가는 답).
 #   [v2 작업 90] 이어 쓰기: 같은 사람·같은 프로그램의 내 경험노트(myNotes.json)에 문장이 있는 칸은 답한 것으로 치고,
-#        그 노트에서 이미 답한 후배 질문·이미 물은 깊이 질문(myNotes의 asked)은 다시 묻지 않는다.
+#        그 노트에서 이미 답한 후배 질문·이미 물은 깊이 질문(myNotes의 askedDepth 번호, 옛 기록은 asked 글)은 다시 묻지 않는다.
 #        노트가 있으면 첫 응답(answers가 빈 때)에 resumed: true·myNoteId.
 #   ② 코드: [11/22] 그 뒤 근거가 0건이거나 모두 2년 넘은 칸만 기본 질문(근거 적은 칸 순). 근거가 충분한 칸은
 #        묻지 않고 covered로 알린다 → 깊이 질문(교환·파견 3, 인턴·비교과 2 — DEPTH_QUESTIONS, 판단·비교·후회·오해) → 「배운점」 마지막.
@@ -70,31 +70,54 @@ GENERIC = "{s}에 대해 기억나는 경험을 들려주세요."
 # [11/22] 깊이 질문 — 보고서가 이미 답한 사실(서류·학점·금액)은 다시 묻지 않고, 보고서에 잘 안 쓰는
 # 판단·비교·후회·오해를 묻는다(PRD 1:10 「보고서가 답하지 못한 질문만 묻는다」). (칸, 질문) — 답은 그 칸에 담긴다.
 # 유도 질문·본인 식별 답(성적·사람 이름·날짜)을 부르는 질문은 넣지 않는다. 문장은 미리가 정했다(AI가 만들지 않음).
-# [11/23 작업 84] 세 번째 값 = 예시답 칩(원우 PR #133 제안 문구). 질문마다 뜻이 달라 칸 단위 frames.json 예시 대신 여기 둔다.
+# [11/23 작업 84] 네 번째 값 = 예시답 칩(원우 PR #133 제안 문구). 질문마다 뜻이 달라 칸 단위 frames.json 예시 대신 여기 둔다.
+# [11/26 작업 108] 첫 값 = 바뀌지 않는 번호. 「물었음」은 번호로 남기고 번호로 대조한다(myNotes askedDepth).
+# 문구를 고쳐도 번호는 그대로 두고, 바뀌기 전 문구는 DEPTH_OLD에 남긴다(옛 기록 asked의 글을 그 번호로 이어 준다).
+# 번호는 지우거나 다른 질문에 다시 쓰지 않는다.
 DEPTH_QUESTIONS = {
     "교환": [
-        ("생활", "출국 전에 걱정했던 것과 실제로 달랐던 게 있었나요?",
+        ("교환-1", "생활", "출국 전에 걱정했던 것과 실제로 달랐던 게 있었나요?",
          ["걱정보다 수월했던 건 …", "생각보다 힘들었던 건 …", "예상과 달랐던 건 …"]),
-        ("지원", "다시 준비 과정을 거친다면 무엇부터 하실 것 같아요?",
+        ("교환-2", "지원", "다시 준비 과정을 거친다면 무엇부터 하실 것 같아요?",
          ["어학 점수부터 준비할 거예요", "서류 일정부터 확인할 거예요", "다시 한다면 먼저 …"]),
-        ("팁", "후배들이 {p}에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?",
+        ("교환-3", "팁", "후배들이 {p}에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?",
          ["생각보다 많아요. 예를 들면 …", "의외로 잘 모르는 건 …", "잘못 알려진 건 …"]),
     ],
     "인턴": [
-        ("업무내용", "시작 전에 상상했던 일과 실제 업무가 어떻게 달랐나요?",
+        ("인턴-1", "업무내용", "시작 전에 상상했던 일과 실제 업무가 어떻게 달랐나요?",
          ["생각보다 많았던 일은 …", "상상과 달랐던 건 …", "예상과 비슷했던 건 …"]),
-        ("배운점", "이 인턴이 맞는 사람과 안 맞는 사람은 어떤 사람일까요?",
+        ("인턴-2", "배운점", "이 인턴이 맞는 사람과 안 맞는 사람은 어떤 사람일까요?",
          ["이런 사람에게 맞아요: …", "이런 사람은 힘들 수 있어요: …", "꼭 필요한 건 …"]),
     ],
     "비교과": [
-        ("배운점", "기대와 비교해 실제로 얻은 건 뭐였어요?",
+        ("비교과-1", "배운점", "기대와 비교해 실제로 얻은 건 뭐였어요?",
          ["기대한 만큼 얻은 건 …", "기대와 달랐던 건 …", "기대보다 좋았던 건 …"]),
-        ("배운점", "이 프로그램을 몇 학년 때 듣는 게 가장 좋을까요? 왜요?",
+        ("비교과-2", "배운점", "이 프로그램을 몇 학년 때 듣는 게 가장 좋을까요? 왜요?",
          ["1학년 때가 좋아요", "2~3학년 때가 좋아요", "학년보다 중요한 건 …"]),
-        ("활동내용", "끝까지 하려면 어떤 점을 각오해야 하나요?",
+        ("비교과-3", "활동내용", "끝까지 하려면 어떤 점을 각오해야 하나요?",
          ["시간을 꽤 들여야 해요", "과제가 많은 편이에요", "꼭 각오할 건 …"]),
     ],
 }
+# 바뀌기 전 문구(번호 → 옛 문구들). 11/26 작업 93(b2867b0)에서 비교과-1 문구를 바꿨다.
+DEPTH_OLD = {
+    "비교과-1": ["신청할 때 기대한 것과 실제로 얻은 게 같았나요?"],
+}
+DEPTH_BY_ID = {d[0]: d for qs in DEPTH_QUESTIONS.values() for d in qs}
+
+
+def _depth_pattern(template):
+    """질문 틀 → 정규화한 글과 맞춰 볼 식. {p}(프로그램 짧은 이름)는 아무 이름이나 — 짧은 이름 규칙이 바뀌어도 맞게."""
+    parts = askboo._norm(template).split("{p}")
+    return re.compile(".+?".join(re.escape(x) for x in parts))
+
+
+_DEPTH_MATCH = [(d[0], _depth_pattern(t)) for d in DEPTH_BY_ID.values() for t in [d[2], *DEPTH_OLD.get(d[0], [])]]
+
+
+def depth_id(question):
+    """깊이 질문 글(지금 문구 또는 바뀌기 전 문구) → 번호. 깊이 질문이 아니면 None."""
+    n = askboo._norm(question)
+    return next((i for i, p in _DEPTH_MATCH if p.fullmatch(n)), None) if n else None
 # 한 인터뷰에 묻는 깊이 질문 수(종류별, 없으면 기본). 근거가 적은 칸에 담기는 질문부터(시연 순서가 매번 같게).
 # 교환·파견은 보고서 근거가 많아 기본 질문이 거의 안 남으므로 3개 모두 묻는다(11/22 미리).
 DEPTH_PER_INTERVIEW = {"교환": 3, "*": 2}
@@ -231,7 +254,7 @@ def _stem(s):
 def _all_stems():
     """말머리 칩(…로 끝남)의 앞부분 모음. 틀 예시 + 깊이 질문 예시."""
     chips = [c for f in FRAMES.values() for cs in (f.get("예시") or {}).values() for c in cs]
-    chips += [c for qs in DEPTH_QUESTIONS.values() for _, _, cs in qs for c in cs]
+    chips += [c for qs in DEPTH_QUESTIONS.values() for *_, cs in qs for c in cs]
     return {_stem(c) for c in chips if isinstance(c, str) and c.rstrip().endswith("…")} - {""}
 
 
@@ -251,10 +274,9 @@ def chips_for(program, section, question):
     """그 질문에 붙일 예시답 칩. 깊이 질문이면 질문별 예시, 아니면 frames.json 칸 예시. 후배 질문은 없음."""
     if section == QUESTION_SECTION:
         return None
-    p = short_name(program)
-    for s, q, ex in DEPTH_QUESTIONS.get(kind_of(program), []):
-        if s == section and askboo._norm(q.format(p=p)) == askboo._norm(question):
-            return _chips(ex)
+    d = DEPTH_BY_ID.get(depth_id(question))
+    if d and d[1] == section and d in DEPTH_QUESTIONS.get(kind_of(program), []):
+        return _chips(d[3])
     if askboo._norm(question).endswith(askboo._norm(base_question(program, section))):   # 기본 질문·배운점(꼬리 질문은 없음)
         return _chips((frame_of(program).get("예시") or {}).get(section))
     return None
@@ -275,15 +297,17 @@ def interviewNext(me, payload):
 
 
 def prior_of(program, mine):
-    """내 경험노트에서 이미 한 것: 문장이 있는 칸, 답한 후배 질문 id, 물은 질문 글(정규화)."""
+    """내 경험노트에서 이미 한 것: 문장이 있는 칸, 답한 후배 질문 id, 물은 깊이 질문 번호(depth).
+    [작업 108] 번호(askedDepth)에 더해, 번호가 없던 옛 기록의 질문 글(asked)도 번호로 바꿔 넣는다(바뀌기 전 문구 포함)."""
     names = set(sections_of(program))
-    out = {"sections": set(), "questionIds": set(), "asked": set()}
+    out = {"sections": set(), "questionIds": set(), "depth": set()}
     for sec in ((mine or {}).get("myNote") or {}).get("sections", []):
         lines = sec.get("lines") or []
         if lines and sec.get("name") in names:
             out["sections"].add(sec["name"])
         out["questionIds"] |= {ln["answersQuestionId"] for ln in lines if ln.get("answersQuestionId")}
-    out["asked"] = {askboo._norm(q) for q in (mine or {}).get("asked") or []}
+    out["depth"] = {i for i in (mine or {}).get("askedDepth") or [] if i in DEPTH_BY_ID}
+    out["depth"] |= {depth_id(q) for q in (mine or {}).get("asked") or []} - {None}
     return out
 
 
@@ -368,9 +392,10 @@ def _next_step(me, program, payload, prior):
             return step
 
     # ③′ 깊이 질문(보고서에 잘 안 쓰는 판단·비교) — 이번 인터뷰에서 아직 안 한 것
-    asked = {askboo._norm(a.get("question")) for a in answers} | prior["asked"]   # [v2] 지난번에 물은 것도
-    for s, q, ex in depth_questions(program, sections, stats):
-        if askboo._norm(q) not in asked:
+    # [작업 108] 번호로 대조. 지난번에 물은 것은 고르기 전에 빼므로(depth_questions) 남은 질문이 다음 차례가 된다.
+    now = {depth_id(a.get("question")) for a in answers}
+    for i, s, q, ex in depth_questions(program, sections, stats, before=prior["depth"]):
+        if i not in now:
             step = {**base, "section": s, "question": q, "depth": True}
             if _chips(ex):
                 step["examples"] = _chips(ex)   # [11/23 작업 84] 깊이 질문 예시답
@@ -426,14 +451,15 @@ def section_order(program, sections, stats=None):
     return body + ([LAST_SECTION] if LAST_SECTION in sections else [])
 
 
-def depth_questions(program, sections, stats=None):
-    """이번 인터뷰의 깊이 질문(종류별 DEPTH_PER_INTERVIEW개). 근거가 적은 칸에 담기는 것부터(같으면 목록 순서)."""
+def depth_questions(program, sections, stats=None, before=()):
+    """이번 인터뷰의 깊이 질문 (번호, 칸, 질문, 칩) — 종류별 DEPTH_PER_INTERVIEW개. 근거가 적은 칸에 담기는 것부터(같으면 목록 순서).
+    [작업 108] before = 지난 인터뷰들에서 이미 물은 번호. 먼저 빼고 나서 고른다(앞 N개만 돌지 않게)."""
     stats = evidence_stats(program) if stats is None else stats
     kind = kind_of(program)
-    pool = [d for d in DEPTH_QUESTIONS.get(kind, []) if d[0] in sections]
-    pool.sort(key=lambda d: len(stats.get(d[0]) or []))
+    pool = [d for d in DEPTH_QUESTIONS.get(kind, []) if d[1] in sections and d[0] not in before]
+    pool.sort(key=lambda d: len(stats.get(d[1]) or []))
     n = DEPTH_PER_INTERVIEW.get(kind, DEPTH_PER_INTERVIEW["*"])
-    return [(s, q.format(p=short_name(program)), ex) for s, q, ex in pool[:n]]
+    return [(i, s, q.format(p=short_name(program)), ex) for i, s, q, ex in pool[:n]]
 
 
 def base_question(program, section):
@@ -501,9 +527,10 @@ def summarizeInterview(me, payload):
     my_note = {"sections": my_sections}
     answered = demand.count_interview_answers(transcript)
     asked = [_unwrap(a.get("question")) for a in transcript if a.get("question")]
+    asked_depth = list(dict.fromkeys(i for i in map(depth_id, asked) if i))   # [작업 108] 물은 깊이 질문 번호
     try:
         my_note_id = save_my_note(me, program, draft_id, my_note, public_draft,
-                                  answered=answered, asked=asked, append=append)
+                                  answered=answered, asked=asked, asked_depth=asked_depth, append=append)
         saved = True
         drop_interview_draft(me, program)   # [v2 작업 79] 요약하면 미완성 초안은 지운다(0장 보관기간)
     except OSError:
