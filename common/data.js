@@ -18,6 +18,8 @@ const AUTH_FNS = ["login", "logout", "getMe"];
 // 서버 확인용(localhost·GitHub Pages): 주소 끝에 ?server=all 또는 ?server=sendMessage,getMessages
 // → 그 탭에서만 기억(sessionStorage, 두 창 시연). ?server= (빈 값)으로 해제. 붙이지 않으면 USE_MOCK대로(기본 mock).
 // [작업 58] 공개 주소에서도 받는다 — 붙인 탭만 Cloud Functions(FN_PUBLIC)로 간다.
+// [11/26] 공개 주소(github.io)는 아무것도 안 붙여도 서버(all)가 기본 — 처음 연 사람이 mock 고정 답을 보지 않게.
+//   공개 주소에서 mock으로 보려면 ?server=mock(그 탭만). localhost는 지금처럼 mock 기본.
 function localServerFns() {
   try {
     if (!IS_PUBLIC && !["localhost", "127.0.0.1"].includes(location.hostname)) return [];
@@ -28,9 +30,11 @@ function localServerFns() {
       else sessionStorage.removeItem("vccServer");
     }
     const saved = sessionStorage.getItem("vccServer") || "";
-    return saved ? saved.split(",").map((s) => s.trim()).filter(Boolean) : [];
+    if (saved === "mock") return [];
+    if (!saved) return IS_PUBLIC ? ["all"] : [];
+    return saved.split(",").map((s) => s.trim()).filter(Boolean);
   } catch {
-    return [];
+    return IS_PUBLIC ? ["all"] : [];
   }
 }
 

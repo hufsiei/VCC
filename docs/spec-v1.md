@@ -69,6 +69,7 @@
 - **초기화:** 리허설 전 `python functions/reset_runtime.py` → runtime 파일을 비우고 시연 시작 상태로 돌린다.
 - `data/runtime/`은 커밋하지 않는다(`.gitignore`). 시연 중 쌓인 기록이 저장소에 섞이지 않게.
 - 화면은 아무것도 바꿀 필요가 없다. `data.js`에서 `USE_MOCK = false`로 바꾸면 같은 함수가 서버로 간다. 원우·민지는 mock으로 계속 작업하고, 두 창 확인은 미리 PC에서 한다.
+- **[11/26] 공개 주소(github.io)는 서버가 기본**: `USE_MOCK`은 그대로 `true`(localhost는 mock 기본)이고, 공개 주소에서는 주소에 아무것도 없으면 `?server=all`과 같이 모든 함수가 Cloud Functions로 간다. 공개 주소에서 mock으로 보려면 `?server=mock`(그 탭만, sessionStorage).
 
 ## 3. data.js 동작
 
