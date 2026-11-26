@@ -46,3 +46,54 @@ def check(me, now=None):
         g["dayCount"] += 1
         store.save("aiUsage")
     return None
+
+
+# ---------- 로그인 실패 한도 (작업 38, 11/26) ----------
+# 계정(정규화한 colreg_no)마다 LOGIN_WINDOW초 안에 LOGIN_FAILS번 틀리면 LOGIN_LOCK초 동안 그 계정의 로그인을 막는다.
+# 막힌 동안은 맞는 비번도 받지 않는다(받으면 맞힌 순간을 알려 주는 셈이라 반복 시도를 못 막는다).
+# 시연 경계: 성공한 로그인은 세지 않고 그 계정의 실패 기록을 지운다 — 여러 창에서 맞는 비번으로 몇 번을 들어와도 안 막힌다.
+#   누가 시연 계정을 일부러 틀려도 막히는 건 60초뿐. 급하면 reset_runtime.py가 loginFails도 지운다.
+# 세는 대상은 students.json에 있는 계정만(account.login이 행을 찾은 뒤 부른다) — 아무 아이디나 넣어 기록을 불리지 못하게.
+# 기록: data/runtime/loginFails.json {colreg_no: {"since": 창 시작(초), "fails": 정수, "until": 잠금 끝(초, 0이면 없음)}}
+#   fails는 정수라 ncp에서 두 컨테이너가 같이 세도 더해진다(store._merge).
+LOGIN_FAILS = 5
+LOGIN_WINDOW = 60
+LOGIN_LOCK = 60
+LOGIN_KEY = "loginFails"
+
+
+def login_wait(uid, now=None):
+    """막혀 있으면 남은 초(1 이상 정수), 아니면 0. 읽기만 한다."""
+    now = time.time() if now is None else now
+    with store.lock():
+        r = store.load(LOGIN_KEY, {}).get(uid)
+    if not r or r.get("until", 0) <= now:
+        return 0
+    return max(1, int(r["until"] - now + 0.999))
+
+
+def login_failed(uid, now=None):
+    """틀린 비번 1회를 센다. 이번에 막혔으면 남은 초(LOGIN_LOCK), 아니면 0."""
+    now = time.time() if now is None else now
+    with store.lock():
+        rec = store.load(LOGIN_KEY, {})
+        for k in [k for k, v in rec.items()   # 지난 기록 정리: 창도 잠금도 끝난 계정
+                  if k != uid and now - v.get("since", 0) >= LOGIN_WINDOW and v.get("until", 0) <= now]:
+            del rec[k]
+        r = rec.get(uid)
+        if not r or now - r.get("since", 0) >= LOGIN_WINDOW:
+            r = rec[uid] = {"since": now, "fails": 0, "until": 0}
+        r["fails"] += 1
+        locked = r["fails"] >= LOGIN_FAILS
+        if locked:   # 잠그고 창을 잠금 끝으로 옮긴다 — 풀린 뒤에는 다시 5번
+            r.update(since=now + LOGIN_LOCK, fails=0, until=now + LOGIN_LOCK)
+        store.save(LOGIN_KEY)
+    return LOGIN_LOCK if locked else 0
+
+
+def login_ok(uid):
+    """로그인 성공: 그 계정의 실패 기록을 지운다(없으면 저장하지 않음)."""
+    with store.lock():
+        rec = store.load(LOGIN_KEY, {})
+        if rec.pop(uid, None) is not None:
+            store.save(LOGIN_KEY)

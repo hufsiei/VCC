@@ -97,7 +97,8 @@ def plan(ids, load):
 
     # 보는 사람 기준 dict — 시연 계정 키만
     for name, what in (("nicknames", "보는 사람별 선배 글자"), ("shownSeniors", "추천 목록"),
-                       ("recommendOptOut", "추천받기 끔"), ("aiUsage", "AI 호출 수"), ("scraps", "스크랩")):
+                       ("recommendOptOut", "추천받기 끔"), ("aiUsage", "AI 호출 수"), ("scraps", "스크랩"),
+                       ("loginFails", "로그인 실패 횟수·잠금")):
         new, n = _drop_keys(load(name, {}), ids)
         add(name, new, n, what)
 
@@ -120,7 +121,7 @@ def plan(ids, load):
 
 HANDLED = {"messages", "questions", "noteLines", "noteVersions", "alerts", "threadReports", "pendingNicknames",
            "nicknames", "shownSeniors", "recommendOptOut", "aiUsage", "scraps", "myNotes", "consents",
-           "interviewDrafts", "sessions", "reported", "demands"}
+           "interviewDrafts", "sessions", "reported", "demands", "loginFails"}
 
 
 def apply(store, changes):
