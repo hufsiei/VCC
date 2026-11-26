@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>인터BOO · 외대人사이드</title>
 <link rel="stylesheet" href="../../common/style.css">
 <style>
@@ -14,6 +14,12 @@
   /* 고정 입력줄(dock)에 마지막 말풍선이 가리지 않게: 높이는 talk.js가 잰다 */
   #viewMain .page { padding-bottom: calc(var(--dock-h, 120px) + var(--space-md)); }
   #viewSummary .page { padding-bottom: calc(var(--dock-h, 180px) + var(--space-md)); }
+  /* [11/26] 휴대폰 키보드가 열린 동안(talk.js syncKeyboard): 하단 탭을 숨기고 입력줄을 키보드 바로 위(--kb)에.
+     본문 아래 여백도 그만큼 — 마지막 말풍선까지 내려 볼 수 있게 */
+  body.keyboard-open #viewMain .tabbar { display: none; }
+  body.keyboard-open #viewMain.has-tabbar { padding-bottom: 0; }
+  body.keyboard-open #mainDock { bottom: var(--kb, 0px); padding-bottom: var(--space-sm); }
+  body.keyboard-open #viewMain .page { padding-bottom: calc(var(--dock-h, 120px) + var(--kb, 0px) + var(--space-md)); }
   /* 근거 블록이 들어가는 BOO 답변은 말풍선보다 넓게 */
   .msg__body--wide { flex: 1; max-width: calc(100% - 44px); }
   .msg__bubble p + p { margin-top: var(--space-sm); }

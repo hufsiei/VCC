@@ -334,6 +334,44 @@ toTopBtn.addEventListener("click", () => {
   if (title) { title.setAttribute("tabindex", "-1"); title.focus({ preventScroll: true }); }
 });
 
+// [11/26 민지] 휴대폰 키보드(안드로이드에서 확인): 입력창을 누르면 키보드가 입력줄·하단 탭을 덮거나 밀어 올려
+// 마지막 말풍선까지 내려 볼 수 없었다. 입력창에 포커스가 있는 동안 하단 탭을 숨기고 입력줄을 키보드 바로 위에 붙인다.
+// 안드로이드는 viewport의 interactive-widget=resizes-content로 화면이 키보드만큼 줄고(--kb 0),
+// 그 설정을 모르는 브라우저는 visualViewport로 키보드 높이를 재서 --kb만큼 올린다.
+const touchDevice = window.matchMedia("(pointer: coarse)").matches;
+let keepLatest = false; // 키보드를 열 때 맨 아래를 보고 있었으면 열린 뒤에도 맨 아래를 보여 준다
+
+function keyboardInset() {
+  const vv = window.visualViewport;
+  return vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+}
+
+function syncKeyboard() {
+  const open = touchDevice && document.activeElement === composerInput;
+  document.body.classList.toggle("keyboard-open", open);
+  document.body.style.setProperty("--kb", `${open ? keyboardInset() : 0}px`);
+  measureDock();
+  if (open && keepLatest) scrollToLatest();
+}
+
+composerInput.addEventListener("focus", () => {
+  const root = document.documentElement;
+  keepLatest = window.scrollY + window.innerHeight >= root.scrollHeight - window.innerHeight / 2;
+  syncKeyboard();
+});
+composerInput.addEventListener("blur", () => {
+  keepLatest = false;
+  syncKeyboard();
+});
+window.addEventListener("resize", () => { if (document.body.classList.contains("keyboard-open")) syncKeyboard(); });
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", () => { if (document.body.classList.contains("keyboard-open")) syncKeyboard(); });
+}
+// 전송 버튼을 눌러도 입력창 포커스(키보드)를 그대로 둔다 — 누르는 순간 키보드가 닫히며 버튼이 움직여 눌림이 빗나가지 않게
+sendBtn.addEventListener("pointerdown", (e) => {
+  if (touchDevice && document.activeElement === composerInput) e.preventDefault();
+});
+
 // ---------------------------------------------------------------------------
 // 5. 물어보기 — askBoo: ok / hold / official / notes / chat / error
 // ---------------------------------------------------------------------------
