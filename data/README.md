@@ -402,7 +402,7 @@
 | 필드 | 형식 | 뜻 |
 |---|---|---|
 | myNotes[].id / noteId | 글자 | 내 경험노트 번호(`M-…`), 공유되는 해봤노트 번호 |
-| myNotes[].program / type | 글자 | 프로그램, 종류 |
+| myNotes[].program / type | 글자 | 프로그램, 종류(**[11/26]** 해봤노트 카드 `type`과 같음 — `교환`·`파견`·`인턴`·`비교과`) |
 | myNotes[].share [11/22] | 글자 | `private`(나만 보기) · `partial`(일부 공유) · `shared`(공유됨). 「반영 중」은 없음 |
 | myNotes[].filled / total [11/22] | 숫자 | 내 문장이 있는 칸 수 / 노트 틀 전체 칸 수(「노트 틀 4/7」) |
 | myNotes[].sharedLines [11/22] | 숫자 | 지금 해봤노트에 보이는 내 문장 수(신고로 숨긴 것 제외) |
@@ -410,6 +410,7 @@
 | questions[].questionId / text | 글자 | 질문 번호, 내용 |
 | questions[].status | 글자 | `hold`(미답변) · `answered`(답변 도착) · `official`(규정 질문 → 화면 「공식 안내」) |
 | questions[].askedAt / noteId / answeredAt | 글자 | 질문 시각 / 답이 된 노트(answered) 또는 담은 노트(hold, 「질문함에 담기」) / 답한 시각(answered) |
+| questions[].program / type / section [11/26] | 글자 또는 null | 프로그램명 / `교환`·`파견`·`인턴`·`비교과`(해봤노트 카드 `type`과 같음) / 칸 이름. 늘 있고 없으면 null. `program`이 null이면 선배에게 전달되지 않은 질문 |
 | scraps[].noteId / program | 글자 | scrapNote로 켠 노트, 최근 것이 위 |
 | alerts[].text / questionId / noteId / at | 글자 | 알림 문구, 관련 질문·노트, 시각 |
 

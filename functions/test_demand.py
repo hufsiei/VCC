@@ -186,6 +186,28 @@ if INTERN:
     expect("현장실습: 월급 질문 → 근무조건",
            demandNext(OTHER, {"state": {"fromQuestionId": q_pay}})["state"].get("section") == "근무조건")
 
+# ── 5-2. [11/26 작업 117] 프로그램 없는 보류 질문 → 정리하면서 고른 프로그램이 그 행에 채워짐 ───
+bare = rf.add_question(OTHER, "해외에서 학기 중에 일해 볼 수 있는지 궁금해요", None, None, status="hold")
+r, seen = walk(OTHER, {"_start": {"fromQuestionId": bare}, "field": "국제교류", "detail": "독일", "program": MARBURG,
+                       "section": "생활", "when": "1년 뒤", "situation": "2학년이고 어학 점수를 준비하고 있어요",
+                       "hope": "현지에서 일해 본 경험", "more": None})
+n_before = len(store.load("questions", []))
+saved = saveDemand(OTHER, {"state": r["state"], "consent": True})
+row_ = next(q for q in store.load("questions", []) if q["id"] == bare)
+expect("프로그램을 고르면 그 질문 행에 프로그램·칸이 채워짐(행은 늘지 않음)",
+       "program" in seen and saved.get("questionIds") == [bare] and row_["프로그램명"] == MARBURG and row_["칸"] == "생활"
+       and len(store.load("questions", [])) == n_before)
+card = next(q for q in rf.getInbox(OTHER, {})["questions"] if q["questionId"] == bare)
+expect("getInbox에 program·type·section", (card["program"], card["type"], card["section"]) == (MARBURG, "교환", "생활"))
+bare2 = rf.add_question(OTHER, "해외 경험은 무엇부터 준비해야 할지 궁금해요", None, None, status="hold")
+r, _ = walk(OTHER, {"_start": {"fromQuestionId": bare2}, "field": "국제교류", "detail": "독일",
+                    "program": demand.NOT_YET, "section": "비용", "when": "1년 뒤",
+                    "situation": "1학년이라 아직 정한 것이 없어요", "hope": "넓게 알아보고 싶은 마음", "more": None})
+saveDemand(OTHER, {"state": r["state"], "consent": True})
+card = next(q for q in rf.getInbox(OTHER, {})["questions"] if q["questionId"] == bare2)
+expect("「아직 정하지 않았어요」면 program·type은 null, 고른 칸만",
+       (card["program"], card["type"], card["section"]) == (None, None, "비용"))
+
 # ── 6. 경험 나눔: 답변 3 + 공유 1문장 ─────────────────────────────────
 mid = rf.save_my_note(SENIOR1, MARBURG, "D-9001", {"sections": []}, {"sections": []}, answered=2)
 store.load("noteLines", []).append({"myNoteId": mid, "sourceId": "S-1"})

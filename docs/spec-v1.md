@@ -499,14 +499,17 @@ payload `{threadId, reason?, block?}`. 쪽지 대화 ⋮ 메뉴의 신고·차�
 ```json
 { "myNotes": [ { "id": "M-0001", "program": "마르부르크필립스대학교", "type": "교환", "noteId": "N-marburg",
                  "share": "partial", "filled": 4, "total": 7, "sharedLines": 3, "editedLines": 0, "updatedAt": "..." } ],   // [11/22] 최근에 요약한 것이 위
-  "questions": [ { "questionId": "Q-0001", "text": "...", "status": "hold", "askedAt": "..." },
-                 { "questionId": "Q-0002", "text": "...", "status": "answered", "noteId": "N-marburg", "answeredAt": "..." } ],
+  "questions": [ { "questionId": "Q-0001", "text": "...", "status": "hold", "askedAt": "...", "program": null, "type": null, "section": null },
+                 { "questionId": "Q-0002", "text": "...", "status": "answered", "noteId": "N-marburg", "answeredAt": "...",
+                   "program": "마르부르크필립스대학교", "type": "교환", "section": "생활" } ],
   "scraps": [ { "noteId": "N-marburg", "program": "마르부르크필립스대학교" } ],   // [11/22] scrapNote로 켠 노트, 최근이 위
   "alerts": [ { "text": "내 질문에 선배가 답했어요 · 마르부르크필립스대학교 해봤노트", "questionId": "Q-0002", "noteId": "N-marburg", "at": "..." } ] }
 ```
-**[11/22] 내 경험노트 카드(`myNotes`)**: `id`는 내 경험노트 번호(`M-…`), `noteId`는 공유되는 해봤노트 번호. `share` = `private`(나만 보기) | `partial`(일부 공유 — 화면 「N문장 공유」, N = `sharedLines`) | `shared`(해봤노트 공유됨). **「반영 중」 상태는 없다** — `saveConsent`가 그 자리에서 해봤노트에 반영하므로(11/22 미리 결정), 공유 직후 알림은 「해봤노트에 내 이야기가 반영됐어요」(`noteId` 포함). `filled`/`total` = 노트 틀에서 내 문장이 있는 칸 수 / 전체 칸 수(「노트 틀 4/7」). `sharedLines` = 지금 해봤노트에 보이는 내 문장 수(신고로 숨긴 것 제외).
+**[11/22] 내 경험노트 카드(`myNotes`)**: `id`는 내 경험노트 번호(`M-…`), `noteId`는 공유되는 해봤노트 번호. **[11/26 작업 117]** `type`은 그 프로그램 해봤노트 카드와 같은 값(파견 학교는 `파견`. `getMyNote`도 같음). `share` = `private`(나만 보기) | `partial`(일부 공유 — 화면 「N문장 공유」, N = `sharedLines`) | `shared`(해봤노트 공유됨). **「반영 중」 상태는 없다** — `saveConsent`가 그 자리에서 해봤노트에 반영하므로(11/22 미리 결정), 공유 직후 알림은 「해봤노트에 내 이야기가 반영됐어요」(`noteId` 포함). `filled`/`total` = 노트 틀에서 내 문장이 있는 칸 수 / 전체 칸 수(「노트 틀 4/7」). `sharedLines` = 지금 해봤노트에 보이는 내 문장 수(신고로 숨긴 것 제외).
 **[11/23 고치기] `editedLines`** = 선배가 고친 문장 수(내 경험노트 문장 `updateMyNote` + 공개 문장 `saveConsent` `changed`, 줄마다 `edited: true`인 것). `getMyNote`에도 같은 값. **다시 요약하면 고친 문장이 사라진다** — `summarizeInterview`는 같은 프로그램의 내 경험노트와 공개 초안을 새 AI 문장으로 통째로 바꾼다(**[v2]** `append: true`면 지우지 않고 덧붙이므로 이 확인은 `append`가 아닐 때만). 그래서 화면(인터BOO 들려주기)은 「AI 요약」을 누르면 `getInbox().myNotes`에서 같은 `program` 카드를 찾아 `editedLines ≥ 1`이면 확인 바텀시트를 먼저 띄운다: 제목 「다시 요약할까요?」, 본문 「고친 문장 N개가 새 요약으로 바뀌어요. 해봤노트에 이미 공유한 문장은 다시 공유하기 전까지 그대로예요.」, Primary 「새로 요약하기」 / Text 「취소」. 0이거나 카드가 없으면 바로 요약한다.
 **[11/19]** 질문 `status`는 `hold`(미답변) | `answered` | `official`. 화면은 `answered`에 「선배가 답했어요」 라벨 + 해봤노트 링크(**[v2]** 「후배 질문」 칸이 없으므로 질문 상세의 「선배의 답」 Q·A가 주 화면, 노트 링크는 보조). (이전 예시의 `waiting`은 쓰지 않는다.) **[v2]** `deleted`는 목록에 나오지 않는다. 카드·상세의 「더 들려주기」(`myNotes` 카드, `../talk/?mode=tell&program=…`)는 비활성 「자소서용 요약 보기」 자리에 둔다. `total`은 「후배 질문」 칸을 뺀 칸 수.
+
+**[11/26 작업 117] 질문의 프로그램**: `questions[]`에는 늘 `program` · `type` · `section` 세 필드가 있다(없는 값은 `null`). `program` = 질문함 행의 프로그램명. `type` = `교환` | `파견` | `인턴` | `비교과`(그 프로그램 해봤노트 카드 `listNotes`의 `type`과 같은 값, `program`이 없거나 프로그램 목록에 없으면 `null`). `section` = 질문의 칸 이름. **`program`이 `null`인 질문은 어느 선배에게도 전달되지 않는다**(들려주기 후배 질문은 같은 프로그램 것만 고른다) → 화면은 전달됐다고 쓰지 않는다. 질문 상세용 함수는 따로 없고 상세도 이 값을 쓴다.
 
 ### deleteQuestion(questionId) · updateQuestion(questionId, text) [v2]
 내 보관함 질문 상세의 「질문 삭제」·「질문 고치기」. **본인 질문이고 `status: "hold"`일 때만**. `answered`는 `{ "error": "선배가 답한 질문은 지울 수 없어요" }`(deleteQuestion) / `{ "error": "선배가 답한 질문은 고칠 수 없어요" }`(updateQuestion), `official`은 `{ "error": "공식 안내 질문은 지울 수 없어요" }` / `{ "error": "공식 안내 질문은 고칠 수 없어요" }`, 남의 것·없는 것·이미 지운 것은 `{ "error": "볼 수 없는 기록이에요" }`.
@@ -583,7 +586,7 @@ payload `{id, changed: [{section, index, text}]}` — `index`는 `getMyNote`의 
 
 ### saveDemand(state) [11/22 열림]
 payload `{state, consent: true}`. 서버가 같은 규칙으로 다시 검사한다. 끝나지 않았으면 `{ "ok": false, "message": "아직 정리가 끝나지 않았어요", "next": {demandNext 응답} }`.
-저장: 질문 문장(가장 궁금한 것 + 더 궁금한 것)을 **질문함에 `hold`로**(`프로그램명`·`칸`·`시기`·`수요: true`) — 다음 그 프로그램 선배의 들려주기가 후배 질문으로 먼저 묻고(작업 74, **[v2]** `junior: true`), 콘솔 수요 현황에도 합산된다. `fromQuestionId`로 시작했으면 그 질문 행에 맥락만 붙인다(질문함이 늘지 않음). 상황·바라는 것은 `runtime/demands.json`에만 둔다(선배에게 보내지 않음, 부서 집계는 P1).
+저장: 질문 문장(가장 궁금한 것 + 더 궁금한 것)을 **질문함에 `hold`로**(`프로그램명`·`칸`·`시기`·`수요: true`) — 다음 그 프로그램 선배의 들려주기가 후배 질문으로 먼저 묻고(작업 74, **[v2]** `junior: true`), 콘솔 수요 현황에도 합산된다. `fromQuestionId`로 시작했으면 그 질문 행에 맥락만 붙인다(질문함이 늘지 않음). **[11/26 작업 117]** 그 행에 프로그램이 없었고 정리하면서 프로그램을 골랐으면 `프로그램명`도 채운다(이미 있으면 바꾸지 않는다). 상황·바라는 것은 `runtime/demands.json`에만 둔다(선배에게 보내지 않음, 부서 집계는 P1).
 ```json
 { "ok": true, "demandId": "R-0001", "questionIds": ["Q-0003"],
   "recommend": { "ready": true, "by": "ask", "need": 3, "talk": { "answered": 0, "shared": 0 }, "ask": true }, "unlocked": true }
