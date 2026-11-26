@@ -45,6 +45,8 @@ PROVIDER = {
     "변환":     "hcx",     # askBoo ④ 근거 → 해요체 한 문장
     "충분판정": "hcx",     # 인터뷰 답이 칸을 채웠나 {"충분":true} — HCX 10/10
     "꼬리질문": "hcx",     # 인터뷰 꼬리 질문 1개 — HCX 9/10
+    "말판정":   "hcx",     # [작업 110 초안, 플래그 VCC_TELL_CHAT=1] 들려주기 선배 말 6종(답·부족·되물음·딴얘기·모름·그만) + 궁금한 것. 끄면 안 부름
+    "대화쓰기": "sonnet",  # [작업 110 초안, VCC_TELL_CHAT=1] 반응 + 칸 + 다음 질문 다듬기 {반응,칸,더묻기,질문}. 코드가 검증, 탈락하면 고정 질문
     "요약":     "sonnet",  # 인터뷰 요약 — HCX 0/10(형식 실패), Sonnet 9/10·Opus 9/10
     "1인칭":    "sonnet",  # 작업 21: 검증된 요약 문장 → 내 경험노트용 1인칭 해라체 (일괄 1회). 미측정, 실패하면 해요체 그대로
     "일치검사": "opus",    # 요약 문장 ↔ 원문 일치 — 만드는 모델(요약=Sonnet)과 검사하는 모델을 분리. Opus 10/10
@@ -68,6 +70,8 @@ SETTINGS = {
     "변환":     {"max_tokens": 150,  "temperature": 0},
     "충분판정": {"max_tokens": 30,   "temperature": 0},
     "꼬리질문": {"max_tokens": 100,  "temperature": 0.3},
+    "말판정":   {"max_tokens": 150,  "temperature": 0},     # 궁금(선배 말 그대로 옮김)이 붙으면 출력이 길어진다
+    "대화쓰기": {"max_tokens": 1500, "effort": "low"},      # 출력 150자 안팎. 인터뷰 한 턴마다 부르므로 low
     "요약":     {"max_tokens": 4000, "effort": "medium"},
     "1인칭":    {"max_tokens": 3000, "effort": "low"},
     "일치검사": {"max_tokens": 2000, "effort": "medium"},

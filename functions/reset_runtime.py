@@ -103,7 +103,8 @@ def plan(ids, load):
         add(name, new, n, what)
 
     # owner 칸이 있는 dict
-    for name, what in (("myNotes", "내 경험노트"), ("consents", "공개 동의"), ("interviewDrafts", "인터뷰 초안")):
+    for name, what in (("myNotes", "내 경험노트"), ("consents", "공개 동의"), ("interviewDrafts", "인터뷰 초안"),
+                       ("tellChat", "대화형 인터뷰 판정(작업 110)")):
         new, n = _drop_keys(load(name, {}), ids, lambda k, v: v.get("owner"))
         add(name, new, n, what)
 
@@ -121,7 +122,7 @@ def plan(ids, load):
 
 HANDLED = {"messages", "questions", "noteLines", "noteVersions", "alerts", "threadReports", "pendingNicknames",
            "nicknames", "shownSeniors", "recommendOptOut", "aiUsage", "scraps", "myNotes", "consents",
-           "interviewDrafts", "sessions", "reported", "demands", "loginFails"}
+           "interviewDrafts", "tellChat", "sessions", "reported", "demands", "loginFails"}
 
 
 def apply(store, changes):
