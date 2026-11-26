@@ -8,9 +8,10 @@
 
 import {
   currentUser, logout, getInbox, getMyNote, getNote, listNotes, scrapNote, updateMyNote, getMe, setRecommendable,
+  deleteQuestion, updateQuestion,
 } from "../../common/data.js";
 import { isUnread, markSeen, refreshBell, onBell, unreadOf, threadHasNews } from "./bell.js";
-import { setupMessages, renderMessagesTab, openThread, stopPolling, allThreads, loadThreads } from "./messages.js";
+import { setupMessages, renderMessagesTab, openThread, stopPolling, allThreads, loadThreads, openConfirm } from "./messages.js";
 
 // ---------------------------------------------------------------------------
 // 0. 로그인 확인
@@ -824,9 +825,11 @@ async function renderQuestion(questionId) {
     return;
   }
 
+  // [11/26 작업 91] 답을 기다리는 질문(hold)은 「질문 고치기」를 누르면 질문 문장 자리가 입력창으로 바뀐다
+  const editingThis = questionEditing === q.questionId && q.status === "hold";
   const head = el("div", { className: "question-head" }, [
     questionStatusLabel(q),
-    el("p", { className: "question-head__text", text: orDash(q.text) }),
+    editingThis ? questionEditor(q) : el("p", { className: "question-head__text", text: orDash(q.text) }),
     el("span", { className: "question__date", text: questionDates(q) }),
   ]);
   const children = [head];
@@ -879,11 +882,127 @@ async function renderQuestion(questionId) {
       emptyEvidence("아직 이 질문에 답한 선배가 없어요. 다음 선배 인터뷰 때 먼저 물어볼게요."),
       el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } }),
     );
+    // [11/26 작업 91] 본인 hold 질문만 고치기·삭제(spec deleteQuestion·updateQuestion). 고치는 중에는 숨김
+    if (q.status === "hold" && !editingThis) children.push(questionActions(q));
   }
 
   questionBody.setAttribute("aria-busy", "false");
   questionBody.replaceChildren(...children);
   drawIcons();
+}
+
+// ---------------------------------------------------------------------------
+// 7-0. 질문 고치기·삭제 [v2 작업 91] — spec deleteQuestion·updateQuestion. hold(답을 기다리는 질문)만.
+//      고치기: 질문 문장 자리에 입력창(5-9, 300자) + Secondary 「저장」 / Text 「취소」 — 내 경험노트 「문장 고치기」와 같은 모양
+//      삭제: 확인 시트(5-10, 되돌릴 수 없는 동작) → 질문함으로 돌아가 토스트
+// ---------------------------------------------------------------------------
+
+const MAX_QUESTION_CHARS = 300;
+let questionEditing = null; // 고치는 중인 questionId
+let questionBusy = false;
+
+function questionActions(q) {
+  const editBtn = el("button", { className: "btn btn--outline", attrs: { type: "button" } }, [icon("pencil"), el("span", { text: "질문 고치기" })]);
+  const deleteBtn = el("button", { className: "btn btn--danger", attrs: { type: "button" } }, [icon("trash-2"), el("span", { text: "질문 삭제" })]);
+  editBtn.addEventListener("click", () => {
+    questionEditing = q.questionId;
+    renderQuestion(q.questionId).then(() => {
+      const box = document.getElementById("question-edit");
+      if (box) box.focus();
+    });
+  });
+  deleteBtn.addEventListener("click", () => openConfirm({
+    title: "질문을 지울까요?",
+    text: "지운 질문은 질문함에서 사라지고, 선배 인터뷰에서도 더 묻지 않아요. 되돌릴 수 없어요.",
+    okText: "질문 삭제",
+    danger: true,
+    onOk: () => removeQuestion(q),
+  }));
+  return el("div", { className: "btn-row" }, [editBtn, deleteBtn]);
+}
+
+async function removeQuestion(q) {
+  if (questionBusy) return;
+  questionBusy = true;
+  let res = null;
+  try {
+    res = await deleteQuestion(q.questionId);
+  } catch (err) {
+    console.error(err);
+  }
+  questionBusy = false;
+  if (!res || res.error || res.ok === false) {
+    toast((res && res.error) || "지우지 못했어요. 잠시 뒤에 다시 시도해 주세요.", "circle-alert");
+    return;
+  }
+  // 목록에서 뺀다(서버도 getInbox에서 뺀다 — 소프트 삭제)
+  if (inbox) inbox.questions = inbox.questions.filter((x) => x.questionId !== q.questionId);
+  questionEditing = null;
+  goBack();
+  renderTabsMeta();
+  if (currentTab === "questions") renderPanel();
+  toast("질문을 지웠어요");
+}
+
+function questionEditor(q) {
+  const id = "question-edit";
+  const errId = `${id}-err`;
+  const box = el("textarea", { className: "input", attrs: { id, rows: 3, maxlength: MAX_QUESTION_CHARS, "aria-describedby": `${id}-hint ${errId}` } });
+  box.value = q.text || "";
+  const count = el("span", { className: "num", text: `${box.value.length}/${MAX_QUESTION_CHARS}` });
+  box.addEventListener("input", () => { count.textContent = `${box.value.length}/${MAX_QUESTION_CHARS}`; });
+  const err = el("p", { className: "field__error", attrs: { id: errId, role: "alert", hidden: true } }, [icon("circle-alert"), el("span")]);
+  const showError = (message) => {
+    err.lastChild.textContent = message;
+    err.hidden = false;
+    box.setAttribute("aria-invalid", "true");
+    drawIcons();
+    box.focus();
+  };
+  const saveBtn = el("button", { className: "btn btn--secondary", text: "저장", attrs: { type: "button" } });
+  const cancelBtn = el("button", { className: "btn btn--text", text: "취소", attrs: { type: "button" } });
+  const finish = () => {
+    questionEditing = null;
+    renderQuestion(q.questionId);
+  };
+  cancelBtn.addEventListener("click", finish);
+
+  saveBtn.addEventListener("click", async () => {
+    if (questionBusy) return;
+    const text = box.value.trim();
+    if (!text) return showError("질문을 적어 주세요.");
+    if (text.length > MAX_QUESTION_CHARS) return showError(`${MAX_QUESTION_CHARS}자 안으로 적어 주세요.`);
+    if (text === q.text) return finish();
+    questionBusy = true;
+    saveBtn.disabled = true;
+    cancelBtn.disabled = true;
+    let res = null;
+    try {
+      res = await updateQuestion(q.questionId, text);
+    } catch (e) {
+      console.error(e);
+    }
+    questionBusy = false;
+    if (!res || res.error || res.ok === false || typeof res.text !== "string") {
+      saveBtn.disabled = false;
+      cancelBtn.disabled = false;
+      return showError((res && res.error) || "저장하지 못했어요. 잠시 뒤에 다시 시도해 주세요.");
+    }
+    q.text = res.text;
+    if (res.editedAt) q.editedAt = res.editedAt;
+    finish();
+    toast("질문을 고쳤어요");
+  });
+
+  return el("div", { className: "field" }, [
+    el("label", { className: "field__label", text: "내 질문", attrs: { for: id } }),
+    box,
+    el("p", { className: "sub", attrs: { id: `${id}-hint` } }, [
+      "선배에게 그대로 전달돼요. 연락처·메일·링크는 넣을 수 없어요. ", count,
+    ]),
+    err,
+    el("div", { className: "btn-row" }, [saveBtn, cancelBtn]),
+  ]);
 }
 
 // ---------------------------------------------------------------------------

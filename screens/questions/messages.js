@@ -291,7 +291,8 @@ const confirmSheet = document.getElementById("confirmSheet");
 let confirmAction = null;
 let confirmFocus = null;
 
-function openConfirm({ title, text, okText, danger = false, onOk }) {
+// [11/26 작업 91] 질문 상세 「질문 삭제」도 같은 확인 시트를 쓴다(questions.js에서 import)
+export function openConfirm({ title, text, okText, danger = false, onOk }) {
   confirmFocus = document.activeElement;
   document.getElementById("confirmTitle").textContent = title;
   document.getElementById("confirmText").textContent = text;
