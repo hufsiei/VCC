@@ -1646,8 +1646,21 @@ if (kept) {
   if (kept.tell) restoreTell(kept.tell);
 }
 
-history.replaceState({ view: "main" }, "", location.href);
+// [작업 118] ?from=Q-…(내 보관함 질문 카드 「궁금한 것 정리하기」) — 보류 답 아래 버튼과 같은 흐름으로 바로 시작.
+// 주소에서 from은 지워 새로고침·뒤로 와도 다시 시작하지 않는다
+const startUrl = new URL(location.href);
+const fromQuestion = startUrl.searchParams.get("from");
+if (fromQuestion) {
+  startUrl.searchParams.delete("from");
+  mode = "ask";
+}
+
+history.replaceState({ view: "main" }, "", startUrl.href);
 setMode(mode);
+if (fromQuestion) {
+  if (!demand.active) startDemand(fromQuestion);
+  else if (demand.from !== fromQuestion) toast("지금 정리하던 것을 먼저 마쳐 주세요", "info");
+}
 showDemandCard(); // ① 선배 추천이 잠겼을 때만 물어보기 맨 위 카드(작업 92)
 drawIcons();
 measureDock();

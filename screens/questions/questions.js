@@ -340,6 +340,27 @@ function questionStatusLabel(q) {
   return statusLabel("neutral", "clock", "답을 기다려요");
 }
 
+// [11/26 작업 118] 질문의 프로그램(spec getInbox 작업 117): 커버는 해봤노트 카드의 분야 띠(태그 + 프로그램 이름).
+// program이 null이면 어느 선배에게도 전달되지 않은 질문이다. 필드가 아예 없으면(재배포 전 서버) 커버 없이 그전 모양
+const needsProgram = (q) => q.status === "hold" && q.program === null;
+
+function questionBand(q) {
+  if (q.program === undefined) return null;
+  const cat = CATEGORY[q.type] || null;
+  return el("div", { className: `note-card__band ${cat ? `cat-${cat}` : "question-band--none"}` }, [
+    cat ? el("span", { className: "category-tag", text: CATEGORY_NAME[cat] }) : null,
+    el("span", { className: "note-card__kind", text: q.program || "프로그램을 정하지 않았어요" }),
+  ]);
+}
+
+// 인터BOO 보류 답 아래 버튼과 같은 흐름(demandNext fromQuestionId) — 인터BOO가 ?from=을 받아 바로 시작한다
+function sortOutButton(q) {
+  const href = `../talk/?mode=ask&from=${encodeURIComponent(q.questionId)}`;
+  return el("a", { className: "btn btn--primary btn--block", text: "궁금한 것 정리하기", attrs: { href } });
+}
+
+const NOT_DELIVERED = "아직 선배에게 전달되지 않았어요. 프로그램을 고르면 전달돼요";
+
 function questionCard(q) {
   const children = [questionStatusLabel(q), questionLink(q, "question__text")];
   if (q.status === "answered") {
@@ -361,10 +382,13 @@ function questionCard(q) {
   } else {
     children.push(
       el("span", { className: "question__date", text: questionDates(q) }),
-      el("p", { className: "question__info", text: "근거 0건 · 선배 인터뷰 질문으로 전달됐어요" }),
+      el("p", { className: "question__info", text: needsProgram(q) ? NOT_DELIVERED : "근거 0건 · 선배 인터뷰 질문으로 전달됐어요" }),
     );
+    if (needsProgram(q)) children.push(sortOutButton(q));
   }
-  return el("article", { className: "card question" }, children);
+  const band = questionBand(q);
+  if (!band) return el("article", { className: "card question" }, children);
+  return el("article", { className: "note-card" }, [band, el("div", { className: "question question-card__body" }, children)]);
 }
 
 function renderQuestionsTab(panel) {
@@ -832,7 +856,9 @@ async function renderQuestion(questionId) {
     editingThis ? questionEditor(q) : el("p", { className: "question-head__text", text: orDash(q.text) }),
     el("span", { className: "question__date", text: questionDates(q) }),
   ]);
-  const children = [head];
+  const band = questionBand(q);
+  if (band) head.classList.add("question-card__body");
+  const children = [band ? el("div", { className: "note-card" }, [band, head]) : head];
 
   if (q.status === "answered" && q.noteId) {
     const id = encodeURIComponent(q.noteId);
@@ -879,7 +905,8 @@ async function renderQuestion(questionId) {
   } else {
     // 답을 기다리는 질문: 근거 0건 틀 + 닮은선배 보기(6-2와 같은 처리)
     children.push(
-      emptyEvidence("아직 이 질문에 답한 선배가 없어요. 다음 선배 인터뷰 때 먼저 물어볼게요."),
+      emptyEvidence(needsProgram(q) ? `${NOT_DELIVERED}.` : "아직 이 질문에 답한 선배가 없어요. 다음 선배 인터뷰 때 먼저 물어볼게요."),
+      ...(needsProgram(q) && !editingThis ? [sortOutButton(q)] : []),
       el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } }),
     );
     // [11/26 작업 91] 본인 hold 질문만 고치기·삭제(spec deleteQuestion·updateQuestion). 고치는 중에는 숨김
@@ -998,7 +1025,8 @@ function questionEditor(q) {
     el("label", { className: "field__label", text: "내 질문", attrs: { for: id } }),
     box,
     el("p", { className: "sub", attrs: { id: `${id}-hint` } }, [
-      "선배에게 그대로 전달돼요. 연락처·메일·링크는 넣을 수 없어요. ", count,
+      needsProgram(q) ? "프로그램을 고르면 선배에게 그대로 전달돼요. " : "선배에게 그대로 전달돼요. ",
+      "연락처·메일·링크는 넣을 수 없어요. ", count,
     ]),
     err,
     el("div", { className: "btn-row" }, [saveBtn, cancelBtn]),

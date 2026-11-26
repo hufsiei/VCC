@@ -70,6 +70,10 @@
   .question__info { font-size: var(--font-size-secondary); color: var(--color-text-muted); }
   .question .btn-row { margin-top: var(--space-xs); }
   .question .btn-row .btn { font-size: var(--font-size-secondary); }
+  /* [작업 118] 분야 띠가 있는 질문 카드·상세: 띠 아래 흰 본문. 분야를 모르면 중립 띠 */
+  .question-card__body { padding: var(--space-md); }
+  .question-band--none { background: var(--color-neutral-bg); }
+  .question-band--none .note-card__kind { color: var(--status-neutral-fg); }
 
   /* 알림 목록(8절): 행 = 아이콘 + 문장 + 시간, 안 읽은 알림은 SOFT BLUE */
   .alert-list { display: flex; flex-direction: column; margin: 0 calc(-1 * var(--page-gutter)); }
