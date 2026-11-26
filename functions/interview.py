@@ -7,7 +7,8 @@
 #        본인이 한 질문·이미 answered·이번 인터뷰에서 답했거나 건너뛴 질문은 뺀다.
 #        [v2 작업 89] 「후배 질문」 칸은 없다. 응답은 junior: true, section = 그 질문의 칸(질문 행의 「칸」, 틀 밖이거나
 #        없으면 AI(문단분류, Sonnet)가 틀 안의 칸 하나를 고르고, 그것도 안 되면 교환 「팁」·인턴·비교과 「배운점」).
-#        답은 그 칸에 담기고 progress.filled에 센다. 꼬리 질문은 붙이지 않는다.
+#        답은 그 칸에 담기고 progress.filled에 센다. [11/26] 답이 부족하면(③과 같은 판정) 그 질문에 꼬리 질문 1회.
+#        꼬리 답도 같은 questionId·칸에 담겨 처음 답과 함께 요약된다(후배에게 가는 답).
 #   [v2 작업 90] 이어 쓰기: 같은 사람·같은 프로그램의 내 경험노트(myNotes.json)에 문장이 있는 칸은 답한 것으로 치고,
 #        그 노트에서 이미 답한 후배 질문·이미 물은 깊이 질문(myNotes의 asked)은 다시 묻지 않는다.
 #        노트가 있으면 첫 응답(answers가 빈 때)에 resumed: true·myNoteId.
@@ -164,6 +165,11 @@ JUNIOR_ASK = "후배가 이렇게 물었어요 — \"{q}\" 경험이 있으면 �
 _JUNIOR_ASK_RE = re.compile(r'^후배가 이렇게 물었어요 — "(.*)" 경험이 있으면 들려주세요\.?$', re.S)
 
 
+# [11/26] 후배 질문의 꼬리 질문 머리말. 화면이 요약 때 questionId를 빼고 보내므로, 이 머리말이 붙은 답은
+# 바로 앞 후배 질문 답의 꼬리 답으로 본다.
+JUNIOR_FOLLOW = "조금 더 여쭤볼게요. "
+
+
 def _unwrap(question):
     """interviewNext가 감싼 후배 질문 글 → 후배 질문 원문. 감싼 글이 아니면 그대로."""
     m = _JUNIOR_ASK_RE.match((question or "").strip())
@@ -283,7 +289,7 @@ def prior_of(program, mine):
 
 def _next_step(me, program, payload, prior):
     # [v2] 후배 질문 답은 질문의 칸으로(옛 「후배 질문」 칸·questionId를 빠뜨린 답도)
-    answers = [_place_junior(program, a) for a in _clean_answers(payload.get("answers"))]
+    answers = _place_all(program, _clean_answers(payload.get("answers")))
     # [11/23 작업 84] 말머리 칩만 보낸 답은 빼고 센다. 방금 그랬으면 같은 질문을 다시 묻는다(아래).
     last_raw = answers[-1] if answers else None
     retry = last_raw if last_raw and not last_raw.get("skipped") and not is_junior(last_raw) \
@@ -306,6 +312,21 @@ def _next_step(me, program, payload, prior):
     seen_q = {a.get("questionId") for a in answers if a.get("questionId")} | prior["questionIds"]
     seen_text = {askboo._norm(a.get(k)) for a in answers if is_junior(a) for k in ("asked", "question")}
     waiting = [q for q in juniors if q["id"] not in seen_q and askboo._norm(q["질문"]) not in seen_text]
+    # [11/26] 방금 답이 후배 질문의 첫 답이면 다음 질문보다 먼저 충분한지 본다 — 질문마다 꼬리 질문 1회
+    last = answers[-1] if answers else None
+    if last and last is last_raw and not last.get("skipped") and last.get("answer") and is_junior(last) \
+            and last.get("section") in sections:
+        same = [a for a in answers if is_junior(a) and not a.get("skipped") and _junior_key(a) == _junior_key(last)]
+        if len(same) == 1:
+            follow = follow_up(last["section"], last.get("asked", ""), last["answer"])
+            if follow:   # junior: true를 붙이지 않는다 — 화면이 일반 질문 말풍선으로 question을 보여 주게
+                step = {"done": False, "section": last["section"], "question": JUNIOR_FOLLOW + follow,
+                        "followUp": True, "asked": last.get("asked", ""), "progress": progress,
+                        "pendingQuestions": len(waiting), "covered": covered}
+                if last.get("questionId"):
+                    step["questionId"] = last["questionId"]
+                return step
+
     if waiting:
         q = waiting[0]
         return {"done": False, "junior": True, "section": question_section(program, q),
@@ -322,8 +343,7 @@ def _next_step(me, program, payload, prior):
         return step
 
     # ③ 방금 들어온 답이 그 칸의 첫 답이면 충분한지 보고, 부족하면 꼬리 질문(칸당 1회)
-    last = answers[-1] if answers else None
-    # [v2] 후배 질문 답에는 꼬리 질문을 붙이지 않고, 그 칸의 「첫 답」으로도 세지 않는다(그 칸 질문의 꼬리는 그대로)
+    # [v2] 후배 질문 답(위에서 따로 본다)은 그 칸의 「첫 답」으로 세지 않는다(그 칸 질문의 꼬리는 그대로)
     if last and not last.get("skipped") and last.get("answer") and last.get("section") in sections \
             and not is_junior(last):
         same = [a for a in answers if a.get("section") == last["section"] and not a.get("skipped")
@@ -534,14 +554,35 @@ def _place_junior(program, a):
     return a
 
 
+def _junior_key(a):
+    return a.get("questionId") or askboo._norm(a.get("asked"))
+
+
+def _place_all(program, items):
+    """답마다 _place_junior. 꼬리 답(JUNIOR_FOLLOW 머리말)은 바로 앞 후배 질문의 questionId·asked·칸을 물려받고
+    follow에 꼬리 질문 글을 남긴다."""
+    out = []
+    for a in items:
+        question = a.get("question") or ""
+        prev = out[-1] if out else None
+        if question.startswith(JUNIOR_FOLLOW) and prev and is_junior(prev):
+            a = {**a, "follow": question[len(JUNIOR_FOLLOW):], "asked": prev.get("asked", ""),
+                 "section": prev.get("section"), "junior": True}
+            if prev.get("questionId"):
+                a["questionId"] = prev["questionId"]
+        else:
+            a = _place_junior(program, {k: v for k, v in a.items() if k != "follow"})
+        out.append(a)
+    return out
+
+
 def group_answers(me, program, transcript):
     """칸별로 답을 모은다(첫 답 + 꼬리 답). 순서는 frames.json 칸 순서.
     [v2 작업 89] 「후배 질문」 칸은 없다 — 후배 질문 답은 질문의 칸에 담되, 칸 안에서 질문마다 따로 모은다
     (문장에 answersQuestionId·asked를 붙여야 하므로 그 칸의 다른 답과 섞어 요약하지 않는다)."""
     order = sections_of(program)
     by_key, keys = {}, []
-    for a in transcript:
-        a = _place_junior(program, a)
+    for a in _place_all(program, transcript):
         section = a.get("section") or "기타"
         qid = a.get("questionId") if is_junior(a) else None
         key = (section, qid or (askboo._norm(a.get("asked")) if is_junior(a) else None))
@@ -551,7 +592,7 @@ def group_answers(me, program, transcript):
                            "asked": a.get("asked", "") if is_junior(a) else a.get("question", ""),
                            "answers": [], "questions": []}
         by_key[key]["answers"].append(a["answer"])
-        q = a.get("asked") if is_junior(a) else _unwrap(a.get("question"))
+        q = a.get("follow") or (a.get("asked") if is_junior(a) else _unwrap(a.get("question")))
         by_key[key]["questions"].append((q or "").strip())
     keys.sort(key=lambda k: order.index(k[0]) if k[0] in order else len(order))   # 안정 정렬: 칸 안에서는 들어온 순서
     groups = [by_key[k] for k in keys]
@@ -582,8 +623,13 @@ def summarize_group(g):
                 lines.append({"text": s})
     if lines:
         return lines
-    src = [askboo.clean_source(s) for s in askboo.split_sentences(g["source"])]
-    return [{"text": s, "fallback": True} for s in src if s and not too_thin(s)][:3]
+    # [11/26] 후배 질문은 처음 답과 꼬리 답을 따로 잘라 둘 다 싣는다(마침표 없는 첫 답이 꼬리 답과 붙지 않게)
+    parts = g["answers"] if g.get("questionId") else [g["source"]]
+    out = []
+    for part in parts:
+        src = [askboo.clean_source(s) for s in askboo.split_sentences(part)]
+        out += [{"text": s, "fallback": True} for s in src if s and not too_thin(s)][:3]
+    return out
 
 
 # 정보가 없는 짧은 문장(「생각보다 많이 들었어요.」)은 해봤노트에 올리지 않는다

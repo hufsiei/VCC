@@ -77,7 +77,7 @@ answers = skip_tip + [{"section": s["section"], "question": s["question"], "ques
                        "answer": "학기 중엔 어렵고 방학에 단기 인턴 했어요."}]
 s = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": answers})
 expect("후배 질문 답은 그 칸으로 셈", s["progress"]["filled"] == 1 and s["progress"]["mine"] == 1)
-expect("후배 질문 답엔 꼬리 질문 없음", not s.get("followUp"))
+expect("충분한 후배 질문 답엔 꼬리 질문 없음", not s.get("followUp"))
 legacy = skip_tip + [{"section": "후배 질문", "question": s_again["asked"], "answer": "학기 중엔 어렵고 방학에 단기 인턴 했어요."}]
 s_legacy = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": legacy})
 expect("옛 화면(「후배 질문」 칸)도 같은 다음 질문", s_legacy.get("question") == s.get("question")
@@ -131,6 +131,29 @@ bare2 = bare + [{"section": first, "question": r_["question"], "answer": "의외
 r2_ = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": bare2})
 expect("이어 쓰면 다음으로(같은 깊이 질문 반복 없음)", not r2_.get("retry") and r2_.get("question") != s["question"])
 expect("꼬리 질문엔 칸 칩 없음", interview.chips_for(PROGRAM, "팁", "어떤 점이 가장 기억에 남았어요?") is None)
+
+# 1-5) [11/26] 후배 질문의 짧은 답 → 꼬리 질문 1회, 꼬리 답도 같은 questionId·칸
+short = [{"section": "생활", "question": s_again["asked"], "questionId": qid, "answer": "그냥 국제교류팀에 문의하면 돼요"}]
+f1 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": short})
+expect("후배 질문의 부족한 답 → 꼬리 질문(다음 후배 질문보다 먼저)",
+       f1.get("followUp") and not f1.get("junior") and f1.get("questionId") == qid and f1.get("section") == "생활"
+       and f1.get("question", "").startswith(interview.JUNIOR_FOLLOW) and f1.get("pendingQuestions") == 1)
+more = {"section": f1.get("section"), "question": f1.get("question"), "questionId": qid, "answer": "그냥 방학에 하라고 안내받았어요"}
+f2 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": short + [more]})
+expect("같은 후배 질문에 두 번 안 붙음 → 다음 후배 질문", not f2.get("followUp") and f2.get("questionId") == q_tip)
+f3 = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": short + [more] + skip_tip + [
+    {"section": "생활", "question": "기숙사나 현지 생활은 어땠어요?", "answer": "그냥 그랬어요."}]})
+expect("후배 질문 답은 칸의 첫 답으로 안 셈(칸 꼬리 그대로)", f3.get("followUp") and f3.get("section") == "생활"
+       and not f3.get("questionId"))
+no_id = [{k: v for k, v in a.items() if k != "questionId"} for a in short + [more]]
+g_f = interview.group_answers(SENIOR, PROGRAM, no_id)
+expect("questionId 없이 와도 처음 답·꼬리 답이 한 묶음", len(g_f) == 1 and g_f[0]["questionId"] == qid
+       and len(g_f[0]["answers"]) == 2 and g_f[0]["asked"] == s_again["asked"]
+       and g_f[0]["questions"][1] == f1["question"][len(interview.JUNIOR_FOLLOW):])
+saved_call, interview.callAI = interview.callAI, lambda *a, **k: {"ok": False, "text": "", "json": None, "model": "fake"}
+fb = [ln["text"] for ln in interview.summarize_group(g_f[0])]
+expect("폴백에도 두 답이 함께", len(fb) == 2 and "국제교류팀" in fb[0] and "방학" in fb[1])
+interview.callAI = saved_call
 
 # 2) 부족한 답 → 꼬리 질문 1회, 다시 부족해도 다음 칸
 answers.append({"section": s["section"], "question": s["question"], "answer": "그냥 그랬어요."})
