@@ -22,6 +22,7 @@
 #   CLAUDE_KEY (→ ANTHROPIC_API_KEY)  CLOVA_KEY  VCC_LOGIN_PW  ALLOW_ORIGIN  STORE_BACKEND=ncp
 #   NCP_OS_BUCKET  NCP_OS_ACCESS_KEY  NCP_OS_SECRET_KEY  (선택) NCP_OS_ENDPOINT NCP_OS_REGION NCP_OS_PREFIX
 #   (선택) CLOVA_URL  CLAUDE_MODEL  VCC_ASK_FULL=1(물어보기 A안, 없으면 옛 길)
+#   (선택) VCC_ASK_OVERLAP=0 질문정리·답쓰기 겹쳐 돌리기 끔(없으면 켬, 작업 35 · #278)
 #   VCC_PEER_SECRET  쪽지·추천 응답의 상대 값(withId·studentId)을 만드는 비밀(긴 임의 문자열). 없으면 고정 기본값 + 경고(작업 38 D-1)
 #   (선택) VCC_DIAG=1  배포 점검 때만 넣는다. 없으면 _diag는 「없는 함수」로 거절(로그인 없이 부를 수 있으므로). 점검 뒤 지운다.
 #
@@ -43,7 +44,7 @@ for p in (HERE / "lib", HERE / "functions"):
 # 기본 파라미터 중 환경변수로 옮길 것(이 목록 밖의 값은 환경으로 가지 않는다)
 ENV_PARAMS = ("CLOVA_KEY", "CLOVA_URL", "CLAUDE_MODEL", "VCC_LOGIN_PW", "STORE_BACKEND",
               "NCP_OS_BUCKET", "NCP_OS_ACCESS_KEY", "NCP_OS_SECRET_KEY", "NCP_OS_ENDPOINT", "NCP_OS_REGION", "NCP_OS_PREFIX",
-              "VCC_ASK_FULL", "VCC_PEER_SECRET")
+              "VCC_ASK_FULL", "VCC_ASK_OVERLAP", "VCC_PEER_SECRET")
 ALLOWED_ORIGINS = ("https://hufsiei.github.io",)   # ALLOW_ORIGIN이 없을 때. "*"는 쓰지 않는다(PRD 9장)
 SECRET_PARAMS = ("CLAUDE_KEY", "CLOVA_KEY", "VCC_LOGIN_PW", "NCP_OS_ACCESS_KEY", "NCP_OS_SECRET_KEY", "VCC_PEER_SECRET")
 SERVER_ERROR = "서버 처리 중 문제가 생겼어요"
