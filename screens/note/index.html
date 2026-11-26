@@ -72,8 +72,33 @@
     background: var(--color-surface);
   }
   .summary__title { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
-  .summary__text { line-height: 1.7; word-break: keep-all; overflow-wrap: anywhere; }
+  /* [11/26 #321] 요약 개조식: 문장마다 한 줄(점) + 아래 출처 연도·「보고서 N건」. 생활·지원은 소주제 라벨로 묶음 */
+  .summary__list { display: flex; flex-direction: column; gap: var(--space-sm); margin: 0; padding-left: 20px; list-style: disc; }
+  .summary__item { line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; }
+  .summary__item::marker { color: var(--color-text-muted); }
+  .summary__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); margin-top: 2px; }
   .summary__from { font-size: var(--font-size-caption); color: var(--color-text-muted); white-space: nowrap; }
+  .summary__count {
+    display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--radius-pill);
+    background: var(--status-neutral-bg); color: var(--status-neutral-fg); font-size: var(--font-size-caption); white-space: nowrap;
+  }
+  .summary__group { display: flex; flex-direction: column; gap: var(--space-xs); }
+  .summary__group + .summary__group { margin-top: var(--space-xs); }
+  .summary__topic { margin: 0; font-size: var(--font-size-secondary); font-weight: 600; color: var(--color-heading); }
+  /* 소주제가 안 잡힌 문장: 라벨 없이 맨 뒤(spec), 앞 묶음과 섞여 보이지 않게 구분선 */
+  .summary__list--rest { padding-top: var(--space-sm); border-top: 1px solid var(--color-border); }
+  /* [11/26 #321] 비용 칸 stats: 한 줄 + 분포 띠. 코드 집계라 중립색만(HUFS GREEN·SOFT MINT 금지) */
+  .stats { display: flex; flex-direction: column; gap: var(--space-xs); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-card); background: var(--color-neutral-bg); }
+  .stats__line { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-xs) var(--space-sm); }
+  .stats__range { font-size: var(--font-size-card-title); font-weight: 600; color: var(--color-heading); }
+  .stats__sub { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+  .stats__strip { display: block; width: 100%; height: 28px; overflow: visible; }
+  .stats__axis { stroke: var(--color-border); stroke-width: 4; stroke-linecap: round; }
+  .stats__tick { stroke: var(--status-neutral-fg); stroke-width: 2; }
+  .stats__dot { stroke: var(--status-neutral-fg); stroke-opacity: .55; stroke-width: 8; stroke-linecap: round; }
+  .stats__strip line { vector-effect: non-scaling-stroke; }
+  .stats__median { stroke: var(--color-hufs-navy); stroke-width: 3; stroke-linecap: round; }
+  .stats__ends { display: flex; justify-content: space-between; font-size: var(--font-size-caption); color: var(--color-text-muted); }
   .summary-new__title {
     display: flex;
     align-items: center;
