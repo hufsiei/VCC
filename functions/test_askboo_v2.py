@@ -30,8 +30,9 @@ def ok(obj):
 FAIL = {"ok": False, "text": "", "json": None, "model": "fake", "error": "x"}
 
 
-def make_fake(plan=None, answer=None, match=True, pick=(1, 2)):
-    """작업명별 가짜 응답. plan=None이면 질문정리 실패, answer=None이면 답쓰기 실패."""
+def make_fake(plan=None, answer=None, match=True, pick=(1, 2), slander=False):
+    """작업명별 가짜 응답. plan=None이면 질문정리 실패, answer=None이면 답쓰기 실패.
+    slander: [작업 116] 질문함 관문의 쪽지검사(HCX) 판정 — True면 비방."""
     calls = []
 
     def fake(작업명, messages, system=None):
@@ -44,6 +45,8 @@ def make_fake(plan=None, answer=None, match=True, pick=(1, 2)):
             return ok(answer) if answer is not None else FAIL
         if 작업명 == "답검사":
             return ok({"일치": match})
+        if 작업명 == "쪽지검사":
+            return ok({"ok": False, "reason": "비방"} if slander else {"ok": True})
         if 작업명 == "변환":
             src = re.search(r"근거: (.*)\n출력", messages[-1]["content"], re.S).group(1)
             return ok({"1": src})
@@ -290,8 +293,8 @@ def turn(program, question="마르부르크 생활비 얼마예요?", status="ok
 
 res, row = saved_row(HACK, turn(PROGRAM))
 expect("담기 + 앞 턴 프로그램 → 질문 행에 프로그램·칸", row["프로그램명"] == PROGRAM and row["칸"] == "생활", row)
-expect("담기 응답 모양·문구는 그대로(noteId 없음, AI 없음)", res["message"] == askboo.HOLD_SAVED and "noteId" not in res
-       and "_program" not in res and askboo.callAI.calls == [], res)
+expect("담기 응답 모양·문구는 그대로(noteId 없음, AI는 관문 쪽지검사 1회만)", res["message"] == askboo.HOLD_SAVED and "noteId" not in res
+       and "_program" not in res and [c[0] for c in askboo.callAI.calls] == ["쪽지검사"], res)
 st = demand._from_question("H0143", row["id"])
 expect("궁금한 것 정리하기가 분야·프로그램·칸을 채움", st.get("field") == "국제교류" and st.get("program") == PROGRAM
        and st.get("section") == "생활", st)
@@ -307,6 +310,100 @@ expect("history 항목에 program 칸이 없어도 담김(spec상 선택)",
 expect("「말고」로 뺀 프로그램은 붙이지 않음", saved_row("코트라 말고 다른 인턴 있어요?", turn(KOTRA))[1]["프로그램명"] is None)
 expect("다른 나라 질문에는 앞 턴 프로그램을 붙이지 않음", saved_row("일본 생활비는 얼마예요?", turn(PROGRAM))[1]["프로그램명"] is None)
 expect("목록에 없는 학교 질문에도 붙이지 않음", saved_row("남스웨덴공과대학교 기숙사 있어요?", turn(PROGRAM))[1]["프로그램명"] is None)
+
+# ── [11/26 작업 116] 질문함에 담기 전 관문 ─────────────────────────────────
+# 공개 서버 H0019 질문함에 「너 되게 멍청하구나」(Q-0036)가 담김 · 질문 58건 중 29건이 프로그램 없이 담김
+def n_rows():
+    return len(store.load("questions", []))
+
+
+def run_save(question, history=None, force=None, **kw):
+    """save=True로 묻고 (응답, 새로 담긴 질문 행 또는 None, AI 작업명 목록)."""
+    askboo.callAI = make_fake(**kw)
+    before = n_rows()
+    body = {"question": question, "history": history or []}
+    if force:
+        body["force"] = force
+    res = askboo.askBoo("H0143", body, save=True)
+    rows = store.load("questions", [])
+    return res, (rows[-1] if len(rows) > before else None), [c[0] for c in askboo.callAI.calls]
+
+
+def has_save_chip(res):
+    return any(c.get("action") == "save" for c in res.get("chips") or [])
+
+
+CHAT = {"의도": "대화", "분야": None, "나라": None, "프로그램후보": [], "제외": [], "칸": None}
+for q in ("너 되게 멍청하구나", "?", "아 피곤하다"):
+    expect(f"정규식: 알고 싶은 말 아님 — {q}", not askboo.wants_to_know(q))
+    # 질문정리가 대화 + 궁금 false → chat, 담기 칩 없음
+    res, row, _ = run_save(q, plan=dict(CHAT, 궁금=False, 정리된질문=q))
+    expect(f"① 궁금 false → chat·담기 칩 없음·담기지 않음: {q}", res["status"] == "chat" and not has_save_chip(res)
+           and row is None and "questionId" not in res, res)
+    # 질문정리가 「궁금」을 빼먹으면 정규식으로 — 결과는 같다
+    res, row, _ = run_save(q, plan=dict(CHAT, 정리된질문=q))
+    expect(f"① 궁금 빠짐 → 정규식으로 칩 없음: {q}", res["status"] == "chat" and not has_save_chip(res) and row is None, res)
+    # 질문정리 실패(v1) → 프로그램 없음 보류 길이지만 담지 않고 「구체적으로 물어봐 주세요」
+    res, row, calls = run_save(q, plan=None)
+    expect(f"③ v1: 담기지 않음(chat 문구): {q}", res["status"] == "chat" and res["message"] == askboo.SAVE_NOT_WANT
+           and row is None and not has_save_chip(res) and "쪽지검사" not in calls, res)
+    expect(f"③ 질문정리가 경험질문이라 해도 궁금 false면 담지 않음: {q}",
+           run_save(q, plan=dict(CHAT, 의도="경험질문", 궁금=False, 정리된질문=q))[1] is None)
+
+res, row, _ = run_save("이건 아까도 한 얘기잖아", plan=dict(CHAT, 궁금=True, 정리된질문="KOTRA 말고 다른 무역 인턴은 어떤가요?"))
+expect("① 궁금 true면 chat에 「질문함에 담기」 칩(담기는 칩을 누를 때)", res["status"] == "chat" and has_save_chip(res) and row is None, res)
+
+for q in ("교환학생 가서 아르바이트 할 수 있는지 알고 싶어요", "졸업하고 해외 취업 준비는 어디서부터 해야 할지 모르겠어요"):
+    expect(f"정규식: 알고 싶은 말 — {q}", askboo.wants_to_know(q))
+    res, row, calls = run_save(q, plan=None)
+    expect(f"③ v1: 알고 싶은 말은 담김: {q}", res["status"] == "hold" and row and row["질문"] == q
+           and res.get("questionId") == row["id"] and calls.count("쪽지검사") == 1, (res, calls))
+
+# ② 관문: force hold(칩 「질문함에 담기」)도 비방·연락처는 담지 않는다
+SLANDER = "선배들 다 머리가 나쁜 것 같은데 마르부르크 기숙사는 어땠어요?"
+res, row, calls = run_save(SLANDER, force="hold", slander=True)
+expect("② 비방 문장 force hold → 담지 않고 이유 문구(chat)", res["status"] == "chat" and row is None
+       and res["message"] == askboo.SAVE_BLOCKED["비방"] and "questionId" not in res and calls == ["쪽지검사"], (res, calls))
+expect("② 비방 거절 응답에 기록용 칸이 새지 않음", "_program" not in res)
+res, row, calls = run_save("너 되게 멍청하구나", force="hold", slander=True)
+expect("② 금지어 없는 욕도 HCX가 비방이면 force hold 거절", row is None and res["message"] == askboo.SAVE_BLOCKED["비방"], res)
+res, row, calls = run_save("마르부르크 기숙사 어땠어요? 제 번호 010-1234-5678로 알려 주세요", force="hold")
+expect("② 연락처 든 말 force hold → 코드가 거절(HCX 안 부름)", res["status"] == "chat" and row is None
+       and res["message"] == askboo.SAVE_BLOCKED["연락처"] and calls == [], (res, calls))
+res, row, calls = run_save("기숙사 어땠는지 abc@test.com 으로 알려 주세요", force="hold")
+expect("② 메일 든 말도 질문함에는 담지 않음", row is None and res["message"] == askboo.SAVE_BLOCKED["연락처"], res)
+res, row, calls = run_save("마르부르크 기숙사 한심하던데 어땠어요?", force="hold")
+expect("② 금지어(msg_check) → 비방 거절, HCX 안 부름", row is None and res["message"] == askboo.SAVE_BLOCKED["비방"] and calls == [], res)
+res, row, calls = run_save("마르부르크 기숙사 어땠어요?", force="hold")
+expect("② 보통 질문 force hold는 그대로 담김(HCX 1회)", res["status"] == "hold" and row and calls == ["쪽지검사"], calls)
+askboo.callAI = lambda *a, **k: {"ok": False, "text": "", "json": None, "model": "fake", "error": "x"}
+res = askboo.askBoo("H0143", {"question": "마르부르크 기숙사 어땠어요?", "force": "hold"})
+expect("② 쪽지검사 호출 실패는 통과로 보고 담음(AI 장애로 막지 않음)", res["status"] == "hold" and res.get("questionId"), res)
+# 보류 길(근거 없음)에서도 같은 관문
+res, row, calls = run_save("취업 준비 같이 할 사람 궁금해요 카톡 아이디 boo1234", plan=None)
+expect("② 보류 길에서도 연락처 든 말은 담지 않음", row is None and res["status"] == "chat"
+       and res["message"] == askboo.SAVE_BLOCKED["연락처"], res)
+
+# ③ 규정 정규식 길: 알고 싶은 말일 때만 담는다
+res, row, calls = run_save("장학금 받아서 다행이다", plan=None)
+expect("③ 「장학금 받아서 다행이다」 → 담기지 않음", row is None and res.get("questionId") is None and "쪽지검사" not in calls, res)
+res, row, _ = run_save("장학금 기준이 뭐예요?", plan=None)
+expect("③ 규정 질문은 그대로 official로 담김", res["status"] == "official" and row and row["status"] == "official", res)
+res, row, _ = run_save("휴학하고 교환학생 가도 되나요? 제 번호는 010-9999-8888", plan=None)
+expect("③ 규정 질문이라도 연락처가 들면 담지 않음(안내 문구는 그대로)", res["status"] == "official" and row is None
+       and res.get("questionId") is None and res["message"].startswith("학교 규정에 관한 질문이라"), res)
+
+# ④ 프로그램 없는 질문은 바로 앞 턴의 프로그램을 이어받아 담는다
+res, row, _ = run_save("준비는 어떻게", turn(PROGRAM), plan=None)
+expect("④ 「준비는 어떻게」 → 앞 턴 프로그램으로 담김", row and row["프로그램명"] == PROGRAM and row["칸"], row)
+expect("④ 문구·noteId는 이번에 찾은 것 기준(앞 턴 노트를 찾아본 게 아님)", res.get("message") == askboo.HOLD_NO_PROGRAM
+       and "noteId" not in res, res)
+res, row, _ = run_save("준비는 어떻게", turn(PROGRAM), plan=dict(CHAT, 의도="경험질문", 궁금=True, 정리된질문="준비는 어떻게 해요?"))
+expect("④ 질문정리 길에서도 앞 턴 프로그램으로 담김", row and row["프로그램명"] == PROGRAM, row)
+res, row, _ = run_save("준비는 어떻게", turn(""), plan=None)
+expect("④ 앞 턴 프로그램이 없으면 None 그대로", row and row["프로그램명"] is None, row)
+res, row, _ = run_save("일본은 준비 어떻게 해요?", turn(PROGRAM), plan=None)
+expect("④ 다른 나라 질문에는 앞 턴 프로그램을 붙이지 않음", row is None or row["프로그램명"] != PROGRAM, row)
 store.RUNTIME = _runtime
 
 h = askboo.clean_history([{"question": " a ", "status": "ok", "program": "p"},{"question": "", "status": "x"}, {"bad": 1},
