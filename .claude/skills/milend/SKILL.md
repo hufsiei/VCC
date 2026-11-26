@@ -11,7 +11,8 @@ description: VCC 업무 마무리 루틴(미리·원우·민지 모두 각자 PC
 
 ## 1. 세션 정리
 - 상태판: `python -X utf8 C:/dev/VCC/.claude/skills/milwork/board.py list`(아래 `board.py`). 줄마다 브랜치가 병합됐는지 `gh pr list --state merged --head <브랜치>`로 본다. 병합된 것은 폴더를 지우고(`cd /c/dev` 후 `git worktree remove`, 실패하면 `rm -rf`) `board.py remove <폴더>`. 병합 안 된 것은 상태를 알리고 나에게 묻는다(내일 다른 PC에서 이어 한다면 브랜치를 push해 두라고 권한다). 상태판에 없는 `C:\dev\VCC-*` 폴더도 같은 기준으로 정리한다. 상태판은 드라이브 `@VCC\총괄\board-<이름>.md`(사람별, 두 PC 공용)다.
-- 큐: `board.py queue`에서 「제안」·「승인」으로 남은 줄(내일로 넘길 것)과 `board.py decide`의 답 없는 결정요망을 보고에 넣는다. 병합된 작업의 큐 줄은 `board.py queue done Q-n --pr <번호>`로 「완료」로 닫는다(「반려」는 안 하기로 한 일에만). 줄은 지우지 않는다. 폴더를 `remove`하면 그 폴더 큐 줄(시작됨)은 자동으로 완료가 되지만 PR 번호는 `queue done`으로 남긴다.
+- 큐: `board.py queue`에서 「제안」·「승인」으로 남은 줄(내일로 넘길 것)과 `board.py decide`의 답 없는 결정요망을 보고에 넣는다. 병합된 작업의 큐 줄은 `board.py queue done Q-n --pr <번호>`로 「완료」로 닫는다(「반려」는 안 하기로 한 일에만). 줄을 손으로 지우지 않는다(지난 줄은 아래 `clean`이 지운다). 폴더를 `remove`하면 그 폴더 큐 줄(시작됨)은 자동으로 완료가 되지만 PR 번호는 `queue done`으로 남긴다.
+- 위의 완료 처리와 답 확인을 마친 뒤 `board.py clean --days 1`: 완료·반려가 된 지 하루 넘은 큐 줄과 답한 결정요망을 지운다. 번호는 상태판 머리 「마지막 번호」에서 이어진다.
 - 끝으로 `board.py chief --set –`로 총괄 세션 이름을 비운다(내일 milstart가 다시 적는다). 켜 둔 `/loop … /milwatch`는 이 창을 닫으면 같이 꺼진다고 알린다.
 - 오늘 연 내 PR 중 병합 안 된 것, 리뷰를 기다리는 팀원 PR 목록.
 - 켜 둔 서버: `netstat -ano | grep -E ":8787|:8000"`. 있으면 끌지 묻는다(local_fn.py, serve_screens.py).
