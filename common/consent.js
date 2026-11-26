@@ -4,6 +4,9 @@
 //   시트 마크업은 이 파일이 body 끝에 만든다(화면 HTML에 #consentSheet를 두지 않는다).
 //   열기: document에 "open-consent"(detail = summarizeInterview 응답 또는 getMyNote 응답)를 보내거나 openConsent(같은 값).
 //   getMyNote 응답으로 열면(share가 private가 아닐 때) 스위치 처음 상태 = 지금 해봤노트에 보이는 문장(lines[].shared).
+//   [v2 작업 90] 이어 쓴 요약(publicDraft에 new: true 문장이 있음): 새 문장은 켬(identifying은 꺼짐),
+//   예전 문장은 getMyNote(myNoteId)의 lines[].shared 그대로. 다시 공유하면 문장이 통째로 바뀌므로(publish_lines)
+//   지금 상태를 읽기 전·못 읽었을 때는 「동의하고 공유」를 잠근다.
 // 기준: docs/design-rules.md 7-② 공개 동의 바텀시트 · 8절 '공개 동의' · 5-10, docs/spec-v1.md 4장(summarizeInterview·saveConsent)
 // 규칙: 데이터는 common/data.js 함수로만, 화면 글은 textContent로만(innerHTML 금지), 색은 style.css 변수만.
 //
@@ -109,6 +112,8 @@ const state = {
   rejected: new Map(), // lineId → 서버가 준 message (saveConsent.rejected, spec 4장 [11/20])
   edits: new Map(),   // [11/23] lineId → 고친 문장(이번에 고친 것, 아직 공유 전)
   editing: null,      // 지금 고치는 중인 lineId(한 번에 하나)
+  mine: null,         // getMyNote(myNoteId) 약속 — 못 읽으면 null로 끝난다
+  check: "ok",        // 이어 쓴 요약의 예전 문장 공유 상태: "ok" | "loading" | "failed"
   lastFocus: null,
 };
 // 같은 요약 초안을 다시 열면 고른 상태를 그대로 보여 준다(공유 범위 바꾸기)
@@ -139,16 +144,23 @@ function openSheet(draft) {
 
   const prev = remembered.get(draft.draftId);
   const sharedNow = currentlyShared(draft); // 「공유 범위 바꾸기」: 지금 상태에서 시작
+  const appended = allLines(draft).some((l) => l.new === true);
   state.on = new Map();
   for (const line of allLines(draft)) {
     // 기본 켬. 본인 식별 문장(identifying)은 기본 꺼짐 — 판단은 사용자가 한다(7-②)
+    // 이어 쓴 요약의 예전 문장은 일단 꺼짐 — checkShared가 지금 공유 상태로 바꾼다
     // 서버가 거절한 문장은 해봤노트에 들어가지 않았으므로 꺼짐
     const on = prev && prev.has(line.lineId) ? prev.get(line.lineId)
       : sharedNow ? sharedNow.has(line.lineId)
+      : appended && line.new !== true ? false
       : line.identifying !== true;
     state.on.set(line.lineId, state.rejected.has(line.lineId) ? false : on);
   }
   state.lineCount = state.on.size;
+  state.mine = readMyNote(draft);
+  const oldLines = appended ? allLines(draft).filter((l) => l.new !== true) : [];
+  const needCheck = !prev && !sharedNow && Boolean(draft.myNoteId) && oldLines.length > 0;
+  state.check = needCheck ? "loading" : "ok";
 
   // summarizeInterview 응답의 answered·need가 둘 다 숫자이고 answered < need일 때만(getMyNote 응답엔 값이 없어 안 보임)
   const lacking = Number.isFinite(draft.answered) && Number.isFinite(draft.need) && draft.answered < draft.need;
@@ -166,6 +178,7 @@ function openSheet(draft) {
   renderTarget();
   update();
   loadTarget(draft);
+  if (needCheck) checkShared(draft, oldLines);
 
   root.hidden = false;
   document.body.classList.add("sheet-open");
@@ -177,7 +190,8 @@ function openSheet(draft) {
 function closeSheet() {
   if (state.busy) return;
   if (state.draft) {
-    remembered.set(state.draft.draftId, new Map(state.on));
+    // 공유 상태를 못 읽은 채 닫으면 고른 상태를 기억하지 않는다(다시 열 때 다시 읽음)
+    if (state.check === "ok") remembered.set(state.draft.draftId, new Map(state.on));
     rememberedEdits.set(state.draft.draftId, new Map(state.edits));
   }
   state.editing = null;
@@ -200,14 +214,47 @@ function allLines(draft) {
 // getMyNote 응답은 sharedLines가 있고, summarizeInterview 응답은 myNoteId로 getMyNote를 한 번 더 읽는다(못 읽으면 0).
 async function sharedLinesOf(draft) {
   if (Number.isFinite(draft.sharedLines)) return draft.sharedLines;
-  if (!draft.myNoteId) return 0;
+  const mine = await state.mine;
+  return mine && Number.isFinite(mine.sharedLines) ? mine.sharedLines : 0;
+}
+
+// summarizeInterview 응답(sharedLines 없음)이면 myNoteId로 지금 내 경험노트를 읽는다. 못 읽으면 null
+async function readMyNote(draft) {
+  if (Number.isFinite(draft.sharedLines) || !draft.myNoteId) return null;
   try {
     const mine = await getMyNote(draft.myNoteId);
-    return mine && Number.isFinite(mine.sharedLines) ? mine.sharedLines : 0;
+    return mine && !mine.error && Array.isArray(mine.sections) ? mine : null;
   } catch (err) {
     console.error(err);
-    return 0;
+    return null;
   }
+}
+
+// [v2 작업 90] 이어 쓴 요약: 예전 문장의 스위치를 지금 해봤노트에 보이는 상태로 맞춘다
+async function checkShared(draft, oldLines) {
+  const request = state.mine;
+  const mine = await request;
+  if (state.draft !== draft || state.mine !== request) return; // 그 사이 다시 열림
+  if (mine) {
+    const shared = new Set(mine.sections.flatMap((s) => s.lines || []).filter((l) => l && l.shared).map((l) => l.lineId));
+    for (const line of oldLines) state.on.set(line.lineId, shared.has(line.lineId) && !state.rejected.has(line.lineId));
+  }
+  state.check = mine ? "ok" : "failed";
+  renderLines();
+  renderTarget();
+  update();
+  drawIcons();
+}
+
+function retryCheck() {
+  const draft = state.draft;
+  state.check = "loading";
+  state.mine = readMyNote(draft);
+  renderLines();
+  update();
+  loadTarget(draft);
+  checkShared(draft, allLines(draft).filter((l) => l.new !== true));
+  panel.focus();
 }
 
 async function loadTarget(draft) {
@@ -267,6 +314,17 @@ function renderTarget() {
 // ---------------------------------------------------------------------------
 
 function renderLines() {
+  if (state.check === "loading") {
+    linesBox.replaceChildren(el("div", { className: "skeleton", attrs: { style: "height: 96px", "aria-label": "불러오는 중" } }));
+    return;
+  }
+  if (state.check === "failed") {
+    linesBox.replaceChildren(
+      statusLabel("error", "circle-alert", "지금 공유 중인 문장을 확인하지 못했어요"),
+      el("button", { className: "btn btn--text", text: "다시 시도", attrs: { type: "button" }, on: { click: retryCheck } }),
+    );
+    return;
+  }
   const sections = (state.draft.publicDraft.sections || []).filter((s) => (s.lines || []).some((l) => l && l.lineId));
   if (sections.length === 0) {
     linesBox.replaceChildren(el("p", { className: "sub", text: "공개할 수 있는 문장이 없어요." }));
@@ -470,11 +528,13 @@ function update() {
     return;
   }
   const on = onCount();
-  const ready = on > 0 && agreeBox.checked && !state.busy && state.editing === null;
+  const ready = on > 0 && agreeBox.checked && !state.busy && state.editing === null && state.check === "ok";
   submitBtn.disabled = !ready;
   // 비활성이면 이유를 버튼 아래 14px로(5-4)
   let reason = "";
-  if (state.editing !== null) reason = "고치는 중인 문장을 저장하거나 취소해 주세요";
+  if (state.check === "loading") reason = "지금 공유 중인 문장을 확인하고 있어요";
+  else if (state.check === "failed") reason = "공유 중인 문장을 확인한 뒤에 공유할 수 있어요";
+  else if (state.editing !== null) reason = "고치는 중인 문장을 저장하거나 취소해 주세요";
   else if (on === 0) reason = "공개할 문장을 하나 이상 켜 주세요";
   else if (!agreeBox.checked) reason = "동의에 체크하면 공유할 수 있어요";
   submitReason.hidden = !reason || state.busy;
