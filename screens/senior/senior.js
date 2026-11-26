@@ -9,7 +9,7 @@
 // 주소: ?senior=B(프로필). 예전 주소 ?view=messages·?thread=T-0001은 내 보관함 · 쪽지 탭으로 넘긴다.
 
 import {
-  currentUser, getMe, getInbox, listNotes, recommendSeniors,
+  currentUser, logout, getMe, getInbox, listNotes, recommendSeniors,
   getMessages, previewNickname, checkMessage, sendMessage,
 } from "../../common/data.js";
 import { rememberRequest, localRequests, forgetRequests, unreadOf } from "../questions/bell.js";
@@ -28,6 +28,13 @@ if (!me) location.replace("../login/");
   }
 }
 if (me && me.status === "직원") document.getElementById("consoleBtn").hidden = false;
+// 헤더 왼쪽 로그아웃(11/26, 디자인 규칙 5-1) — 인터BOO와 같은 동작. 이 탭의 다른 기록은 건드리지 않는다
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  if (confirm("로그아웃할까요?")) {
+    logout();
+    location.replace("../login/");
+  }
+});
 
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };

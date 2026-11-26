@@ -2,7 +2,7 @@
 // 기준: docs/design-rules.md 7-③·5-2·5-5·6-1~6-5·8절(해봤노트 상세), docs/spec-v1.md 4장 listNotes·getNote·scrapNote·reportStatement
 // 규칙: 데이터는 common/data.js 함수로만, 화면 글은 textContent로만(innerHTML 금지), 색은 style.css 변수만.
 
-import { currentUser, listNotes, getNote, scrapNote, saveQuestion, reportStatement } from "../../common/data.js";
+import { currentUser, logout, listNotes, getNote, scrapNote, saveQuestion, reportStatement } from "../../common/data.js";
 
 // ---------------------------------------------------------------------------
 // 0. 로그인 확인
@@ -11,6 +11,13 @@ import { currentUser, listNotes, getNote, scrapNote, saveQuestion, reportStateme
 const me = currentUser();
 if (!me) location.replace("../login/");
 if (me && me.status === "직원") document.getElementById("consoleBtn").hidden = false;
+// 헤더 왼쪽 로그아웃(11/26, 디자인 규칙 5-1) — 인터BOO와 같은 동작. 이 탭의 다른 기록은 건드리지 않는다
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  if (confirm("로그아웃할까요?")) {
+    logout();
+    location.replace("../login/");
+  }
+});
 
 // 노트 종류(type) → 분야(3-3). 교환·파견은 국제교류, 인턴은 현장실습
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
@@ -479,16 +486,20 @@ function summarySourceText(item, sources, reportName) {
 // [11/26 칸유형] 생활 칸 소주제 순서(디자인 규칙 1-2, 민지 결정 5종). 다른 칸은 처음 나온 순서
 const TOPIC_ORDER = { 생활: ["주거", "교통", "음식", "행정", "사람"] };
 
-// 요약 문장 한 줄: 문장 + (출처 연도 · 「보고서 N건」 · 「개인 경험」)
+// 그 요약 문장 sources의 서로 다른 문서 수(spec getNote [11/26 칸유형], Q-38) — sourceId 앞부분(R149·I12)이 문서.
+// R149-1-1·R149-1-3은 1명. 한 선배의 보고서와 인터뷰는 이을 칸이 없어 따로 센다
+const docCount = (ids) => new Set((ids || []).map((id) => String(id).split("-")[0]).filter(Boolean)).size;
+
+// 요약 문장 한 줄: 문장 + (출처 연도 · 「선배 N명」 · 「개인 경험」)
 function summaryItem(item, sources, reportName) {
   const from = summarySourceText(item, sources, reportName);
-  const count = (item.sources || []).length;
+  const count = docCount(item.sources);
   return el("li", { className: "summary__item" }, [
     summarySentence(item),
     el("span", { className: "summary__meta" }, [
       from ? el("span", { className: "summary__from", text: from }) : null,
-      // 이 문장을 받치는 원문 수(sources.length) — 코드 집계라 AI 표시색이 아닌 중립색
-      count ? el("span", { className: "summary__count", text: `${reportName} ${count}건` }) : null,
+      // 이 문장을 받치는 선배(문서) 수 — 코드 집계라 AI 표시색이 아닌 중립색. [11/26 #324] 「보고서 N건」 → 「선배 N명」
+      count ? el("span", { className: "summary__count", text: `선배 ${count}명` }) : null,
       // 규정에 닿는 요약 문장(official) — 칸 문장과 같은 중립 라벨 「개인 경험」(디자인 규칙 8-1)
       item.official ? statusLabel("neutral", "user", "개인 경험") : null,
     ]),
@@ -574,7 +585,7 @@ function summarySentence(item) {
     span.tabIndex = 0;
     span.setAttribute("aria-label", `${item.text} — Enter를 누르면 이 문장을 신고할 수 있어요`);
     span.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); openReportSheet({ ...item, kind: "summary" }); }
+      if (e.key === "Enter") { e.preventDefault(); pickSentence(span, { bubble: false }); openReportSheet({ ...item, kind: "summary" }); }
     });
   }
   return span;
@@ -590,7 +601,7 @@ function summaryBlock(section, sources, reportName) {
       el("h3", { className: "summary__title", text: section.name }),
       stats ? statsBlock(stats, reportName) : null,
       ...summaryList(section, sources, reportName),
-      el("p", { className: "summary__hint" }, [icon("flag"), el("span", { text: "틀린 문장은 길게 누르거나 드래그해서 신고할 수 있어요" })]),
+      el("p", { className: "summary__hint" }, [icon("flag"), el("span", { text: "문장을 길게 누르거나 드래그하면 복사하거나 신고할 수 있어요" })]),
     ]),
   ];
   if (added.length) {
@@ -855,6 +866,7 @@ function openReportSheet(line) {
 }
 
 function closeReportSheet() {
+  clearPicked();
   sheet.hidden = true;
   document.body.classList.remove("sheet-open");
   reportTarget = null;
@@ -888,15 +900,22 @@ sheet.addEventListener("keydown", (e) => {
 });
 
 // ---------------------------------------------------------------------------
-// 8-1. 요약 문장 신고 풍선(spec reportStatement 화면, 디자인 규칙 8-1 ③) — 11/25 #266
-//   요약 문장을 길게 누르거나(모바일: 글자 선택) 드래그하면(PC) 선택 끝에 「신고하기」 풍선 → 위 신고 시트.
-//   선택이 여러 문장에 걸치면 선택이 끝난 문장을 신고한다.
+// 8-1. 요약 문장 고르기 → 「복사」·「신고하기」 풍선(spec reportStatement 화면, 디자인 규칙 8-1 ③) — 11/25 #266, 11/26 문장 단위
+//   [11/26 민지] 길게 누르면 단어만 잡히던 것을 문장 하나 전체로 고른다. 고른 문장은 빨간 글자 + 빨간 밑줄(여러 줄이어도 전체).
+//   - 휴대폰: 요약 문장은 브라우저 글자 선택을 끄고(index.html) 0.5초 길게 누르기를 직접 잰다.
+//   - PC: 문장 위에서 드래그를 시작하면 그 문장 하나 전체를 고른다(브라우저 글자 선택은 끔 — 여러 문장에 걸치지 않게). 0.5초 누르고 있어도 같다.
+//   - 브라우저 선택 대신 문장을 고르므로 복사는 풍선의 「복사」(그 문장 전체). 「신고하기」 버튼·신고 시트는 그대로.
+//   - 다른 곳을 누르거나 Esc·화면 크기 바뀜·시트 닫기(취소)면 선택을 푼다.
+//   - 신고·복사 대상은 고른 문장 span에 묶인 summary 항목(sentenceItem) — 화면 문장 = 시트 인용 = reportStatement(lineId).
 // ---------------------------------------------------------------------------
 
 const bubble = el("button", { className: "report-bubble", attrs: { type: "button" } }, [icon("flag"), el("span", { text: "신고하기" })]);
-bubble.hidden = true;
-document.body.append(bubble);
+const copyBtn = el("button", { className: "copy-bubble", attrs: { type: "button" } }, [icon("copy"), el("span", { text: "복사" })]);
+const pop = el("div", { className: "sentence-pop" }, [copyBtn, bubble]);
+pop.hidden = true;
+document.body.append(pop);
 let bubbleItem = null;
+let pickedSpan = null;
 
 function sentenceOf(node) {
   const elNode = node && (node.nodeType === 1 ? node : node.parentElement);
@@ -905,41 +924,105 @@ function sentenceOf(node) {
 }
 
 function hideReportBubble() {
-  bubble.hidden = true;
+  pop.hidden = true;
+}
+
+function clearPicked() {
+  if (pickedSpan) pickedSpan.classList.remove("summary__sentence--picked");
+  pickedSpan = null;
   bubbleItem = null;
+  hideReportBubble();
 }
 
-function placeReportBubble() {
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || !sel.rangeCount || viewDetail.hidden) return hideReportBubble();
-  const span = sentenceOf(sel.focusNode) || sentenceOf(sel.anchorNode);
-  if (!span) return hideReportBubble();
-  const rects = sel.getRangeAt(0).getClientRects();
-  const last = rects[rects.length - 1] || span.getBoundingClientRect();
+// 문장 하나 전체를 고른다. bubble: false면 표시만(키보드 Enter → 바로 시트)
+function pickSentence(span, { bubble: showPop = true } = {}) {
+  if (pickedSpan && pickedSpan !== span) pickedSpan.classList.remove("summary__sentence--picked");
+  pickedSpan = span;
+  span.classList.add("summary__sentence--picked");
   bubbleItem = sentenceItem.get(span);
-  bubble.hidden = false;
+  if (!showPop || viewDetail.hidden) return;
+  pop.hidden = false;
   drawIcons();
-  // 선택 블록 오른쪽 끝 아래. 화면 밖으로 나가지 않게 좌우 16px 안으로
-  const w = bubble.offsetWidth;
+  // 고른 문장의 마지막 줄 오른쪽 끝 아래 8px. 화면 밖으로 나가지 않게 좌우 16px 안으로
+  const rects = span.getClientRects();
+  const last = rects[rects.length - 1] || span.getBoundingClientRect();
+  const w = pop.offsetWidth;
   const left = Math.min(Math.max(16, last.right - w), document.documentElement.clientWidth - w - 16);
-  bubble.style.left = `${left + window.scrollX}px`;
-  bubble.style.top = `${last.bottom + window.scrollY + 8}px`;
+  pop.style.left = `${left + window.scrollX}px`;
+  pop.style.top = `${last.bottom + window.scrollY + 8}px`;
 }
 
-let bubbleTick = 0;
-document.addEventListener("selectionchange", () => {
-  cancelAnimationFrame(bubbleTick);
-  bubbleTick = requestAnimationFrame(placeReportBubble);
+// 길게 누르기(휴대폰 손가락·PC 마우스 모두): 0.5초, 10px 넘게 움직이면 취소(휴대폰은 스크롤).
+// PC 마우스로 문장 위에서 끌면(10px 넘게) 드래그를 시작한 문장 하나만 바로 고른다 — 여러 문장을 한 번에 고르지 않는다(11/26)
+const LONG_PRESS_MS = 500;
+let press = null;
+function cancelPress() {
+  if (press) clearTimeout(press.timer);
+  press = null;
+}
+document.addEventListener("pointerdown", (e) => {
+  if (pop.contains(e.target) || !sheet.hidden) return;
+  const span = sentenceOf(e.target);
+  // 문장 밖을 누르면 선택을 푼다
+  if (!span) { if (pickedSpan) clearPicked(); return; }
+  if (pickedSpan && pickedSpan !== span) clearPicked();
+  cancelPress();
+  press = { x: e.clientX, y: e.clientY, span, mouse: e.pointerType === "mouse", timer: setTimeout(() => { press = null; pickSentence(span); }, LONG_PRESS_MS) };
 });
-// 풍선을 누를 때 선택이 풀려 풍선이 먼저 사라지지 않게 mousedown 기본 동작을 막는다
-bubble.addEventListener("mousedown", (e) => e.preventDefault());
+document.addEventListener("pointermove", (e) => {
+  if (!press || Math.hypot(e.clientX - press.x, e.clientY - press.y) <= 10) return;
+  const { span, mouse } = press;
+  cancelPress();
+  if (mouse) pickSentence(span);
+});
+for (const type of ["pointerup", "pointercancel"]) document.addEventListener(type, cancelPress);
+window.addEventListener("scroll", cancelPress, { passive: true });
+// 안드로이드 길게 누르기의 기본 메뉴(복사·공유 등)는 요약 문장에서만 막는다 — 대신 풍선이 뜬다
+document.addEventListener("contextmenu", (e) => {
+  if (sentenceOf(e.target)) e.preventDefault();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && pickedSpan && sheet.hidden) clearPicked();
+});
+
+// 풍선을 누를 때 포커스·선택이 풀려 풍선이 먼저 사라지지 않게 기본 동작을 막는다
+pop.addEventListener("mousedown", (e) => e.preventDefault());
 bubble.addEventListener("click", () => {
   if (!bubbleItem) return;
-  const item = bubbleItem;
-  window.getSelection().removeAllRanges();
-  openReportSheet({ ...item, kind: "summary" });
+  // 시트가 열려 있는 동안 문장 표시는 남기고, 시트를 닫으면(취소 포함) 푼다
+  openReportSheet({ ...bubbleItem, kind: "summary" });
 });
-window.addEventListener("resize", hideReportBubble);
+copyBtn.addEventListener("click", async () => {
+  if (!bubbleItem) return;
+  const text = bubbleItem.text || "";
+  try {
+    await copyText(text);
+    toast("문장을 복사했어요");
+  } catch (err) {
+    console.error(err);
+    toast("복사하지 못했어요. 다시 시도해 주세요", "circle-alert");
+  }
+  clearPicked();
+});
+
+// 클립보드 API가 없거나 막힌 브라우저는 숨긴 입력칸으로 복사(글자만)
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  const area = el("textarea", { className: "copy-scratch", attrs: { readonly: "", "aria-hidden": "true" } });
+  area.value = text;
+  document.body.append(area);
+  area.select();
+  const ok = document.execCommand("copy");
+  area.remove();
+  if (!ok) throw new Error("copy failed");
+}
+// 화면 폭이 바뀌면(회전 등) 풍선 자리가 어긋나므로 푼다. 휴대폰 주소줄이 접히며 높이만 바뀌는 것은 무시
+let lastWidth = window.innerWidth;
+window.addEventListener("resize", () => {
+  if (window.innerWidth === lastWidth) return;
+  lastWidth = window.innerWidth;
+  clearPicked();
+});
 
 // ---------------------------------------------------------------------------
 // 9. 시작
