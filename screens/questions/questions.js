@@ -7,7 +7,7 @@
 // 공개 동의 시트는 common/consent.js(작업 70, 11/22 common으로 옮김)를 쓴다: "open-consent"로 열고 "consent-saved"로 끝을 받는다.
 
 import {
-  currentUser, getInbox, getMyNote, getNote, listNotes, scrapNote, updateMyNote, getMe, setRecommendable,
+  currentUser, logout, getInbox, getMyNote, getNote, listNotes, scrapNote, updateMyNote, getMe, setRecommendable,
 } from "../../common/data.js";
 import { isUnread, markSeen, refreshBell, onBell, unreadOf, threadHasNews } from "./bell.js";
 import { setupMessages, renderMessagesTab, openThread, stopPolling, allThreads, loadThreads } from "./messages.js";
@@ -19,6 +19,13 @@ import { setupMessages, renderMessagesTab, openThread, stopPolling, allThreads, 
 const me = currentUser();
 if (!me) location.replace("../login/");
 if (me && me.status === "직원") document.getElementById("consoleBtn").hidden = false;
+// 헤더 왼쪽 로그아웃(11/26, 디자인 규칙 5-1) — 인터BOO와 같은 동작. 이 탭의 다른 기록은 건드리지 않는다
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  if (confirm("로그아웃할까요?")) {
+    logout();
+    location.replace("../login/");
+  }
+});
 
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };

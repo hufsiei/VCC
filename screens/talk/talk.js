@@ -1373,11 +1373,11 @@ laterBtn.addEventListener("click", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 8. 헤더 — 직원 계정이면 콘솔 버튼, 메뉴는 로그아웃
+// 8. 헤더 — 직원 계정이면 콘솔 버튼, 왼쪽은 로그아웃(11/26: 햄버거 → log-out 좌우 반전, 디자인 규칙 5-1)
 // ---------------------------------------------------------------------------
 
 if (me && me.status === "직원") document.getElementById("consoleBtn").hidden = false;
-document.getElementById("menuBtn").addEventListener("click", () => {
+document.getElementById("logoutBtn").addEventListener("click", () => {
   if (confirm("로그아웃할까요?")) {
     try { sessionStorage.removeItem(KEEP_KEY); } catch { /* 보존 없이 */ }
     logout();
