@@ -40,6 +40,7 @@ PROVIDER = {
     "질문정리": "sonnet",  # [v2 작업 87] askBoo ① 최근 대화 + 질문 → 의도·프로그램·제외·칸·정리된 질문. 실패하면 정규식 경로
     "고르기":   "hcx",     # askBoo ④ 근거 번호 고르기 — 11/20 작업 54 재측정 40/40(100%)으로 확정. 상한 8(v2). CLOVA 자리
     "답쓰기":   "sonnet",  # [v2 작업 87] askBoo ⑤ 고른 근거로 2~4문장, 문장마다 근거 번호. 번호 없는 문장은 코드가 버림, 다 버려지면 원문 인용
+    "답쓰기-전문": "sonnet",  # [11/26 A안] VCC_ASK_FULL=1일 때: 프로그램 근거 전문 → 2~6문장, 문장마다 문장 번호(3-2). 근거 전문은 캐시(cache)
     "답검사":   "opus",    # [v2 작업 87] askBoo ⑥ 답 문장 ↔ 인용 근거 원문 대조. 인터뷰 일치검사와 말한 사람 규칙이 달라(BOO가 전하는 말투 허용) 프롬프트 따로
     "변환":     "hcx",     # askBoo ④ 근거 → 해요체 한 문장
     "충분판정": "hcx",     # 인터뷰 답이 칸을 채웠나 {"충분":true} — HCX 10/10
@@ -62,6 +63,7 @@ SETTINGS = {
     "질문정리": {"max_tokens": 1500, "effort": "low"},      # 생각 토큰이 max_tokens에 들어가므로 출력(200자 안팎)보다 넉넉히
     "고르기":   {"max_tokens": 30,   "temperature": 0, "top_p": 0.1},
     "답쓰기":   {"max_tokens": 3000, "effort": "low"},      # medium 6.4초 → low로 시연 시간 단축(품질은 측정으로 확인)
+    "답쓰기-전문": {"max_tokens": 4000, "effort": "low"},   # 입력 최대 2만 자(약 1.3만 토큰), 출력 6문장. 답쓰기와 같은 effort로 비교
     "답검사":   {"max_tokens": 1500, "effort": "low"},
     "변환":     {"max_tokens": 150,  "temperature": 0},
     "충분판정": {"max_tokens": 30,   "temperature": 0},
@@ -83,7 +85,7 @@ LOG_FILE = paths.LOGS / "ai-calls.jsonl"   # .gitignore 대상. worktree에서 �
 
 
 # ── 3. 관문 ───────────────────────────────────────────────────────
-def callAI(작업명, messages, system=None, 측정모델=None, 측정설정=None):
+def callAI(작업명, messages, system=None, 측정모델=None, 측정설정=None, cache=None):
     """작업명에 맞는 모델로 한 번 호출한다.
 
     messages: [{"role": "user"|"assistant", "content": "..."}]
@@ -91,12 +93,17 @@ def callAI(작업명, messages, system=None, 측정모델=None, 측정설정=Non
       text — 모델이 낸 글 전체 / json — text 안의 첫 번째 {...}를 읽은 것(없으면 None)
     화면에 보여 줄지는 부르는 쪽이 json을 검사해서 정한다(형식이 틀리면 버리고 폴백).
     측정모델·측정설정: 모델 비교 측정 스크립트(eval_*.py) 전용. 서비스 코드는 넘기지 않는다(PROVIDER 표가 기준).
+    cache: [11/26 A안] 마지막 user 글 **앞에** 붙일 고정 블록(글자). Claude에는 cache_control ephemeral(5분)로 보내
+      system·예시·고정 블록까지를 캐시하고, 마지막 user 글(질문)만 가변으로 둔다. HCX는 캐시 없이 두 글을 이어 보낸다.
+      지금은 답쓰기-전문(근거 전문)만 쓴다. 다른 작업은 넘기지 않는다.
     """
     if 작업명 not in PROVIDER:
         raise ValueError(f"PROVIDER 표에 없는 작업명: {작업명}")
     모델 = 측정모델 or PROVIDER[작업명]
     설정 = 측정설정 or SETTINGS.get(작업명, {})
-    messages = mask_messages(messages)  # 연락처·메일·학번·링크·주소 → [연락처] 등
+    if cache:
+        messages = with_cache_block(messages, cache, blocks=모델 != "hcx")
+    messages = mask_messages(messages)  # 연락처·메일·학번·링크·주소 → [연락처] 등 (블록형 content도 가린다)
     system = mask(system) if system else system
     시작 = time.time()
     try:
@@ -179,7 +186,26 @@ def call_claude(messages, system, 설정, model_id):
     if response.stop_reason == "max_tokens":  # 생각 토큰까지 max_tokens에 들어가므로 잘리면 이유를 남긴다
         raise RuntimeError(f"max_tokens({kwargs['max_tokens']})에 걸려 답이 잘렸습니다")
     text = "".join(b.text for b in response.content if b.type == "text")
-    return text, {"input": response.usage.input_tokens, "output": response.usage.output_tokens}
+    u = response.usage
+    # input_tokens는 캐시 밖 나머지만. 캐시 쓰기·읽기 토큰은 따로 남긴다(ai_usage.py가 단가를 달리 매김)
+    return text, {"input": u.input_tokens, "output": u.output_tokens,
+                  "cache_write": getattr(u, "cache_creation_input_tokens", None) or 0,
+                  "cache_read": getattr(u, "cache_read_input_tokens", None) or 0}
+
+
+def with_cache_block(messages, fixed, blocks=True):
+    """마지막 user 글 앞에 고정 블록을 붙인 새 목록. blocks=True(Claude)면 [고정(cache_control), 가변] 두 블록,
+    False(HCX)면 두 글을 이어 붙인 글자 하나. 고정 블록 글자가 호출마다 같아야 캐시가 맞는다(시각·번호를 넣지 않는다)."""
+    out = [dict(m) for m in messages]
+    for m in reversed(out):
+        if m.get("role") == "user" and isinstance(m.get("content"), str):
+            if blocks:
+                m["content"] = [{"type": "text", "text": fixed, "cache_control": {"type": "ephemeral"}},
+                                {"type": "text", "text": m["content"]}]
+            else:
+                m["content"] = fixed + "\n" + m["content"]
+            break
+    return out
 
 
 # ── 5. 도우미 ─────────────────────────────────────────────────────
@@ -249,6 +275,8 @@ def _기록(작업명, 모델, usage, 시작, ok, error=None):
             "입력토큰": usage.get("input"), "출력토큰": usage.get("output"),
             "ms": int((time.time() - 시작) * 1000), "ok": ok,
         }
+        if "cache_write" in usage:   # [11/26] Claude 호출만. 입력토큰은 캐시 밖 나머지, 이 두 칸이 캐시 쓰기·읽기
+            row["캐시쓰기토큰"], row["캐시읽기토큰"] = usage["cache_write"], usage["cache_read"]
         if error:
             row["error"] = mask(error)[:200]  # 오류 문구에 요청 내용이 섞일 수 있어 가린 뒤 자른다
         line = json.dumps(row, ensure_ascii=False) + "\n"
