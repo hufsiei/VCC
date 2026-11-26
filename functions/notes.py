@@ -325,9 +325,29 @@ def _norm(s):
     return re.sub(r"\s+", "", s or "").lower()
 
 
+def _matches(card, q):
+    """검색어(_norm한 글)가 프로그램명·별칭·한 줄 요약·추천 대상 중 하나에 들어 있는지."""
+    words = [card["program"], *PROGRAMS.get(card["program"], {}).get("별칭", []), card["oneLine"], card["forWhom"]]
+    return any(q in _norm(w) for w in words if w)
+
+
+def _search(cards, raw):
+    """[11/26 작업 121] 검색어 그대로 대조하고, 하나도 안 맞을 때만 학교 이름 오타를 고친 글(askboo.fix_names)로
+    한 번 더 대조한다(「마브루크」→ 마르부르크). 코드 대조만, AI 없음."""
+    q = _norm(raw)
+    if not q:
+        return cards
+    hit = [c for c in cards if _matches(c, q)]
+    if hit:
+        return hit
+    from askboo import fix_names   # askboo가 notes를 import하므로 여기서 부른다
+    fixed = _norm(fix_names(raw))
+    return [c for c in cards if _matches(c, fixed)] if fixed != q else []
+
+
 def listNotes(me, p):
     f = p.get("filter") or {}
-    kind, q = f.get("type"), _norm(f.get("q"))
+    kind = f.get("type")
     rows = _visible_lines()
     with store.lock():
         hidden = set(store.load("reported", {}))
@@ -349,14 +369,11 @@ def listNotes(me, p):
         card["lastSemester"] = max(sems) if sems else None
         if kind and card["type"] != kind:
             continue
-        if q:
-            words = [card["program"], *PROGRAMS.get(card["program"], {}).get("별칭", []), card["oneLine"], card["forWhom"]]
-            if not any(q in _norm(w) for w in words if w):
-                continue
         card["country"] = _country(card["program"])
         card["kind"] = _org_kind(card["program"])
         card["scrapped"] = nid in scrapped
         out.append(card)
+    out = _search(out, f.get("q"))
     # [11/23 주제별] 비교과는 이수 인원 많은 순(없으면 뒤). 다른 종류 카드의 자리·순서는 그대로
     extra = iter(sorted((c for c in out if c["type"] == "비교과"), key=lambda c: -(c["completedCount"] or -1)))
     out = [next(extra) if c["type"] == "비교과" else c for c in out]
