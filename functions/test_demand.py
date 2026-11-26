@@ -201,6 +201,28 @@ store.load("reported", {})["L-S-2"] = {"status": "숨김 중"}
 store.load("noteLines", []).append({"myNoteId": mid2, "sourceId": "S-2"})
 expect("신고로 숨긴 문장은 공유로 치지 않음", recommend_status("H0241")["ready"] is False)
 
+# ── 칩 순서: 우리 학과 선배가 많이 다녀온 순 → 전교 순 (11/26) ──────────────
+def opts(me, state):
+    return [o["value"] if isinstance(o, dict) else o for o in demandNext(me, {"state": state})["options"]]
+
+
+FRENCH = "H0004"   # 프랑스어학부 FATI전공(학적)
+h = demand._seniors()
+expect("독일어과 학생의 나라 첫 칩은 독일", opts(JUNIOR, {"field": "국제교류"})[0] == "독일")
+expect("프랑스어학부 학생의 나라 첫 칩은 프랑스", opts(FRENCH, {"field": "국제교류"})[0] == "프랑스")
+expect("「아직 정하지 않았어요」는 맨 끝", opts(FRENCH, {"field": "국제교류"})[-1] is None)
+dept_fr = h[("국제교류", "program")]["dept"][rf.student(FRENCH)["crs_nm"]]
+unis = opts(FRENCH, {"field": "국제교류", "detail": "프랑스"})[:-1]
+expect("대학 칩은 우리 학과 선배가 많이 간 순",
+       [dept_fr.get(u, 0) for u in unis] == sorted((dept_fr.get(u, 0) for u in unis), reverse=True))
+all_c = h[("국제교류", "detail")]["all"]
+staff = opts("staff01", {"field": "국제교류"})[:-1]
+expect("학과가 없으면 전교 선배 순", [all_c.get(c, 0) for c in staff] == sorted((all_c.get(c, 0) for c in staff), reverse=True))
+expect("인턴 기관 종류도 학과 순", opts(JUNIOR, {"field": "현장실습"})[0] == max(
+    h[("현장실습", "detail")]["dept"]["독일어과"].items(), key=lambda x: x[1])[0])
+expect("비교과 유형은 「1회성(4)」의 횟수를 떼고 셈", "1회성" in h[("비교과", "detail")]["all"])
+expect("칩에 인원 숫자를 붙이지 않음", all("명" not in str(o) for o in opts(JUNIOR, {"field": "국제교류"})))
+
 print()
 if fails:
     print(f"실패 {len(fails)}건")
