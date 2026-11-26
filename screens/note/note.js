@@ -479,16 +479,20 @@ function summarySourceText(item, sources, reportName) {
 // [11/26 칸유형] 생활 칸 소주제 순서(디자인 규칙 1-2, 민지 결정 5종). 다른 칸은 처음 나온 순서
 const TOPIC_ORDER = { 생활: ["주거", "교통", "음식", "행정", "사람"] };
 
-// 요약 문장 한 줄: 문장 + (출처 연도 · 「보고서 N건」 · 「개인 경험」)
+// 그 요약 문장 sources의 서로 다른 문서 수(spec getNote [11/26 칸유형], Q-38) — sourceId 앞부분(R149·I12)이 문서.
+// R149-1-1·R149-1-3은 1명. 한 선배의 보고서와 인터뷰는 이을 칸이 없어 따로 센다
+const docCount = (ids) => new Set((ids || []).map((id) => String(id).split("-")[0]).filter(Boolean)).size;
+
+// 요약 문장 한 줄: 문장 + (출처 연도 · 「선배 N명」 · 「개인 경험」)
 function summaryItem(item, sources, reportName) {
   const from = summarySourceText(item, sources, reportName);
-  const count = (item.sources || []).length;
+  const count = docCount(item.sources);
   return el("li", { className: "summary__item" }, [
     summarySentence(item),
     el("span", { className: "summary__meta" }, [
       from ? el("span", { className: "summary__from", text: from }) : null,
-      // 이 문장을 받치는 원문 수(sources.length) — 코드 집계라 AI 표시색이 아닌 중립색
-      count ? el("span", { className: "summary__count", text: `${reportName} ${count}건` }) : null,
+      // 이 문장을 받치는 선배(문서) 수 — 코드 집계라 AI 표시색이 아닌 중립색. [11/26 #324] 「보고서 N건」 → 「선배 N명」
+      count ? el("span", { className: "summary__count", text: `선배 ${count}명` }) : null,
       // 규정에 닿는 요약 문장(official) — 칸 문장과 같은 중립 라벨 「개인 경험」(디자인 규칙 8-1)
       item.official ? statusLabel("neutral", "user", "개인 경험") : null,
     ]),
