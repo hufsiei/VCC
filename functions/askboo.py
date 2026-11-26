@@ -2164,23 +2164,30 @@ def _official(me, question, programs, save):
 #   ① 비자·보험·체류 허가·거주 등록 → 「대사관과 ○○팀」
 #   ② 파견 대학 지원 서류·입학 허가·지원 절차 → 「모집 요강과 ○○팀」
 #   ③ 파견·현지 대학 규정(local_scope가 규정에서 뺀 질문: 현지 장학금·현지 수강 학점 등) → 「그 대학 안내와 ○○팀」
+#   ④ [11/26 미리 결정] 학점 인정 경험(「학점 인정 받을 때 주의할 점」「챙길 서류」 — 규정 표현 「인정 신청·인정받을 수」는
+#      official이 먼저) → 「학과 사무실」. departments.json에 학과 사무실 줄이 없어 연락처(문의·officialPhone)는 붙이지 않는다
 #   생활비·기숙사·수업·교통 같은 생활 질문에는 붙이지 않는다(과잉 안내 0 — test_askboo_v2). 걸리는 말이 있을 때만.
 CHECK_VISA_RE = re.compile(r"비자|보험|체류\s*허가|거주\s*(허가|등록)|레지던스\s*퍼밋|외국인\s*등록")
 CHECK_APPLY_RE = re.compile(r"입학\s*허가|지원\s*(서류|절차)|(파견|교환|지원|제출)\s*서류|서류\s*(는|를|가|은)?\s*(뭐|뭘|무엇|어떤|준비|내|챙)"
                             r"|원서|지원하려면|지원\s*방법|지원\s*과정")
+CHECK_CREDIT_RE = re.compile(r"학점\s*인정|성적\s*인정|인정\s*(받|학점|과목)|(학점|성적)\s*(변환|환산)")
 CHECK_TEXT = {
     "비자": "비자·보험은 나라와 시기마다 규정이 바뀌어요. 선배 경험은 참고만 하고, 대사관과 {부서}에서 꼭 확인해 주세요.",
     "지원": "지원 서류와 절차는 해마다 바뀔 수 있어요. 선배 경험은 참고만 하고, 모집 요강과 {부서}에서 꼭 확인해 주세요.",
+    "인정": "학점 인정은 학과와 과목마다 기준이 달라요. 선배 경험은 참고만 하고, 학과 사무실에서 꼭 확인해 주세요.",
     "규정": "파견 대학의 규정은 학교와 해마다 달라요. 선배 경험은 참고만 하고, 그 대학 안내와 {부서}에서 꼭 확인해 주세요.",
 }
+CHECK_NO_CONTACT = {"인정"}   # 담당이 학과 사무실 — 부서 대표전화를 붙이면 다른 곳으로 안내하게 된다
 
 
 def check_kind(question):
-    """확인 안내가 필요한 질문이면 "비자"|"지원"|"규정", 아니면 None."""
+    """확인 안내가 필요한 질문이면 "비자"|"지원"|"인정"|"규정", 아니면 None."""
     if CHECK_VISA_RE.search(question):
         return "비자"
     if CHECK_APPLY_RE.search(question):
         return "지원"
+    if CHECK_CREDIT_RE.search(question):
+        return "인정"
     # 수강 경험 말투(「파견 대학에서 몇 학점 수강했어요?」)는 규정을 묻는 말이 아니라 빼고, 주체가 현지인 것만(현지 장학금 등)
     if local_scope(question) and not COURSE_TONE_RE.search(question) \
             and (OFFICIAL_RE.search(question) or OFFICIAL_WIDE_RE.search(question)):
@@ -2194,7 +2201,7 @@ def official_check(question, programs):
     if not kind:
         return None
     dept = _dept(question, programs)
-    contact = _contact(dept)
+    contact = "" if kind in CHECK_NO_CONTACT else _contact(dept)
     out = {"message": CHECK_TEXT[kind].format(부서=dept.get("부서명", "담당 부서")) + (f" {contact}" if contact else ""),
            "officialUrl": dept.get("공식안내URL", "")}
     if contact:
