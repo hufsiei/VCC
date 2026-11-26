@@ -198,6 +198,79 @@ def _alias_ok(t, q):
         start = q.find(t, start + 1)
     return False
 
+
+# ── [11/26 작업 105] 학교 이름 오타·변형 퍼지 대조(코드, AI 없음) ─────────────────
+# 국제처 검토: 「마브루크·마부루크·마르브루크·마르브루쿠」가 마르부르크로 안 잡혀 보류로 빠졌다. 별칭으로는 다 못 막는다.
+# 규칙(가짜 매칭을 막는 쪽으로 좁게):
+#   ① 한글 4글자 이상인 프로그램명·별칭만(3글자 「말라가·밀라노·레이던」은 「말라고·밀리니·레이어로」 같은 보통 말에 걸려서 뺐다). 질문의 한글 덩어리 **첫머리**에서만 본다(낱말 가운데는 안 봄).
+#   ② 첫 글자가 같아야 한다(「함부르크」는 「마부르크」와 자모 두 개만 달라도 다른 도시).
+#   ③ 자모(초성·중성·종성)로 풀어 편집 거리가 그 이름 자모 수의 30% 이하이고 3 이하. 글자 수 차이는 1까지.
+#   ④ 덩어리가 이미 어떤 이름·별칭·나라·도시로 시작하면 보지 않는다(정확한 대조가 먼저).
+#   ⑤ 가장 가까운 후보가 서로 다른 프로그램 둘이면(동점) 고치지 않는다.
+# 맞으면 그 자리를 이름으로 바꾼 글을 대조에만 쓴다(질문 원문·저장·AI 입력은 그대로).
+def _jamo(s):
+    out = []
+    for ch in s:
+        c = ord(ch) - 0xAC00
+        if 0 <= c < 11172:
+            out += [("초", c // 588), ("중", c % 588 // 28)] + ([("종", c % 28)] if c % 28 else [])
+        else:
+            out.append(("", ch))
+    return out
+
+
+def _edit(a, b):
+    prev = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        cur = [i]
+        for j, y in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x != y)))
+        prev = cur
+    return prev[-1]
+
+
+FUZZY_MIN = 4   # 이름의 한글 글자 수(질문 쪽은 한 글자 모자란 것까지 본다)
+_FUZZY = {}     # 첫 글자 → [(이름·별칭, 프로그램명, 자모)]
+for _t, _name, _ in _TERMS:
+    if re.fullmatch(r"[가-힣]{%d,}" % FUZZY_MIN, _t):
+        _FUZZY.setdefault(_t[0], []).append((_t, _name, _jamo(_t)))
+_FUZZY_SKIP = None   # ④ 나라·도시 이름(CITIES가 아래에 있어 처음 쓸 때 만든다)
+
+
+def _fuzzy_skip():
+    global _FUZZY_SKIP
+    if _FUZZY_SKIP is None:
+        words = {t for t, _, _ in _TERMS} | {_norm(w) for w in [*COUNTRIES, *CITY_COUNTRY]}
+        _FUZZY_SKIP = sorted((w for w in words if len(w) >= 2), key=len, reverse=True)
+    return _FUZZY_SKIP
+
+
+def fix_names(text):
+    """질문 속 학교 이름 오타를 프로그램명·별칭으로 바꾼 글(대조용). 고칠 것이 없으면 그대로."""
+    if not text:
+        return text
+    out, last = [], 0
+    for m in re.finditer(r"[가-힣]{%d,}" % (FUZZY_MIN - 1), text):
+        run = m.group(0)
+        if run[0] not in _FUZZY or any(run.startswith(w) for w in _fuzzy_skip()):
+            continue
+        best = []   # (거리, 글자 수 차, 이름, 프로그램명, 고칠 글자 수)
+        for t, name, tj in _FUZZY[run[0]]:
+            for n in range(len(t) - 1, min(len(run), len(t) + 1) + 1):
+                d = _edit(_jamo(run[:n]), tj)
+                if d <= min(3, int(len(tj) * 0.3)):
+                    best.append((d, abs(n - len(t)), t, name, n))
+        if not best:
+            continue
+        best.sort()
+        if len({b[3] for b in best if b[:2] == best[0][:2]}) > 1:   # ⑤
+            continue
+        _, _, t, _, n = best[0]
+        out += [text[last:m.start()], t]
+        last = m.start() + n
+    return "".join(out) + text[last:] if out else text
+
+
 # 사후 검증용 고유명사 사전: 프로그램명·별칭·국가·부서명 + 자주 지어내는 시험·기관 이름
 PROPER_NOUNS = sorted({w for name, p in PROGRAMS.items() for w in [name, *p.get("별칭", []), p.get("세부", "")]
                        if len(_norm(w)) >= 2} |
@@ -494,7 +567,7 @@ EXIST_RE = re.compile(r"(데이터|자료|노트|근거|정보|후기|사례)\s*
 
 def _named_programs(text):
     """이름·별칭·약칭(KOTRA·코트라)으로 직접 부른 프로그램. 직군·기관유형(「무역 인턴」)은 보지 않는다."""
-    q = _norm(text)
+    q = _norm(fix_names(text))
     found = {name for t, name, is_alias in _TERMS if t in q and (not is_alias or _alias_ok(t, q))}
     kw = INTERN_KEYWORDS if isinstance(INTERN_KEYWORDS, dict) else {}
     for w, names in (kw.get("약칭") or {}).items():
@@ -736,7 +809,7 @@ def _exists(plan, history):
 
 # ── ① 프로그램 대조 ───────────────────────────────────────────────────
 def match_programs(question):
-    q = _norm(question)
+    q = _norm(fix_names(question))
     hits = [(t, name) for t, name, is_alias in _TERMS if t in q and (not is_alias or _alias_ok(t, q))]
     keep = [(t, name) for t, name in hits if not any(t != t2 and t in t2 for t2, _ in hits)]
     found = sorted({name for _, name in keep})
@@ -841,7 +914,7 @@ def _places(text):
 def _direct_programs(question):
     """이름·별칭으로 직접 부른 프로그램(match_programs ① 단계와 같은 규칙). 인턴 사전(직군·약칭)으로 잡힌 업체 여럿은
     학생이 두 곳을 부른 것이 아니므로 세지 않는다(「무역 쪽 인턴 어디가 좋아요?」는 탐색)."""
-    q = _norm(question)
+    q = _norm(fix_names(question))
     hits = [(t, name) for t, name, is_alias in _TERMS if t in q and (not is_alias or _alias_ok(t, q))]
     return {name for t, name in hits if not any(t != t2 and t in t2 for t2, _ in hits)}
 
