@@ -169,17 +169,42 @@ def _sections(field, program):
     return [s for s in (notes.FRAMES.get(kind) or {}).get("칸", []) if s != QUESTION_SECTION]
 
 
+# [11/26 P11] 보류 질문에 칸이 없을 때 질문 문장으로 칸을 정한다(코드만, AI 없음).
+#   askboo의 주제어 표(TOPICS_EXCHANGE → SECTION_BY_ITEM)를 읽기만 하고, 그 표가 일부러 빼 둔 보류 주제
+#   (askboo 「아르바이트·취업 등은 보고서에 칸이 없으므로 hold」)만 여기서 덧붙인다. 시연 0:40 「학기 중 현지 인턴 병행」 → 생활
+#   (들려주기 문단분류가 같은 질문에 고르는 칸과 같다 — test_interview.py).
+HOLD_TOPICS_EXCHANGE = [(r"인턴|아르바이트|알바|일자리|병행|현지\s*취업", "생활")]
+
+
+def guess_section(question, program):
+    """질문 문장 → 그 프로그램 노트 틀(data/frames.json)의 칸. 못 정하면 None(지금처럼 칸을 묻는다)."""
+    import askboo   # 근거를 읽는 모듈이라 쓸 때만 불러온다(runtime_fns가 demand를 부를 때마다 읽지 않게)
+    text = question or ""
+    names = _sections(None, program)
+    if notes._kind(program) in ("교환", "파견"):
+        found = [askboo.SECTION_BY_ITEM.get(n) for pat, nums in askboo.TOPICS_EXCHANGE if re.search(pat, text) for n in nums]
+        found += [s for pat, s in HOLD_TOPICS_EXCHANGE if re.search(pat, text)]
+    else:
+        found = ["근무조건"] if askboo.INTERVIEW_ONLY_INTERN.search(text) else []
+    return next((s for s in found if s in names), None)
+
+
 def _from_question(me, qid):
-    """물어보기에서 보류된 내 질문으로 시작: 프로그램·칸·질문 문장을 미리 채운다."""
+    """물어보기에서 보류된 내 질문으로 시작: 프로그램·칸·질문 문장을 미리 채운다.
+    [11/26 P11] 칸이 없거나 그 노트 틀 밖이면 질문 문장으로 정한다(guess_section). 못 정하면 칸을 묻는다."""
     q = next((q for q in store.load("questions", []) if q.get("id") == qid), None)
     if not q or q.get("colreg_no") != me:
         return None
     st = {"fromQuestionId": qid, "question": q.get("질문")}
-    if q.get("프로그램명") in notes.PROGRAMS:
-        st["field"], st["detail"] = _program_field(q["프로그램명"])
-        st["program"] = q["프로그램명"]
-    if q.get("칸"):
-        st["section"] = q["칸"]
+    program = q.get("프로그램명") if q.get("프로그램명") in notes.PROGRAMS else None
+    if program:
+        st["field"], st["detail"] = _program_field(program)
+        st["program"] = program
+    section = q.get("칸")
+    if program and section not in _sections(st["field"], program):
+        section = guess_section(q.get("질문"), program) or section
+    if section:
+        st["section"] = section
     return st
 
 
