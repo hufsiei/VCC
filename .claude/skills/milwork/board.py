@@ -36,7 +36,7 @@
 #   decide                                          결정요망 표 출력(답 없는 것 위)
 #   decide add --folder VCC-x --session <이름> --q "질문" --options "A(추천) …; B …"   → 「D-n」, 그 폴더 줄 결정요망에 D-n
 #   decide answer D-n --a "A"                       답·시각 기록, 그 폴더 줄에서 D-n 제거. 출력 첫 줄은 그 D-n의 세션 이름
-#   clean [--days 1]                                「갱신」이 N일 넘게 지난 완료·반려 대기 작업 줄 + 「답한 때」가 N일 넘게 지난 결정요망 줄을 지운다(밀종료)
+#   clean [--days 1]                                「갱신」이 N일 넘게 지난 완료·반려 대기 작업 줄 + 「답한 때」가 N일 넘게 지나고 작업이 끝난(폴더 줄 없음) 결정요망 줄을 지운다(밀종료). Q·D 가장 큰 번호 줄은 남긴다
 #   selftest                                        임시 폴더에서 위 명령 왕복, 틀리면 종료코드 1
 # <폴더>는 "VCC-xxx" 또는 "C:\dev\VCC-xxx" 어느 쪽이든 된다.
 import argparse
@@ -158,19 +158,16 @@ def now():
 
 
 def age(stamp, at=None):
-    """「MM/DD HH:MM」이 지난 시간(timedelta). 연도가 없으니 미래가 되면 작년으로 본다. 못 읽으면 None."""
+    """「MM/DD HH:MM」이 지난 시간(timedelta). 연도가 없으니 올해로 본다. 하루 넘게 미래거나 못 읽으면 None(지우지 않음)."""
     at = at or datetime.now()
     m = re.match(r"^(\d\d)/(\d\d) (\d\d):(\d\d)$", stamp.strip())
     if not m:
         return None
-    for year in (at.year, at.year - 1):
-        try:
-            t = datetime(year, *map(int, m.groups()))
-        except ValueError:          # 02/29가 없는 해, 잘못 적은 값
-            continue
-        if t <= at + timedelta(days=1):     # 두 PC 시계 차이만큼의 미래는 올해
-            return at - t
-    return None
+    try:
+        t = datetime(at.year, *map(int, m.groups()))
+    except ValueError:          # 02/29가 없는 해, 잘못 적은 값
+        return None
+    return at - t if t <= at + timedelta(days=1) else None     # 두 PC 시계 차이만큼의 미래는 봐준다
 
 
 def folder_name(s):
@@ -259,7 +256,7 @@ def save(st, path=None, html=True):
     lines = [chief_line(st), "", last, "", f"# VCC 상태판 — {ME or p.stem} (두 PC 공용 · 갱신 {now()} {HOST})", "",
              "작업 대화창은 `milwork`로 줄을 만들고 진행에 따라 「상태」「파일」「전달 대기」를 고친다. "
              "팀원 답장은 그 대화창이 바로 쓰고 「전달 대기」에 요점을 적는다. 미리가 보내면 `--sent`로 「보냄」 표시. "
-             "총괄 대화창은 대기 작업을 승인하고 결정요망에 답한다. 병합된 줄과 폴더, 완료·반려·답한 지 하루 지난 줄은 `milend`가 지운다.", ""]
+             "총괄 대화창은 대기 작업을 승인하고 결정요망에 답한다. 병합된 줄과 폴더, 완료·반려 하루 지난 줄과, 답한 지 하루 지나고 작업이 끝난 결정요망은 `milend`가 지운다(가장 큰 번호 줄은 남김).", ""]
     lines += table(COLS, st["rows"])
     lines += ["", "## 대기 작업", ""] + table(QCOLS, st["queue"])
     lines += ["", "## 결정요망", ""] + table(DCOLS, st["decide"])
@@ -664,8 +661,13 @@ def cmd_clean(args):
 
     with locked():
         st = load()
-        q = [x["번호"] for x in st["queue"] if x["상태"] in ("완료", "반려") and old(x["갱신"])]
-        d = [x["번호"] for x in st["decide"] if x["답"] not in EMPTY and old(x["답한 때"])]
+        # 가장 큰 번호 줄은 남긴다 — 옛 board.py가 저장해 「마지막 번호」 머리가 빠져도 번호가 다시 쓰이지 않게
+        top = {f"Q-{max_num(st['queue'], 'Q')}", f"D-{max_num(st['decide'], 'D')}"}
+        q = [x["번호"] for x in st["queue"]
+             if x["번호"] not in top and x["상태"] in ("완료", "반려") and old(x["갱신"])]
+        d = [x["번호"] for x in st["decide"]
+             if x["번호"] not in top and x["답"] not in EMPTY and old(x["답한 때"])
+             and not find(st["rows"], x["폴더"])]          # 폴더 줄이 있으면 작업 중
         if q or d:
             st["queue"] = [x for x in st["queue"] if x["번호"] not in q]
             st["decide"] = [x for x in st["decide"] if x["번호"] not in d]
@@ -922,9 +924,9 @@ def cmd_selftest(args):
         fails.append(f"이전: 줄 내용 {r}")
     if migrate(old, new):
         fails.append("이전: 두 번 옮김")
-    # 지난 줄 정리: 연말 넘김, 오래된 완료·반려만, 답한 결정요망, 번호 이어 가기
+    # 지난 줄 정리: 미래 도장, 오래된 완료·반려만, 답한 결정요망, 번호 이어 가기
     at = datetime(2027, 1, 1, 9, 0)
-    for stamp, want in (("12/31 08:00", timedelta(days=1, hours=1)), ("01/01 08:00", timedelta(hours=1)),
+    for stamp, want in (("12/31 08:00", None), ("01/01 08:00", timedelta(hours=1)),
                         ("01/01 10:00", timedelta(hours=-1)), ("–", None), ("13/40 00:00", None)):
         if age(stamp, at) != want:
             fails.append(f"age({stamp!r}) = {age(stamp, at)} (기대 {want})")
@@ -958,24 +960,28 @@ def cmd_selftest(args):
     for i in ("Q-3", "Q-4"):
         run("queue", "done", i, first=f"{i} 완료")
     run("decide", "answer", "D-1", "--a", "B", first="s")
-    run("clean", "--days", "0")
-    st = load(f)
-    for x in st["queue"]:                    # 분 단위라 방금 줄은 --days 0에서도 남을 수 있음
-        x["갱신"] = past
-    for x in st["decide"]:
-        x["답한 때"] = past
-    save(st, f, html=False)
-    run("clean")
-    if load(f)["queue"] or load(f)["decide"] or "마지막 번호: Q-5 · D-3" not in f.read_text(encoding="utf-8"):
-        fails.append("clean: 다 지운 뒤 줄이 남았거나 마지막 번호 머리 없음")
-    run("queue", "add", "--task", "– 이어서", "--from", "직접", first="Q-6 승인")
-    run("decide", "add", "--folder", a, "--session", "s", "--q", "4?", "--options", "A; B", first="D-4")
-    # 머리 줄이 없는 옛 상태판
+    def age_all():
+        st = load(f)
+        for x in st["queue"]:
+            x["갱신"] = past
+        for x in st["decide"]:
+            x["답한 때"] = past
+        save(st, f, html=False)
+
+    # 폴더 줄이 남아 있으면 답한 지 오래돼도 결정요망을 남긴다
+    run("add", a, "--branch", "miri/st", "--who", "미리", "--task", "진행 중")
+    age_all()
+    run("clean", first="정리: 대기 작업 2줄 · 결정요망 0줄 (Q-3, Q-4)")
+    run("remove", a, first=f"지움: {a}")
+    run("clean", first="정리: 대기 작업 0줄 · 결정요망 1줄 (D-1)")      # 가장 큰 번호 D-3은 남김
+    left = [x["번호"] for x in load(f)["queue"] + load(f)["decide"]]
+    if left != ["Q-5", "D-3"]:
+        fails.append(f"clean: 가장 큰 번호 줄만 남아야 함: {left}")
+    # 머리 줄을 지워도(옛 board.py 저장) 남은 줄에서 번호가 이어진다
     text = f.read_text(encoding="utf-8")
     f.write_text(re.sub(r"(?m)^마지막 번호: .*\n", "", text), encoding="utf-8")
-    run("queue", "add", "--task", "– 옛 판", "--from", "직접", first="Q-7 승인")
-    if "마지막 번호: Q-7 · D-4" not in f.read_text(encoding="utf-8"):
-        fails.append("옛 상태판: 마지막 번호 머리를 새로 쓰지 않음")
+    run("queue", "add", "--task", "– 이어서", "--from", "직접", first="Q-6 승인")
+    run("decide", "add", "--folder", a, "--session", "s", "--q", "4?", "--options", "A; B", first="D-4")
     print(f"임시 폴더: {tmp}")
     if fails:
         print("\n실패 " + str(len(fails)) + "건:\n" + "\n".join(fails))
@@ -1036,7 +1042,7 @@ def main():
     dn.set_defaults(fn=cmd_decide_answer)
 
     cn = sp.add_parser("clean")
-    cn.add_argument("--days", type=int, default=1, help="완료·반려·답한 지 N일 넘은 대기 작업·결정요망 줄을 지움")
+    cn.add_argument("--days", type=int, default=1, help="완료·반려 N일 넘은 대기 작업 + 답한 지 N일 넘고 폴더 줄 없는 결정요망 삭제")
     cn.set_defaults(fn=cmd_clean)
 
     sp.add_parser("selftest").set_defaults(fn=cmd_selftest)
