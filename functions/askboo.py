@@ -92,6 +92,8 @@ EXPERIENCE_TONE = re.compile(r"(했|었|였|웠|겼|졌|냈|썼|봤|갔|왔|됐|
 
 
 def is_official(question):
+    if local_scope(question):   # [11/26 Q-38] 현지·파견 대학 이야기·수강 경험 말투는 규정이 아니다(아래 「데이터」 뒤 정의)
+        return False
     if OFFICIAL_RE.search(question):
         return True
     return bool(OFFICIAL_WIDE_RE.search(question)) and not EXPERIENCE_TONE.search(question)
@@ -109,6 +111,9 @@ TOPICS_EXCHANGE = [
     (r"기숙사|숙소|방\s*구|방값|집\s*구|월세|자취|주거", ["2-4"]),
     (r"교내\s*활동|동아리|버디|모임|학생회|행사", ["2-5"]),
     (r"생활비|비용|예산|얼마|물가", ["2-6"]),
+    # [11/26 Q-38] 학비·학기 등록비(독일 노트 「학기 등록만 하면 교통권 포함」은 2-2에 있다)·현지 장학금은 비용 칸
+    (r"학비|등록비|수업료|학기\s*등록|장학", ["2-6", "2-2"]),
+    (r"몇\s*학점\s*(을|씩|정도|쯤)?\s*(들|수강)", ["2-2", "2-3"]),   # [Q-38] 「독일 대학교에서 몇 학점 들어?」 — 수강 경험
     (r"학점\s*인정|학점인정|성적\s*인정|학점", ["3", "2-2"]),
     (r"날씨|치안|소매치기|생활(?!비)", ["2-7", "1-3"]),
     (r"조언|한마디|어때|어땠|후기|경험담|팁|해\s*주고\s*싶은|알아\s*두면|후회|아쉬", ["4"]),  # 11/20 원우 제안: '팁' 질문이 보류로 빠지던 것 · 11/23 후회·아쉬움
@@ -147,6 +152,25 @@ COUNTRIES = {}
 for _name, _p in PROGRAMS.items():
     if _p.get("분야") == "국제교류" and _p.get("세부"):
         COUNTRIES.setdefault(_p["세부"], []).append(_name)
+
+# [11/26 Q-38] 규정 = 외대 제도(학점 인정·외대 장학금·선발·등록금 납부·휴학 등). 같은 낱말이라도 주체가 현지·파견 대학이거나
+# (「독일 현지 대학교에서 주는 장학금」) 수강 경험을 묻는 말투(「독일 대학교에서 몇 학점 들어?」)면 선배 경험 질문이다.
+# 외대 제도 말(외대·인정·선발·휴학·등록금·국제교류팀 등)이 함께 있으면 주체가 현지여도 그대로 규정
+# (「현지에서 들은 학점 인정받을 수 있어요?」). 주체를 말하지 않은 「장학금 얼마예요?」「학점 인정 신청 언제까지?」는 지금처럼 규정.
+LOCAL_SUBJECT_RE = re.compile(
+    r"현지|자체|DAAD|거기서|거기에서|그\s*(학교|대학)|파견\s*(대학|학교|교)"
+    r"|(?:" + "|".join(re.escape(c) for c in sorted(COUNTRIES, key=len, reverse=True) or ["독일"]) + r")\s*(?:의\s*)?(?:대학|학교)",
+    re.IGNORECASE)
+COURSE_TONE_RE = re.compile(r"몇\s*학점\s*(을|씩|정도|쯤)?\s*(들|수강|신청했|신청해|넣)")
+# 기한·자격·배정·발표 등 절차 말도 외대 제도로 본다(보수 — 외대 제도 질문이 근거 길로 가는 쪽이 더 위험)
+HUFS_RULE_RE = re.compile(r"외대|본교|우리\s*학교|국제교류팀|인정|선발|배정|휴학|등록금|초과학기|졸업"
+                          r"|발표|모집|자격(?!증)|마감|기한|언제까지|중복\s*지원|불이익|페널티|연장")
+
+
+def local_scope(question):
+    """[Q-38] 현지·파견 대학 이야기이거나 수강 경험 말투이고 외대 제도 말이 없으면 True — is_official이 규정으로 보지 않는다."""
+    return bool((LOCAL_SUBJECT_RE.search(question) or COURSE_TONE_RE.search(question))
+                and not HUFS_RULE_RE.search(question))
 
 
 def _norm(s):
@@ -317,7 +341,13 @@ def _answer(me, payload, save, trace=None):
     effective = question
     if plan:
         if plan["의도"] == "규정":
-            return _official(me, question, programs, save)
+            if not local_scope(question):
+                return _official(me, question, programs, save)
+            plan["의도"] = "경험질문"   # [Q-38] 현지·파견 대학 이야기는 질문정리가 규정이라 해도 근거 길로(정규식과 같은 기준)
+        # [11/26 Q-38] 「장학금 받은 사람이 있나?」처럼 주제어가 있는 사람 찾기는 경험 질문(①″ 정규식 길과 같은 기준 —
+        #   사람 찾기 카드는 주제어가 없을 때만). 근거가 없으면 카드 대신 보류 → 질문함
+        if plan["의도"] == "사람찾기" and has_topic(question):
+            plan["의도"] = "경험질문"
         plan["제외"] += [p for p in excluded if p not in plan["제외"]]
         # [11/24] 「아예 데이터가 없나요?」 — 있고 없음을 묻는 말은 앞 대화 주제의 노트 수로 답한다(코드가 센다, AI 없음)
         if plan["의도"] in ("대화", "탐색") and EXIST_RE.search(question) and not match_programs(question) \
@@ -343,7 +373,8 @@ def _answer(me, payload, save, trace=None):
             found = _explore(plan, programs, country or plan["나라"])
             if found:
                 return found
-            return _hold(me, question, programs[0] if programs else None, plan["칸"], save, why="탐색 결과 없음")
+            return _hold(me, question, programs[0] if programs else None, plan["칸"], save, why="탐색 결과 없음",
+                         place=_place(country or plan["나라"], programs))
         if not programs and plan["분야"] and plan["제외"]:
             # 「코트라 말고 무역 인턴」처럼 제외하고 남는 프로그램이 없으면 그 분야 노트 목록으로
             found = _explore(plan, [], country or plan["나라"])
@@ -355,6 +386,9 @@ def _answer(me, payload, save, trace=None):
     # ① 프로그램이 없으면 보류
     if not programs:
         return _hold(me, question, None, None, save, why="프로그램 없음")
+    # [11/26 Q-38] 나라로 여러 학교를 잡았으면 보류 문구를 나라 단위로(「독일 해봤노트에는 …」).
+    #   programs[0]은 근거가 가장 많은 학교일 뿐이라 학교 이름으로 말하면 그 학교만 본 것처럼 읽힌다(실서버 「독일 학비 알려줘」)
+    place = _place(country, programs)
 
     # ①″ [11/23] 사람을 찾는 질문이나 나라만 말한 질문인데 주제어가 없으면 → 해봤노트 카드로 안내(AI 없음)
     if not plan and not has_topic(question) and (PERSON_RE.search(question) or country):
@@ -366,7 +400,7 @@ def _answer(me, payload, save, trace=None):
     #     답쓰기가 실패(형식·호출)하면 None → 아래 옛 길(추출 → 고르기 → 답쓰기 → 원문 인용) 그대로
     if ask_full():
         trace["route"] = (trace.get("route") or "") + "·전문"
-        found = _answer_full(me, question, effective, programs, plan, save)
+        found = _answer_full(me, question, effective, programs, plan, save, place)
         if found is not None:
             return found
         trace["route"] += "→옛 길"
@@ -375,18 +409,18 @@ def _answer(me, payload, save, trace=None):
     cands, section, why = extract(effective if effective == question else f"{question} {effective}", programs,
                                   section_hint=plan["칸"] if plan else None)
     if not cands:
-        return _hold(me, question, programs[0], section, save, why=why)
+        return _hold(me, question, programs[0], section, save, why=why, place=place)
 
     # ④ 고르기 (HCX)
     picked, why = pick(effective, cands)
     if not picked:
-        return _hold(me, question, programs[0], section, save, why=why)
+        return _hold(me, question, programs[0], section, save, why=why, place=place)
 
     # ⑤ 답쓰기 + ⑥ 검증 (v2) → 다 버려지면 v1 원문 인용
     # [11/24 작업 87] 답쓰기가 {"답":[]}(근거가 질문에 안 맞음)를 내면 원문을 답처럼 보여 주지 않고 보류한다
     out = compose(effective, picked, on_empty=EMPTY_ANSWER)
     if out is EMPTY_ANSWER:
-        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음")
+        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음", place=place)
     if out is None:
         out = fallback_lines(picked)
     out["noteId"] = notes.note_id(picked[0]["program"])
@@ -394,15 +428,15 @@ def _answer(me, payload, save, trace=None):
     return out
 
 
-def _answer_full(me, question, effective, programs, plan, save):
+def _answer_full(me, question, effective, programs, plan, save, place=None):
     """[11/26 A안] 전문 길. 돌려주는 값: 응답 사전, 또는 None(답쓰기 실패 — 부르는 쪽이 옛 길로)."""
     paras, why = full_evidence(effective if effective == question else f"{question} {effective}", programs)
     section = "근무조건" if why.startswith("인터뷰로만") else (plan["칸"] if plan else None)
     if not paras:
-        return _hold(me, question, programs[0], section, save, why=why)
+        return _hold(me, question, programs[0], section, save, why=why, place=place)
     out, quotes = compose_full(effective, paras)
     if out is EMPTY_ANSWER:
-        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음")
+        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음", place=place)
     if out is None:
         if not quotes:          # 답쓰기 호출·형식 실패 → 옛 길
             return None
@@ -1608,19 +1642,28 @@ def _official(me, question, programs, save):
             "message": f"학교 규정에 관한 질문이라 {dept.get('부서명', '담당 부서')} 공식 안내에서 정확한 내용을 확인해 주세요."}
 
 
-def _hold(me, question, program, section, save, why=""):
+def _place(country, programs):
+    """[Q-38] 보류 문구에 쓸 나라 — 나라로 학교 둘 이상을 잡았을 때만. 아니면 None(학교 이름 문구 그대로)."""
+    return country if country and len(programs) > 1 else None
+
+
+def _hold(me, question, program, section, save, why="", place=None):
+    """place: [Q-38] 나라 단위 보류(「독일 해봤노트에는 …」). 이때 한 학교 노트 링크(noteId)는 주지 않는다.
+    질문함에는 지금처럼 program(근거가 가장 많은 학교)으로 담는다."""
     qid = _save(me, question, program, section, "hold", save)
     if why == "담기":
         message = HOLD_SAVED
     elif not program:
         message = HOLD_NO_PROGRAM
+    elif place:
+        message = HOLD_NO_TOPIC.format(program=place)
     elif evidence_count(program):     # 노트는 있는데 이 내용만 없다 → 그 노트로 갈 수 있게 noteId도 준다
         message = HOLD_NO_TOPIC.format(program=program)
     else:
         message = HOLD_MESSAGE
     out = {"status": "hold", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": True, "message": message,
            "_program": program}
-    if program and evidence_count(program):
+    if program and evidence_count(program) and not place:
         out["noteId"] = notes.note_id(program)
     if not save:
         out["_why"] = why   # 평가 스크립트에서만 보이는 보류 이유
