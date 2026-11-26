@@ -58,6 +58,10 @@
   /* 다시 묻기(입력 오류 5-9): 아이콘 + 14px 문구 */
   .demand-retry { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--font-size-secondary); color: var(--status-warning-fg); }
   .demand-retry .icon { width: 16px; height: 16px; flex: none; }
+  /* 직접 쓰는 단계의 예시 칩(#331-2): 안내 한 줄(14px 보조색 + 연필) 아래 「예: 」 칩 */
+  .demand-examples { display: flex; flex-direction: column; gap: var(--space-xs); }
+  .demand-examples__hint { display: flex; align-items: center; gap: var(--space-xs); margin: 0; font-size: var(--font-size-secondary); color: var(--color-text-muted); }
+  .demand-examples__hint .icon { width: 16px; height: 16px; flex: none; }
   .demand-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-xs); }
   .demand-foot .btn--text { min-height: 44px; }
   /* 「맨 위로」(디자인 규칙 5-8, 11/25): 대화를 한 화면 넘게 내리면 고정 입력줄 바로 위 오른쪽에 뜬다.
