@@ -433,6 +433,10 @@ def _answer(me, payload, save, trace=None):
         trace["route"] = found.pop("_route")
         return found
 
+    # ①⁰ [작업 35] 학교 이름이 글자로 잡힌 첫 질문이면 답쓰기-전문을 질문정리와 같이 시작(쓰일지는 _answer_full이 정한다)
+    spec = _overlap_start(question, history, excluded, programs, country)
+    if spec:
+        trace["overlap"] = spec
     # ① [v2] 질문 정리(AI). 실패하면 plan=None → 아래는 v1 경로 그대로
     plan = clarify(question, history, excluded)
     trace["plan"] = plan
@@ -501,7 +505,7 @@ def _answer(me, payload, save, trace=None):
     #     답쓰기가 실패(형식·호출)하면 None → 아래 옛 길(추출 → 고르기 → 답쓰기 → 원문 인용) 그대로
     if ask_full():
         trace["route"] = (trace.get("route") or "") + "·전문"
-        found = _answer_full(me, question, effective, programs, plan, save, place)
+        found = _answer_full(me, question, effective, programs, plan, save, place, spec)
         if found is not None:
             return found
         trace["route"] += "→옛 길"
@@ -529,13 +533,14 @@ def _answer(me, payload, save, trace=None):
     return out
 
 
-def _answer_full(me, question, effective, programs, plan, save, place=None):
-    """[11/26 A안] 전문 길. 돌려주는 값: 응답 사전, 또는 None(답쓰기 실패 — 부르는 쪽이 옛 길로)."""
+def _answer_full(me, question, effective, programs, plan, save, place=None, spec=None):
+    """[11/26 A안] 전문 길. 돌려주는 값: 응답 사전, 또는 None(답쓰기 실패 — 부르는 쪽이 옛 길로).
+    spec: [작업 35] _overlap_start가 미리 시작한 답쓰기. 프로그램·근거 글이 같으면 그 결과를 쓴다."""
     paras, why = full_evidence(effective if effective == question else f"{question} {effective}", programs)
     section = "근무조건" if why.startswith("인터뷰로만") else (plan["칸"] if plan else None)
     if not paras:
         return _hold(me, question, programs[0], section, save, why=why, place=place)
-    out, quotes = compose_full(effective, paras)
+    out, quotes = compose_full(effective, paras, written=_overlap_take(spec, programs, paras))
     if out is EMPTY_ANSWER:
         return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음", place=place)
     if out is None:
@@ -1906,6 +1911,48 @@ def ask_full():
     return os.environ.get("VCC_ASK_FULL", "0").strip() == "1"
 
 
+# ── [11/26 작업 35 · #278 3-3] 질문정리와 답쓰기 겹쳐 돌리기 ─────────────────
+# 첫 질문(앞 대화 없음)에 학교(프로그램) 이름이 글자로 잡히면 질문정리를 기다리지 않고 답쓰기-전문을 같이 시작한다.
+# 질문정리 뒤 길이 전문 길(_answer_full)이고 프로그램·근거 글이 같을 때만 그 답을 쓴다. 대화·탐색·규정 등 다른 길이면 버린다.
+# 버리는 것은 답쓰기 한 번뿐 — 답검사(Opus)는 답을 쓰기로 정한 뒤에만 부른다. 규정·인원·비교·도시·비교과 같은
+# AI 없는 길은 이보다 먼저 걸러지므로 순서는 그대로다. 답쓰기에는 질문정리가 다듬은 질문 대신 원래 질문이 들어간다
+# (첫 질문은 질문정리가 조사만 다듬는다 — docs/조사/278_첫답시간_미리.md 3절). 끄기: VCC_ASK_OVERLAP=0
+_overlap_pool = None
+
+
+def ask_overlap():
+    """겹쳐 돌리기 켜짐 여부(기본 켬, 전문 길에서만). 부를 때마다 읽는다(측정 스크립트가 환경변수로 바꿔 돌린다)."""
+    return os.environ.get("VCC_ASK_OVERLAP", "1").strip() != "0"
+
+
+def _overlap_start(question, history, excluded, programs, country):
+    """조건이 맞으면 답쓰기-전문을 미리 시작해 {programs, evidence, future}를, 아니면 None을 돌려준다(코드만, 0.01초 안)."""
+    global _overlap_pool
+    if not (ask_full() and ask_overlap()) or history or excluded or country or not programs:
+        return None
+    if programs != [p for p in match_programs(question) if p not in excluded]:   # 학교 이름을 글자로 부른 질문만
+        return None
+    paras, _ = full_evidence(question, programs)
+    if not paras:
+        return None
+    if _overlap_pool is None:
+        from concurrent.futures import ThreadPoolExecutor
+        _overlap_pool = ThreadPoolExecutor(4)
+    return {"programs": list(programs), "evidence": render_evidence(paras),
+            "future": _overlap_pool.submit(write_full, question, paras)}
+
+
+def _overlap_take(spec, programs, paras):
+    """미리 시작한 답쓰기를 쓸 수 있으면 그 결과(끝날 때까지 기다림), 아니면 None. 같은지는 답쓰기가 본 근거 글로 가린다."""
+    if not spec:
+        return None
+    if spec["programs"] != list(programs) or spec["evidence"] != render_evidence(paras):
+        spec["used"] = False
+        return None
+    spec["used"] = True
+    return spec["future"].result()
+
+
 _SEASON_RANK = {"1": 1, "여름": 2, "2": 3, "겨울": 4}
 
 
@@ -2017,15 +2064,21 @@ def full_sources(refs, by_n):
     return " ".join(verify_parts), "\n".join(check_parts), cited
 
 
-def compose_full(question, paras, max_lines=MAX_ANSWER_LINES_FULL):
-    """AI(답쓰기-전문) → 문장마다 두 단계 번호로 원문 대조 → 답검사. 돌려주는 값: (응답|None|EMPTY_ANSWER, 원문 인용 후보).
-    원문 인용 후보: 답쓰기가 가리킨 문장(문단만 가리키면 그 문단 첫 문장), 처음 가리킨 순서. 다 버려졌을 때 폴백에 쓴다."""
+def write_full(question, paras):
+    """답쓰기-전문 호출 하나(AI). 돌려주는 값: callAI 결과(호출이 예외면 ok=False). 겹쳐 돌리기(_overlap_start)가 따로 부른다."""
     system, shots = load_prompt("askBoo-답쓰기-전문")
     try:   # 지침·예시·근거 전문이 캐시(고정), 질문만 가변
-        r = callAI("답쓰기-전문", shots + [{"role": "user", "content": f"질문: {question}\n출력:"}],
-                   system=system, cache=render_evidence(paras))
+        return callAI("답쓰기-전문", shots + [{"role": "user", "content": f"질문: {question}\n출력:"}],
+                      system=system, cache=render_evidence(paras))
     except Exception:
-        return None, []
+        return {"ok": False}
+
+
+def compose_full(question, paras, max_lines=MAX_ANSWER_LINES_FULL, written=None):
+    """AI(답쓰기-전문) → 문장마다 두 단계 번호로 원문 대조 → 답검사. 돌려주는 값: (응답|None|EMPTY_ANSWER, 원문 인용 후보).
+    원문 인용 후보: 답쓰기가 가리킨 문장(문단만 가리키면 그 문단 첫 문장), 처음 가리킨 순서. 다 버려졌을 때 폴백에 쓴다.
+    written: [작업 35] 겹쳐 돌리기로 미리 받아 둔 답쓰기 결과(write_full). 있으면 답쓰기를 다시 부르지 않는다."""
+    r = write_full(question, paras) if written is None else written
     j = r.get("json") if r.get("ok") else None
     answers = j.get("답") if isinstance(j, dict) else None
     if not isinstance(answers, list):

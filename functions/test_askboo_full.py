@@ -1,15 +1,20 @@
 # test_askboo_full.py — [11/26 A안] 플래그 VCC_ASK_FULL 전문 길 시험. AI는 가짜(callAI 대신)라 돈을 쓰지 않는다.
 # 보는 것: (a) 두 단계 번호 해석 (b) 코드 검사 범위 = 지목 문장 + 앞뒤 한 문장 (c) 글자 수 상한 자르기
 #         (d) 옛 번호 "3"(문단 전체)도 통과 (e) 플래그 꺼지면 옛 길 그대로 + 전문 길 흐름(호출 순서·캐시·폴백·보류)
+#         (f) [작업 35] 질문정리·답쓰기 겹쳐 돌리기(VCC_ASK_OVERLAP): 쓰는 경우·버리는 경우·응답이 순서대로 돌릴 때와 같은지
+#         (a)~(e)는 호출 순서를 보므로 겹쳐 돌리기를 끄고(VCC_ASK_OVERLAP=0) 본다
 # 실행: cd functions && python test_askboo_full.py   (질문함에 저장하지 않는다: save=False)
 import json
 import os
 import re
 import sys
+import threading
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 os.environ.pop("VCC_ASK_FULL", None)
+os.environ["VCC_ASK_OVERLAP"] = "0"
 import ai  # noqa: E402
 import askboo  # noqa: E402
 
@@ -189,6 +194,77 @@ INTERN = next(n for n, p in askboo.PROGRAMS.items() if p.get("분야") == "현�
               and not askboo.notes.interview_lines(n))
 paras, why = askboo.full_evidence("월급 얼마예요?", [INTERN])
 expect("(e) 현장실습 근무조건 질문 + 인터뷰 없음 → 근거 없음(옛 길과 같은 규칙)", paras == [] and why.startswith("인터뷰로만"), why)
+
+# ── (f) [작업 35] 질문정리·답쓰기 겹쳐 돌리기 ────────────────────────────
+def run_ov(question, overlap, history=None, delay=0.0, **kw):
+    """겹쳐 돌리기 켬/끔으로 한 번. delay: 질문정리·답쓰기-전문 가짜가 각각 쉬는 초(겹쳐지는지 시간으로 본다)."""
+    os.environ["VCC_ASK_FULL"] = "1"
+    os.environ["VCC_ASK_OVERLAP"] = "1" if overlap else "0"
+    inner = make_fake(**kw)
+    lock = threading.Lock()
+
+    def fake(작업명, messages, system=None, cache=None, **k):
+        if delay and 작업명 in ("질문정리", "답쓰기-전문"):
+            time.sleep(delay)
+        with lock:
+            return inner(작업명, messages, system=system, cache=cache, **k)
+    askboo.callAI = fake
+    trace = {}
+    t = time.perf_counter()
+    res = askboo._answer("H0143", {"question": question, "history": history or []}, False, trace)
+    sec = time.perf_counter() - t
+    sp = trace.get("overlap")
+    if sp:   # 버린 답쓰기도 끝까지 기다린 뒤 호출 수를 센다(응답은 이미 나왔음)
+        sp["future"].result()
+    return res, [c[0] for c in inner.calls], (None if sp is None else sp.get("used")), sec, inner.calls
+
+
+Q = "마르부르크 기숙사 어땠어요?"
+res1, names1, used1, sec1, calls1 = run_ov(Q, True, delay=0.3, answer=FULL_ANS)
+res0, names0, used0, sec0, _ = run_ov(Q, False, delay=0.3, answer=FULL_ANS)
+expect("(f) 경험 질문 → 미리 쓴 답을 씀, 응답은 순서대로 돌릴 때와 같음", used1 is True and res1 == res0 and res1["status"] == "ok",
+       (used1, res1.get("status"), res0.get("status")))
+expect("(f) 답쓰기-전문은 한 번, 답검사는 그 뒤", sorted(names1[:2]) == ["답쓰기-전문", "질문정리"] and names1.count("답쓰기-전문") == 1
+       and names1[2:] == ["답검사"], names1)
+expect("(f) 미리 쓴 답쓰기에는 원래 질문이 들어감", next(c[1] for c in calls1 if c[0] == "답쓰기-전문") == f"질문: {Q}\n출력:")
+expect("(f) 두 호출이 겹쳐 돌아 순서대로보다 빠름(가짜 0.3초 × 2)", sec1 < 0.5 <= 0.6 <= sec0, (round(sec1, 2), round(sec0, 2)))
+expect("(f) 겹쳐 돌리기를 끄면 미리 시작하지 않음", used0 is None and names0 == ["질문정리", "답쓰기-전문", "답검사"], names0)
+
+LEIDEN = "레이던 대학교"
+PLANS = {
+    "대화": {**PLAN, "의도": "대화", "프로그램후보": []},
+    "탐색": {**PLAN, "의도": "탐색"},
+    "규정": {**PLAN, "의도": "규정", "정리된질문": "마르부르크 파견 학점 인정은 어떻게 돼요?"},
+    "다른 프로그램": {**PLAN, "프로그램후보": [LEIDEN]},
+}
+for label, plan in PLANS.items():
+    r1, n1, u1, _, _ = run_ov(Q, True, plan=plan, answer=FULL_ANS)
+    r0, n0, _, _, _ = run_ov(Q, False, plan=plan, answer=FULL_ANS)
+    expect(f"(f) 질문정리 {label} → 미리 쓴 답은 버림, 응답은 순서대로와 같음", u1 is not True and r1 == r0,
+           (label, u1, r1.get("status"), r0.get("status")))
+    expect(f"(f) 질문정리 {label} → 버려도 답검사는 부르지 않음(답쓰기 1번 낭비만)",
+           n1.count("답쓰기-전문") == n0.count("답쓰기-전문") + 1 and n1.count("답검사") == n0.count("답검사"), (label, n1, n0))
+
+r1, n1, u1, _, _ = run_ov(Q, True, plan=None, answer=FULL_ANS)
+r0, n0, _, _, _ = run_ov(Q, False, plan=None, answer=FULL_ANS)
+expect("(f) 질문정리 실패(v1 길) → 같은 질문·프로그램이라 미리 쓴 답을 씀", u1 is True and r1 == r0 and n1.count("답쓰기-전문") == 1, (u1, n1))
+r1, n1, u1, _, _ = run_ov(Q, True, answer=lambda n: None if n == "답쓰기-전문" else OLD_ANS)
+r0, _, _, _, _ = run_ov(Q, False, answer=lambda n: None if n == "답쓰기-전문" else OLD_ANS)
+expect("(f) 미리 쓴 답쓰기가 실패 → 옛 길(순서대로와 같음)", u1 is True and r1 == r0 and "고르기" in n1, (u1, n1))
+r1, n1, u1, _, _ = run_ov(Q, True, answer={"답": []})
+expect("(f) 미리 쓴 답쓰기가 빈 답 → hold", r1["status"] == "hold" and r1.get("_why") == "답쓰기 근거 없음" and u1 is True, r1)
+
+H1 = [{"question": "독일 교환 어디가 좋아요?", "status": "notes", "program": ""}]
+for label, q, hist in (("앞 대화 있음", Q, H1), ("학교 이름 없음(나라만)", "독일 기숙사 어땠어요?", None),
+                       ("제외 있음", "레이던 말고 마르부르크 기숙사 어땠어요?", None)):
+    r1, n1, u1, _, _ = run_ov(q, True, history=hist, answer=FULL_ANS)
+    r0, n0, _, _, _ = run_ov(q, False, history=hist, answer=FULL_ANS)
+    expect(f"(f) {label} → 겹쳐 돌리지 않음(호출 순서·응답 그대로)", u1 is None and n1 == n0 and r1 == r0, (label, u1, n1, n0))
+for q in ("마르부르크 파견 장학금은 얼마 받아요?", "마르부르크랑 레이던 중 어디가 더 나아요?"):
+    r1, n1, u1, _, _ = run_ov(q, True, answer=FULL_ANS)
+    r0, n0, _, _, _ = run_ov(q, False, answer=FULL_ANS)
+    expect(f"(f) AI 없는 길이 먼저 → 답쓰기를 미리 시작하지 않음: {q}", u1 is None and n1 == n0 and r1 == r0, (r1.get("status"), n1))
+os.environ["VCC_ASK_OVERLAP"] = "0"
 
 # ── ai.py cache 블록 ───────────────────────────────────────────────────
 msgs = [{"role": "user", "content": "예시"}, {"role": "assistant", "content": "{}"}, {"role": "user", "content": "질문: q"}]
