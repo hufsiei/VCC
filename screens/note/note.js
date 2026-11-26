@@ -368,8 +368,9 @@ function evidenceBlock(lines, sources, reportName) {
   const latest = items.map((i) => i.src.semester).filter(Boolean).sort((a, b) => semesterKey(b) - semesterKey(a))[0];
   const num = (n) => (n > 0 ? el("span", { className: "evidence__num", text: n }) : DASH);
 
-  // 근거 적음 라벨(6-1 v4.3): 1~2건이면 「선배 N명의 경험이에요」(lines.length로 판단, spec)
-  const few = lines.length <= 2 ? statusLabel("neutral", "user", `선배 ${lines.length}명의 경험이에요`) : null;
+  // 근거 적음 라벨(6-1 v4.3): 1~2건이면 고정 문구 「선배 1명의 경험이에요」(lines.length로 판단, spec 5장).
+  // [11/26 #295] 문장 수 ≠ 선배 수이고 서버에 사람 수 값이 없어 숫자를 넣지 않는다
+  const few = lines.length <= 2 ? statusLabel("neutral", "user", "선배 1명의 경험이에요") : null;
 
   return el("details", { className: "evidence" }, [
     el("summary", { className: "evidence__head" }, [
