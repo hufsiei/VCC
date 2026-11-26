@@ -12,6 +12,7 @@ description: VCC 업무 시작 루틴(미리·원우·민지 모두 각자 PC에
 
 ## 1. 상태 확인 (조용히, 문제 있을 때만 말한다)
 - 본 폴더: `git -C C:/dev/VCC fetch -q` → `git -C C:/dev/VCC status -sb`. main이 아니거나 `[behind n]`이면 hook과 같은 모양의 한 줄을 **보고 맨 위에** 보여 준다: `[VCC] pull 안 됨 — <이유: 다른 브랜치 x / n커밋 뒤처짐 / 고친 파일 있음> · 직접 pull하세요: git -C C:/dev/VCC pull`. 대신 pull하거나 되돌리지 않는다(남의 작업일 수 있다).
+- **상태판 서버 켜기**(11/26 Q-62): `python -X utf8 C:/dev/VCC/.claude/skills/milwork/board.py serve`를 백그라운드(run_in_background)로 켠다. 이미 켜져 있으면 「이미 켜져 있음」만 나오니 여러 번 쳐도 하나만 뜬다. 보고 맨 위(pull 줄 아래)에 한 줄: **「상태판: http://localhost:8765/ (새로고침하면 최신)」**. 포트를 다른 프로그램이 쓰면 그 이유를 한 줄로 적고 넘어간다(시스템 설정·작업 스케줄러는 건드리지 않는다, 127.0.0.1에서만 열림).
 - `.env`: **값을 읽거나 출력하지 않는다.** 키 이름 3개(CLOVA_KEY·ANTHROPIC_API_KEY·VCC_LOGIN_PW)가 있는지만 본다. 모자라면 "Bitwarden에서 다시 붙여 주세요"라고만 말한다(.env 편집은 내가 직접 한다).
 - 총괄 등록: `ListAgents` 첫 줄 「This session is <이름>」에서 내 세션 이름을 읽어 `python -X utf8 C:/dev/VCC/.claude/skills/milwork/board.py chief --set <내 세션이름>`으로 내 상태판 머리에 적는다(작업창이 제안·결정요망을 이 이름으로 보낸다).
 - **「컴퓨터 바꿨어」인 날만**: 스킬 연결(`~\.claude\skills`에 milstart·milend·milreview·milwork·milwatch가 모두 있는지, 빠지면 `.claude/미리-PC설정.md` 2절대로 junction — SymbolicLink는 관리자 권한이 필요하니 쓰지 않는다)과 계정(`gh auth status` 활성 계정, `git -C C:/dev/VCC config user.email`이 noreply 주소인지, 나=미리면 활성 계정이 hufsiei)을 본다. 다르면 알린다.
