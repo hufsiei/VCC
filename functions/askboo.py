@@ -277,6 +277,13 @@ def _answer(me, payload, save, trace=None):
         trace["route"] = "규정(정규식)"
         return _official(me, question, programs, save)
 
+    # ①‴′ [11/26] 인원·순위 질문(「독일 7+1 가장 많이 간 대학교」) → 학적의 파견대학을 코드가 세어 답한다(AI 없음).
+    #     비교(「어느 학교가 제일 많이」)보다 먼저 본다
+    found = rank(question, programs, country, excluded)
+    if found:
+        trace["route"] = "인원"
+        return found
+
     # ①‴ [11/25 작업 87] 여러 곳 비교 질문 → 고정 안내 + 노트 카드(AI 없음). 비교 근거가 없으니 한 학교 답을 되풀이하지 않는다
     if is_compare(question):
         trace["route"] = "비교"
@@ -1022,6 +1029,95 @@ def timing(question, history, programs, country, excluded=()):
     found["message"] = (head + f"{label} 선배 보고서 {total:,}편을 시기별로 보면 "
                         + " · ".join(f"{s} {n:,}편" for s, n in seasons)
                         + f"이에요. 모집 일정은 학교 공지에서 확인해 주세요. {tail}")
+    return found
+
+
+# ── ①‴′ [11/26] 인원·순위 질문 (코드, AI 없음) ──────────────────────────
+# 실서버 「독일 7+1 갈 때 가장 많이 간 대학교?」(11/26 15:26)에 근거가 많은 순으로 노트만 보여 줬다 — 실제 간 학생 수
+# (뷔르츠부르크 6 · 마르부르크 5 · 마인츠 4)와 순서가 다르다. 학적(students.json)의 파견대학·해외경험 유형을 세어 고정 문구로 답한다.
+# 노트가 없는 학교는 인원만 말하고, 카드는 노트가 있는 학교를 인원 많은 순으로. 사람 칸(학번 등)은 세기만 하고 내보내지 않는다.
+# 유형 묶음(미리 11/26): 이름에 「파견학생」이 들어간 유형(학과·우수입학·국제 파견학생) = 7+1 파견. 아너스 파견은 7+1이 아니다.
+ABROAD = [(s["파견대학"], s.get("해외경험 유형") or "") for s in _json("students.json", []) if s.get("파견대학")]
+KIND_ORDER = ("교환학생", "7+1 파견", "자비유학생", "아너스 파견")
+KIND_WORDS = (("7+1 파견", re.compile(r"7\s*\+\s*1|파견\s*학생|학과\s*파견|우수\s*입학|국제\s*파견")),
+              ("교환학생", re.compile(r"교환")), ("자비유학생", re.compile(r"자비")), ("아너스 파견", re.compile(r"아너스")))
+# 「가는 곳」을 묻는 말만 본다 — 「가장 많이 한 일」「주말에 많이 가는 곳」「대학 순위」「인기 있는 음식」「한 반 인원」은 아니다
+RANK_RE = re.compile(r"(가장|제일|젤)\s*많이\s*(가|갔|간|다녀|보내|뽑|파견|선택|지원)"
+                     r"|많이\s*(간|가는|갔던|다녀온|파견된|보내는|뽑는)\s*(학교|대학|나라|국가|파견지)"
+                     r"|몇\s*명(이나|이|정도|쯤)?\s*(가|갔|간|다녀|뽑|보내|파견)"
+                     r"|(간|갔던|다녀온|가는|파견된)\s*(사람|학생|선배)\s*(수|인원|이\s*몇)|(파견|다녀온|간)\s*인원"
+                     r"|인기\s*(있는|많은)?\s*(학교|대학|파견지)|(학교|대학|파견지|어디)\S{0,2}\s*(제일|가장)?\s*인기"
+                     r"|(인원|인기|파견)\s*순위|인원\s*(많은|순)")
+# 학교가 아닌 곳을 묻는 말(「독일에서 제일 많이 간 여행지」 — has_topic에 없는 말)
+RANK_NOT_RE = re.compile(r"여행|관광|맛집|식당|음식|카페|마트|도시|동네|수업|과목|강의|동아리|축제|술집|가게|병원")
+# 학교 하나를 부른 질문은 인원만 묻는 말이어야 한다(「마르부르크에서 가장 많이 간 곳」은 그 학교 안 이야기)
+RANK_ONE_RE = re.compile(r"몇\s*명|인원|(사람|학생|선배)\s*(수|이\s*몇)")
+RANK_TOP = 3   # 문구에 말하는 학교 수(나머지는 「모두 n곳」으로)
+
+
+def kind_group(kind):
+    """학적의 해외경험 유형 → 묶음. 「파견학생」이 들어간 유형은 7+1 파견."""
+    return "7+1 파견" if "파견학생" in kind else kind
+
+
+def rank(question, programs, country, excluded=()):
+    """「독일 7+1 가장 많이 간 대학교?」「마르부르크 몇 명 갔어요?」 → 학적의 파견 인원을 세어 말하고 노트 카드(status "notes").
+    나라나 학교를 질문에서 알 수 없으면 None(전국 순위는 나라 이름을 놓쳤을 때 엉뚱한 답이 되므로 하지 않는다)."""
+    if not RANK_RE.search(question) or has_topic(question) or RANK_NOT_RE.search(question) \
+            or _field_of(question) == "현장실습":
+        return None
+    scope = [p for p in (COUNTRIES.get(country, []) if country else programs)
+             if PROGRAMS.get(p, {}).get("분야") == "국제교류" and p not in excluded]
+    if not scope or (len(scope) == 1 and not RANK_ONE_RE.search(question)):
+        return None
+    from collections import Counter
+    kinds = [k for k, rx in KIND_WORDS if rx.search(question)]
+    counts = {}
+    for school, kind in ABROAD:
+        k = kind_group(kind)
+        if school in scope and (not kinds or k in kinds):
+            counts.setdefault(school, Counter())[k] += 1
+    order = sorted(counts, key=lambda n: (-sum(counts[n].values()), -evidence_count(n), n))
+    kind_label = "·".join(kinds) if kinds else "교환·파견"
+    if country:
+        where = f"{country} {kind_label}"
+    elif len(scope) == 1:
+        where = f"{scope[0]} {kind_label}" if kinds else scope[0]
+    else:
+        where = kind_label
+
+    def num(n):   # 「6명(교환학생 4·7+1 파견 2)」 — 유형을 골라 물었거나 한 유형뿐이면 괄호 없음
+        c = counts[n]
+        part = "·".join(f"{k} {c[k]}" for k in KIND_ORDER if c[k]) if not kinds and len(c) > 1 else ""
+        return f"{sum(c.values())}명" + (f"({part})" if part else "")
+
+    def say(n):
+        return f"{n} {num(n)}"
+
+    if not order:
+        message = f"{where} 다녀온 선배는 아직 없어요."
+    elif len(scope) == 1:
+        message = f"{where} 다녀온 선배는 {num(order[0])}이에요."
+    elif len(order) == 1:
+        top = order
+        message = f"{where} 다녀온 선배는 {say(order[0])}이에요."
+    else:
+        total = lambda n: sum(counts[n].values())   # noqa: E731
+        top = order[:RANK_TOP]
+        while len(top) < min(len(order), MAX_NOTES) and total(order[len(top)]) == total(top[-1]):
+            top.append(order[len(top)])   # 3등과 같은 인원이면 함께 말한다(5곳까지)
+        message = (f"{where} 다녀온 선배는 {len(order)}곳 {sum(map(total, order))}명이에요. "
+                   f"많이 간 곳은 {' · '.join(say(n) for n in top)} 순이에요.")
+        missing = [n for n in top if not evidence_count(n)]
+        if missing:
+            message += f" {', '.join(missing)}{_josa('은는', missing[-1])} 아직 해봤노트가 없어요."
+    # 카드: 인원 많은 순, 노트 없는 학교는 빼고. 인원이 0명이면 그 나라 노트를 근거 많은 순으로
+    found = _notes(order or sorted(scope, key=evidence_count, reverse=True), country)
+    if not found:
+        return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "message": message,
+                "chips": [{"label": "해봤노트 둘러보기", "action": "notes",
+                           "payload": {"field": "국제교류", "exclude": list(excluded)}}]}
+    found["message"] = message + (" 많이 간 학교 노트부터 보여 드려요." if order and len(found["notes"]) > 1 else "")
     return found
 
 
