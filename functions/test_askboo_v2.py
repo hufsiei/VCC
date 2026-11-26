@@ -305,6 +305,38 @@ expect("「독일 인턴 언제」→ 독일 교환 노트를 쓰지 않음", re
 res, _ = run("마르부르크 언제 가는 게 좋아요?", [])
 expect("한 학교 시기 → 그 노트만", res["status"] == "notes" and [c["program"] for c in res["notes"]] == [PROGRAM], res.get("notes"))
 
+# [11/26] 인원·순위 질문 → 학적의 파견대학을 세어 답한다(AI 없음)
+res, calls = run("독일 7+1 갈 때 가장 많이 간 대학교는 어디야?", [])
+expect("「7+1 가장 많이 간」→ 파견학생 유형만 세어 인원 순", res["status"] == "notes" and calls == []
+       and res["message"].startswith("독일 7+1 파견 다녀온 선배는") and "마르부르크필립스대학교 3명" in res["message"], res.get("message"))
+expect("카드도 인원 많은 순", res["notes"][0]["program"] == PROGRAM, [c["program"] for c in res["notes"]])
+res, _ = run("독일에서 가장 많이 간 대학교는?", [])
+expect("유형을 안 말하면 모두 세고 유형별로 나눠 말함", "뷔르츠부르크 대학교 6명(교환학생 4·7+1 파견 2)" in res["message"]
+       and res["notes"][0]["program"] == "뷔르츠부르크 대학교", res.get("message"))
+expect("7+1 묶음: 학과·우수입학·국제 파견학생, 아너스 제외", askboo.kind_group("우수입학 파견학생") == "7+1 파견"
+       and askboo.kind_group("국제 파견학생") == "7+1 파견" and askboo.kind_group("아너스 파견") == "아너스 파견")
+res, _ = run("마르부르크 몇 명 갔어요?", [])
+expect("한 학교 인원", res["message"].startswith("마르부르크필립스대학교 다녀온 선배는 5명") and len(res["notes"]) == 1, res.get("message"))
+res, _ = run("뷔르츠부르크 말고 독일에서 제일 많이 간 곳", [])
+expect("「말고」로 뺀 학교는 세지 않음", "뷔르츠부르크" not in res["message"] and "뷔르츠부르크 대학교" not in [c["program"] for c in res["notes"]], res.get("message"))
+_saved = askboo.ABROAD
+askboo.ABROAD = _saved + [("본대학교", "교환학생")] * 9   # 본대학교를 1등으로 만들고 노트가 없다고 친다
+_ev = askboo.evidence_count
+askboo.evidence_count = lambda n: 0 if n == "본대학교" else _ev(n)
+res, _ = run("독일 교환학생 제일 많이 간 학교?", [])
+expect("노트 없는 학교는 인원만 말하고 카드에서 뺌", "본대학교 10명" in res["message"] and "본대학교는 아직 해봤노트가 없어요" in res["message"]
+       and "본대학교" not in [c["program"] for c in res["notes"]], res.get("message"))
+askboo.ABROAD, askboo.evidence_count = _saved, _ev
+res, calls = run("마르부르크 수업 한 반 인원 몇 명이에요?", [], plan=plan_q, answer=answer)
+expect("주제가 있는 「인원」(수업)은 인원 답이 아니라 경험 답", "질문정리" in [c[0] for c in calls])
+res, _ = run("독일 교환학생 선발 인원 몇 명이에요?", [])
+expect("「선발 인원」은 공식 안내", res["status"] == "official")
+hits = [q for q in ("마르부르크에서 가장 많이 한 일은?", "마르부르크 학생들이 주말에 많이 가는 곳", "마르부르크 대학 순위 어때요?",
+                    "독일에서 제일 많이 간 여행지", "마르부르크에서 어디가 제일 인기 있는 맛집이에요?", "마르부르크에서 제일 많이 간 곳",
+                    "독일 파견 순서가 어떻게 돼요?", "마르부르크 한국인 몇 명 있어요?")
+        if askboo.rank(q, *(lambda c: (c[1] or askboo.match_programs(q), c[0]))(askboo.match_country(q)))]
+expect("학교 인원이 아닌 「많이·인기·순위」는 인원 답을 하지 않음", hits == [], hits)
+
 # 걸리면 안 되는 것
 res, calls = run("교환학생 선발 기준이 뭐예요?", H_EX)
 expect("「선발 기준」은 후속이 아니라 공식 안내", res["status"] == "official", res.get("status"))
