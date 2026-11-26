@@ -12,7 +12,7 @@ import store
 store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"
 
 import interview
-from runtime_fns import add_question, find_my_note, getMyNote, saveConsent, updateMyNote
+from runtime_fns import add_question, find_my_note, getMyNote, save_my_note, saveConsent, updateMyNote
 
 PROGRAM = "마르부르크필립스대학교"
 SENIOR, JUNIOR = "H0469", "H0143"
@@ -60,7 +60,7 @@ first = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": []})
 expect("첫 인터뷰엔 resumed 없음", "resumed" not in first and first.get("questionId") == q1)
 answers1, steps1 = run([])
 asked1 = [s["question"] for s in steps1 if not s.get("done")]
-depth = [q for _, q, _ in interview.depth_questions(PROGRAM, interview.sections_of(PROGRAM))]
+depth = [q for _, _, q, _ in interview.depth_questions(PROGRAM, interview.sections_of(PROGRAM))]
 expect("첫 인터뷰에서 깊이 질문 3개를 다 물음", all(q in asked1 for q in depth))
 
 # 깊이 질문 하나는 아직 안 한 것으로 만들기 위해 첫 요약은 앞의 세 답만(후배 질문 + 깊이 2)
@@ -126,6 +126,73 @@ other = "H0745"
 d4 = interview.summarizeInterview(other, {"program": PROGRAM, "transcript": answers1[:1], "append": True})
 expect("노트 없는 append = 새 노트, 문장 전부 new", d4["saved"] and all(
     ln.get("new") for s in d4["publicDraft"]["sections"] for ln in s["lines"]))
+
+# 7) [작업 108] 깊이 질문은 번호로 「물었음」을 남기고 번호로 대조한다 — 비교과(한 인터뷰 2개, 모두 3개)
+# 11/26 미리 폰 시험(H0019, 대동제 이벤트 Guardians): 문구가 바뀌자 같은 질문을 또 묻고, 세 번째 질문은 안 나왔다.
+EXTRA = "교육혁신원 대동제 이벤트 Guardians(퀴즈 고득점을 위한 자료 업로드!)"
+OLD_Q1 = "신청할 때 기대한 것과 실제로 얻은 게 같았나요?"   # 비교과-1의 바뀌기 전 문구(작업 93, b2867b0)
+ALL3 = [d[0] for d in interview.DEPTH_QUESTIONS["비교과"]]
+NOTE = {"sections": [{"name": "활동내용", "lines": [{"text": "활동을 했다."}]},
+                     {"name": "배운점", "lines": [{"text": "많이 배웠다."}]}]}
+
+
+def run_as(me, program):
+    answers, steps = [], []
+    while True:
+        s = interview.interviewNext(me, {"program": program, "answers": answers})
+        steps.append(s)
+        if s.get("done") or len(steps) > 20:
+            return answers, steps
+        answers = answers + [{"section": s["section"], "question": s["question"],
+                              "answer": f"{s['section']} 칸 이야기를 자세히 들려줄게요."}]
+
+
+def depth_ids(steps):
+    return [interview.depth_id(s["question"]) for s in steps if s.get("depth")]
+
+
+expect("깊이 질문 번호는 겹치지 않음", len(interview.DEPTH_BY_ID) == sum(len(v) for v in interview.DEPTH_QUESTIONS.values()))
+expect("바뀌기 전 문구도 그 질문의 번호로", interview.depth_id(OLD_Q1) == "비교과-1"
+       and interview.depth_id("기대와 비교해 실제로 얻은 건 뭐였어요?") == "비교과-1")
+expect("깊이 질문이 아닌 글은 번호 없음", interview.depth_id(interview.base_question(EXTRA, "배운점")) is None
+       and interview.depth_id("") is None and interview.depth_id(None) is None)
+expect("{p}가 든 질문은 이름이 달라도 같은 번호", interview.depth_id(
+    "후배들이 마르부르크에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?") == "교환-3"
+       == interview.depth_id("후배들이 마르부르크필립스대학교에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?"))
+
+ME = "H0019"
+ans_a, steps_a = run_as(ME, EXTRA)
+first2 = depth_ids(steps_a)
+expect("비교과 첫 방문: 깊이 질문 2개(한 인터뷰에 묻는 수 그대로)", len(first2) == 2 and None not in first2)
+# 첫 방문 순서는 그대로(main과 같음): 빈 칸 기본 질문(활동내용) → 깊이 질문 2개(배운점 칸에 담겨 배운점 질문은 따로 없음) → done
+expect("첫 방문 순서: 빈 칸 기본 질문 → 깊이 질문 2개 → done",
+       [("깊이" if s.get("depth") else s.get("section")) for s in steps_a[:-1]] == ["활동내용", "깊이", "깊이"]
+       and steps_a[0]["question"] == interview.base_question(EXTRA, "활동내용") and steps_a[-1].get("done") is True)
+interview.summarizeInterview(ME, {"program": EXTRA, "transcript": ans_a})
+_, rec_a = find_my_note(ME, EXTRA)
+expect("요약하면 물은 깊이 질문 번호를 저장(askedDepth)", rec_a.get("askedDepth") == first2)
+ans_b, steps_b = run_as(ME, EXTRA)
+expect("앞 2개를 물은 뒤 방문하면 세 번째 질문이 나옴", depth_ids(steps_b) == [i for i in ALL3 if i not in first2]
+       and steps_b[-1].get("done") is True)
+interview.summarizeInterview(ME, {"program": EXTRA, "transcript": ans_b, "append": True})
+_, rec_b = find_my_note(ME, EXTRA)
+expect("append 요약: askedDepth 합침", sorted(rec_b["askedDepth"]) == sorted(ALL3))
+_, steps_c = run_as(ME, EXTRA)
+expect("다 물었으면 done", len(steps_c) == 1 and steps_c[0].get("done") is True)
+
+# 옛 기록(번호 없이 글만): M-0003처럼 옛 문구·새 문구가 둘 다 asked에 있어도 같은 질문으로 보고 세 번째만 묻는다
+q2 = interview.DEPTH_BY_ID["비교과-2"][2]
+save_my_note("H0020", EXTRA, "D-old", NOTE, NOTE, asked=[OLD_Q1, q2, interview.DEPTH_BY_ID["비교과-1"][2]])
+_, steps_old = run_as("H0020", EXTRA)
+expect("문구가 바뀐 뒤에도 다시 묻지 않음(옛 기록 asked 글)", depth_ids(steps_old) == ["비교과-3"])
+save_my_note("H0021", EXTRA, "D-old2", NOTE, NOTE, asked=[OLD_Q1])
+_, steps_old2 = run_as("H0021", EXTRA)
+expect("옛 문구 하나만 물었으면 나머지 둘을 물음", sorted(depth_ids(steps_old2)) == ["비교과-2", "비교과-3"])
+
+# 번호로 남긴 기록은 글이 어떻게 바뀌었든 번호로 본다(지금 문구와 다른 글만 있어도)
+save_my_note("H0022", EXTRA, "D-id", NOTE, NOTE, asked=["앞으로 바뀔지 모르는 문구"], asked_depth=["비교과-1", "비교과-3"])
+_, steps_id = run_as("H0022", EXTRA)
+expect("문구가 바뀐 뒤에도 다시 묻지 않음(askedDepth 번호)", depth_ids(steps_id) == ["비교과-2"])
 
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)
