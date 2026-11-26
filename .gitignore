@@ -6,3 +6,4 @@ functions/logs/
 data/runtime/
 docs/hub-data.json
 .claude/settings.local.json
+.playwright-mcp/

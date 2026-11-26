@@ -26,6 +26,28 @@ import store
 
 store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"     # 실제 data/runtime을 건드리지 않는다
 
+# AI 차단: callAI와 그 아래 호출(CLOVA·Claude)을 모두 막는다. 어디서든 불리면 세고(AI_CALLS), 요금 나가는 호출은 하지 않는다.
+# 서버 코드는 `from ai import callAI`로 이름을 복사해 가므로 callAI만 바꾸면 빠진다 → 맨 아래 call_hcx·call_claude도 막는다.
+import ai
+AI_CALLS = []
+
+
+def _blocked_call_ai(작업명, *a, **k):
+    AI_CALLS.append(작업명)
+    return {"ok": False, "text": "", "json": None, "model": "점검", "error": "점검 중 AI 차단"}
+
+
+def _blocked_leaf(*a, **k):
+    AI_CALLS.append("(하위 호출)")
+    raise RuntimeError("점검 중 AI 차단")
+
+
+ai.callAI = _blocked_call_ai
+ai.call_hcx = _blocked_leaf
+ai.call_claude = _blocked_leaf
+AI_LOG = paths.LOGS / "ai-calls.jsonl"
+AI_LOG_BEFORE = AI_LOG.read_text(encoding="utf-8").count("\n") if AI_LOG.exists() else 0
+
 ROOT = paths.ROOT
 results = []   # (번호, 항목, 상태, 설명)
 
@@ -111,6 +133,19 @@ def check_access_and_tokens():
                  ("로그아웃한 토큰", (call(base, "logout", {}, senior), call(base, "getMessages", {}, senior))[1])]
         bad = [n for n, r in tries if r.get("error") != "로그인이 필요해요"]
         add(6, "토큰 없이·임의 헤더로 요청 → 거절", not bad, "4가지 모두 「로그인이 필요해요」" if not bad else "통과됨: " + ", ".join(bad))
+
+        # 새 함수 대조: ROUTES에 있는 함수를 전부 토큰 없이 불러 거절되는지 본다. 나중에 함수가 늘어도 자동으로 들어온다
+        # (로그인 없이 부를 수 있는 함수는 local_fn.NEEDS_NO_LOGIN에 적힌 것만 빼 준다)
+        import local_fn
+        open_ok = [n for n in local_fn.ROUTES if n not in local_fn.NEEDS_NO_LOGIN
+                   and call(base, n, {}).get("error") != "로그인이 필요해요"]
+        add(6, f"ROUTES 전 함수({len(local_fn.ROUTES)}개) 토큰 없이 → 거절", not open_ok,
+            f"로그인 없이 열린 것 {sorted(local_fn.NEEDS_NO_LOGIN)} 외 모두 거절" if not open_ok else "열려 있음: " + ", ".join(open_ok))
+        # 관리자 함수는 학생 토큰으로도 거절돼야 한다(콘솔 함수가 학생에게 열리면 집계·리포트가 샌다). 거절 모양은 error 칸
+        import admin
+        open_adm = [n for n in admin.ROUTES if "error" not in call(base, n, {}, junior)]
+        add(1, f"관리자 함수({len(admin.ROUTES)}개) 학생 토큰 → 거절", not open_adm,
+            "모두 거절" if not open_adm else "학생에게 열림: " + ", ".join(open_adm))
     finally:
         srv.shutdown()
 
@@ -192,7 +227,8 @@ def check_secrets():
     from mask import find
     log = paths.LOGS / "ai-calls.jsonl"
     rows = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines() if l.strip()] if log.exists() else []
-    allowed = {"at", "작업", "모델", "입력토큰", "출력토큰", "ms", "ok", "error"}
+    # 캐시쓰기·캐시읽기토큰은 Claude 호출의 토큰 수(숫자)다. 글 내용 칸이 아니니 허용(11/26 A안 캐시)
+    allowed = {"at", "작업", "모델", "입력토큰", "출력토큰", "캐시쓰기토큰", "캐시읽기토큰", "ms", "ok", "error"}
     extra = sorted({k for r in rows for k in r} - allowed)
     pii = sum(1 for r in rows for v in r.values() if isinstance(v, str) and find(v))
     add(4, "AI 호출 로그에 글 내용·연락처 없음", not extra and not pii,
@@ -207,6 +243,28 @@ def check_secrets():
             ids += len(re.findall(r"(?<!\d)20\d{7}(?!\d)", t))
             mails |= set(re.findall(r"[\w.+-]+@[\w-]+\.[\w.]+", t))
     real = sorted(m for m in mails if not m.endswith(("example.com", "example.org", "users.noreply.github.com")))
+    # 금지 열: 시트에만 두는 이름·성별·나이(CLAUDE.md). JSON은 모든 키를, CSV는 머리 줄을 본다. 비번 이름도 data/에 없어야 한다
+    banned = {"studt_na_kr", "sex", "나이(만)", "VCC_LOGIN_PW"}
+    found = set()
+
+    def walk(o):
+        if isinstance(o, dict):
+            found.update(banned & set(o))
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    for f in data.glob("*.*"):
+        try:
+            if f.suffix == ".json":
+                walk(json.loads(f.read_text(encoding="utf-8")))
+            elif f.suffix == ".csv":
+                head = f.read_text(encoding="utf-8-sig").splitlines()[0].split(",")
+                found.update(banned & {h.strip().strip('"') for h in head})
+        except (ValueError, IndexError, OSError):
+            continue
+    add(5, "data/에 금지 열(studt_na_kr·sex·나이(만)) 없음", not found, "0건" if not found else "발견: " + ", ".join(sorted(found)))
     add(5, "data/에 실제 학번 모양 없음", ids == 0, "0건" if ids == 0 else f"{ids}건")
     add(5, "data/의 메일은 가상 주소만", not real, f"{len(mails)}개 모두 example 주소" if not real else "확인: " + ", ".join(real[:5]))
 
@@ -239,6 +297,16 @@ def main():
             step()
         except Exception as e:   # 한 항목이 깨져도 나머지는 본다
             add(0, step.__name__, False, f"점검 중 오류: {type(e).__name__}: {e}")
+    # 서버 흐름이 AI를 부르려 한 것(예: sendMessage의 쪽지검사)은 위 가짜 callAI가 막아 실제 호출·요금은 0이다.
+    # 막힌 시도는 알려 주기만 한다. 실패는 하위 호출(CLOVA·Claude)까지 닿은 경우 = 차단이 뚫린 경우.
+    # ai-calls.jsonl 줄 수는 다른 창이 AI를 돌리면 함께 늘어 증거가 못 되니 참고로만 적는다.
+    after = AI_LOG.read_text(encoding="utf-8").count("\n") if AI_LOG.exists() else 0
+    leaked = [c for c in AI_CALLS if c == "(하위 호출)"]
+    tried = sorted({c for c in AI_CALLS if c != "(하위 호출)"})
+    add(0, "점검 중 AI 실제 호출 0건", not leaked,
+        f"실제 호출 0건 · 막은 시도 {len(AI_CALLS)}건" + (f"({', '.join(tried)})" if tried else "")
+        + f" · 참고: ai-calls.jsonl +{after - AI_LOG_BEFORE}줄(다른 창 호출 포함)" if not leaked
+        else f"차단이 뚫려 AI 하위 호출 {len(leaked)}건 — 점검 중단하고 키 사용량 확인")
     print("보안 점검표 (PRD 9-4)\n")
     for no, item, state, detail in sorted(results, key=lambda r: r[0]):
         print(f"{state:6} {no} {item} — {detail}")
