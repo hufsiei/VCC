@@ -33,7 +33,7 @@ python functions/serve_screens.py
 
 파일을 더블클릭해 열면 동작하지 않습니다. 반드시 위 서버로 `localhost:8000`에서 엽니다.
 `python -m http.server 8000`은 쓰지 않습니다(11/24). 저장소 전체를 같은 와이파이의 다른 기기에도 열어 `.env`(키)·`functions/logs`·`data/runtime`이 주소로 보입니다. `serve_screens.py`는 이 PC(127.0.0.1)에서만 열리고 `screens/`·`common/`·`assets/`·`data/`(runtime 제외)만 보여 줍니다. 포트를 바꾸려면 끝에 번호(`… serve_screens.py 8001`).
-기본은 mock 데이터(`common/mock-data.json`)로 동작합니다(`common/data.js`의 `USE_MOCK`).
+localhost의 기본은 mock 데이터(`common/mock-data.json`)입니다(`common/data.js`의 `USE_MOCK`). 공개 주소는 서버가 기본이고 `?server=mock`으로 mock을 봅니다. 서버의 물어보기는 A안(`VCC_ASK_FULL=1`, 켜짐 — 끄는 법은 [운영노트](docs/운영노트.md) 5장 「배포」)입니다.
 함수마다 따로 서버로 보내려면 `data.js`의 `SERVER_FNS`(또는 되돌릴 때 `MOCK_FNS`)에 함수 이름을 적습니다.
 코드를 고치지 않고 확인할 때는 localhost에서 주소 끝에 `?server=all` 또는 `?server=sendMessage,getMessages`를 붙입니다. 그 탭에서만 기억하고(두 창 시연), `?server=`로 해제합니다. 서버로 가는 함수가 하나라도 있으면 로그인도 서버로 가므로 다시 로그인합니다. 로컬 서버(`functions/local_fn.py`)는 미리가 서버 코드를 고칠 때 쓰는 개발용입니다(AI 키는 미리 PC에만, 11/25). 다른 PC에서는 AI 함수가 실패하니 AI가 드는 흐름은 공개 주소로 확인합니다(아래 「실서버 시험」).
 
