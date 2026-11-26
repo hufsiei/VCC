@@ -437,8 +437,10 @@ function lineCard(line, src, { quote = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// 5-1. 칸별 요약 문단(작업 78, spec getNote [v2] summary·[11/23] newLines)
-//   소제목 → 요약 문단(문장 끝 출처 연도 + official이면 「개인 경험」) → 「새로 더해진 선배 이야기 N건」.
+// 5-1. 칸별 요약(작업 78, spec getNote [v2] summary·[11/23] newLines·[11/26 칸유형])
+//   소제목 → (비용 칸 stats 한 줄 + 분포 띠) → 요약 개조식(문장마다 한 줄 + 출처 연도 + 「보고서 N건」, official이면 「개인 경험」)
+//   → 「새로 더해진 선배 이야기 N건」. 생활·지원 칸은 summary[].topic이 있으면 소주제 라벨로 묶는다.
+//   [11/26 #321] 한 문단으로 이어 쓰던 것을 개조식으로 바꿈(국제처 피드백 「그래서 얼마인거지?」).
 //   [11/25 #266] 「원문 N건 보기」 접기는 없앴다 — 근거는 요약 문장 끝 출처, 신고는 요약 문장에(5-2 신고 풍선).
 //   summary가 없으면 이 부분을 안 쓰고 원문 목록 그대로. 배운점은 서버가 summary를 보내지 않는다.
 // ---------------------------------------------------------------------------
@@ -474,17 +476,93 @@ function summarySourceText(item, sources, reportName) {
     .join(" · ");
 }
 
-function summaryParagraph(section, sources, reportName) {
-  const parts = [];
-  section.summary.forEach((item, i) => {
-    if (i) parts.push(" ");
-    parts.push(summarySentence(item));
-    const from = summarySourceText(item, sources, reportName);
-    if (from) parts.push(" ", el("span", { className: "summary__from", text: from }));
-    // 규정에 닿는 요약 문장(official) — 칸 문장과 같은 중립 라벨 「개인 경험」(디자인 규칙 8-1)
-    if (item.official) parts.push(" ", statusLabel("neutral", "user", "개인 경험"));
-  });
-  return el("p", { className: "summary__text" }, parts);
+// [11/26 칸유형] 생활 칸 소주제 순서(디자인 규칙 1-2, 민지 결정 5종). 다른 칸은 처음 나온 순서
+const TOPIC_ORDER = { 생활: ["주거", "교통", "음식", "행정", "사람"] };
+
+// 요약 문장 한 줄: 문장 + (출처 연도 · 「보고서 N건」 · 「개인 경험」)
+function summaryItem(item, sources, reportName) {
+  const from = summarySourceText(item, sources, reportName);
+  const count = (item.sources || []).length;
+  return el("li", { className: "summary__item" }, [
+    summarySentence(item),
+    el("span", { className: "summary__meta" }, [
+      from ? el("span", { className: "summary__from", text: from }) : null,
+      // 이 문장을 받치는 원문 수(sources.length) — 코드 집계라 AI 표시색이 아닌 중립색
+      count ? el("span", { className: "summary__count", text: `${reportName} ${count}건` }) : null,
+      // 규정에 닿는 요약 문장(official) — 칸 문장과 같은 중립 라벨 「개인 경험」(디자인 규칙 8-1)
+      item.official ? statusLabel("neutral", "user", "개인 경험") : null,
+    ]),
+  ]);
+}
+
+// 요약 개조식. topic이 하나라도 있으면 소주제별로 묶고, topic 없는 문장은 라벨 없이 맨 뒤
+function summaryList(section, sources, reportName) {
+  const items = section.summary;
+  const list = (arr, extra = "") => el("ul", { className: `summary__list${extra}` }, arr.map((it) => summaryItem(it, sources, reportName)));
+  const topicOf = (it) => (typeof it.topic === "string" && it.topic.trim() ? it.topic.trim() : null);
+  if (!items.some(topicOf)) return [list(items)];
+
+  const order = TOPIC_ORDER[section.name] || [];
+  const groups = new Map();
+  for (const it of items) {
+    const t = topicOf(it);
+    if (!t) continue;
+    if (!groups.has(t)) groups.set(t, []);
+    groups.get(t).push(it);
+  }
+  const rank = (t) => (order.includes(t) ? order.indexOf(t) : order.length);
+  const names = [...groups.keys()].sort((a, b) => rank(a) - rank(b)); // 정렬은 안정적이라 목록 밖 라벨은 처음 나온 순서
+  const out = names.map((t) =>
+    el("div", { className: "summary__group" }, [el("h4", { className: "summary__topic", text: t }), list(groups.get(t))]));
+  const rest = items.filter((it) => !topicOf(it));
+  if (rest.length) out.push(list(rest, " summary__list--rest"));
+  return out;
+}
+
+// [11/26 칸유형] 비용 칸 stats {min, max, median, n, years}(만 원, 코드 집계). 값이 이상하면 null → 표시 안 함
+function validStats(stats) {
+  if (!stats || typeof stats !== "object") return null;
+  const { min, max, median, n } = stats;
+  const nums = [min, max, median, n].map(Number);
+  if (!nums.every(Number.isFinite) || nums[3] < 1 || nums[0] > nums[1] || nums[2] < nums[0] || nums[2] > nums[1]) return null;
+  const years = (Array.isArray(stats.years) ? stats.years : []).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+  const values = (Array.isArray(stats.values) ? stats.values : []).map(Number).filter((v) => Number.isFinite(v) && v >= nums[0] && v <= nums[1]);
+  return { min: nums[0], max: nums[1], median: nums[2], n: nums[3], years, values };
+}
+
+const manwon = (v) => `${Math.round(v).toLocaleString("ko-KR")}만 원`;
+
+// 비용 한 줄 + 분포 띠(SVG, createElementNS — innerHTML 금지). AI가 만든 것이 아니므로 중립색만
+function statsBlock(stats, reportName) {
+  const range = stats.min === stats.max ? manwon(stats.min) : `${manwon(stats.min)} ~ ${manwon(stats.max)}`;
+  const years = stats.years.length ? ` · ${[...new Set([stats.years[0], stats.years[stats.years.length - 1]])].join("–")}` : "";
+  const line = el("p", { className: "stats__line" }, [
+    el("span", { className: "stats__range num", text: `한 달 ${range}` }),
+    el("span", { className: "stats__sub", text: `가운데 ${manwon(stats.median)} · ${reportName} ${stats.n}건${years}` }),
+  ]);
+
+  const NS = "http://www.w3.org/2000/svg";
+  const svgEl = (tag, attrs) => {
+    const node = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+    return node;
+  };
+  // 가로로 늘어나도(preserveAspectRatio none) 점·선 굵기는 그대로(CSS vector-effect), 점은 길이 0인 둥근 선
+  const W = 300, H = 28, PAD = 8, Y = 14;
+  const x = (v) => (stats.max === stats.min ? W / 2 : PAD + ((v - stats.min) / (stats.max - stats.min)) * (W - PAD * 2));
+  const svg = svgEl("svg", { class: "stats__strip", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", role: "img",
+    "aria-label": `한 달 비용 ${range}, 가운데 ${manwon(stats.median)}, ${reportName} ${stats.n}건` });
+  svg.append(svgEl("line", { class: "stats__axis", x1: PAD, y1: Y, x2: W - PAD, y2: Y }));
+  // 보고서별 금액(values)이 오면 점으로, 없으면 최소·최대 눈금만
+  if (stats.values.length) stats.values.forEach((v) => svg.append(svgEl("line", { class: "stats__dot", x1: x(v), y1: Y, x2: x(v), y2: Y })));
+  else [stats.min, stats.max].forEach((v) => svg.append(svgEl("line", { class: "stats__tick", x1: x(v), y1: Y - 6, x2: x(v), y2: Y + 6 })));
+  svg.append(svgEl("line", { class: "stats__median", x1: x(stats.median), y1: Y - 9, x2: x(stats.median), y2: Y + 9 }));
+
+  return el("div", { className: "stats" }, [
+    line,
+    svg,
+    el("p", { className: "stats__ends num" }, [el("span", { text: manwon(stats.min) }), el("span", { text: manwon(stats.max) })]),
+  ]);
 }
 
 // 요약 문장 하나. lineId(「S-…」)가 있으면 신고할 수 있다 — 선택하면 풍선(5-2), 키보드는 Tab → Enter
@@ -506,10 +584,12 @@ function summaryBlock(section, sources, reportName) {
   const lines = section.lines || [];
   const fresh = newLineCount(section);
   const added = lines.slice(lines.length - fresh);
+  const stats = validStats(section.stats);
   const out = [
     el("div", { className: "summary" }, [
       el("h3", { className: "summary__title", text: section.name }),
-      summaryParagraph(section, sources, reportName),
+      stats ? statsBlock(stats, reportName) : null,
+      ...summaryList(section, sources, reportName),
       el("p", { className: "summary__hint" }, [icon("flag"), el("span", { text: "틀린 문장은 길게 누르거나 드래그해서 신고할 수 있어요" })]),
     ]),
   ];
