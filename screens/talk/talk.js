@@ -385,7 +385,7 @@ const MAX_ASK_LOG = 60; // 궁금한 것 정리하기 말풍선(한 번에 20개
 
 addTo(askChat, booText("궁금한 경험을 물어보세요. 선배들의 보고서와 인터뷰를 근거로 답해 드려요. 근거가 없으면 지어내지 않고 질문함에 담아 둘게요."));
 
-// withHistory: false면 앞 대화 없이 묻는다(chat 칩 「질문함에 담기」 — 브리프 4-②)
+// withHistory: false면 앞 대화 없이 묻는다. 「질문함에 담기」 칩도 앞 대화를 보낸다 — 서버가 담을 질문의 프로그램을 정하는 데만 쓴다(#327)
 // force: "hold" = chat 칩 「질문함에 담기」 — 답을 찾지 않고 바로 질문함에 담는다(spec 4장 askBoo force, PR #179)
 async function sendQuestion(question, { withHistory = true, force } = {}) {
   ask.busy = true;
@@ -590,7 +590,7 @@ function chatChips(chips) {
       } else {
         // save: 질문함에 담기 — 답을 찾지 않고 hold로(spec 4장 chat 칩 save)
         const question = typeof payload.question === "string" && payload.question.trim() ? payload.question.trim() : "";
-        if (question) sendQuestion(question, { withHistory: false, force: "hold" });
+        if (question) sendQuestion(question, { force: "hold" });
         else for (const b of row.querySelectorAll("button")) b.disabled = false;
       }
     });
