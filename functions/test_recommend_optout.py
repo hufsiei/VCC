@@ -13,12 +13,25 @@ import notes
 import runtime_fns as rf
 rf._call_ai = lambda *a, **k: {"ok": True, "json": {"ok": True}}   # 시험은 실제 AI를 부르지 않는다(쪽지검사 연결, 작업 27)
 from account import getMe
-from runtime_fns import recommendSeniors, respondRequest, sendMessage, setRecommendable
+from runtime_fns import respondRequest, setRecommendable
 
 JUNIOR, OTHER, SENIOR1 = "H0143", "H0102", "H0469"   # SENIOR1 = 시연 선배1(마르부르크 경험)
 NOTE = notes.note_id("마르부르크필립스대학교")
 HELLO = "안녕하세요, 마르부르크 파견 준비가 궁금해서 쪽지 드려요."
 fails = []
+
+
+# [작업 38 D-1] 응답의 상대 값은 학번이 아니라 불투명 값(peer_ref). 이 시험은 학번으로 쓰고, 서버에는 화면처럼
+# 불투명 값으로 보내고 받은 값은 학번으로 되돌려 본다. 불투명 값 자체는 test_messages.py 9절.
+def sendMessage(me, p):
+    return rf.sendMessage(me, {**p, "to": rf.peer_ref(me, p["to"])})
+
+
+def recommendSeniors(me, p):
+    r = rf.recommendSeniors(me, p)
+    for x in r.get("seniors", []):
+        x["studentId"] = rf.resolve_peer(me, x["studentId"])
+    return r
 
 
 def expect(name, cond):

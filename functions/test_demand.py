@@ -127,7 +127,7 @@ expect("두 번째부터 unlocked False", s2.get("ok") and s2["unlocked"] is Fal
 # 열린 뒤: 추천·쪽지
 rec = rf.recommendSeniors(JUNIOR, {"noteId": "N-marburg"})
 expect("열리면 추천 3명", rec.get("shown") == 3)
-send = rf.sendMessage(JUNIOR, {"to": SENIOR1, "text": "마르부르크 학점 인정이 궁금해서 쪽지 드려요."})
+send = rf.sendMessage(JUNIOR, {"to": rf.peer_ref(JUNIOR, SENIOR1), "text": "마르부르크 학점 인정이 궁금해서 쪽지 드려요."})
 info = next(t for t in rf.getMessages(SENIOR1, {})["threads"] if t["threadId"] == send["threadId"])["askerInfo"]
 expect("선배가 보는 관심 = 「교환학생·독일」, 시기, 학과·상황 원문 없음",
        info["관심"][0] == "교환학생·독일" and info["시기"] == "다음 학기" and "crs_nm" not in info

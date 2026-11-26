@@ -12,7 +12,7 @@ import store
 store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"
 
 import runtime_fns as rf
-from runtime_fns import getInbox, getMessages, recommendSeniors, respondRequest, sendMessage
+from runtime_fns import getInbox, respondRequest
 rf._call_ai = lambda *a, **k: {"ok": True, "json": {"ok": True}}   # 시험은 실제 AI를 부르지 않는다(쪽지검사 연결, 작업 27)
 
 JUNIOR, SENIOR1, SENIOR2 = "H0143", "H0469", "H0241"
@@ -24,6 +24,26 @@ fails = []
 # 시계: 테스트가 날짜를 옮길 수 있게 runtime_fns.now를 바꾼다
 clock = [datetime(2026, 11, 21, 10, 0, tzinfo=rf.KST)]
 rf.now = lambda: clock[0].isoformat(timespec="seconds")
+
+
+# [작업 38 D-1] 응답의 상대 값은 학번이 아니라 불투명 값(peer_ref). 이 시험은 학번으로 쓰고, 서버에는 화면처럼
+# 불투명 값으로 보내고 받은 값은 학번으로 되돌려 본다. 불투명 값 자체는 test_messages.py 9절.
+def sendMessage(me, p):
+    return rf.sendMessage(me, {**p, "to": rf.peer_ref(me, p["to"])})
+
+
+def recommendSeniors(me, p):
+    r = rf.recommendSeniors(me, p)
+    for x in r.get("seniors", []):
+        x["studentId"] = rf.resolve_peer(me, x["studentId"])
+    return r
+
+
+def getMessages(me, p):
+    r = rf.getMessages(me, p)
+    for t in r["threads"]:
+        t["withId"] = rf.resolve_peer(me, t["withId"])
+    return r
 
 
 def later(days):
@@ -48,7 +68,7 @@ def unlock(*ids):
 # ── 0. [11/22] 경험 나눔·수요 제공 전에는 추천·새 쪽지 요청이 잠김 ──────────
 r = recommendSeniors(JUNIOR, {"noteId": MARBURG})
 expect("잠김: 추천 목록 없이 locked + 안내", r.get("locked") is True and "seniors" not in r and r["recommend"]["ready"] is False)
-expect("잠김: 닉네임 미리보기도 막힘", rf.previewNickname(JUNIOR, {"to": SENIOR1}).get("locked") is True)
+expect("잠김: 닉네임 미리보기도 막힘", rf.previewNickname(JUNIOR, {"to": rf.peer_ref(JUNIOR, SENIOR1)}).get("locked") is True)
 s = sendMessage(JUNIOR, {"to": SENIOR1, "text": HELLO})
 expect("잠김: 새 쪽지 요청은 reason 잠김", s.get("ok") is False and s.get("reason") == "잠김")
 unlock(JUNIOR)
@@ -183,6 +203,53 @@ expect("수락된 대화는 만료되지 않음", thread(JUNIOR, tid1)["status"]
 store.load("messages", {})["T-old"] = {"asker": "H0010", "senior": SENIOR1, "askerNickname": "조용한 고래",
                                         "status": "requested", "createdAt": rf.now(), "messages": [], "lastRead": {}}
 expect("옛 requested는 waiting으로 읽음", thread(SENIOR1, "T-old")["status"] == "waiting")
+
+# ── 9. [작업 38 D-1] 상대 학번 대신 불투명 값 ─────────────────────────────
+import json
+import re
+COLREG = re.compile(r"\bH\d{4}\b|\bstaff\d+\b")      # colreg_no 모양(가상학생 H0001~, 직원 staff01~)
+raw_rec = rf.recommendSeniors(JUNIOR, {"noteId": MARBURG})
+raw_msg = rf.getMessages(JUNIOR, {})
+ref1 = rf.peer_ref(JUNIOR, SENIOR1)
+card = next((x for x in raw_rec["seniors"] if x["studentId"] == ref1), None)
+conv = next((t for t in raw_msg["threads"] if t["threadId"] == tid1), None)
+expect("같은 선배: recommendSeniors.studentId == getMessages.withId", card is not None and conv is not None
+       and card["studentId"] == conv["withId"])
+expect("불투명 값은 'p' + 16자리, 학번 모양 아님", all(re.fullmatch(r"p[0-9a-f]{16}", x["studentId"]) for x in raw_rec["seniors"]))
+expect("다시 불러도 같은 값", rf.recommendSeniors(JUNIOR, {"noteId": MARBURG})["seniors"][0]["studentId"]
+       == raw_rec["seniors"][0]["studentId"])
+expect("보는 사람마다 다른 값", rf.peer_ref(JUNIOR, SENIOR1) != rf.peer_ref("H0010", SENIOR1))
+sen = next(t for t in rf.getMessages(SENIOR1, {})["threads"] if t["threadId"] == tid1)
+expect("선배 쪽 withId(보낸 후배)도 불투명 값이고 되풀림", not COLREG.search(sen["withId"])
+       and rf.resolve_peer(SENIOR1, sen["withId"]) == JUNIOR)
+expect("선배가 받은 withId로 답장(수락된 대화)", rf.sendMessage(SENIOR1, {"to": sen["withId"], "text": "또 물어보세요."})["ok"])
+n_before = len(rf._threads())
+for label, to in [("학번 그대로", SENIOR1), ("남(H0010)에게 나간 값", rf.peer_ref("H0010", SENIOR1)),
+                  ("엉터리 값", "p0123456789abcdef"), ("빈 값", ""), ("숫자", 12345)]:
+    r = rf.sendMessage(JUNIOR, {"to": to, "text": HELLO})
+    expect(f"sendMessage {label} → 거절", "error" in r and not r.get("ok"))
+    expect(f"previewNickname {label} → 거절", "error" in rf.previewNickname(JUNIOR, {"to": to}))
+expect("거절된 값으로 대화가 생기지 않음", len(rf._threads()) == n_before)
+expect("내 값(peer_ref(나, 나))으로는 나에게 못 보냄",
+       "error" in rf.sendMessage(JUNIOR, {"to": rf.peer_ref(JUNIOR, JUNIOR), "text": HELLO}))
+pv = rf.previewNickname(JUNIOR, {"to": raw_rec["seniors"][-1]["studentId"]})
+expect("previewNickname은 카드의 studentId로 동작", "myNickname" in pv)
+seen = []
+for who in (JUNIOR, SENIOR1, SENIOR2, others[0]):
+    seen += [rf.getMessages(who, {}), getInbox(who, {}), rf.recommendSeniors(who, {"noteId": MARBURG})]
+seen += [rf.sendMessage(JUNIOR, {"to": ref1, "text": "감사합니다!"}), pv]
+leak = sorted({m for x in seen for m in COLREG.findall(json.dumps(x, ensure_ascii=False))})
+expect(f"응답 전체에 colreg_no 모양 없음{' ' + str(leak[:5]) if leak else ''}", not leak)
+import os
+old_secret = os.environ.get("VCC_PEER_SECRET")
+os.environ["VCC_PEER_SECRET"] = "test-secret-1"
+other_ref = rf.peer_ref(JUNIOR, SENIOR1)
+expect("비밀이 다르면 다른 값 + 옛 값은 안 풀림", other_ref != ref1 and rf.resolve_peer(JUNIOR, ref1) is None
+       and rf.resolve_peer(JUNIOR, other_ref) == SENIOR1)
+os.environ.pop("VCC_PEER_SECRET")
+if old_secret is not None:
+    os.environ["VCC_PEER_SECRET"] = old_secret
+expect("비밀을 되돌리면 원래 값", rf.peer_ref(JUNIOR, SENIOR1) == ref1)
 
 # ── 쪽지검사 AI 연결(작업 27 후속): 가짜 callAI로 3경우 + 코드 규칙 우선 + 한도·캐시 ─────
 import limits

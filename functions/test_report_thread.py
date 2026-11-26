@@ -10,12 +10,18 @@ import store
 store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"
 
 import runtime_fns as rf
-from runtime_fns import getInbox, getMessages, reportThread, respondRequest, sendMessage
+from runtime_fns import getInbox, getMessages, reportThread, respondRequest
 rf._call_ai = lambda *a, **k: {"ok": True, "json": {"ok": True}}   # 시험은 실제 AI를 부르지 않는다(쪽지검사 연결, 작업 27)
 
 JUNIOR, SENIOR1, SENIOR2, OTHER = "H0143", "H0469", "H0241", "H0102"
 HELLO = "안녕하세요, 마르부르크 파견 준비가 궁금해서 쪽지 드려요."
 fails = []
+
+
+# [작업 38 D-1] 응답의 상대 값은 학번이 아니라 불투명 값(peer_ref). 이 시험은 학번으로 쓰고, 서버에는 화면처럼
+# 불투명 값으로 보내고 받은 값은 학번으로 되돌려 본다. 불투명 값 자체는 test_messages.py 9절.
+def sendMessage(me, p):
+    return rf.sendMessage(me, {**p, "to": rf.peer_ref(me, p["to"])})
 
 
 def expect(name, cond):

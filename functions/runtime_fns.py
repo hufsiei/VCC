@@ -18,8 +18,12 @@
 # 선배 추천 열림(11/22, demand.py): 경험 나눔(답변 3 + 1문장 공유) 또는 수요 제공(궁금한 것 정리하기) 전에는
 #   recommendSeniors·previewNickname·sendMessage(새 요청)가 {locked} / reason "잠김"으로 막는다. 받은 선배의 답장은 막지 않는다.
 # recommendSeniors(작업 85): 점수는 score.py(원우), 목록 보관·더 보기·재계산은 여기(spec 4장 인원 규칙).
+# [11/26 작업 38 D-1] 응답의 상대 학번(withId·studentId)은 peer_ref 불투명 값, 입력 to는 resolve_peer로 푼다.
+import hashlib
+import hmac
 import json
 import logging
+import os
 import random
 import time
 from datetime import datetime, timedelta, timezone
@@ -83,6 +87,46 @@ def senior_label(viewer, senior):
             store.save("nicknames")
         dept = student(senior).get("crs_nm", "")
         return f"{dept} 선배 {mine[senior]}".strip()
+
+
+# ---------- [11/26 작업 38 D-1] 상대 학번 대신 불투명 값 ----------
+# getMessages.withId·recommendSeniors.studentId는 학번이 아니라 peer_ref(보는 사람, 상대) — 같은 두 사람이면 늘 같은 값이고,
+# 보는 사람마다 다르다(남의 값으로는 다른 사람을 가리킬 수 없다). 화면이 sendMessage·previewNickname의 to로 돌려주면
+# resolve_peer가 학번으로 푼다. 학번·엉터리 값은 풀리지 않는다(= 받는 사람 없음). 비밀은 VCC_PEER_SECRET(.env·NCP 파라미터).
+PEER_SECRET_ENV = "VCC_PEER_SECRET"
+_PEER_FALLBACK = "vcc-peer-ref-fallback"   # 파라미터가 없을 때만(경고). 값이 바뀌면 화면이 들고 있던 값은 새로 받으면 된다
+_peer_maps = {}                            # (비밀, 보는 사람) -> {불투명 값: 학번}
+_peer_warned = []
+
+
+def _peer_secret():
+    s = os.environ.get(PEER_SECRET_ENV, "").strip()
+    if not s:
+        if not _peer_warned:
+            log.warning("%s 없음 — 고정 기본값으로 상대 값을 만든다", PEER_SECRET_ENV)
+            _peer_warned.append(1)
+        s = _PEER_FALLBACK
+    return s
+
+
+def peer_ref(viewer, peer):
+    """보는 사람(viewer)에게 보여 줄 상대(peer)의 불투명 값 'p' + 16자리 hex."""
+    mac = hmac.new(_peer_secret().encode(), f"{viewer}|{peer}".encode(), hashlib.sha256)
+    return "p" + mac.hexdigest()[:16]
+
+
+def resolve_peer(viewer, ref):
+    """peer_ref의 반대. 이 사람에게 나간 값이 아니면 None."""
+    if not isinstance(ref, str) or len(ref) != 17 or not ref.startswith("p"):
+        return None
+    key = (_peer_secret(), viewer)
+    table = _peer_maps.setdefault(key, {})
+    if ref not in table:
+        student("")                                      # students.json 읽어 두기
+        with store.lock():
+            people = set(_students) | {x for t in _threads().values() for x in (t["asker"], t["senior"])}
+        table.update({peer_ref(viewer, h): h for h in people if h})
+    return table.get(ref)
 
 
 def _letter(i):
@@ -234,9 +278,13 @@ def checkMessage(me, p):
 
 
 def previewNickname(me, p):
-    to = p.get("to")
+    to = resolve_peer(me, p.get("to"))       # 화면은 recommendSeniors.studentId(불투명 값)를 보낸다
     if not to:
         return {"error": "받는 선배가 없어요"}
+    return _preview_nickname(me, to)
+
+
+def _preview_nickname(me, to):
     with store.lock():
         _, t = _find_thread(me, to)
         if t:
@@ -253,7 +301,8 @@ def previewNickname(me, p):
 
 
 def sendMessage(me, p):
-    to, text = p.get("to"), (p.get("text") or "").strip()
+    # to = studentId·withId(불투명 값). 학번·남에게 나간 값·엉터리 값은 풀리지 않아 「받는 사람 없음」
+    to, text = resolve_peer(me, p.get("to")), (p.get("text") or "").strip()
     if not to or not text:
         return {"error": "받는 사람과 내용을 확인해 주세요"}
     if to == me:
@@ -289,7 +338,7 @@ def sendMessage(me, p):
             err = _limit_error(me, to)
             if err:
                 return err
-            nickname = previewNickname(me, {"to": to})["myNickname"]
+            nickname = _preview_nickname(me, to)["myNickname"]
             store.load("pendingNicknames", {}).pop(f"{to}|{me}", None)
             store.save("pendingNicknames")
             tid = store.next_id("T")
@@ -343,7 +392,7 @@ def getMessages(me, p):
             other = t["senior"] if role == "asker" else t["asker"]
             last = t["lastRead"].get(me, "")
             item = {
-                "threadId": tid, "role": role, "withId": other,
+                "threadId": tid, "role": role, "withId": peer_ref(me, other),   # 학번 아님(작업 38 D-1)
                 "nickname": senior_label(me, other) if role == "asker" else t["askerNickname"],
                 "status": t["status"], "requestedAt": t["requestedAt"],
                 "accepted": t["status"] == "accepted",   # 옛 필드(화면 호환). 새 화면은 status를 쓴다
@@ -520,7 +569,7 @@ def recommendSeniors(me, p):
             shown[me][nid] = {"ids": ids, "version": version, "at": now()}
             store.save("shownSeniors")   # [11/25] 목록이 그대로면 저장하지 않는다(읽기 요청이 다른 기록을 덮어쓰지 않게)
 
-        seniors = [{"studentId": h, "nickname": senior_label(me, h), "score": by_id[h]["score"],
+        seniors = [{"studentId": peer_ref(me, h), "nickname": senior_label(me, h), "score": by_id[h]["score"],
                     "requestsFull": by_id[h]["requestsFull"], "reasons": by_id[h]["reasons"],
                     **({"retryAt": retry[h]} if h in retry else {})} for h in ids]
         return {"seniors": seniors, "shown": len(seniors), "hasMore": len(ids) < cap, "newCount": new_count}
