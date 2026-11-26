@@ -110,7 +110,9 @@ payload `{id, pw}`
 { "ok": true, "user": { "colreg_no": "staff01", "status": "직원", "부서명": "전체", "권한": "총괄", "token": "…" } }
 { "ok": true, "user": { "colreg_no": "staff02", "status": "직원", "부서명": "혁신지원팀", "부서코드": "D04", "권한": "부서", "token": "…" } }
 { "ok": false, "reason": "아이디 또는 비밀번호가 맞지 않아요." }
+{ "ok": false, "reason": "로그인 시도가 많아요. 60초 뒤에 다시 시도해 주세요.", "retryAfter": 60 }
 ```
+**[11/26 작업 38] 실패 한도**: 계정(`colreg_no`, 대소문자 정규화 뒤)마다 60초 안에 비번을 5번 틀리면 그 계정은 60초 동안 막힌다 — 막힌 동안은 맞는 비번도 위 마지막 응답(`retryAfter` = 남은 초, 1 이상 정수, `reason`의 숫자와 같음). 성공한 로그인은 세지 않고 그 계정의 실패 기록을 지운다(두 창·여러 창 시연은 안 막힘). `students.json`에 없는 아이디는 세지 않고 늘 위 실패 응답. 다른 계정에는 영향 없음. 기록은 `runtime/loginFails.json`(`functions/limits.py`), `reset_runtime.py`가 시연 계정 기록을 지운다. 화면은 `reason`을 그대로 보여 주면 된다. mock에는 이 응답이 없다.
 **[작업 85]** 서버 응답의 `user`에는 `token`(작업 73)이 있고, `data.js`가 이것을 `me.token`으로 저장해 `X-Token`에 쓴다. mock 응답에는 `token`이 없다(mock은 헤더를 쓰지 않음). `부서코드`는 부서 직원만(`전체`에는 없음).
 
 ### getMe()
