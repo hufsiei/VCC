@@ -272,6 +272,14 @@ function shareLabel(note) {
 const frameText = (note) =>
   Number.isFinite(note.filled) && Number.isFinite(note.total) ? `노트 틀 ${note.filled}/${note.total}` : `노트 틀 ${DASH}`;
 
+// [v2 작업 90] Secondary 「더 들려주기」 → 인터BOO 들려주기에서 이 경험으로 바로 시작(spec getInbox·interviewNext 이어 쓰기).
+// 서버가 내 경험노트의 칸을 답한 것으로 쳐서 새 질문만 묻고, 요약은 지난 문장 뒤에 덧붙는다(append)
+function tellMoreButton(note) {
+  if (!note || !note.program) return null;
+  const href = `../talk/?mode=tell&program=${encodeURIComponent(note.program)}`;
+  return el("a", { className: "btn btn--secondary btn--block", attrs: { href } }, [icon("message-circle-plus"), el("span", { text: "더 들려주기" })]);
+}
+
 // 「자소서용 요약 보기」 — v4.3: 비활성 + 「운영 연계 시 열려요」(6-6)
 function resumeButton() {
   return [
@@ -297,6 +305,7 @@ function myNoteCard(note) {
     el("div", { className: "mynote__body" }, [
       el("h3", { className: "note-card__title" }, [title]),
       el("div", { className: "mynote__meta" }, [el("span", { text: frameText(note) }), shareLabel(note)]),
+      tellMoreButton(note),
       ...resumeButton(),
     ]),
   ]);
@@ -715,6 +724,8 @@ function renderMyNote() {
   if (n.noteId && n.share !== "private") {
     actions.push(el("a", { className: "link-more", text: `${orDash(n.program)} 해봤노트에서 보기 ›`, attrs: { href: `../note/?id=${encodeURIComponent(n.noteId)}` } }));
   }
+  const more = tellMoreButton(n);
+  if (more) actions.push(more);
   actions.push(...resumeButton());
 
   myNoteBody.setAttribute("aria-busy", "false");

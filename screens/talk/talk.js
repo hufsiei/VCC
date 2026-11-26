@@ -942,6 +942,7 @@ const tell = {
   log: [],         // 화면에 그린 말풍선 [{t: "choose"|"user"|"boo"|"step", text?, step?, at}]
   waiting: false,  // interviewNext 응답을 아직 못 받음(돌아오면 다시 부른다)
   summarized: false, // AI 요약이 끝남 — 노트에 저장됐으니 이 탭 보존·서버 초안을 더 남기지 않는다(9절)
+  resumed: false,  // [v2 작업 90] 같은 프로그램의 내 경험노트가 이미 있음(interviewNext 첫 응답 resumed: true)
 };
 const EXTRA_QUESTION = "더 들려주고 싶은 이야기";
 const DONE_TEXT = "지금 물을 건 다 물었어요. 더 들려줄 칸을 고르거나 AI 요약을 눌러 주세요.";
@@ -1009,6 +1010,9 @@ async function startTell() {
   }
 
   tell.experiences = experiences;
+  // [v2 작업 90] 내 보관함 「더 들려주기」(?mode=tell&program=…)로 오면 경험을 고르지 않고 바로 그 경험으로
+  const wanted = experiences.find((exp) => exp.name === wantedProgram);
+  if (wanted) return chooseProgram(wanted);
   if (experiences.length === 1) return chooseProgram(experiences[0]);
 
   tell.log.push({ t: "choose", at: timeText() });
@@ -1178,6 +1182,7 @@ async function askNext() {
   // 지나간 질문의 버튼(「경험이 없어요」·예시답 칩)은 끈다
   for (const b of tellChat.querySelectorAll(".msg__actions button, .chip-row button")) b.disabled = true;
   if (typeof res.pendingQuestions === "number") tell.pending = res.pendingQuestions;
+  if (res.resumed) tell.resumed = true; // [v2 작업 90] 내 경험노트에 이어서 — 서버가 이미 쓴 칸은 다시 묻지 않는다
   if (Array.isArray(res.covered)) tell.covered = res.covered;
   renderNotice();
 
@@ -1190,12 +1195,14 @@ async function askNext() {
 }
 
 // 첫 화면 안내(7-①): pendingQuestions ≥ 1이면 「후배 N명이 이 경험을 기다리고 있어요」
+// [v2 작업 90] 내 경험노트가 이미 있으면 「이어서 들려주기」 — 지난 이야기는 지우지 않고 덧붙인다(summarizeInterview append)
 function renderNotice() {
-  tellNotice.replaceChildren(
+  tellNotice.replaceChildren(...[
+    tell.resumed ? statusLabel("info", "info", "이어서 들려주기 · 지난 이야기에 덧붙여요") : null,
     tell.pending > 0 && tell.answers.length === 0
       ? statusLabel("info", "info", `후배 ${tell.pending}명이 이 경험을 기다리고 있어요`)
-      : "",
-  );
+      : null,
+  ].filter(Boolean));
   drawIcons();
 }
 
@@ -1325,7 +1332,9 @@ async function runSummary() {
   const transcript = tell.answers
     .filter((a) => !a.skipped)
     .map(({ section, question, answer }) => ({ section, question, answer }));
-  const res = await summarizeInterview(tell.program.name, transcript);
+  // [v2 작업 90] 늘 append: true — 같은 프로그램의 내 경험노트가 있으면 지우지 않고 덧붙이고(고친 문장·공유 동의 유지),
+  // 없으면 서버가 새로 만든다(runtime_fns.save_my_note: append and old일 때만 덧붙임). 11/23 「두 번째 인터뷰가 첫 번째를 지움」 방지
+  const res = await summarizeInterview(tell.program.name, transcript, true);
 
   if (!res || res.error) {
     summaryStatus.replaceChildren(statusLabel("error", "circle-alert", "요약하지 못했어요"));
@@ -1438,7 +1447,7 @@ function saveKeep() {
     const t = tell.program && !tell.summarized
       ? {
           program: tell.program, answers: tell.answers, step: tell.step, pending: tell.pending, covered: tell.covered,
-          extra: tell.extra, experiences: tell.experiences, log: tell.log, waiting: tell.waiting,
+          extra: tell.extra, experiences: tell.experiences, log: tell.log, waiting: tell.waiting, resumed: tell.resumed,
         }
       : null;
     const d = { active: demand.active, step: demand.active ? demand.step : null, from: demand.from, sent: demand.sent };
@@ -1492,7 +1501,7 @@ function restoreTell(kept) {
     started: true, program: kept.program, step: kept.step || null, pending: kept.pending || 0,
     answers: Array.isArray(kept.answers) ? kept.answers : [], covered: Array.isArray(kept.covered) ? kept.covered : [],
     extra: kept.extra || null, experiences: Array.isArray(kept.experiences) ? kept.experiences : [],
-    log: Array.isArray(kept.log) ? kept.log : [], waiting: !!kept.waiting,
+    log: Array.isArray(kept.log) ? kept.log : [], waiting: !!kept.waiting, resumed: !!kept.resumed,
   });
   for (const item of tell.log) {
     replayAt = item.at;
@@ -1551,7 +1560,10 @@ function restartTell() {
 // 시작
 // ---------------------------------------------------------------------------
 
+// [v2 작업 90] ?program=…(내 보관함 「더 들려주기」) — 보존된 들려주기가 다른 경험이면 그것은 이어 그리지 않는다
+const wantedProgram = new URLSearchParams(location.search).get("program");
 const kept = loadKeep();
+if (kept && wantedProgram && kept.tell && kept.tell.program && kept.tell.program.name !== wantedProgram) kept.tell = null;
 if (kept) {
   restoring = true;
   if (kept.ask) restoreAsk(kept.ask);
