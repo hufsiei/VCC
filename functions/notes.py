@@ -7,6 +7,8 @@
 #   getNote(me, {id})          — 칸 뒤에 인터뷰 문장을 붙인다. [v2 작업 89] 「후배 질문」 칸은 없다 — 후배 질문에 답한
 #                                문장은 질문의 칸에 일반 문장으로 들어가고 answersQuestionId·asked만 붙는다(화면 라벨용)
 #   listNotes(me, {filter})    — 카드 목록. evidenceCount·lastSemester에 인터뷰 문장을 더한다
+#   [11/26 작업 35] evidenceCount = 칸 문장 수의 합(보고서 문단 + 동의 인터뷰 문장, 신고로 숨긴 것 제외).
+#                   getNote 상단·listNotes 카드·동의 시트 「근거 N건」이 모두 이 값이다(칸 칩은 그 칸 lines 수)
 #   interview_lines(program)   — askBoo 근거 풀에 더할 인터뷰 문장(후배 질문 답도 그 칸 문장으로)
 #   scrapNote(me, {noteId, scrap}) — 스크랩 켜기·끄기(runtime/scraps.json). 카드·노트의 scrapped, getInbox.scraps
 #   saveQuestion(me, {noteId, section}) — [11/22] 「질문함에 담기」: 그 칸을 질문함에 hold로(다음 인터뷰가 먼저 묻는다)
@@ -173,6 +175,16 @@ def _official_url(program):
     return DEPTS.get(code, {}).get("공식안내URL", "")
 
 
+def _report_count(note, hidden):
+    """[11/26 작업 35] 노트의 보고서·후기 문장 수 = 칸 문장(「후배 질문」 칸 제외) 중 신고로 숨기지 않은 것.
+    사전 생성 evidenceCount(보고서 문단 수)와 신고가 없으면 같다(251개 노트 모두 같음, 11/26 확인).
+    신고로 문장이 칸에서 빠지면 상단 「근거 N건」도 같이 줄어 칸별 「근거 N건」의 합과 같게 한다."""
+    if not hidden:
+        return note.get("evidenceCount") or 0
+    return sum(1 for sec in note.get("sections", []) if sec.get("name") != QUESTION_SECTION
+               for ln in sec.get("lines", []) if ln.get("lineId") not in hidden)
+
+
 def _merge(nid, rows):
     """사전 생성 노트 + 인터뷰 문장. rows는 이 노트의 보이는 noteLines."""
     base = NOTES.get(nid)
@@ -183,6 +195,7 @@ def _merge(nid, rows):
         hidden = set(store.load("reported", {}))
     # [v2] 사전 생성 노트에 남은 「후배 질문」 칸은 뺀다(인터뷰 문장은 _visible_lines가 질문의 칸으로 옮겨 둠)
     note["sections"] = [s for s in note["sections"] if s.get("name") != QUESTION_SECTION]
+    report = _report_count(note, hidden)   # 인터뷰 문장을 붙이기 전, 숨긴 문장을 뺀 보고서 문장 수
     hidden_sources = set()
     for sec in note["sections"]:   # 신고로 숨긴 보고서 문장도 뺀다
         hidden_sources |= {ln.get("sourceId") for ln in sec.get("lines", []) if ln.get("lineId") in hidden}
@@ -202,7 +215,7 @@ def _merge(nid, rows):
                                                              "semester": r.get("semester")}
     _section_summary(note, by_section, hidden_sources, hidden)
 
-    note["evidenceCount"] = (note.get("evidenceCount") or 0) + len(rows)
+    note["evidenceCount"] = report + len(rows)   # = 칸별 lines 수의 합(listNotes 카드와 같은 셈)
     sems = [s for s in [note.get("lastSemester"), *(r.get("semester") for r in rows)] if s]
     note["lastSemester"] = max(sems) if sems else None
     if not note.get("officialUrl"):
@@ -316,6 +329,8 @@ def listNotes(me, p):
     f = p.get("filter") or {}
     kind, q = f.get("type"), _norm(f.get("q"))
     rows = _visible_lines()
+    with store.lock():
+        hidden = set(store.load("reported", {}))
     count, last, program_of = {}, {}, {}
     for r in rows:
         nid = r.get("noteId")
@@ -329,7 +344,7 @@ def listNotes(me, p):
     for nid in ids:
         n = NOTES.get(nid) or _empty_note(nid, program_of[nid])
         card = {k: n.get(k) for k in SUMMARY_KEYS}
-        card["evidenceCount"] = (card["evidenceCount"] or 0) + count.get(nid, 0)
+        card["evidenceCount"] = _report_count(n, hidden) + count.get(nid, 0)   # getNote 상단과 같은 셈
         sems = [s for s in (card["lastSemester"], last.get(nid)) if s]
         card["lastSemester"] = max(sems) if sems else None
         if kind and card["type"] != kind:
