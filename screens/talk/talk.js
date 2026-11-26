@@ -1316,6 +1316,12 @@ async function runSummary() {
 }
 
 // 요약 카드 = 내 경험노트 원본(myNote). 노트 틀 순서, 이야기하지 않은 칸은 「–」
+// 같은 질문(asked)에 답한 문장이 이어지면 첫 문장에만 Q 인용을 붙인다(common/consent.js와 같은 규칙)
+function firstOfQuestion(lines, i) {
+  const asked = lines[i].asked;
+  return Boolean(asked) && (i === 0 || lines[i - 1].asked !== asked);
+}
+
 function summaryCard(res) {
   const frame = FRAMES[tell.program.kind] || FRAMES["교환"];
   const sections = new Map(((res.myNote && res.myNote.sections) || []).map((s) => [s.name, s.lines || []]));
@@ -1326,11 +1332,12 @@ function summaryCard(res) {
     const lines = sections.get(name) || [];
     const row = el("div", { className: "summary-row" }, [el("span", { className: "summary-row__name", text: name })]);
     if (lines.length === 0) row.append(el("p", { className: "summary-row__empty", text: "–" }));
-    for (const line of lines) {
-      // 후배 질문에 답한 문장(asked가 붙음): Q(후배 질문 원문, 인용) + A(내 답) — 그 질문의 칸 안에
-      if (line.asked) row.append(el("span", { className: "msg__quote", text: `Q. ${line.asked}` }));
+    lines.forEach((line, i) => {
+      // 후배 질문에 답한 문장(asked가 붙음): Q(후배 질문 원문, 인용) + A(내 답) — 그 질문의 칸 안에.
+      // [11/26 #295] Q는 같은 질문이 이어지는 문장의 첫 문장에만(common/consent.js firstOfQuestion과 같은 규칙)
+      if (firstOfQuestion(lines, i)) row.append(el("span", { className: "msg__quote", text: `Q. ${line.asked}` }));
       row.append(el("p", { text: line.asked ? `A. ${line.text}` : line.text }));
-    }
+    });
     card.append(row);
   }
   return card;
