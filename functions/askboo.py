@@ -1604,9 +1604,10 @@ def timing(question, history, programs, country, excluded=()):
 # 실서버 「독일 7+1 갈 때 가장 많이 간 대학교?」(11/26 15:26)에 근거가 많은 순으로 노트만 보여 줬다 — 실제 간 학생 수
 # (뷔르츠부르크 6 · 마르부르크 5 · 마인츠 4)와 순서가 다르다. 학적(students.json)의 파견대학·해외경험 유형을 세어 고정 문구로 답한다.
 # 노트가 없는 학교는 인원만 말하고, 카드는 노트가 있는 학교를 인원 많은 순으로. 사람 칸(학번 등)은 세기만 하고 내보내지 않는다.
-# 유형 묶음(미리 11/26): 이름에 「파견학생」이 들어간 유형(학과·우수입학·국제 파견학생) = 7+1 파견. 아너스 파견은 7+1이 아니다.
+# 유형 묶음(미리 11/26): 「파견학생」이 들어간 유형(학과·우수입학·국제 파견학생)과 아너스 파견 = 7+1 파견.
+# 단 「아너스」를 콕 집어 물으면 아너스 파견만 센다.
 ABROAD = [(s["파견대학"], s.get("해외경험 유형") or "") for s in _json("students.json", []) if s.get("파견대학")]
-KIND_ORDER = ("교환학생", "7+1 파견", "자비유학생", "아너스 파견")
+KIND_ORDER = ("교환학생", "7+1 파견", "자비유학생")
 KIND_WORDS = (("7+1 파견", re.compile(r"7\s*\+\s*1|파견\s*학생|학과\s*파견|우수\s*입학|국제\s*파견")),
               ("교환학생", re.compile(r"교환")), ("자비유학생", re.compile(r"자비")), ("아너스 파견", re.compile(r"아너스")))
 # 「가는 곳」을 묻는 말만 본다 — 「가장 많이 한 일」「주말에 많이 가는 곳」「대학 순위」「인기 있는 음식」「한 반 인원」은 아니다
@@ -1624,8 +1625,8 @@ RANK_TOP = 3   # 문구에 말하는 학교 수(나머지는 「모두 n곳」�
 
 
 def kind_group(kind):
-    """학적의 해외경험 유형 → 묶음. 「파견학생」이 들어간 유형은 7+1 파견."""
-    return "7+1 파견" if "파견학생" in kind else kind
+    """학적의 해외경험 유형 → 묶음. 「파견학생」이 들어간 유형과 아너스 파견은 7+1 파견."""
+    return "7+1 파견" if "파견학생" in kind or kind == "아너스 파견" else kind
 
 
 def rank(question, programs, country, excluded=()):
@@ -1640,9 +1641,12 @@ def rank(question, programs, country, excluded=()):
         return None
     from collections import Counter
     kinds = [k for k, rx in KIND_WORDS if rx.search(question)]
+    honors = "아너스 파견" in kinds
+    if honors:   # 「아너스 파견학생」의 「파견학생」으로 7+1 전체를 세지 않는다
+        kinds = [k for k in kinds if k != "7+1 파견"]
     counts = {}
     for school, kind in ABROAD:
-        k = kind_group(kind)
+        k = kind if honors and kind == "아너스 파견" else kind_group(kind)
         if school in scope and (not kinds or k in kinds):
             counts.setdefault(school, Counter())[k] += 1
     order = sorted(counts, key=lambda n: (-sum(counts[n].values()), -evidence_count(n), n))

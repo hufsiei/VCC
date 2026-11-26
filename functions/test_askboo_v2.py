@@ -454,8 +454,19 @@ expect("카드도 인원 많은 순", res["notes"][0]["program"] == PROGRAM, [c[
 res, _ = run("독일에서 가장 많이 간 대학교는?", [])
 expect("유형을 안 말하면 모두 세고 유형별로 나눠 말함", "뷔르츠부르크 대학교 6명(교환학생 4·7+1 파견 2)" in res["message"]
        and res["notes"][0]["program"] == "뷔르츠부르크 대학교", res.get("message"))
-expect("7+1 묶음: 학과·우수입학·국제 파견학생, 아너스 제외", askboo.kind_group("우수입학 파견학생") == "7+1 파견"
-       and askboo.kind_group("국제 파견학생") == "7+1 파견" and askboo.kind_group("아너스 파견") == "아너스 파견")
+expect("7+1 묶음: 학과·우수입학·국제 파견학생 + 아너스 파견", all(askboo.kind_group(k) == "7+1 파견"
+       for k in ("학과 파견학생", "우수입학 파견학생", "국제 파견학생", "아너스 파견")))
+_saved = askboo.ABROAD
+askboo.ABROAD = [(PROGRAM, "학과 파견학생")] * 2 + [(PROGRAM, "아너스 파견"), (PROGRAM, "교환학생")]
+for q in ("마르부르크 7+1 몇 명 갔어요?", "마르부르크 파견학생 몇 명 갔어요?"):
+    res, calls = run(q, [])
+    expect(f"아너스도 센다: {q}", res["message"].startswith("마르부르크필립스대학교 7+1 파견 다녀온 선배는 3명") and calls == [],
+           res.get("message"))
+for q in ("마르부르크 아너스 몇 명 갔어요?", "마르부르크 아너스 파견학생 몇 명 갔어요?"):
+    res, calls = run(q, [])
+    expect(f"아너스만 센다: {q}", res["message"].startswith("마르부르크필립스대학교 아너스 파견 다녀온 선배는 1명") and calls == [],
+           res.get("message"))
+askboo.ABROAD = _saved
 res, _ = run("마르부르크 몇 명 갔어요?", [])
 expect("한 학교 인원", res["message"].startswith("마르부르크필립스대학교 다녀온 선배는 5명") and len(res["notes"]) == 1, res.get("message"))
 res, _ = run("뷔르츠부르크 말고 독일에서 제일 많이 간 곳", [])
