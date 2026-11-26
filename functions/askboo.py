@@ -278,7 +278,12 @@ def _answer(me, payload, save, trace=None):
     # [v2] chat 칩 「질문함에 담기」: 답을 찾지 않고 바로 질문함에 hold로
     if payload.get("force") == "hold":
         trace["route"] = "담기"
-        return _hold(me, question, None, None, save, why="담기")
+        program = _saved_program(question, history)
+        section = None
+        if program:   # [Q-44] 칸까지 남긴다 — 「궁금한 것 정리하기」가 분야부터 다시 묻지 않게(못 정하면 None)
+            from demand import guess_section   # demand → runtime_fns → askboo로 이어지므로 쓸 때 불러온다
+            section = guess_section(question, program)
+        return _hold(me, question, program, section, save, why="담기")
 
     # [11/24 작업 87] 앞 턴(과 이번 말)에서 「○○ 말고」로 뺀 프로그램 — 이번 말이 그 이름을 다시 부르지 않으면 계속 뺀다
     excluded = carried_exclusions(question, history)
@@ -508,6 +513,23 @@ def carried_exclusions(question, history):
             out += [n for n in match_programs(m.group(1)) if n in PROGRAMS and n not in out]
     again = _named_programs(EXCLUDE_RE.sub(" ", question))
     return [n for n in out if n not in again]
+
+
+def _saved_program(question, history):
+    """[Q-44] 「질문함에 담기」로 담는 질문의 프로그램(코드 대조, AI 없음). 못 정하면 None.
+    질문에서 부른 프로그램 → 없으면 바로 앞 턴의 프로그램. 「말고」로 뺀 것, 목록에 없는 학교 이름이나
+    다른 나라를 말하는 질문에는 붙이지 않는다(엉뚱한 프로그램의 선배에게 가지 않게)."""
+    excluded = carried_exclusions(question, history)
+    prev = history[-1]["program"] if history else ""
+    prev = prev if prev in PROGRAMS and prev not in excluded else None
+    rest = EXCLUDE_RE.sub(" ", question)
+    named = [n for n in match_programs(rest) if n in PROGRAMS and n not in excluded]
+    if named:   # 약칭 「코트라」처럼 여럿이면 앞 턴이 그중 하나일 때만
+        return prev if prev in named else named[0] if len(named) == 1 else None
+    if SCHOOL_NAME.search(rest):
+        return None
+    country, programs = match_country(rest)
+    return None if country and prev not in programs else prev
 
 
 def clarify(question, history, excluded=()):
@@ -1664,7 +1686,7 @@ def _hold(me, question, program, section, save, why="", place=None):
         message = HOLD_MESSAGE
     out = {"status": "hold", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": True, "message": message,
            "_program": program}
-    if program and evidence_count(program) and not place:
+    if program and evidence_count(program) and not place and why != "담기":   # 담기 응답에는 노트 링크를 붙이지 않는다
         out["noteId"] = notes.note_id(program)
     if not save:
         out["_why"] = why   # 평가 스크립트에서만 보이는 보류 이유

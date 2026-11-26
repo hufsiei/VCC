@@ -265,7 +265,48 @@ expect("force hold는 AI 없이 바로 보류", res["status"] == "hold" and askb
 expect("force hold 문구는 「담아 두었어요」(못 찾았어요 아님)", res["message"] == askboo.HOLD_SAVED, res["message"])
 res = askboo.askBoo("H0143", {"question": "마르부르크 기숙사 어땠어요?", "force": "hold"}, save=False)
 expect("force hold는 프로그램이 있어도 같은 문구", res["status"] == "hold" and res["message"] == askboo.HOLD_SAVED, res["message"])
-h = askboo.clean_history([{"question": " a ", "status": "ok", "program": "p"}, {"question": "", "status": "x"}, {"bad": 1},
+
+# ── [11/26 Q-44] 「질문함에 담기」 저장에 프로그램·칸을 남긴다 ─────────────────
+import tempfile  # noqa: E402
+
+import demand  # noqa: E402
+import store  # noqa: E402
+
+_runtime = store.RUNTIME
+store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"   # 실제 data/runtime을 건드리지 않는다
+HACK = "학기 중 현지 인턴 병행할 수 있어요?"
+
+
+def saved_row(question, history=None):
+    askboo.callAI = make_fake()
+    res = askboo.askBoo("H0143", {"question": question, "history": history or [], "force": "hold"})
+    row = next(q for q in store.load("questions", []) if q["id"] == res["questionId"])
+    return res, row
+
+
+def turn(program, question="마르부르크 생활비 얼마예요?", status="ok"):
+    return [{"question": question, "status": status, "program": program}]
+
+
+res, row = saved_row(HACK, turn(PROGRAM))
+expect("담기 + 앞 턴 프로그램 → 질문 행에 프로그램·칸", row["프로그램명"] == PROGRAM and row["칸"] == "생활", row)
+expect("담기 응답 모양·문구는 그대로(noteId 없음, AI 없음)", res["message"] == askboo.HOLD_SAVED and "noteId" not in res
+       and "_program" not in res and askboo.callAI.calls == [], res)
+st = demand._from_question("H0143", row["id"])
+expect("궁금한 것 정리하기가 분야·프로그램·칸을 채움", st.get("field") == "국제교류" and st.get("program") == PROGRAM
+       and st.get("section") == "생활", st)
+expect("history 없이 질문이 학교를 부르면 그 프로그램(화면 칩은 history를 안 보냄)",
+       saved_row("마르부르크에서 " + HACK)[1]["프로그램명"] == PROGRAM)
+expect("질문의 프로그램이 앞 턴보다 먼저", saved_row("마르부르크 기숙사 어땠어요?", turn(KOTRA))[1]["프로그램명"] == PROGRAM)
+row = saved_row(HACK)[1]
+expect("프로그램을 모르면 지금처럼 비움", row["프로그램명"] is None and row["칸"] is None, row)
+expect("앞 턴에 프로그램이 없으면 비움", saved_row(HACK, turn(""))[1]["프로그램명"] is None)
+expect("「말고」로 뺀 프로그램은 붙이지 않음", saved_row("코트라 말고 다른 인턴 있어요?", turn(KOTRA))[1]["프로그램명"] is None)
+expect("다른 나라 질문에는 앞 턴 프로그램을 붙이지 않음", saved_row("일본 생활비는 얼마예요?", turn(PROGRAM))[1]["프로그램명"] is None)
+expect("목록에 없는 학교 질문에도 붙이지 않음", saved_row("남스웨덴공과대학교 기숙사 있어요?", turn(PROGRAM))[1]["프로그램명"] is None)
+store.RUNTIME = _runtime
+
+h = askboo.clean_history([{"question": " a ", "status": "ok", "program": "p"},{"question": "", "status": "x"}, {"bad": 1},
                           {"question": "b", "status": 3}, {"question": "c"}, {"question": "d"}, {"question": "e"}])
 expect("history 정리: 글자만, 최근 4개", [x["question"] for x in h] == ["b", "c", "d", "e"] and h[0]["status"] == "" and h[0]["program"] == "", h)
 
