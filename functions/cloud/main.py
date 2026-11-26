@@ -21,7 +21,7 @@
 # 기본 파라미터(콘솔 > 액션 > 기본 파라미터). 값은 콘솔에만 — 코드·zip·커밋·화면에 쓰지 않는다.
 #   CLAUDE_KEY (→ ANTHROPIC_API_KEY)  CLOVA_KEY  VCC_LOGIN_PW  ALLOW_ORIGIN  STORE_BACKEND=ncp
 #   NCP_OS_BUCKET  NCP_OS_ACCESS_KEY  NCP_OS_SECRET_KEY  (선택) NCP_OS_ENDPOINT NCP_OS_REGION NCP_OS_PREFIX
-#   (선택) CLOVA_URL  CLAUDE_MODEL
+#   (선택) CLOVA_URL  CLAUDE_MODEL  VCC_ASK_FULL=1(물어보기 A안, 없으면 옛 길)
 #   (선택) VCC_DIAG=1  배포 점검 때만 넣는다. 없으면 _diag는 「없는 함수」로 거절(로그인 없이 부를 수 있으므로). 점검 뒤 지운다.
 #
 # 오류: 응답에는 고정 문구만. 예외 종류·원문(Object Storage 오류 XML·버킷 이름 등)은 stderr → 액션 로그(키 값은 가린다).
@@ -41,7 +41,8 @@ for p in (HERE / "lib", HERE / "functions"):
 
 # 기본 파라미터 중 환경변수로 옮길 것(이 목록 밖의 값은 환경으로 가지 않는다)
 ENV_PARAMS = ("CLOVA_KEY", "CLOVA_URL", "CLAUDE_MODEL", "VCC_LOGIN_PW", "STORE_BACKEND",
-              "NCP_OS_BUCKET", "NCP_OS_ACCESS_KEY", "NCP_OS_SECRET_KEY", "NCP_OS_ENDPOINT", "NCP_OS_REGION", "NCP_OS_PREFIX")
+              "NCP_OS_BUCKET", "NCP_OS_ACCESS_KEY", "NCP_OS_SECRET_KEY", "NCP_OS_ENDPOINT", "NCP_OS_REGION", "NCP_OS_PREFIX",
+              "VCC_ASK_FULL")
 ALLOWED_ORIGINS = ("https://hufsiei.github.io",)   # ALLOW_ORIGIN이 없을 때. "*"는 쓰지 않는다(PRD 9장)
 SECRET_PARAMS = ("CLAUDE_KEY", "CLOVA_KEY", "VCC_LOGIN_PW", "NCP_OS_ACCESS_KEY", "NCP_OS_SECRET_KEY")
 SERVER_ERROR = "서버 처리 중 문제가 생겼어요"
