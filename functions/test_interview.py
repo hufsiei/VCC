@@ -83,7 +83,9 @@ s_legacy = interview.interviewNext(SENIOR, {"program": PROGRAM, "answers": legac
 expect("옛 화면(「후배 질문」 칸)도 같은 다음 질문", s_legacy.get("question") == s.get("question")
        and s_legacy["progress"] == s["progress"])
 # [11/22] 마르부르크는 다섯 칸 모두 최근 근거가 있다(지원15·학점15·비용5·생활20·팁5) → 기본 질문 없이 깊이 질문
-depth = interview.depth_questions(PROGRAM, ["지원", "학점", "비용", "생활", "팁", "배운점"])
+depth4 = interview.depth_questions(PROGRAM, ["지원", "학점", "비용", "생활", "팁", "배운점"])
+expect("깊이 질문마다 번호", [d[0] for d in depth4] == ["교환-3", "교환-2", "교환-1"])
+depth = [d[1:] for d in depth4]   # (칸, 질문, 칩)
 expect("교환 깊이 질문 3개, 근거 적은 칸 먼저(팁 → 지원 → 생활)", [d[0] for d in depth] == ["팁", "지원", "생활"])
 expect("{p}는 프로그램 짧은 이름으로", "{p}" not in depth[0][1] and "마르부르크" in depth[0][1])
 first = depth[0][0]
@@ -109,12 +111,12 @@ interview.evidence_stats = real_stats
 
 # 1-3) 인턴·비교과도 깊이 질문이 틀의 칸에 담긴다
 for kind, frame in (("인턴", interview.FRAMES["인턴"]["칸"]), ("비교과", interview.FRAMES["비교과"]["칸"])):
-    expect(f"{kind} 깊이 질문 칸은 틀 안에", all(s in frame for s, *_ in interview.DEPTH_QUESTIONS[kind]))
-extra = {q: s for s, q, _ in interview.DEPTH_QUESTIONS["비교과"]}
+    expect(f"{kind} 깊이 질문 칸은 틀 안에", all(s in frame for _, s, *_ in interview.DEPTH_QUESTIONS[kind]))
+extra = {q: s for _, s, q, _ in interview.DEPTH_QUESTIONS["비교과"]}
 expect("비교과 기대 질문은 열린 질문", "기대와 비교해 실제로 얻은 건 뭐였어요?" in extra)
 expect("비교과 학년 질문은 배운점 칸", extra.get("이 프로그램을 몇 학년 때 듣는 게 가장 좋을까요? 왜요?") == "배운점")
 expect("비교과 기대 질문 칩은 모두 이어 쓰기", all(c.endswith("…") and interview.bare_stem(c)
-       for c in interview.DEPTH_QUESTIONS["비교과"][0][2]))
+       for c in interview.DEPTH_QUESTIONS["비교과"][0][3]))
 intern = next(p for p in interview.askboo.PROGRAMS if interview.kind_of(p) == "인턴")
 expect("인턴 깊이 질문은 2개", len(interview.depth_questions(intern, interview.FRAMES["인턴"]["칸"])) == 2)
 

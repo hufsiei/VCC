@@ -273,5 +273,23 @@ expect("P12 한 선배의 두 문장 = 노트 2줄·sourceId 2개(줄 수 ≠ �
 expect("P12 노트 줄에 사람을 가릴 값(학번·owner) 없음",
        OTHER not in json.dumps(ans, ensure_ascii=False) and not any("owner" in ln for ln in ans))
 
+# [11/26 작업 35 P3] 근거 건수 세 곳이 같은 단위(문장)인지 — 시연 노트(마르부르크). 시트 N = listNotes 카드,
+# 해봤노트 상단 = getNote evidenceCount, 칸 칩 = 그 칸 lines 수. 상단 = 칸 칩의 합이어야 한다(신고로 숨긴 문장 포함).
+def ev_card():
+    return next(c for c in notes.listNotes(JUNIOR, {"filter": {"q": PROGRAM}})["notes"] if c["id"] == "N-marburg")["evidenceCount"]
+
+
+def ev_note():
+    n = notes.getNote(JUNIOR, {"id": "N-marburg"})
+    return n["evidenceCount"], sum(len(s["lines"]) for s in n["sections"]), n
+
+
+top, chips, n35 = ev_note()
+expect("P3 상단 = 칸 칩의 합 = 카드(시트 N)", top == chips == ev_card())
+rep_line = next(ln for s in n35["sections"] for ln in s["lines"] if ln["lineId"].startswith("L-R"))
+reportStatement(JUNIOR, {"lineId": rep_line["lineId"], "reason": "기타"})
+top2, chips2, _ = ev_note()
+expect("P3 보고서 문장 신고 뒤: 상단·카드 −1, 여전히 칸 칩의 합", top2 == top - 1 == chips2 == ev_card())
+
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)
