@@ -520,7 +520,7 @@ def _saved_program(question, history):
     질문에서 부른 프로그램 → 없으면 바로 앞 턴의 프로그램. 「말고」로 뺀 것, 목록에 없는 학교 이름이나
     다른 나라를 말하는 질문에는 붙이지 않는다(엉뚱한 프로그램의 선배에게 가지 않게)."""
     excluded = carried_exclusions(question, history)
-    prev = history[-1]["program"] if history else ""
+    prev = (history[-1].get("program") or "") if history else ""
     prev = prev if prev in PROGRAMS and prev not in excluded else None
     rest = EXCLUDE_RE.sub(" ", question)
     named = [n for n in match_programs(rest) if n in PROGRAMS and n not in excluded]

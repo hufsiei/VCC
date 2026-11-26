@@ -301,6 +301,9 @@ expect("질문의 프로그램이 앞 턴보다 먼저", saved_row("마르부르
 row = saved_row(HACK)[1]
 expect("프로그램을 모르면 지금처럼 비움", row["프로그램명"] is None and row["칸"] is None, row)
 expect("앞 턴에 프로그램이 없으면 비움", saved_row(HACK, turn(""))[1]["프로그램명"] is None)
+expect("history 항목에 program 칸이 없어도 담김(spec상 선택)",
+       saved_row(HACK, [{"question": "안녕", "status": "chat"}])[1]["프로그램명"] is None
+       and askboo._saved_program(HACK, [{"question": "안녕", "status": "chat"}]) is None)
 expect("「말고」로 뺀 프로그램은 붙이지 않음", saved_row("코트라 말고 다른 인턴 있어요?", turn(KOTRA))[1]["프로그램명"] is None)
 expect("다른 나라 질문에는 앞 턴 프로그램을 붙이지 않음", saved_row("일본 생활비는 얼마예요?", turn(PROGRAM))[1]["프로그램명"] is None)
 expect("목록에 없는 학교 질문에도 붙이지 않음", saved_row("남스웨덴공과대학교 기숙사 있어요?", turn(PROGRAM))[1]["프로그램명"] is None)
