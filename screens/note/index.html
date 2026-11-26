@@ -113,9 +113,33 @@
   .summary__sentence:focus-visible { outline: none; border-radius: 4px; box-shadow: var(--focus-ring); }
   .summary__hint { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--font-size-caption); color: var(--color-text-muted); }
   .summary__hint .icon { width: 14px; height: 14px; flex: none; }
+  /* [11/26] 고른 요약 문장(문장 하나 전체): 빨간 글자 + 빨간 밑줄 — 여러 줄이어도 문장 전체(8-1 ③) */
+  .summary__sentence--picked { color: var(--status-error-fg); text-decoration: underline; text-decoration-color: var(--status-error-fg); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  /* 요약 문장은 브라우저 글자 선택(휴대폰 단어 잡기·PC 여러 문장 드래그)·길게 누르기 메뉴를 끄고 문장 하나 단위로 고른다(note.js 8-1) */
+  .summary__sentence[tabindex] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  /* 고른 문장 끝 풍선: 「복사」(외곽선 버튼 5-4) + 「신고하기」(위험 버튼, 그대로) */
+  .sentence-pop { position: absolute; z-index: 20; display: flex; gap: var(--space-sm); }
+  .sentence-pop[hidden] { display: none; }
+  .copy-bubble {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-height: 44px;
+    padding: 0 var(--space-md);
+    border: 1px solid var(--color-hufs-navy);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    color: var(--color-hufs-navy);
+    font: inherit;
+    font-size: var(--font-size-secondary);
+    font-weight: 600;
+    box-shadow: var(--shadow-float);
+    cursor: pointer;
+  }
+  .copy-bubble .icon { width: 16px; height: 16px; }
+  .copy-bubble:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .copy-scratch { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; }
   .report-bubble {
-    position: absolute;
-    z-index: 20;
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
@@ -131,7 +155,6 @@
     box-shadow: var(--shadow-float);
     cursor: pointer;
   }
-  .report-bubble[hidden] { display: none; }
   .report-bubble .icon { width: 16px; height: 16px; }
   .report-bubble:focus-visible { outline: none; box-shadow: var(--focus-ring); }
   /* 신고 시트: 무엇을 신고하는지 문장을 인용으로 */
@@ -144,7 +167,7 @@
   <!-- ===== 1단계: 해봤노트 목록 (메인 헤더 + 하단 탭) ===== -->
   <section id="viewList" class="has-tabbar">
     <header class="header">
-      <button class="icon-btn" type="button" aria-label="메뉴"><i data-lucide="menu" class="icon"></i></button>
+      <button class="icon-btn" id="logoutBtn" type="button" aria-label="로그아웃"><i data-lucide="log-out" class="icon icon--mirror"></i></button>
       <a class="header__brand" href="../talk/">
         <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
         외대人사이드

@@ -207,6 +207,8 @@ button { font: inherit; color: inherit; }
   cursor: pointer;
 }
 .icon-btn .icon { width: 24px; height: 24px; }
+/* 좌우 반전 아이콘(11/26): 메인 헤더 왼쪽 로그아웃 — log-out을 뒤집어 문틀은 오른쪽, 화살표는 왼쪽(5-1) */
+.icon--mirror { transform: scaleX(-1); }
 
 /* 알림 점(5-1): 8px 오류색 + 흰 테두리 2px */
 .icon-btn__dot {
