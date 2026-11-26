@@ -228,7 +228,8 @@ def check_secrets():
     log = paths.LOGS / "ai-calls.jsonl"
     rows = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines() if l.strip()] if log.exists() else []
     # 캐시쓰기·캐시읽기토큰은 Claude 호출의 토큰 수(숫자)다. 글 내용 칸이 아니니 허용(11/26 A안 캐시)
-    allowed = {"at", "작업", "모델", "입력토큰", "출력토큰", "캐시쓰기토큰", "캐시읽기토큰", "ms", "ok", "error"}
+    # 웹검색은 작업 99 시험(11/26)의 검색 횟수(숫자). 미리 PC 로그에 남아 있어 허용(Q-60)
+    allowed = {"at", "작업", "모델", "입력토큰", "출력토큰", "캐시쓰기토큰", "캐시읽기토큰", "웹검색", "ms", "ok", "error"}
     extra = sorted({k for r in rows for k in r} - allowed)
     pii = sum(1 for r in rows for v in r.values() if isinstance(v, str) and find(v))
     add(4, "AI 호출 로그에 글 내용·연락처 없음", not extra and not pii,
