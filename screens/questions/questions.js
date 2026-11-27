@@ -461,13 +461,13 @@ function scrapCard(scrap) {
   const dot = () => el("span", { text: "·", attrs: { "aria-hidden": "true" } });
   const meta = el("p", { className: "note-card__meta" }, [
     el("span", { text: `근거 ${count}` }), dot(),
-    el("span", { text: `최근 ${semesterText(note.lastSemester)}` }), dot(),
-    el("span", { className: "note-card__star", attrs: { "aria-label": `만족도 ${orDash(note.satisfaction)}` } },
-      [icon("star"), el("span", { text: orDash(note.satisfaction) })]),
+    el("span", { text: `최근 ${semesterText(note.lastSemester)}` }),
   ]);
   if (note.type === "비교과") {
     const done = note.completedCount === null || note.completedCount === undefined ? DASH : `${note.completedCount}명`;
-    meta.append(dot(), el("span", { text: `이수 ${done}` }));
+    const star = el("span", { className: "note-card__star", attrs: { "aria-label": `만족도 ${orDash(note.satisfaction)}` } },
+      [icon("star"), el("span", { text: orDash(note.satisfaction) })]);
+    meta.append(dot(), star, dot(), el("span", { text: `이수 ${done}` }));
   }
   return el("article", { className: `note-card${cat ? ` cat-${cat}` : ""}` }, [
     el("div", { className: "note-card__band" }, [
