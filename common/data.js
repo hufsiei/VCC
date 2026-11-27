@@ -79,6 +79,32 @@ function mockShortName(info, program) {
   return name && name.length <= 14 ? name : SHORT_FALLBACK[KIND_BY_FIELD[info["분야"]] || "교환"];
 }
 
+// [작업 111] 대화형 들려주기(VCC_TELL_CHAT) 화면 연습용. 기본 꺼짐 — 주소 끝에 ?tellchat=1(그 탭은 기억, ?tellchat=0으로 끔)
+//   또는 sessionStorage mockTellChat = "1". 켜면 방금 답에 든 말로 interviewNext.tellChat 표본을 골라
+//   reaction·heard·heldQuestionId·stopped만 얹는다: 「그만」 → stopped · 「궁금」 → held · 「?」로 끝남·「무슨 뜻」 → askedBack · 그 밖 → answer
+function mockTellChatOn() {
+  try {
+    const q = new URLSearchParams(location.search).get("tellchat");
+    if (q !== null) sessionStorage.setItem("mockTellChat", q === "1" ? "1" : "0");
+    return sessionStorage.getItem("mockTellChat") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function mockTellChat(m, p, step) {
+  const answers = p.answers || [];
+  const last = answers[answers.length - 1];
+  if (!mockTellChatOn() || !last || last.skipped) return step; // 첫 응답·「경험이 없어요」에는 붙이지 않음
+  const said = String(last.answer || "").trim();
+  const key = said.includes("그만") ? "stopped" : said.includes("궁금") ? "held"
+    : /[?？]$/.test(said) || said.includes("무슨 뜻") ? "askedBack" : "answer";
+  const { reaction, heard, heldQuestionId, stopped } = m.interviewNext.tellChat[key];
+  const chat = { reaction, heard };
+  if (stopped) return { done: true, stopped, ...chat, progress: step.progress, ...(step.covered ? { covered: step.covered } : {}) };
+  return { ...step, ...chat, ...(heldQuestionId ? { heldQuestionId } : {}) };
+}
+
 function mockInterview(m, p) {
   const iv = m.interviewNext;
   const answers = p.answers || [];
@@ -279,7 +305,8 @@ function pickMock(m, name, p) {
       // [11/26 작업 104] 비자·보험 질문은 선배 답 + 「꼭 확인」 안내(officialCheck, 명세 4장)
       return /비자|보험/.test(p.question || "") ? { ...m.askBoo.exchange, officialCheck: m.askBoo.officialCheck } : m.askBoo.exchange;
     case "interviewNext": {
-      const step = mockInterview(m, p); // 고른 경험(program)에 맞는 노트 틀로 묻는다
+      // 고른 경험(program)에 맞는 노트 틀로 묻는다. ?tellchat=1이면 대화형 표본을 얹는다
+      const step = mockTellChat(m, p, mockInterview(m, p));
       // [v2 작업 90] 서버처럼 내 경험노트가 있는 프로그램의 첫 응답(answers 없음)에 resumed·myNoteId
       return p.program === m.getMyNote.program && !(p.answers || []).length
         ? { ...step, resumed: true, myNoteId: m.getMyNote.id } : step;
