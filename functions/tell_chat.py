@@ -23,8 +23,8 @@
 #        질문의 뜻·왜 묻는지 되묻는 말은 담지 않는다(말판정이 궁금 null). 궁금 글이 선배 말 그대로가 아니면 말 전체(짧을 때만).
 #        [Q-114] 궁금 글이 지시어뿐이면(「나도 그게 궁금했는데」) 「(BOO 질문) 선배 말」로 담는다. 담은 턴이 부족·되물음이면
 #        반응 없이 HELD_TEXT + 다시 묻는 질문만. 부족·되물음·딴얘기 반응에 평가 말(_EVAL)이 들면 버린다.
-#   [Q-131] ① 뒤 코드 바로잡기(fix_kind): 부호뿐 → 되물음, 「다 말했어요」·「남들도 궁금해할 것」 → 부족, 짧은 「모르겠어요」 → 모름.
-#        종류가 6종 밖이어도 궁금 글이 있으면 되물음(parse_judge). 「누가 보낸 질문이냐」는 담지 않는다(_META).
+#   [Q-131] ① 뒤 코드 바로잡기(fix_kind): 부호뿐 → 되물음, 「다 말했어요」·「남들도 궁금해할 것」 → 부족, 짧은 「모르겠어요」 → 모름,
+#        「네?」 → 되물음(궁금 버림), 숫자 든 부족·딴얘기 → 답. 종류가 6종 밖이어도 궁금 글이 있으면 되물음(parse_judge). 「누가 보낸 질문이냐」는 담지 않는다(_META).
 # 실패: 말판정이 실패하면 지금처럼 답으로 보고 고정 질문(반응 없음). 대화쓰기가 실패하면 고정 질문 + 고정 반응.
 # 응답(제안 — spec·화면 미반영): 지금 필드 그대로 + reaction(반응 글) · heard {kind, section}(방금 말을 어떻게 봤는지)
 #        · heldQuestionId(질문함에 담은 질문) · stopped(그만). 화면이 reaction을 질문 말풍선 앞에 그리면 된다.
@@ -91,6 +91,12 @@ _DONT_KNOW_END = ("모르겠어요", "모르겠네요", "모르겠습니다", "�
                   "기억이안나요", "기억안나요", "기억이안나네요", "기억이잘안나요", "기억이안납니다")
 _CONTRAST = re.compile(r"는데|은데|지만|였고|었고|했고|봤고|았고")   # 앞에 다른 내용이 있는 말(「…봤는데 질문은 기억이 안 나요」)
 MAX_DONT_KNOW = 30     # 「모르겠어요」로 바로잡는 말의 글자 수 상한(부호·띄어쓰기 뺀 글)
+# [Q-131 재측정] 「네?」처럼 감탄사 + 물음표뿐이면 되물음, 궁금 없음(재측정 S29: HCX가 궁금 「네?」를 내 질문함에 담김)
+_BARE_ASK = {"네", "예", "응", "뭐", "뭐요", "네에", "예에", "어", "음", "엥", "잉", "넹", "왜요", "무슨"}
+# [Q-131 재측정] 숫자가 든 말(「주 3일, 10시부터 4시까지였어요」)은 다른 칸 이야기여도 답 — HCX가 방금 질문과 칸이 다르면
+# 딴얘기·부족으로 냄(재측정 S20 턴2). 지시(「…써 줘」)·연락처는 그대로 둔다.
+_ORDER = re.compile(r"무시|지시|프롬프트|번역|코드|써\s*줘|해\s*줘|줘요?|주세요|해\s*주|알려\s*줘")
+_CONTACT = re.compile(r"\d{2,4}[-\s.]?\d{3,4}[-\s.]?\d{4}|@|https?:|www\.")
 
 
 def enabled():
@@ -360,13 +366,18 @@ def parse_judge(j):
 def fix_kind(kind, curious, said):
     """[Q-131] 말판정 결과를 코드가 바로잡는다 — 말 전체가 정해진 모양일 때만(정상 답을 덮지 않게).
     부호뿐(「?」) → 되물음(물음표가 없으면 부족), 「지난번에 다 말했어요」·「후배들도 궁금해할 것 같아요」 → 부족,
-    짧은 「…모르겠어요」(앞에 다른 내용·숫자 없음) → 모름."""
+    짧은 「…모르겠어요」(앞에 다른 내용·숫자 없음) → 모름. 「네?」 → 되물음(궁금 없음).
+    부족·딴얘기인데 숫자가 든 말(지시·연락처 아님) → 답(다른 칸 이야기는 대화쓰기 칸으로 옮겨짐)."""
     s = (said or "").strip()
     if s and _PUNCT_ONLY.fullmatch(s):
         return ("되물음" if ("?" in s or "？" in s) else "부족"), None
+    n = _qn(s)
+    if ("?" in s or "？" in s) and n in _BARE_ASK:
+        return "되물음", None
+    if kind in ("부족", "딴얘기") and re.search(r"\d", s) and not _ORDER.search(s) and not _CONTACT.search(s):
+        return "답", curious
     if kind != "답":
         return kind, curious
-    n = _qn(s)
     if not n or re.search(r"\d", n):
         return kind, curious
     if _NO_CONTENT.fullmatch(n):
@@ -481,6 +492,12 @@ def check_question(text, source, asked=()):
     if not isinstance(text, str):
         return None
     t = " ".join(text.split())
+    if t and not _ASK_END.search(t):
+        # [Q-131 재측정] 「…들려주세요. 어떤 일이든 괜찮아요.」 — 질문 뒤 덧붙인 문장은 떼고 질문까지만(S25 질문 버림 → 원문 되풀이)
+        parts = [x for x in re.split(r"(?<=[.!?~])\s+", t) if x]
+        while parts and not _ASK_END.search(parts[-1]):
+            parts.pop()
+        t = " ".join(parts)
     if not t or len(t) > MAX_QUESTION or not _ASK_END.search(t) or facts_outside(t, source) or _qn(t) in asked:
         return None
     return t
