@@ -183,7 +183,7 @@
 | recommendSeniors(noteId, more) | `{noteId, more?:true}` (3명씩 더, 최대 9명) |
 | checkMessage(text) | `{text}` |
 | previewNickname(to) | `{to}` (쪽지 요청 시트를 열 때, 이 대화에서 쓸 내 닉네임) |
-| sendMessage(to, text) | `{to, text}` (to는 상대 studentId) |
+| sendMessage(to, text, noteId?) | `{to, text, noteId?}` (to는 상대 studentId. noteId = 닮은선배 기준 노트, [11/27] `common/data.js`가 붙임) |
 | getMessages(read) [11/23] | `{read?: threadId}` (주면 그 대화를 읽음으로, 없으면 목록만) |
 | respondRequest(threadId, accept) | `{threadId, accept}` (받은 선배의 수락·거절). 보낸 사람의 취소는 `cancelRequest(threadId)` = `{threadId, cancel:true}` |
 | reportThread(threadId, reason, block) [11/23] | `{threadId, reason?, block?}` (쪽지 대화 ⋮ 메뉴의 신고·차단, reason은 신고 사유 최대 100자) |
@@ -381,6 +381,7 @@
 | threads[].accepted | 참/거짓 | 상대가 수락했는지(옛 필드, 새 화면은 `status`) |
 | threads[].blockedByMe [11/23] | 참/거짓 | `blocked`일 때 내가 차단했는지. 화면은 차단한 쪽 「차단한 대화예요」, 당한 쪽 「더 이어 갈 수 없는 대화예요」 |
 | threads[].unread | 숫자 | 안 읽은 메시지 수 |
+| threads[].program [11/27] | 글자 또는 null | 요청을 보낼 때의 닮은선배 기준 프로그램명. 늘 있고, 11/27 전 대화·기준 없는 요청은 null |
 | threads[].retryAt [11/24] | 글자 | `cancelled`이고 취소한 지 7일이 안 됐을 때(asker). 취소 응답에도 같은 값 |
 | threads[].messages[].from | 글자 | `me` 또는 `them` |
 | threads[].messages[].text / at | 글자 | 내용, 시각 |
@@ -409,7 +410,8 @@
 | myNotes[].updatedAt | 글자 | 최근 요약 시각, 최근 것이 위 |
 | questions[].questionId / text | 글자 | 질문 번호, 내용 |
 | questions[].status | 글자 | `hold`(미답변) · `answered`(답변 도착) · `official`(규정 질문 → 화면 「공식 안내」) |
-| questions[].askedAt / noteId / answeredAt | 글자 | 질문 시각 / 답이 된 노트(answered) 또는 담은 노트(hold, 「질문함에 담기」) / 답한 시각(answered) |
+| questions[].askedAt / answeredAt | 글자 | 질문 시각 / 답한 시각(answered) |
+| questions[].noteId [11/27] | 글자 또는 null | 늘 있음. 답이 된 노트(answered)·담은 노트, 없으면 `program`의 해봤노트 id, `program`이 없거나 목록에 없으면 null |
 | questions[].program / type / section [11/26] | 글자 또는 null | 프로그램명 / `교환`·`파견`·`인턴`·`비교과`(해봤노트 카드 `type`과 같음) / 칸 이름. 늘 있고 없으면 null. `program`이 null이면 선배에게 전달되지 않은 질문 |
 | scraps[].noteId / program | 글자 | scrapNote로 켠 노트, 최근 것이 위 |
 | alerts[].text / questionId / noteId / at | 글자 | 알림 문구, 관련 질문·노트, 시각 |

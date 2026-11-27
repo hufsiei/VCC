@@ -300,6 +300,15 @@ def _preview_nickname(me, to):
         return {"myNickname": raw[key]}
 
 
+def _request_program(me, to, note_id):
+    """[11/27] 쪽지 요청의 기준 프로그램. 보낸 사람이 note_id로 받은 추천 목록에 그 선배가 있을 때만, 아니면 None."""
+    if not isinstance(note_id, str) or not note_id:
+        return None
+    program = _program_of(note_id)
+    saved = store.load("shownSeniors", {}).get(me, {}).get(notes.note_id(program))
+    return program if saved and to in saved.get("ids", []) else None
+
+
 def sendMessage(me, p):
     # to = studentId·withId(불투명 값). 학번·남에게 나간 값·엉터리 값은 풀리지 않아 「받는 사람 없음」
     to, text = resolve_peer(me, p.get("to")), (p.get("text") or "").strip()
@@ -328,7 +337,8 @@ def sendMessage(me, p):
         if t and t["status"] == "blocked":               # 누가 차단했든 그 두 사람 사이는 막힌다(11/23)
             return {"ok": False, "reason": "차단", "message": BLOCKED_MESSAGE}
 
-        if t is None or t["status"] in ("cancelled", "expired"):   # 새 요청·다시 요청
+        opening = t is None or t["status"] in ("cancelled", "expired")   # 새 요청·다시 요청
+        if opening:
             if not recommendable(to):                    # [11/23] 추천받기를 끈 선배에게는 새 요청을 보내지 않는다
                 return {"ok": False, "reason": "추천 제외", "message": OPT_OUT_MESSAGE}
         if t is None:                                   # 첫 메시지 = 쪽지 요청
@@ -364,6 +374,10 @@ def sendMessage(me, p):
             t.update(status="waiting", requestedAt=now())
             _alert(to, REQUEST_ALERT, threadId=tid)
         # waiting(내가 보낸 요청에 덧붙이기)·accepted는 그대로 이어 쓴다 — 선배 한 명당 요청 1건
+        if opening:                                     # [11/27] 기준 프로그램. 못 정하면 전 값 유지(새 대화는 없음)
+            program = _request_program(me, to, p.get("noteId"))
+            if program:
+                t["program"] = program
 
         at = now()
         t["messages"].append({"from": me, "text": text, "at": at})
@@ -395,6 +409,7 @@ def getMessages(me, p):
                 "threadId": tid, "role": role, "withId": peer_ref(me, other),   # 학번 아님(작업 38 D-1)
                 "nickname": senior_label(me, other) if role == "asker" else t["askerNickname"],
                 "status": t["status"], "requestedAt": t["requestedAt"],
+                "program": t.get("program"),             # [11/27] 요청의 기준 프로그램(옛 대화는 None)
                 "accepted": t["status"] == "accepted",   # 옛 필드(화면 호환). 새 화면은 status를 쓴다
                 "unread": sum(1 for m in t["messages"] if m["from"] != me and m["at"] > last),
                 "messages": [{"from": "me" if m["from"] == me else "them", "text": m["text"], "at": m["at"]}
@@ -491,8 +506,8 @@ def _program_of(note_id):
     n = notes.NOTES.get(note_id)
     if n and n.get("program"):
         return n["program"]
-    for program, nid in notes.FIXED_IDS.items():
-        if nid == note_id:
+    for program in notes.PROGRAMS:                  # 아직 노트가 없는 프로그램의 id(note_id 해시 규칙)
+        if notes.note_id(program) == note_id:
             return program
     return note_id
 
@@ -883,12 +898,15 @@ def getMyNote(me, p):
 
 
 def _question_context(q):
-    """[11/26 작업 117] 질문 카드용 program·type·section(없으면 None). type은 _card_type.
+    """[11/26 작업 117] 질문 카드용 program·type·section·noteId(없으면 None). type은 _card_type.
     프로그램 목록에 없는 이름은 type을 정하지 않는다."""
     program = q.get("프로그램명") or None
     section = q.get("칸")
-    return {"program": program, "type": _card_type(program) if program in notes.PROGRAMS else None,
-            "section": section if section and section != notes.QUESTION_SECTION else None}
+    known = program in notes.PROGRAMS
+    return {"program": program, "type": _card_type(program) if known else None,
+            "section": section if section and section != notes.QUESTION_SECTION else None,
+            # [11/27] 저장된 노트가 먼저, 없으면 프로그램의 노트(닮은선배 기준 노트)
+            "noteId": q.get("noteId") or (notes.note_id(program) if known else None)}
 
 
 def getInbox(me, p):
@@ -899,7 +917,6 @@ def getInbox(me, p):
                       # spec 4장 getInbox [11/19]: hold(미답변) | answered. 규정 질문은 official 그대로
                       "status": q["status"] if q["status"] in ("answered", "official") else "hold",
                       **_question_context(q),
-                      **({"noteId": q["noteId"]} if q.get("noteId") else {}),
                       **({"answeredAt": q["answeredAt"]} if q.get("answeredAt") else {})}
                      for q in store.load("questions", []) if q["colreg_no"] == me
                      and q.get("status") != "deleted"]   # [v2 작업 91] 지운 질문은 목록에 없다(행은 통계용으로 남음)

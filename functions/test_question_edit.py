@@ -48,6 +48,9 @@ expect("official 질문: 칸 없으면 section null", ctx(mine[off]) == (PROGRAM
 expect("프로그램 없는 질문: 셋 다 null", ctx(others[nowhere]) == (None, None, None))
 expect("옛 「후배 질문」 칸은 section null", ctx(others[legacy]) == (PROGRAM, "교환", None))
 expect("목록에 없는 프로그램: type null", ctx(others[unknown]) == ("없는대학교", None, None))
+nid = notes.note_id(PROGRAM)
+expect("[11/27] noteId: 저장 안 했어도 프로그램의 노트", mine[hold]["noteId"] == nid and mine[off]["noteId"] == nid)
+expect("[11/27] noteId: 프로그램 없음·목록에 없음은 null", others[nowhere]["noteId"] is None and others[unknown]["noteId"] is None)
 cards = {n["program"]: n["type"] for n in notes.NOTES.values()}
 by_type = {t: next(p for p, k in cards.items() if k == t) for t in ("교환", "파견", "인턴", "비교과")}
 typed = {add_question(SENIOR, f"{t} 질문이에요", program=p): t for t, p in by_type.items()}
