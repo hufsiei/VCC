@@ -269,33 +269,158 @@ function serverSearch(q, raw) {
 // [11/23 주제별 묶기] spec listNotes groups: 분야·검색으로 거른 뒤, 나라·기관 유형으로 거르기 전 카드로 센다
 // (칩 하나를 눌러도 다른 칩이 그대로 보이게). 많은 순, 같으면 가나다순. 값이 null인 카드는 세지 않는다.
 // 목록을 화면에서 거르므로(국제교류 = 교환 + 파견) 칩 수도 지금 받은 카드로 센다 — 보이는 카드 수와 늘 맞는다(9절)
-const GROUP_BY_CAT = { global: { key: "country", label: "나라" }, practice: { key: "kind", label: "기관 유형" } };
+// [Q-101] 국제교류는 권역 칩 → 그 권역의 나라 칩 2단, 현장실습은 기관 유형 상위 5개 + 「그 외 N곳」.
+const GROUP_BY_CAT = { global: { key: "country" }, practice: { key: "kind" } }; // 칩으로 거르는 카드 값
+// 권역 표: functions/askboo.py REGIONS(#375)와 같은 묶음. 칩은 한 나라가 한 곳에만 들어가야 해서
+// 「동남아시아」는 따로 두지 않고 「아시아」에 넣는다. 겹치는 나라(몽골 등)는 앞 권역에 든다(askboo와 같은 순서).
+const REGIONS = [
+  ["유럽", ["프랑스", "이탈리아", "독일", "포르투갈", "스페인", "스웨덴", "벨기에", "네덜란드", "덴마크", "아일랜드",
+    "체코", "영국", "오스트리아", "스위스", "핀란드", "노르웨이", "폴란드", "헝가리", "그리스", "루마니아",
+    "불가리아", "세르비아", "크로아티아", "슬로바키아", "슬로베니아", "우크라이나", "튀르키예", "터키"]],
+  ["러시아·중앙아시아", ["러시아", "카자흐스탄", "우즈베키스탄", "키르기스스탄", "몽골"]],
+  ["아시아", ["일본", "중국", "대만", "홍콩", "싱가포르", "베트남", "태국", "인도네시아", "말레이시아", "필리핀", "인도",
+    "미얀마", "캄보디아", "라오스"]],
+  ["북미", ["미국", "캐나다"]],
+  ["중남미", ["브라질", "멕시코", "아르헨티나", "칠레", "콜롬비아", "페루", "쿠바"]],
+  ["중동", ["아랍에미리트", "사우디아라비아", "이란", "이스라엘", "요르단", "이집트", "카타르"]],
+  ["아프리카", ["남아프리카공화국", "케냐", "탄자니아", "나이지리아", "모로코", "에티오피아"]],
+  ["오세아니아", ["호주", "뉴질랜드"]],
+];
+const OTHER_REGION = "그 외 지역"; // 표에 없는 나라도 칩에서 사라지지 않게
+const regionOf = (country) => (REGIONS.find(([, nations]) => nations.includes(country)) || [OTHER_REGION])[0];
+const KIND_TOP = 5; // 접었을 때 보이는 기관 유형 수
+
 const groupEl = document.getElementById("groupChips");
+// 2단(권역 안 나라) 줄 — 1단 줄 바로 아래
+const subGroupEl = el("div", { className: "filter-row", attrs: { role: "group", "aria-label": "나라 필터" } });
+subGroupEl.hidden = true;
+groupEl.after(subGroupEl);
+let currentRegion = ""; // 국제교류에서 고른 권역(없으면 "")
 let currentGroup = ""; // 고른 나라·기관 유형(없으면 "")
+let kindsOpen = false; // 「그 외 N곳」을 펼쳤는지
+
+// 값별 노트 수: 많은 순, 같으면 가나다순
+function countBy(notes, valueOf) {
+  const counts = new Map();
+  for (const n of notes) {
+    const v = valueOf(n);
+    if (v) counts.set(v, (counts.get(v) || 0) + 1);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"));
+}
+
+function filterChip(text, pressed, onClick) {
+  const b = el("button", { className: "choice-chip", text, attrs: { type: "button", "aria-pressed": String(pressed) } });
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+// 칩을 다시 그려도 키보드 포커스는 같은 글자의 칩에 남긴다
+function fillRow(row, chips) {
+  const focused = row.contains(document.activeElement) ? document.activeElement.textContent : null;
+  row.hidden = chips.length === 0;
+  row.replaceChildren(...chips);
+  if (focused !== null) {
+    const same = chips.find((c) => c.textContent === focused);
+    if (same) same.focus();
+  }
+}
+
+function hideGroupChips() {
+  groupEl.hidden = true;
+  subGroupEl.hidden = true;
+}
+
+const inRegion = (notes, region) => notes.filter((n) => n.country && regionOf(n.country) === region);
+
+// 고른 값(칩)에 맞는 카드만 남긴다
+function applyGroup(base) {
+  const g = GROUP_BY_CAT[currentCat];
+  if (!g) return base;
+  if (currentGroup) return base.filter((n) => n[g.key] === currentGroup);
+  if (currentRegion) return inRegion(base, currentRegion);
+  return base;
+}
+
+// 국제교류: 1단 권역, 권역을 고르면 2단에 그 권역의 나라
+function renderRegionChips(base) {
+  // 나라만 있고 권역이 없는 상태(주소로 들어온 경우)는 그 나라의 권역을 켠다
+  if (currentGroup && !currentRegion) currentRegion = regionOf(currentGroup);
+  const regions = countBy(base, (n) => (n.country ? regionOf(n.country) : null));
+  if (currentRegion && !regions.some(([name]) => name === currentRegion)) currentRegion = ""; // 검색으로 사라진 칩은 풀어 준다
+  const nations = currentRegion ? countBy(inRegion(base, currentRegion), (n) => n.country) : [];
+  if (currentGroup && !nations.some(([name]) => name === currentGroup)) currentGroup = "";
+
+  const regionChip = (value, text) => filterChip(text, currentRegion === value, () => {
+    currentRegion = value;
+    currentGroup = "";
+    renderList();
+  });
+  groupEl.setAttribute("aria-label", "권역 필터");
+  fillRow(groupEl, regions.length ? [regionChip("", "권역 전체"), ...regions.map(([name, count]) => regionChip(name, `${name} ${count}`))] : []);
+
+  const nationChip = (value, text) => filterChip(text, currentGroup === value, () => {
+    currentGroup = value;
+    renderList();
+  });
+  fillRow(subGroupEl, nations.length ? [nationChip("", `${currentRegion} 전체`), ...nations.map(([name, count]) => nationChip(name, `${name} ${count}`))] : []);
+}
+
+// 현장실습: 노트 많은 순 상위 5개 + 「그 외 N곳」. 접힌 쪽에서 고른 유형은 접어도 보인다
+function renderKindChips(base) {
+  const kinds = countBy(base, (n) => n.kind);
+  if (currentGroup && !kinds.some(([name]) => name === currentGroup)) currentGroup = "";
+  const chip = (value, text) => filterChip(text, currentGroup === value, () => {
+    currentGroup = value;
+    renderList();
+  });
+  const folds = kinds.length > KIND_TOP + 1; // 하나만 남으면 접지 않는다
+  const shown = !folds || kindsOpen ? kinds : kinds.filter(([name], i) => i < KIND_TOP || name === currentGroup);
+  const chips = kinds.length ? [chip("", "기관 유형 전체"), ...shown.map(([name, count]) => chip(name, `${name} ${count}`))] : [];
+  // 펼침 칩은 거르는 칩이 아니라 aria-pressed 대신 aria-expanded
+  let more = null;
+  if (folds && (kindsOpen || shown.length < kinds.length)) {
+    const text = kindsOpen ? "접기" : `그 외 ${kinds.length - shown.length}곳`;
+    more = el("button", { className: "choice-chip", attrs: { type: "button", "aria-expanded": String(kindsOpen) } },
+      [el("span", { text }), icon(kindsOpen ? "chevron-up" : "chevron-down")]);
+    more.addEventListener("click", () => {
+      kindsOpen = !kindsOpen;
+      renderList();
+      const next = groupEl.querySelector("[aria-expanded]");
+      if (next) next.focus();
+    });
+    chips.push(more);
+  }
+  groupEl.setAttribute("aria-label", "기관 유형 필터");
+  fillRow(groupEl, chips);
+}
 
 function renderGroupChips(base) {
-  const g = GROUP_BY_CAT[currentCat];
-  if (!g) {
+  if (currentCat !== "global") {
+    currentRegion = "";
+    subGroupEl.hidden = true;
+    subGroupEl.replaceChildren();
+  }
+  if (currentCat === "global") renderRegionChips(base);
+  else if (currentCat === "practice") renderKindChips(base);
+  else {
     currentGroup = "";
     groupEl.hidden = true;
     groupEl.replaceChildren();
-    return;
   }
-  const counts = new Map();
-  for (const n of base) if (n[g.key]) counts.set(n[g.key], (counts.get(n[g.key]) || 0) + 1);
-  const groups = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko"));
-  if (currentGroup && !counts.has(currentGroup)) currentGroup = ""; // 검색으로 사라진 칩은 풀어 준다
-  groupEl.hidden = groups.length === 0;
-  groupEl.setAttribute("aria-label", `${g.label} 필터`);
-  const chip = (value, text) => {
-    const b = el("button", { className: "choice-chip", text, attrs: { type: "button", "aria-pressed": String(currentGroup === value) } });
-    b.addEventListener("click", () => {
-      currentGroup = value;
-      renderList();
-    });
-    return b;
-  };
-  groupEl.replaceChildren(chip("", `${g.label} 전체`), ...groups.map(([name, count]) => chip(name, `${name} ${count}`)));
+}
+
+// 목록의 필터·검색어를 주소에 남긴다(새로고침·링크로 다시 열어도 같은 목록). 다른 값(?server= 등)은 그대로 둔다
+const FILTER_PARAMS = { cat: () => currentCat, region: () => currentRegion, group: () => currentGroup, q: () => currentQuery.trim() };
+function syncUrl() {
+  const url = new URL(location.href);
+  if (url.searchParams.has("id")) return; // 상세 주소는 건드리지 않는다
+  url.searchParams.delete("type"); // 처음 들어올 때의 ?type=은 cat으로 바꿔 남긴다
+  for (const [key, value] of Object.entries(FILTER_PARAMS)) {
+    if (value()) url.searchParams.set(key, value());
+    else url.searchParams.delete(key);
+  }
+  if (url.href !== location.href) history.replaceState(history.state, "", url);
 }
 
 function skeletons() {
@@ -312,7 +437,8 @@ function renderList() {
       // 서버 답을 기다리는 동안은 로딩(6-3). 고른 나라·기관 유형 칩은 풀지 않는다
       listEl.setAttribute("aria-busy", "true");
       countEl.textContent = "";
-      groupEl.hidden = true;
+      hideGroupChips();
+      syncUrl();
       listEl.replaceChildren(...skeletons());
       serverSearch(q, currentQuery.trim());
       return;
@@ -322,8 +448,9 @@ function renderList() {
   listEl.setAttribute("aria-busy", "false");
   const base = allNotes.filter((n) => (!currentCat || CATEGORY[n.type] === currentCat) && matches(n));
   renderGroupChips(base);
-  const g = GROUP_BY_CAT[currentCat];
-  const notes = g && currentGroup ? base.filter((n) => n[g.key] === currentGroup) : base;
+  drawIcons(); // 「그 외 N곳」 칩의 화살표
+  syncUrl();
+  const notes = applyGroup(base);
   countEl.textContent = `노트 ${notes.length}개`;
 
   if (!notes.length && q) {
@@ -374,9 +501,12 @@ document.getElementById("filters").addEventListener("click", (e) => {
   const chip = e.target.closest(".choice-chip");
   if (!chip) return;
   currentCat = chip.dataset.cat;
-  currentGroup = ""; // 분야를 바꾸면 나라·기관 유형 칩은 처음부터
+  currentRegion = ""; // 분야를 바꾸면 권역·나라·기관 유형 칩은 처음부터
+  currentGroup = "";
+  kindsOpen = false;
   for (const c of e.currentTarget.querySelectorAll(".choice-chip")) c.setAttribute("aria-pressed", String(c === chip));
   if (loaded) renderList(); // 불러오는 중이거나 오류면 그 화면을 그대로 둔다
+  else syncUrl();
 });
 
 // 검색창 — 칠 때마다 바로 거른다(같은 화면 안 전환). Enter는 휴대폰 키보드만 내린다
@@ -840,13 +970,19 @@ function openDetail(id) {
   showDetail(id);
 }
 
-// ?type=인턴처럼 들어오면(인터BOO chat 칩 「다른 노트 보기」) 그 분야 필터를 켜고 목록을 연다
-function applyTypeFilter(type) {
-  const cat = CATEGORY[type];
-  if (!cat) return;
+// 처음 들어올 때 주소의 필터를 되살린다: ?cat=&region=&group=&q= (syncUrl이 남긴 것).
+// ?type=인턴처럼 들어오면(인터BOO chat 칩 「다른 노트 보기」) 그 분야 필터를 켠다.
+// 목록에 없는 값은 renderList가 칩을 그리며 풀어 준다
+function restoreFilters(params) {
+  const saved = params.get("cat") || "";
+  const cat = Object.hasOwn(CATEGORY_NAME, saved) ? saved : CATEGORY[params.get("type")] || "";
   currentCat = cat;
+  currentRegion = (cat === "global" && params.get("region")) || "";
+  currentGroup = (GROUP_BY_CAT[cat] && params.get("group")) || "";
   for (const c of document.querySelectorAll("#filters .choice-chip")) c.setAttribute("aria-pressed", String(c.dataset.cat === cat));
-  if (loaded) renderList();
+  queryInput.value = (params.get("q") || "").slice(0, queryInput.maxLength);
+  currentQuery = queryInput.value;
+  queryClear.hidden = currentQuery === "";
 }
 
 function route() {
@@ -856,8 +992,8 @@ function route() {
   else showList();
 }
 
-// ?type= 필터는 처음 들어올 때 한 번만 — 뒤로가기(popstate)로 목록에 오면 사용자가 고른 필터를 그대로 둔다
-applyTypeFilter(new URLSearchParams(location.search).get("type"));
+// 주소의 필터는 처음 들어올 때 한 번만 — 뒤로가기(popstate)로 목록에 오면 사용자가 고른 필터를 그대로 둔다
+restoreFilters(new URLSearchParams(location.search));
 
 document.getElementById("detailBack").addEventListener("click", () => {
   if (cameFromList) {
