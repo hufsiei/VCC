@@ -380,7 +380,7 @@ def _log_answer(question, out, program=None, trace=None, prev=None):
             [s.get("program") for s in sources.values()] or [c.get("program") for c in out.get("notes") or []]
         asked = plan.get("정리된질문")
         row = {"id": uuid.uuid4().hex[:12], "at": now(), "status": out.get("status"), "question": mask.mask(question),
-               "lines": [{"text": ln.get("text", ""), "cites": list(ln.get("cites") or [ln.get("sourceId")]),
+               "lines": [{"text": ln.get("text", ""), "cites": list(ln.get("cites") or ([ln["sourceId"]] if ln.get("sourceId") else [])),
                           **({"fallback": True} if ln.get("fallback") else {})} for ln in out.get("lines") or []],
                "programs": list(dict.fromkeys(p for p in programs if p)), "noteId": out.get("noteId"),
                # [작업 119] 대화응답(AI)이 쓴 글은 질문 글처럼 가린다. 코드 고정 문구(공식 안내의 담당 부서 전화 등)는 그대로
@@ -422,6 +422,12 @@ def _answer(me, payload, save, trace=None):
         # [Q-109] 업체를 못 정했고 유형으로만 잡히면(「스타트업 인턴 …」) 후보 업체 선배 모두에게 — 문구는 HOLD_SAVED 그대로
         cands = None if program else _type_candidates(question, carried_exclusions(question, history))
         return _hold(me, question, program, section, save, why="담기", place=(cands or {}).get("label"), candidates=cands)   # [작업 116] 관문은 _save에서(궁금 판단은 안 함 — 칩으로 직접 담음)
+
+    # [11/27] 용어 정의(「현장실습이랑 인턴십 차이」) → 고정 문구. AI·질문함 없음
+    found = term_definition(question)
+    if found:
+        trace["route"] = "용어"
+        return found
 
     want = wants_to_know(question)   # [작업 116] 질문정리 전·실패 때의 「알고 싶은 말」. 질문정리가 되면 그 「궁금」으로 바꾼다
     # [11/24 작업 87] 앞 턴(과 이번 말)에서 「○○ 말고」로 뺀 프로그램 — 이번 말이 그 이름을 다시 부르지 않으면 계속 뺀다
@@ -1095,7 +1101,8 @@ EXTRA_FILLER = {"수료자", "신청", "안내", "지원", "온라인", "실시�
                 "겨울방학", "방중", "방과후", "방과", "후", "초급", "중급", "고급", "초급반", "중급반", "초-중급", "중-고급", "반", "선발",
                 "예정", "및", "등", "이수", "참여", "대상", "까지", "선착순", "외국어", "전공", "학과", "학생", "선배", "직무",
                 "취업역량", "역량", "강화", "해외", "글로벌", "현지", "기업", "공기업", "대기업", "실무", "기초", "준비", "the", "and",
-                "for", "de", "em", "para", "program", "프로그램_튜티"}
+                "for", "de", "em", "para", "program", "프로그램_튜티",
+                "수업"}   # [11/27] 「독일어 수업을 따라가기 어려운데」가 「좋은 수업 만들기 …」로 잡히던 일
 EXTRA_TYPE_SET = {_norm(w) for w in EXTRA_TYPE_WORDS}
 EXTRA_CUE_RE = re.compile("|".join(EXTRA_TYPE_WORDS) + r"|비교과|모임|클럽|콘서트|들을|들어|참가|참여|수강|수료|나가|나갔|해\s*보")
 EXTRA_BLOCK_RE = re.compile(r"교환|파견|유학|어학연수|인턴|현장실습|대학교|기숙사|비자|월세|생활비|학점\s*인정")
@@ -1335,6 +1342,21 @@ def _side_text(names, said=""):
     return f"{said + ' ' if said else ''}{len(names)}개 · 이수 합 {_num(sum(cnt) if cnt else None, '명')} · 만족도 {rng}"
 
 
+_PROGRAM_NAMES = [n.lower() for n in PROGRAMS]
+
+
+def _unknown_latin(question):
+    """[11/27] 질문의 영문 낱말 가운데 어느 프로그램 이름에도 없는 것(유형 말 tutoring·buddy 등은 제외).
+    「ESD 공모전」에 공모전 전체를 말없이 보여 주지 않게, 유형·목록·순위 답 앞에 못 찾았다고 먼저 말한다."""
+    out = {}
+    for w in re.findall(r"[A-Za-z]{2,}", question):
+        k = w.lower()
+        if k == "vs" or any(rx.search(w) for _, rx, _, _ in EXTRA_TYPES) or any(k in n for n in _PROGRAM_NAMES):
+            continue
+        out.setdefault(k, w)
+    return list(out.values())
+
+
 def extra_scope(question, programs, excluded=(), field=None):
     """비교과 유형 단위·순위·비교·없는 프로그램 질문 → 코드가 세어 답한다(AI 없음). 해당 없으면 None(아래 길 그대로).
     field: 질문정리가 「비교과」로 정리했으면 "비교과"(질문에 「비교과」 말이 없어도 본다).
@@ -1360,6 +1382,12 @@ def extra_scope(question, programs, excluded=(), field=None):
             return _extra_notes(a[:2] + b[:3], message, "비교과 비교")
     if named:
         return None
+    unknown = _unknown_latin(question)
+    notice = "·".join(f'"{w}"' for w in unknown) + "가 이름에 들어간 비교과는 찾지 못했어요. " if unknown else ""
+
+    def reply(order, message, route):   # 유형·순위·목록 답(비교 답에는 붙이지 않는다)
+        return _extra_notes(order, notice + message, route)
+
     labels, pool = _type_pool(question, excluded)
     asked_extra = bool(EXTRA_WORD_RE.search(question)) or field == "비교과"
     if not pool and not asked_extra:
@@ -1382,23 +1410,23 @@ def extra_scope(question, programs, excluded=(), field=None):
         order = [n for n in order if _STU_GRADE.get(n, {}).get(g)]
         if not order:
             message = f"{label} {total}개 가운데 {g}학년 때 이수한 선배 기록이 있는 프로그램은 없어요."
-            return _extra_notes([], message, "비교과 학년")
+            return reply([], message, "비교과 학년")
         top = order[:3]
         message = (f"추천 순위는 따로 없어서, {g}학년 때 이수한 선배가 많은 {label}를 보여 드려요. "
                    + " · ".join(f"{short_name(n)} {_STU_GRADE[n][g]}명" for n in top) + " 순이에요.")
-        return _extra_notes(order, message, "비교과 학년")
+        return reply(order, message, "비교과 학년")
     if by_sat and not by_cnt:
         order = sorted(pool, key=lambda n: (-(extra_sat(n) or 0), -(extra_count(n) or 0), n))
         best = extra_sat(order[0])
         if best is None:
-            return _extra_notes(order, f"{label} {total}개의 만족도 기록이 없어요.", "비교과 만족도")
+            return reply(order, f"{label} {total}개의 만족도 기록이 없어요.", "비교과 만족도")
         ties = [n for n in order if extra_sat(n) == best]
         names = " · ".join(short_name(n) for n in ties[:3]) + (f" 등 {len(ties)}개" if len(ties) > 3 else "")
         proxy = ("도움이 됐는지는 선배 경험담이 아직 없어 말하기 어려워서, 만족도로 보여 드려요. "
                  if EXTRA_PROXY.search(question) and not re.search(r"만족도", question) else "")
         message = (f"{proxy}{label} {total}개 중 만족도가 가장 높은 건 {names}(5점 만점에 {best:g}점)이에요. "
                    f"만족도가 높은 순서로 보여 드려요.")
-        return _extra_notes(order, message, "비교과 만족도")
+        return reply(order, message, "비교과 만족도")
     order = sorted(pool, key=lambda n: (-(extra_count(n) or 0), -(extra_sat(n) or 0), n))
     top = order[:3]
     tail = ("아직 선배 경험담은 없어서" if not stories else f"선배 경험담이 있는 노트는 {len(stories)}개이고,")
@@ -1406,7 +1434,7 @@ def extra_scope(question, programs, excluded=(), field=None):
                + " · ".join(f"{short_name(n)} {_num(extra_count(n), '명')}" for n in top) + ".")
     if total == 1:
         message = f"{label}{_josa('은는', label)} 1개예요. {extra_facts(order[0])} {EXTRA_NO_STORY if not stories else ''}".strip()
-    return _extra_notes(order, message, "비교과 유형" if labels else "비교과 목록")
+    return reply(order, message, "비교과 유형" if labels else "비교과 목록")
 
 
 # 「없는 프로그램」을 가를 때 빼는 말(묻는 말투·흔한 말). 이것 말고 남는 말이 있으면 그 활동 이름을 말한 것으로 본다
@@ -2456,6 +2484,57 @@ def verify(sentence, source):
 # 해요체로 바꿀 때 새로 생기는 말투 조각(내용이 아님)
 _STYLE_OK = {"해요", "돼요", "있어", "없어", "좋아", "거예", "이에", "예요", "에요", "세요", "했어", "됐어", "봤어", "가요",
              "와요", "줘요", "져요", "워요", "이어", "어요", "아요", "편이", "수월", "그래"}
+
+
+# ── [11/27] 용어 정의 (코드 고정 문구, AI 없음) ─────────────────────────
+# 「현장실습이랑 인턴십 차이가 뭐예요?」 — 선배 경험을 묻는 말이 아니라 근거를 찾지 않고 서비스 안내 문구로 답한다.
+# 문장 전체가 「용어 (용어) 차이/뜻」 꼴일 때만(앞뒤를 묶어 대조) — 학교·나라·업체 이름이나 다른 말(「인턴 급여 차이」)이
+# 끼면 걸리지 않고 지금 길 그대로. 학교·나라 비교(COMPARE_*)보다 먼저 보지만 이름이 낄 자리가 없어 겹치지 않는다.
+_TERM = r"(현장\s*실습|인턴\s*십|인턴|비교과(?:\s*(?:프로그램|활동))?)"
+_TERM_HEAD = r"^\s*(?:(?:혹시|근데|그런데|그럼|여기서|학교에서)\s*)?"
+_TERM_TAIL = (r"(?:\s*(?:이|가|은|는|을|를|점|뭐|뭔|무엇|무슨|어떻게|돼|되|인가|인지|야|예|에|요|죠|지|"
+              r"있어|있나|궁금|해|알려|설명|줘|주세|주실래|[?？.!~]))*\s*$")
+TERM_DIFF_RE = re.compile(
+    _TERM_HEAD + _TERM + r"\s*(?:이랑|랑|하고|과|와|은|는|이|가|,|/|·|vs\.?)\s*" + _TERM
+    + r"\s*(?:은|는|의|이|가|간의|사이의|사이)?\s*(?:(?:뭐|무엇|어떻게)(?:가)?\s*)?(?:차이|다른\s*점|다른|다르|달라|달라요)"
+    + _TERM_TAIL, re.I)
+TERM_MEAN_RE = re.compile(
+    _TERM_HEAD + _TERM + r"\s*(?:이란|란|의|은|는|이|가)?\s*(?:(?:정확히|정확한)\s*)?(?:무슨\s*뜻|뜻|정의)" + _TERM_TAIL, re.I)
+TERM_LABEL = "서비스 안내"
+TERM_TEXT = {
+    "인턴": "인턴십(인턴)은 기업이나 기관에서 일을 배우며 해 보는 경험을 두루 이르는 말이에요.",
+    "현장실습": "현장실습은 그중 학교를 통해 신청해서 나가는 실습이에요. 해봤노트의 인턴 노트는 현장실습후기를 근거로 해요.",
+    "비교과": "비교과는 정규 교과과정 밖에서 학교가 운영하는 활동이에요. 특강·튜터링·멘토링·공모전 같은 것이 있어요.",
+}
+TERM_CHECK = {
+    "현장실습": "신청 자격과 학점 인정 기준은 {부서} 공식 안내에서 확인해 주세요.",
+    "비교과": "프로그램마다 대상과 신청 방법이 다르니 운영 부서 안내에서 확인해 주세요.",
+}
+
+
+def _term_key(word):
+    w = re.sub(r"\s", "", word)
+    return "비교과" if w.startswith("비교과") else "현장실습" if w == "현장실습" else "인턴"
+
+
+def term_definition(question):
+    """용어 정의 질문이면 status "ok"(근거 0건 — sources {}), 아니면 None. 첫 줄은 「서비스 안내」 표기."""
+    m = TERM_DIFF_RE.match(question) or TERM_MEAN_RE.match(question)
+    if not m:
+        return None
+    keys = {_term_key(g) for g in m.groups() if g}
+    same = len(m.groups()) == 2 and len(keys) < 2   # 「인턴이랑 인턴십 차이」 — 같은 말
+    if same:
+        keys = keys | {"현장실습"}
+    shown = keys | ({"인턴"} if "현장실습" in keys else set())   # 현장실습 문구의 「그중」이 가리킬 인턴십 문장을 앞에
+    texts = [TERM_TEXT[k] for k in ("인턴", "현장실습", "비교과") if k in shown]
+    if same:
+        texts.insert(0, "이 서비스에서는 「인턴」과 「인턴십」을 같은 뜻으로 써요.")
+    dept = DEPTS.get("D02", {}).get("부서명", "담당 부서")
+    texts += [TERM_CHECK[k].format(부서=dept) for k in ("현장실습", "비교과") if k in keys]
+    texts[0] = f"[{TERM_LABEL}] {texts[0]}"
+    return {"status": "ok", "sources": {}, "suggestSenior": False,
+            "lines": [{"text": t, "cites": [], "lineId": f"L-G-{i}"} for i, t in enumerate(texts, 1)]}
 
 
 # ── 응답 만들기 ───────────────────────────────────────────────────────
