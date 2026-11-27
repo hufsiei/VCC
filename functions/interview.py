@@ -27,6 +27,8 @@
 #   ③′ AI(1인칭, Sonnet): 공개 초안 문장을 한 번에 1인칭 해라체로 → 내 경험노트. 검증에 걸린 문장은 해요체 그대로.
 #   ④ 코드: identify.mark로 본인 식별 문장 표시 → runtime_fns.save_my_note로 저장(saved, myNoteId).
 #
+# [작업 110 초안] 플래그 VCC_TELL_CHAT=1이면 interviewNext 한 턴을 tell_chat.py가 맡는다(말판정 HCX → 다음 질문은 아래 코드 →
+#   대화쓰기 Sonnet이 반응·질문 다듬기, 코드가 검증). 기본(0)은 이 파일 그대로.
 # AI는 ai.py의 callAI로만 부른다. 프롬프트 원문은 docs/prompts/충분판정·꼬리질문·요약·일치검사.txt(작업 53 검증본).
 import json
 import re
@@ -38,6 +40,7 @@ import demand
 import identify
 import notes
 import store
+import tell_chat
 from ai import callAI, load_prompt
 from runtime_fns import drop_interview_draft, find_my_note, save_my_note
 
@@ -290,7 +293,10 @@ def interviewNext(me, payload):
     # [v2 작업 90] 이어 쓰기: 내 경험노트가 있으면 그 칸·질문을 이미 한 것으로 친다
     mid, mine = find_my_note(me, program)
     prior = prior_of(program, mine)
-    step = _next_step(me, program, payload, prior)
+    if tell_chat.enabled():   # [작업 110 초안] 대화형 — 끄면(기본) 아래 한 줄 그대로
+        step = tell_chat.next_step(me, program, payload, prior, mine)
+    else:
+        step = _next_step(me, program, payload, prior)
     if mid and not payload.get("answers") and "error" not in step:
         step = {**step, "resumed": True, "myNoteId": mid}
     return step
@@ -311,7 +317,10 @@ def prior_of(program, mine):
     return out
 
 
-def _next_step(me, program, payload, prior):
+def _next_step(me, program, payload, prior, follow=True, passed=frozenset()):
+    """follow·passed는 [작업 110] 대화형(tell_chat)만 넘긴다. 기본값이면 지금 그대로.
+    follow=False: 충분판정·꼬리질문(AI)을 부르지 않는다(대화형은 말판정·대화쓰기가 대신 본다).
+    passed: 선배가 「모름」이라 답 없이 넘긴 칸 — 다시 묻지 않는다(채운 칸으로 세지는 않음)."""
     # [v2] 후배 질문 답은 질문의 칸으로(옛 「후배 질문」 칸·questionId를 빠뜨린 답도)
     answers = _place_all(program, _clean_answers(payload.get("answers")))
     # [11/23 작업 84] 말머리 칩만 보낸 답은 빼고 센다. 방금 그랬으면 같은 질문을 다시 묻는다(아래).
@@ -338,7 +347,7 @@ def _next_step(me, program, payload, prior):
     waiting = [q for q in juniors if q["id"] not in seen_q and askboo._norm(q["질문"]) not in seen_text]
     # [11/26] 방금 답이 후배 질문의 첫 답이면 다음 질문보다 먼저 충분한지 본다 — 질문마다 꼬리 질문 1회
     last = answers[-1] if answers else None
-    if last and last is last_raw and not last.get("skipped") and last.get("answer") and is_junior(last) \
+    if follow and last and last is last_raw and not last.get("skipped") and last.get("answer") and is_junior(last) \
             and last.get("section") in sections:
         same = [a for a in answers if is_junior(a) and not a.get("skipped") and _junior_key(a) == _junior_key(last)]
         if len(same) == 1:
@@ -368,7 +377,7 @@ def _next_step(me, program, payload, prior):
 
     # ③ 방금 들어온 답이 그 칸의 첫 답이면 충분한지 보고, 부족하면 꼬리 질문(칸당 1회)
     # [v2] 후배 질문 답(위에서 따로 본다)은 그 칸의 「첫 답」으로 세지 않는다(그 칸 질문의 꼬리는 그대로)
-    if last and not last.get("skipped") and last.get("answer") and last.get("section") in sections \
+    if follow and last and not last.get("skipped") and last.get("answer") and last.get("section") in sections \
             and not is_junior(last):
         same = [a for a in answers if a.get("section") == last["section"] and not a.get("skipped")
                 and not is_junior(a)]
@@ -381,7 +390,7 @@ def _next_step(me, program, payload, prior):
     # ② [11/22] 비었거나(0건) 오래된 칸만 기본 질문 — 근거가 충분한 칸은 묻지 않는다(covered)
     base = {"done": False, "progress": progress, "pendingQuestions": 0, "covered": covered}
     for s in gaps:
-        if s not in answered:
+        if s not in answered and s not in passed:
             q = base_question(program, s)
             if stats.get(s):   # 근거가 있는데 오래된 칸
                 q = STALE_PREFIX.format(s=s) + q
@@ -402,7 +411,7 @@ def _next_step(me, program, payload, prior):
             return step
 
     # ④ 배운점은 마지막(교환·파견은 인터뷰로만 받는 칸)
-    if LAST_SECTION in sections and LAST_SECTION not in answered:
+    if LAST_SECTION in sections and LAST_SECTION not in answered and LAST_SECTION not in passed:
         step = {**base, "section": LAST_SECTION, "question": base_question(program, LAST_SECTION)}
         ex = _chips((frame.get("예시") or {}).get(LAST_SECTION))   # [11/23 작업 84] 배운점에도 칩
         if ex:
@@ -488,7 +497,10 @@ def summarizeInterview(me, payload):
     program = (payload.get("program") or "").strip()
     if not program:
         return {"error": "들려줄 경험을 먼저 골라 주세요"}
-    transcript = [a for a in _clean_answers(payload.get("transcript"))
+    items = _clean_answers(payload.get("transcript"))
+    if tell_chat.enabled():   # [작업 110 초안] 되물음·딴얘기·모름은 빼고, 다른 칸 이야기는 그 칸으로, 다듬은 질문은 원래 질문으로
+        items = tell_chat.for_summary(me, program, items)
+    transcript = [a for a in items
                   if a.get("answer") and not a.get("skipped") and not bare_stem(a.get("answer"))][:MAX_TRANSCRIPT]
     if not transcript:
         return {"error": "요약할 답이 아직 없어요. 질문에 하나 이상 답해 주세요"}
@@ -533,6 +545,8 @@ def summarizeInterview(me, payload):
                                   answered=answered, asked=asked, asked_depth=asked_depth, append=append)
         saved = True
         drop_interview_draft(me, program)   # [v2 작업 79] 요약하면 미완성 초안은 지운다(0장 보관기간)
+        if tell_chat.enabled():
+            tell_chat.drop(me, program)       # [작업 110 초안] 대화 판정 기록도 함께
     except OSError:
         my_note_id, saved = None, False
     if append and saved:   # [v2 작업 90] 응답은 합친 전체, 이번에 만든 문장에 new: true
