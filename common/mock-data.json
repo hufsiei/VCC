@@ -256,6 +256,12 @@
     }
   },
   "interviewNext": {
+    "tellChat": {
+      "answer": {"done": false, "followUp": true, "section": "비용", "question": "기숙사에 떨어진 뒤 원룸은 어떻게 구했어요?", "reaction": "원룸이 한 달 25만 원이었군요.", "heard": {"kind": "답", "section": "비용"}, "progress": {"filled": 1, "mine": 1, "total": 6}, "pendingQuestions": 0, "covered": ["지원", "학점", "비용", "생활", "팁"]},
+      "askedBack": {"done": false, "section": "팁", "question": "처음 갔을 때 몰라서 헤맨 일이 있었어요?", "reaction": "후배들이 참고할 해봤노트에 담으려고 여쭤보는 거예요. 공개할 문장은 선배가 직접 골라요.", "heard": {"kind": "되물음", "section": null}, "progress": {"filled": 1, "mine": 1, "total": 6}, "pendingQuestions": 0, "covered": ["지원", "학점", "비용", "생활", "팁"]},
+      "held": {"done": false, "section": "생활", "depth": true, "question": "출국 전에 걱정했던 것과 실제로 달랐던 게 있었나요?", "reaction": "기숙사는 1인실이라 편하셨군요. 궁금하신 점은 내 질문함에 담아 두었어요.", "heard": {"kind": "답", "section": "생활"}, "heldQuestionId": "Q-0002", "progress": {"filled": 1, "mine": 1, "total": 6}, "pendingQuestions": 0, "covered": ["지원", "학점", "비용", "생활", "팁"]},
+      "stopped": {"done": true, "stopped": true, "reaction": "알겠어요. 들려주셔서 고마워요. 아래 AI 요약을 누르면 지금까지 이야기가 정리돼요.", "heard": {"kind": "그만", "section": null}, "progress": {"filled": 1, "mine": 1, "total": 6}, "covered": ["지원", "학점", "비용", "생활", "팁"]}
+    },
     "byProgram": {
       "마르부르크필립스대학교": {
         "steps": [
