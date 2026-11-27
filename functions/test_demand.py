@@ -186,6 +186,26 @@ if INTERN:
     expect("현장실습: 월급 질문 → 근무조건",
            demandNext(OTHER, {"state": {"fromQuestionId": q_pay}})["state"].get("section") == "근무조건")
 
+# ── 5-1b. [11/27 #384 B1·B2] 보류 질문의 칸 문구 · 현장실습 칸 추정 ───
+r = demandNext(OTHER, {"state": {"fromQuestionId": q_none}})
+expect("보류 질문 시작 + 칸 없음 → 「방금 질문은 어느 내용에 가까워요?」",
+       r["step"] == "section" and r["question"] == "방금 질문은 어느 내용에 가까워요?")
+expect("현장실습 프로그램이 데이터에 있음", bool(INTERN))
+for text, section in [("거기서는 주로 어떤 업무를 맡아요?", "업무내용"),
+                      ("승무원이 꿈인데 이 인턴 합격이 진로에 도움이 될까요?", "배운점"),
+                      ("인턴 하면서 가장 크게 배운 점이 뭐예요?", "배운점"),
+                      ("면접은 어떻게 준비해야 해요?", "지원·선발"),
+                      ("왜 지원했는지 계기가 궁금해요", "지원동기"),
+                      ("정규직 채용 전환도 되나요? 진로가 고민돼요", "근무조건")]:
+    qid = rf.add_question(OTHER, text, INTERN, None, status="hold")
+    r = demandNext(OTHER, {"state": {"fromQuestionId": qid}})
+    expect(f"현장실습: 「{text}」 → {section}, 칸 단계 건너뜀",
+           r["step"] == "when" and r["state"].get("section") == section)
+qid = rf.add_question(OTHER, "여기 가 본 선배 계세요?", INTERN, None, status="hold")
+r = demandNext(OTHER, {"state": {"fromQuestionId": qid}})
+expect("현장실습: 못 정하면 새 문구로 칸을 물음",
+       r["step"] == "section" and r["question"] == "방금 질문은 어느 내용에 가까워요?")
+
 # ── 5-2. [11/26 작업 117] 프로그램 없는 보류 질문 → 정리하면서 고른 프로그램이 그 행에 채워짐 ───
 bare = rf.add_question(OTHER, "해외에서 학기 중에 일해 볼 수 있는지 궁금해요", None, None, status="hold")
 r, seen = walk(OTHER, {"_start": {"fromQuestionId": bare}, "field": "국제교류", "detail": "독일", "program": MARBURG,
