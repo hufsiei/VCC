@@ -242,7 +242,7 @@ staff = opts("staff01", {"field": "국제교류"})[:-1]
 expect("학과가 없으면 전교 선배 순", [all_c.get(c, 0) for c in staff] == sorted((all_c.get(c, 0) for c in staff), reverse=True))
 expect("인턴 기관 종류도 학과 순", opts(JUNIOR, {"field": "현장실습"})[0] == max(
     h[("현장실습", "detail")]["dept"]["독일어과"].items(), key=lambda x: x[1])[0])
-expect("비교과 유형은 「1회성(4)」의 횟수를 떼고 셈", "1회성" in h[("비교과", "detail")]["all"])
+expect("비교과 유형은 「진로·취업 교육과정(4)」의 횟수를 떼고 셈", "진로·취업 교육과정" in h[("비교과", "detail")]["all"])
 expect("칩에 인원 숫자를 붙이지 않음", all("명" not in str(o) for o in opts(JUNIOR, {"field": "국제교류"})))
 
 print()
