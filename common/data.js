@@ -164,7 +164,7 @@ const DEMAND = {
     detail: { 국제교류: "어느 나라가 궁금해요?", 현장실습: "어떤 곳에서 일해 보고 싶어요?", 비교과: "어떤 종류의 프로그램이 궁금해요?" },
     program: "궁금한 프로그램을 골라 주세요. 아직 정하지 않았어도 괜찮아요.", section: "이 프로그램에서 무엇이 가장 궁금해요?",
     sectionNotYet: "프로그램은 나중에 정해도 돼요. {i}에 대해 무엇이 가장 궁금해요?",
-    sectionFromQuestion: "방금 질문은 어느 내용에 가까워요?",
+    sectionFromQuestion: '아까 적은 질문 "{q}"은 어느 내용에 가까워요?',
     when: "언제쯤 해 보려고 해요?", situation: "지금 어느 정도 준비됐어요? 선배가 답할 때 참고할 수 있게 지금 상황을 적어 주세요.",
     question: "{s}에 대해 무엇이 궁금해요? 선배에게 묻고 싶은 것을 한 문장으로 적어 주세요.",
     hope: "이 경험이 나에게 무엇을 남겨 줬으면 좋겠어요?", more: "더 궁금한 게 있으면 적어 주세요. 없으면 넘어가도 돼요.",
@@ -188,6 +188,11 @@ function answerProblem(text) {
 }
 const countInterview = (tr) =>
   new Set((tr || []).filter((a) => a && !a.skipped && !answerProblem(a.answer)).map((a) => `${a.section}|${String(a.question || "").replace(/\s+/g, "")}`)).size;
+
+const quoteQuestion = (text) => {
+  const t = String(text || "");
+  return t.length > 40 ? `${t.slice(0, 40).trimEnd()}…` : t;
+};
 
 function mockDemand(m, raw) {
   const s = { ...(raw || {}) };
@@ -226,7 +231,7 @@ function mockDemand(m, raw) {
   const sections = frame["칸"].filter((x) => x !== QUESTION_SECTION);
   const label = DEMAND.fieldLabel[s.field] + (s.detail ? `·${s.detail}` : "");
   if (!sections.includes(s.section))
-    return step("section", { question: s.fromQuestionId ? DEMAND.q.sectionFromQuestion
+    return step("section", { question: s.fromQuestionId ? DEMAND.q.sectionFromQuestion.replace("{q}", () => quoteQuestion(s.question))
       : s.program ? DEMAND.q.section : DEMAND.q.sectionNotYet.replace("{i}", label), options: sections });
   if (!DEMAND.when.includes(s.when)) return step("when", { question: DEMAND.q.when, options: DEMAND.when });
   for (const k of ["situation", "question", "hope"]) {
