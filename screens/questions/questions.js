@@ -335,15 +335,29 @@ function questionStatusLabel(q) {
 
 // [11/26 작업 118] 질문의 프로그램(spec getInbox 작업 117): 커버는 해봤노트 카드의 분야 띠(태그 + 프로그램 이름).
 // program이 null이면 어느 선배에게도 전달되지 않은 질문이다. 필드가 아예 없으면(재배포 전 서버) 커버 없이 그전 모양
-const needsProgram = (q) => q.status === "hold" && q.program === null;
+// [11/27 #396 Q-109] 예외: candidates({label, programs})가 있으면 program이 null이어도 후보 업체 선배 모두에게 전달된 질문
+const candidateLabel = (q) => {
+  const label = q.candidates && typeof q.candidates.label === "string" ? q.candidates.label.trim() : "";
+  return q.program === null && label ? label : "";
+};
+const needsProgram = (q) => q.status === "hold" && q.program === null && !candidateLabel(q);
 
 function questionBand(q) {
   if (q.program === undefined) return null;
   const cat = CATEGORY[q.type] || null;
   return el("div", { className: `note-card__band ${cat ? `cat-${cat}` : "question-band--none"}` }, [
     cat ? el("span", { className: "category-tag", text: CATEGORY_NAME[cat] }) : null,
-    el("span", { className: "note-card__kind", text: q.program || "프로그램을 정하지 않았어요" }),
+    el("span", { className: "note-card__kind", text: q.program || candidateLabel(q) || "프로그램을 정하지 않았어요" }),
   ]);
+}
+
+// [11/27 #393-2] 대기 카드 안내: 언제·어떻게 답이 오는지(기한 약속 문구는 쓰지 않음)
+function waitingInfo(q) {
+  const label = candidateLabel(q);
+  return [
+    el("p", { className: "question__info", text: label ? `근거 0건 · ${label} 선배에게 전달됐어요` : "근거 0건 · 선배 인터뷰 질문으로 전달됐어요" }),
+    el("p", { className: "question__info", text: `${label ? "후보 업체를" : "이 프로그램을"} 다녀온 선배가 BOO와 인터뷰할 때 이 질문을 먼저 물어봐요.` }),
+  ];
 }
 
 // 인터BOO 보류 답 아래 버튼과 같은 흐름(demandNext fromQuestionId) — 인터BOO가 ?from=을 받아 바로 시작한다
@@ -373,11 +387,9 @@ function questionCard(q) {
       el("p", { className: "question__info", text: "학교 규정·절차 질문이라 공식 안내에서 확인해 주세요." }),
     );
   } else {
-    children.push(
-      el("span", { className: "question__date", text: questionDates(q) }),
-      el("p", { className: "question__info", text: needsProgram(q) ? NOT_DELIVERED : "근거 0건 · 선배 인터뷰 질문으로 전달됐어요" }),
-    );
-    if (needsProgram(q)) children.push(sortOutButton(q));
+    children.push(el("span", { className: "question__date", text: questionDates(q) }));
+    if (needsProgram(q)) children.push(el("p", { className: "question__info", text: NOT_DELIVERED }), sortOutButton(q));
+    else children.push(...waitingInfo(q));
   }
   const band = questionBand(q);
   if (!band) return el("article", { className: "card question" }, children);
@@ -900,7 +912,8 @@ async function renderQuestion(questionId) {
     children.push(
       emptyEvidence(needsProgram(q) ? `${NOT_DELIVERED}.` : "아직 이 질문에 답한 선배가 없어요. 다음 선배 인터뷰 때 먼저 물어볼게요."),
       ...(needsProgram(q) && !editingThis ? [sortOutButton(q)] : []),
-      el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } }),
+      // [11/27 #379-1] 질문의 noteId(spec 「질문의 노트」)가 있으면 그 노트 기준 추천
+      el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: q.noteId ? `../senior/?noteId=${encodeURIComponent(q.noteId)}` : "../senior/" } }),
     );
     // [11/26 작업 91] 본인 hold 질문만 고치기·삭제(spec deleteQuestion·updateQuestion). 고치는 중에는 숨김
     if (q.status === "hold" && !editingThis) children.push(questionActions(q));
