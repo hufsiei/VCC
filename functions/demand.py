@@ -34,6 +34,7 @@ EXPLORE = [   # 「잘 모르겠어요」 → BOO가 먼저 고민을 묻고 분
     {"label": "진로 찾기", "field": "비교과", "detail": "진로·취업 교육과정"},
     {"label": "공부 방법 찾기", "field": "비교과", "detail": "학습공동체·튜터링·멘토링"},
 ]
+QUOTE_LEN = 40   # 칸 질문에 인용하는 보류 질문 길이. 넘으면 말줄임
 WHEN = ["이번 학기", "다음 학기", "1년 뒤", "아직 몰라요"]
 JUNK = {"몰라요", "모르겠어요", "잘 모르겠어요", "없어요", "없음", "아무거나", "글쎄요", "그냥요", "딱히요", "ㅇㅇ", "네", "아니요"}
 
@@ -45,7 +46,7 @@ QUESTIONS = {
     "program": "궁금한 프로그램을 골라 주세요. 아직 정하지 않았어도 괜찮아요.",
     "section": "이 프로그램에서 무엇이 가장 궁금해요?",
     "sectionNotYet": "프로그램은 나중에 정해도 돼요. {i}에 대해 무엇이 가장 궁금해요?",   # 프로그램 「아직 정하지 않았어요」
-    "sectionFromQuestion": "방금 질문은 어느 내용에 가까워요?",   # [11/27] 보류 질문에서 시작: 궁금한 것은 이미 말했으니 칸만 고른다
+    "sectionFromQuestion": '아까 적은 질문 "{q}"은 어느 내용에 가까워요?',   # [11/27] 보류 질문에서 시작: 궁금한 것은 이미 말했으니 칸만 고른다
     "when": "언제쯤 해 보려고 해요?",
     "situation": "지금 어느 정도 준비됐어요? 선배가 답할 때 참고할 수 있게 지금 상황을 적어 주세요.",
     "question": "{s}에 대해 무엇이 궁금해요? 선배에게 묻고 싶은 것을 한 문장으로 적어 주세요.",
@@ -303,7 +304,10 @@ def next_step(s, me=None):
     sections = _sections(field, s.get("program"))
     if s.get("section") not in sections:
         if s.get("fromQuestionId"):
-            q = QUESTIONS["sectionFromQuestion"]
+            asked = s.get("question") or ""
+            if len(asked) > QUOTE_LEN:
+                asked = asked[:QUOTE_LEN].rstrip() + "…"
+            q = QUESTIONS["sectionFromQuestion"].replace("{q}", asked)
         elif s.get("program"):
             q = QUESTIONS["section"]
         else:
