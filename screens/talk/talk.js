@@ -625,6 +625,8 @@ function renderAnswer(res, question) {
 }
 
 const noteHref = (noteId) => `../note/?id=${encodeURIComponent(noteId)}`;
+// 닮은선배 — noteId가 있으면 그 해봤노트 기준 추천(senior.js 주소 ?noteId=), 없으면(null) 기본 목록
+const seniorHref = (noteId) => (noteId ? `../senior/?noteId=${encodeURIComponent(noteId)}` : "../senior/");
 
 // notes 응답의 노트 카드(공통 부품 .note-card): 분야 띠 · 노트명 · 근거 N건, 누르면 해봤노트 상세.
 // 분야 띠는 해봤노트 화면(note.js noteCover)과 같은 규칙: CATEGORY[type] 띠 + 「교환학생 · 독일」(#173 type).
@@ -1020,7 +1022,7 @@ function demandSentMessage(out) {
   appendAll(body,
     el("p", { className: "msg__bubble", text: "선배와 담당 부서에 전했어요. 질문은 질문함에 담겨 있고, 선배가 경험을 들려줄 때 이 질문을 먼저 물어볼게요." }),
     ready ? statusLabel("success", "check", "선배 추천이 열렸어요") : null,
-    ready ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } }) : null,
+    ready ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: seniorHref(out.noteId) } }) : null, // #390 saveDemand noteId
     el("span", { className: "msg__time", text: timeText() }),
   );
   return msg;
