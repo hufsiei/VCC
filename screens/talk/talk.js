@@ -459,7 +459,14 @@ async function sendQuestion(question, { withHistory = true, force } = {}) {
   const at = timeText();
   addTo(askChat, userText(question));
   const typing = addTo(askChat, typingMessage());
+  // [#364] 3초가 지나도 답이 없으면 점 세 개 옆에 기다림 안내(중립 라벨 — 코드 문구라 AI 색 아님, 3-4)
+  const slowHint = setTimeout(() => {
+    typing.querySelector(".msg__bubble")?.append(statusLabel("neutral", "clock", "선배 글을 읽고 있어요 · 보통 5초 걸려요"));
+    drawIcons();
+    scrollToLatest();
+  }, 3000);
   const res = await askBoo(question, withHistory ? ask.turns.slice(-HISTORY_TURNS) : [], force ? { force } : {});
+  clearTimeout(slowHint);
   typing.remove();
   ask.busy = false;
   updateComposer();
@@ -486,6 +493,31 @@ function rememberTurn(question, res) {
   if (ask.turns.length > HISTORY_TURNS) ask.turns.shift();
 }
 
+// [#357·#331-1·#337] 공식 안내 링크 + 부서 대표전화(tel:). 전화는 숫자·하이픈 모양일 때만
+function officialLinks(officialUrl, officialPhone) {
+  const url = safeUrl(officialUrl);
+  const phone = typeof officialPhone === "string" && /^[0-9+][0-9-]{6,18}$/.test(officialPhone.trim()) ? officialPhone.trim() : "";
+  return [
+    url ? el("a", { className: "link-more", text: "공식 안내 보기 ›", attrs: { href: url, target: "_blank", rel: "noopener" } }) : null,
+    phone ? el("a", { className: "link-more", attrs: { href: `tel:${phone.replace(/-/g, "")}`, "aria-label": `전화 ${phone}` } }, [icon("phone"), phone]) : null,
+  ].filter(Boolean);
+}
+
+// [#357] ok·hold 답 아래 「꼭 확인」 안내(officialCheck) — 코드 고정 문구라 AI 색 말고 정보색(3-4), 근거 블록과 따로
+function officialCheckBox(check) {
+  if (!check || typeof check !== "object" || typeof check.message !== "string" || !check.message.trim()) return null;
+  return el("div", { className: "official-check" }, [
+    statusLabel("info", "info", "꼭 확인"),
+    el("p", { className: "official-check__text", text: check.message }),
+    el("div", { className: "evidence-after" }, officialLinks(check.officialUrl, check.officialPhone)),
+  ]);
+}
+
+// [#331-1] 질문함에 담긴 질문은 선배 인터뷰 질문 — 부서가 답하는 창구로 오해하지 않게
+function inboxNote() {
+  return el("p", { className: "inbox-note" }, [icon("info"), "질문함은 선배 인터뷰 때 묻는 질문이에요. 부서가 답하는 창구는 아니에요."]);
+}
+
 function renderAnswer(res, question) {
   if (!res || res.error) return renderError(res && res.error, () => sendQuestion(question));
 
@@ -495,7 +527,7 @@ function renderAnswer(res, question) {
     // 근거 없음: 답을 지어내지 않는다(6-2) — 안내 + 0건 블록 + 닮은선배 보기 + 토스트
     if (!replayAt) toast("질문함에 담았어요"); // 복원할 때는 다시 띄우지 않는다
     const { msg, body } = booMessage({ wide: true });
-    body.append(
+    appendAll(body,
       el("div", { className: "hold-box" }, [
         el("p", { className: "hold-box__text", text: res.message || "이 부분은 아직 경험한 선배가 없어요. 질문함에 담아 두었어요." }),
         emptyEvidence(),
@@ -511,6 +543,8 @@ function renderAnswer(res, question) {
           ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } })
           : null,
       ]),
+      officialCheckBox(res.officialCheck),
+      res.questionId ? inboxNote() : null,
       el("span", { className: "msg__time", text: timeText() }),
     );
     return msg;
@@ -519,13 +553,13 @@ function renderAnswer(res, question) {
   if (res.status === "official") {
     // 규정 질문: 선배 경험으로 답하지 않고 공식 안내로(6-1 마지막 줄)
     const { msg, body } = booMessage({ wide: true });
-    const url = safeUrl(res.officialUrl);
-    body.append(
+    appendAll(body,
       el("p", { className: "msg__bubble", text: res.message || "학교 규정에 관한 질문이라 공식 안내에서 확인해 주세요." }),
       el("div", { className: "evidence-after" }, [
         statusLabel("info", "info", "공식 안내"),
-        url ? el("a", { className: "link-more", text: "공식 안내 보기 ›", attrs: { href: url, target: "_blank", rel: "noopener" } }) : null,
+        ...officialLinks(res.officialUrl, res.officialPhone),
       ]),
+      res.questionId ? inboxNote() : null,
       el("span", { className: "msg__time", text: timeText() }),
     );
     return msg;
@@ -584,6 +618,7 @@ function renderAnswer(res, question) {
           }),
         ])
       : null,
+    officialCheckBox(res.officialCheck),
     el("span", { className: "msg__time", text: timeText() }),
   );
   return msg;
