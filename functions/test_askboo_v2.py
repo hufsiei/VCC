@@ -1060,6 +1060,41 @@ os.environ.pop("VCC_ASK_CHAT", None)
 if _old_flag is not None:
     os.environ["VCC_ASK_CHAT"] = _old_flag
 
+# ── [11/27] 비교과 정직화 3건 (체험 계정 질문) ─────────────────────────
+res, calls = run("ESD 공모전 있어?", [], plan=None)
+expect("모르는 약어 + 유형 → 못 찾았다고 먼저 말하고 유형 답", res["status"] == "notes" and res["notes"]
+       and res["message"].startswith('"ESD"가 이름에 들어간 비교과는 찾지 못했어요. 공모전·대회 비교과는 '), res.get("message"))
+
+res, _ = run("독일어 수업을 따라가기 어려운데 독일어 능력을 길러줄 프로그램 없을까?", [],
+             plan={"의도": "탐색", "분야": "비교과", "나라": None, "프로그램후보": [], "제외": [], "칸": None,
+                   "정리된질문": "독일어 능력을 기르는 비교과 프로그램"})
+expect("「수업」만 겹치는 비교과로 가지 않고 없는-프로그램 보류", res["status"] == "hold" and not res.get("noteId")
+       and "좋은 수업" not in res["message"] and res["message"] == askboo.HOLD_NO_PROGRAM, res)
+
+res, calls = run("현장실습이랑 인턴십 차이가 뭐예요?", [])
+text = " ".join(ln["text"] for ln in res.get("lines", []))
+expect("용어 차이 → 고정 문구(서비스 안내, 근거 0건, AI·질문함 없음)", res["status"] == "ok" and res["sources"] == {}
+       and text.startswith("[서비스 안내] ") and "현장실습지원센터" in text and "questionId" not in res and calls == [], res)
+for q in ("현장실습 vs 인턴십 차이", "비교과가 무슨 뜻이야?", "인턴십의 정의 알려줘", "인턴과 현장실습은 뭐가 달라요?",
+          "비교과랑 현장실습의 다른 점"):
+    expect(f"용어 정의: 「{q}」", askboo.term_definition(q) is not None)
+for q in ("코트라 인턴이랑 무역협회 인턴 차이", "인턴 급여 차이 있어요?", "교환이랑 인턴 차이", "마르부르크 현장실습이랑 인턴 차이",
+          "현장실습 학점 인정 기준 뜻", "인턴 하면서 느낀 점이 학교 수업이랑 달라요?", "비교과 뭐 있어요?", "현장실습 어땠어요?"):
+    expect(f"용어 정의 아님: 「{q}」", askboo.term_definition(q) is None)
+
+res = askboo.term_definition("비교과랑 현장실습의 다른 점")
+expect("현장실습이 들면 인턴십 문장이 앞에(「그중」이 가리킬 말)", "인턴십" in res["lines"][0]["text"] and "그중" in res["lines"][1]["text"], res)
+import time  # noqa: E402
+_t = time.time()
+for tail in ("이야", "에요", "인가요", "있어", "해줘"):
+    askboo.term_definition("인턴 뜻" + tail * 70 + "x")
+    askboo.term_definition("현장실습 인턴 차이" + tail * 70 + "x")
+expect("긴 말끝 반복에도 정규식이 바로 끝남", time.time() - _t < 1, time.time() - _t)
+
+res, _ = run("NCS 특강 뭐 있어?", [], plan=None)
+expect("비회귀: 이름에 있는 약어(NCS)는 문구 앞에 안내를 붙이지 않음", res["status"] == "notes"
+       and "찾지 못했어요" not in res["message"] and "특강 비교과는" in res["message"], res.get("message"))
+
 # ── 정리 ──────────────────────────────────────────────────────────────
 print()
 print("실패 %d개" % len(fails) if fails else "전부 통과")
