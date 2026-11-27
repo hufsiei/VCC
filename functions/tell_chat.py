@@ -20,6 +20,8 @@
 #        7일 지나면 지우고, 요약(summarizeInterview)이 끝나면 지운다. 화면이 heard.kind를 answers의 kind로 돌려보내면 그 값이 먼저다(제안).
 #   ⑥ 궁금 → askboo._save(#369 관문: 연락처·학번·메일·비방)를 지나 내 질문함(hold, 지금 들려주는 프로그램)에 담는다.
 #        질문의 뜻·왜 묻는지 되묻는 말은 담지 않는다(말판정이 궁금 null). 궁금 글이 선배 말 그대로가 아니면 말 전체(짧을 때만).
+#        [Q-114] 궁금 글이 지시어뿐이면(「나도 그게 궁금했는데」) 「(BOO 질문) 선배 말」로 담는다. 담은 턴이 부족·되물음이면
+#        반응 없이 HELD_TEXT + 다시 묻는 질문만. 부족·되물음·딴얘기 반응에 평가 말(_EVAL)이 들면 버린다.
 # 실패: 말판정이 실패하면 지금처럼 답으로 보고 고정 질문(반응 없음). 대화쓰기가 실패하면 고정 질문 + 고정 반응.
 # 응답(제안 — spec·화면 미반영): 지금 필드 그대로 + reaction(반응 글) · heard {kind, section}(방금 말을 어떻게 봤는지)
 #        · heldQuestionId(질문함에 담은 질문) · stopped(그만). 화면이 reaction을 질문 말풍선 앞에 그리면 된다.
@@ -50,13 +52,23 @@ STOP_TEXT = "알겠어요. 들려주셔서 고마워요. 아래 AI 요약을 누
 HELD_TEXT = "궁금하신 점은 내 질문함에 담아 두었어요."
 FALLBACK_REACTION = {   # 대화쓰기가 실패하거나 반응이 검증에 걸렸을 때. 답은 반응 없이 다음 질문만
     "부족": "괜찮아요. 떠오르는 장면 하나만 들려주셔도 돼요.",
-    "되물음": "편하게 떠오르는 대로 들려주시면 돼요.",
+    "되물음": "다시 여쭤볼게요.",   # [Q-114] 평가·설명 없이 중립(풀어 묻기는 질문이 맡음)
     "딴얘기": "인터뷰로 돌아와서 이어서 여쭤볼게요.",
     "모름": "괜찮아요. 다음 질문으로 넘어갈게요.",
 }
 _END = re.compile(r"(요|죠|까)[.!?~]*$")
 _ASK_END = re.compile(r"(요|까)\?$|주세요\.?$")   # 「…들려주세요.」도 질문으로(기본 질문 「배운 점을 … 들려주세요.」와 같은 끝맺음)
 _FEATURE = re.compile(r"질문함|요약|저장")   # 화면 기능을 말하는 반응은 버린다(담았는지·정리되는지는 코드가 붙인다)
+# [Q-114] 부족·되물음·딴얘기 반응에 선배의 이해·질문 난이도·말의 부족함을 평가하는 말이 들면 버린다
+# (11/27 시험: 「나도 그게 궁금했는데」 → 「질문이 조금 어려웠을 수 있어요. …여쭤본 거예요.」 — 무시당하는 느낌)
+_EVAL = re.compile(r"어려[웠우워]|어렵|헷갈|이해|쉽게\s*말(하면|씀)|다시\s*말(해|하면|씀드리)|무슨\s*말인지|부족|모호|애매"
+                   r"|질문이\s*(조금|좀|너무)?\s*(길|막연|추상)")
+NO_REACTION_HELD = {"부족", "되물음"}   # [Q-114] 질문함에 담은 턴은 반응 없이 HELD_TEXT + 다시 묻는 질문만(말풍선 겹침)
+# [Q-114] 궁금 글이 지시어뿐인지 볼 때 빼는 말(지시어·궁금 표현·맞장구). 남는 낱말이 없으면 BOO 질문을 함께 담는다
+_DEICTIC = re.compile(r"^(그|이|저)(게|거|것|건|걸)")
+_FILLER = re.compile(r"^(나|저|저희|우리)(도|는|가)?$|궁금|알(려|고|면)|싶|모르|^(했|해|하)"
+                     r"|^(진짜|정말|사실|근데|그런데|그래서|음+|아+|어+|오+|ㅋ+|ㅎ+|네|예)$")
+MAX_HELD_ASK = 60      # 지시어 궁금에 함께 담는 BOO 질문 글자 수(넘으면 말줄임)
 # ⑥ 질문의 뜻·왜 묻는지·예를 들어 달라는 말은 궁금으로 담지 않는다 — 말판정이 궁금을 붙여도 코드가 한 번 더 거른다
 # (실제 호출 11/26: 「각오라는 게 무슨 뜻이에요? 예를 들어 주세요.」를 HCX가 궁금으로 냄)
 _META = re.compile(r"뜻|무슨\s*(말|의미)|의미(가|를|예요|에요)|왜\s*(물어|묻|여쭤)|어디에\s*(쓰|써)|예를\s*들|예시")
@@ -187,7 +199,7 @@ def next_step(me, program, payload, prior, mine=None):
     if not judged:   # 판정 실패 — 지금처럼 답으로 보고 고정 질문(기록하지 않음: 다음 턴에도 답으로 센다)
         return plan_with(prev + [cur], passed)
     kind, curious = judged
-    held = hold_question(me, program, curious, last["answer"]) if curious else None
+    held = hold_question(me, program, curious, last["answer"], last.get("question")) if curious else None
     eff = kind
     if kind in REASK_KINDS and reask.get(_h(cur.get("question")), 0) + 1 > MAX_REASK:
         eff = "모름"
@@ -222,9 +234,12 @@ def next_step(me, program, payload, prior, mine=None):
         plan = plan2
     final_sec = moved or section
 
-    reaction = check_reaction(w.get("반응"), source) if w else None
-    if not reaction:
+    raw = w.get("반응") if w else None
+    reaction = check_reaction(raw, source, eff) if w else None
+    if not reaction and not (eff in REASK_KINDS and raw in ("", None) and w):   # 빈 반응(프롬프트가 허용)은 그대로 없음
         reaction = FALLBACK_REACTION.get(eff)
+    if held and eff in NO_REACTION_HELD:
+        reaction = None   # [Q-114] 담았다는 문구 + 다시 묻는 질문만
     q = check_question(w.get("질문"), source, asked) if w else None
 
     if w and w.get("더묻기") is True and q and _can_follow(program, answers, eff, {**cur, "section": final_sec}):
@@ -295,8 +310,22 @@ def judge(section, question, said, before=None):
     return j["종류"], (c if c and c.lower() != "null" else None)
 
 
-def hold_question(me, program, curious, said):
-    """⑥ 궁금 → 내 질문함(hold). #369 관문(askboo._save)에 걸리거나 담을 글이 없으면 None."""
+def bare_deictic(text):
+    """[Q-114] 궁금 글이 지시어뿐인가(「나도 그게 궁금했는데」): 지시어가 있고, 지시어·궁금 표현·맞장구를 빼면 남는 낱말이 없음."""
+    words = [w for w in re.split(r"[\s.,!?~…·\"'「」]+", text or "") if w]
+    if not any(_DEICTIC.search(w) for w in words):
+        return False
+    return not [w for w in words if not _DEICTIC.search(w) and not _FILLER.search(w)]
+
+
+def _clip(s, n):
+    s = " ".join((s or "").split())
+    return s if len(s) <= n else s[:n - 1].rstrip() + "…"
+
+
+def hold_question(me, program, curious, said, asked=None):
+    """⑥ 궁금 → 내 질문함(hold). #369 관문(askboo._save)에 걸리거나 담을 글이 없으면 None.
+    [Q-114] 궁금 글이 지시어뿐이면 무엇이 궁금한지 알 수 있게 「(BOO 질문) 선배 말」로 담는다(BOO 질문 60자 말줄임)."""
     text = curious.strip()
     if _META.search(text):
         return None
@@ -304,6 +333,11 @@ def hold_question(me, program, curious, said):
         text = said.strip() if len(said.strip()) <= MAX_CURIOUS else ""
     if not text:
         return None
+    if bare_deictic(text) and (asked or "").strip():
+        from interview import JUNIOR_FOLLOW
+        ask = (asked or "").strip()
+        ask = ask[len(JUNIOR_FOLLOW):].strip() if ask.startswith(JUNIOR_FOLLOW) else ask
+        text = f"({_clip(ask, MAX_HELD_ASK)}) {text}"
     from demand import guess_section
     qid, blocked = askboo._save(me, text, program, guess_section(text, program), "hold", True)
     return None if blocked else qid
@@ -361,12 +395,13 @@ def facts_outside(text, source):
     return [p for p in askboo.verify(text, source) if p.split(" ")[0] in ("숫자", "영문", "고유명사")]
 
 
-def check_reaction(text, source):
-    """해요체 1~3문장, 120자 안, 근거 밖 사실 없음, 화면 기능 말 없음. 통과하면 다듬은 글, 아니면 None."""
+def check_reaction(text, source, kind=None):
+    """해요체 1~3문장, 120자 안, 근거 밖 사실 없음, 화면 기능 말 없음. 통과하면 다듬은 글, 아니면 None.
+    [Q-114] 부족·되물음·딴얘기면 평가하는 말(_EVAL)도 없어야 한다(답의 반응은 선배 말을 받는 글이라 보지 않음)."""
     if not isinstance(text, str):
         return None
     t = " ".join(text.split())
-    if not t or len(t) > MAX_REACTION or _FEATURE.search(t):
+    if not t or len(t) > MAX_REACTION or _FEATURE.search(t) or (kind in REASK_KINDS and _EVAL.search(t)):
         return None
     parts = [x for x in re.split(r"(?<=[.!?~])\s+", t) if x]
     if len(parts) > MAX_SENTENCES or not all(_END.search(x) for x in parts) or facts_outside(t, source):

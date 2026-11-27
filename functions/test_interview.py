@@ -433,7 +433,8 @@ s5 = nxt(a5)
 held = next((q for q in store.load("questions", []) if q.get("id") == s5.get("heldQuestionId")), None)
 expect("되물음+궁금: 내 질문함에 hold로", held and held.get("colreg_no") == S2 and held.get("프로그램명") == TH
        and held.get("status") == "hold" and held.get("질문") == U5)
-expect("되물음+궁금: 반응 끝에 담았다는 고정 문구", s5.get("reaction") == "그건 제가 알 수 없어요. " + tell_chat.HELD_TEXT)
+expect("되물음+궁금(담음): 반응 빼고 담았다는 고정 문구만 [Q-114]", s5.get("reaction") == tell_chat.HELD_TEXT
+       and s5.get("question") == WRITE[U5]["질문"])
 expect("되물음: 같은 칸 다시", s5.get("section") == "근무조건" and s5.get("heard", {}).get("kind") == "되물음")
 U5b = "각오라는 게 무슨 뜻이에요?"
 JUDGE[U5b] = {"종류": "되물음", "궁금": None}
@@ -449,6 +450,46 @@ JUDGE[U5d] = {"종류": "되물음", "궁금": U5d}   # 실제 호출(11/26)에�
 s5d = nxt(a4 + [ans(s4, U5d)])
 expect("질문 뜻을 묻는 말은 말판정이 궁금을 붙여도 안 담음", "heldQuestionId" not in s5d and len(store.load("questions", [])) == n_q)
 expect("궁금에 연락처 → #369 관문에 걸려 안 담음", "heldQuestionId" not in s5c and len(store.load("questions", [])) == n_q)
+
+# [Q-114] 11/27 장면 — 지시어뿐인 궁금은 BOO 질문을 함께 담고, 평가 말 반응은 버림
+U5e = "나도 그게 궁금했는데"
+JUDGE[U5e] = {"종류": "되물음", "궁금": U5e}
+WRITE[U5e] = {"반응": "질문이 조금 어려웠을 수 있어요. 쉽게 말하면 근무 시간을 여쭤본 거예요.", "칸": None, "더묻기": False,
+              "질문": "하루에 몇 시간쯤 일했어요?"}
+s5e = nxt(a4 + [ans(s4, U5e)])
+held_e = next((q for q in store.load("questions", []) if q.get("id") == s5e.get("heldQuestionId")), None)
+expect("지시어 궁금 → 질문함 글 = 「(BOO 질문) 선배 말」", held_e and held_e.get("질문") == f"({s4['question']}) {U5e}")
+expect("지시어 궁금 + 되물음: 반응 없이 HELD_TEXT + 다시 묻는 질문", s5e.get("reaction") == tell_chat.HELD_TEXT
+       and s5e.get("question") == WRITE[U5e]["질문"] and s5e.get("section") == "근무조건")
+long_q = "가" * 70 + "요?"
+tell_chat_q = tell_chat._clip(long_q, tell_chat.MAX_HELD_ASK)
+expect("BOO 질문 60자 말줄임", len(tell_chat_q) == 60 and tell_chat_q.endswith("…"))
+expect("지시어 판정: 「나도 그게 궁금했는데」·「그거 궁금해요」는 지시어뿐",
+       tell_chat.bare_deictic(U5e) and tell_chat.bare_deictic("저도 그거 궁금해요!"))
+expect("지시어 판정: 내용 있는 궁금은 아님", not tell_chat.bare_deictic("그거 비자 발급은 얼마나 걸려요?")
+       and not tell_chat.bare_deictic("내년에도 모집하나요?") and not tell_chat.bare_deictic("궁금했어요"))
+U5f = "그게 궁금했는데 기숙사 신청은 언제 해요?"
+JUDGE[U5f] = {"종류": "되물음", "궁금": U5f}
+s5f = nxt(a4 + [ans(s4, U5f)])
+held_f = next((q for q in store.load("questions", []) if q.get("id") == s5f.get("heldQuestionId")), None)
+expect("내용 있는 궁금은 그대로 담음", held_f and held_f.get("질문") == U5f)
+# 평가 말 반응(담지 않은 턴) → 고정 문구
+U5g = "무슨 말인지 잘 모르겠어요"
+JUDGE[U5g] = {"종류": "되물음", "궁금": None}
+WRITE[U5g] = {"반응": "제 질문이 헷갈리셨나 봐요.", "칸": None, "더묻기": False, "질문": "출근은 일주일에 며칠 했어요?"}
+s5g = nxt(a4 + [ans(s4, U5g)])
+expect("되물음 평가 말 반응 버림 → 중립 고정 문구", s5g.get("reaction") == tell_chat.FALLBACK_REACTION["되물음"] == "다시 여쭤볼게요."
+       and s5g.get("question") == WRITE[U5g]["질문"])
+U5h = "음 그냥 짧게만 말할게요"
+JUDGE[U5h] = {"종류": "부족", "궁금": None}
+WRITE[U5h] = {"반응": "", "칸": None, "더묻기": False, "질문": "출근하면 처음에 무슨 일을 했어요?"}
+s5h = nxt(a4 + [ans(s4, U5h)])
+expect("부족 + 빈 반응: 반응 없이 질문만", "reaction" not in s5h and s5h.get("question") == WRITE[U5h]["질문"])
+expect("검증: 부족·되물음·딴얘기 평가 말 버림", all(tell_chat.check_reaction(t, "x", k) is None for t, k in (
+    ("질문이 조금 어려웠을 수 있어요.", "되물음"), ("답이 조금 부족해요.", "부족"), ("다시 말해 근무 시간이에요.", "되물음"),
+    ("이해가 안 되셨군요.", "딴얘기"))))
+expect("검증: 답의 반응은 평가 말 검사 안 함(선배 말 받기)", tell_chat.check_reaction("처음엔 적응이 어려우셨군요.", "x", "답"))
+expect("검증: 중립 되물음 반응은 통과", tell_chat.check_reaction("네, 다시 여쭤볼게요.", "x", "되물음"))
 
 # T6) 같은 질문에 답 아닌 말이 MAX_REASK번 넘으면 넘긴다
 U7 = "아 배고프다 점심 뭐 먹지"
