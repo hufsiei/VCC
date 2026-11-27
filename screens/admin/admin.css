@@ -229,7 +229,7 @@
 .report--skeleton { height: 220px; }
 .report-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-lg); align-items: start; }
 .report-form__col { display: flex; flex-direction: column; gap: var(--space-lg); }
-.report-segment { max-width: 320px; }
+.report-period { flex-direction: row; align-items: center; gap: var(--space-md); }
 .report-day__row { display: flex; align-items: center; gap: var(--space-sm); }
 .report-day__text { font-size: var(--font-size-body); color: var(--color-text); white-space: nowrap; }
 .report-day { width: 96px; font-variant-numeric: tabular-nums; }
