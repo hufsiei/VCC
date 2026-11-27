@@ -412,14 +412,16 @@ def _next_issue(dept, s):
 
 
 def _auto_issue(dept):
-    """예정일이 지났으면 이번에 발행한다(저장된 설정이 있을 때만). 전 학기를 집계."""
+    """예정일이 지났으면 이번에 발행한다(저장된 설정이 있을 때만). 마지막으로 끝난 학기를 집계
+    (발행일 0일이면 학기 종료 당일에 발행하므로 오늘 끝나는 학기)."""
     s = _settings(dept)
     if not s.get("saved"):
         return
     due = _next_issue(dept, s)
     if due and due <= now()[:10]:
-        cur = _parse_period({"type": "semester"})[2]
-        _issue(dept, _previous(cur), "auto")
+        _, end, cur = _parse_period({"type": "semester"})   # end = 지금 학기 끝 다음날
+        ends_today = s["day"] == 0 and now()[:10] == (end - timedelta(days=1)).isoformat()
+        _issue(dept, cur if ends_today else _previous(cur), "auto")
 
 
 def getReportSettings(me, p):

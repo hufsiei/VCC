@@ -164,6 +164,17 @@ admin.saveReportSettings(BOSS, {"dept": "D01", "settings": {"period": "semester"
 r = admin.issueReport(BOSS, {"dept": "D01", "period": SEM})
 expect("XSS 글자는 escape(<script> 없음)", "<script>" not in r["html"] and "&lt;script&gt;" in r["html"] and "<img" not in r["html"])
 
+# ── 7. 발행일 0일 = 학기 종료 당일 발행, 그날 끝나는 학기를 집계 (Q-120) ──────
+for dept, saved, due, value in (("D03", datetime(2027, 8, 1), datetime(2027, 8, 31), "2027-1"),
+                                ("D05", datetime(2028, 2, 1), datetime(2028, 2, 29), "2027-2")):
+    clock[0] = saved.replace(tzinfo=rf.KST)
+    admin.saveReportSettings(BOSS, {"dept": dept, "settings": {"period": "semester", "day": 0,
+                                                              "recipients": ["a@example.com"], "sections": ["지표"]}})
+    clock[0] = due.replace(hour=9, tzinfo=rf.KST)
+    h = admin.listIssuedReports(BOSS, {"dept": dept})["reports"]
+    expect(f"발행일 0: {due:%Y-%m-%d} 자동 발행은 {value} 집계",
+           len(h) == 1 and h[0]["mode"] == "auto" and h[0]["period"] == {"type": "semester", "value": value})
+
 print()
 if fails:
     print(f"틀림 {len(fails)}건")
