@@ -49,7 +49,7 @@ d = admin.getDepartments(DEPT, {})
 expect("부서 담당자는 자기 부서 1개(혁신지원팀 D04)", [x["부서코드"] for x in d["departments"]] == ["D04"] and d["fixed"] == "D04")
 expect("부서 담당자가 ALL을 달라 해도 자기 부서로 고정", ov("ALL", me=DEPT)["dept"] == "D04" and ov("D01", me=DEPT)["dept"] == "D04")
 expect("없는 부서코드는 거절", ov("D99") == admin.DENY)
-expect("부서 담당자는 설정 저장 거절", "error" in admin.saveReportSettings(DEPT, {"settings": {"period": "monthly", "day": 1,
+expect("부서 담당자는 설정 저장 거절", "error" in admin.saveReportSettings(DEPT, {"settings": {"period": "semester", "day": 1,
                                                                                    "recipients": ["a@example.com"], "sections": ["지표"]}}))
 expect("부서 담당자는 발행 거절", "error" in admin.issueReport(DEPT, {"period": SEM}))
 
@@ -109,18 +109,24 @@ expect("신고 진술 목록에 노트 문장", all(r["text"] for r in sg["repor
 
 # ── 5. 리포트 설정 · 발행 · 이력 ─────────────────────────────────────────
 s = admin.getReportSettings(BOSS, {"dept": "D01"})
-expect("기본 설정: 월간·대표메일·항목 5개·예정 없음", s["period"] == "monthly" and s["recipients"] == ["intl@example.com"]
+expect("기본 설정: 학기당·대표메일·항목 5개·예정 없음", s["period"] == "semester" and s["recipients"] == ["intl@example.com"]
        and len(s["sections"]) == 5 and s["nextIssueAt"] is None)
-bad = admin.saveReportSettings(BOSS, {"dept": "D01", "settings": {"period": "monthly", "day": 1,
+monthly = admin.saveReportSettings(BOSS, {"dept": "D01", "settings": {"period": "monthly", "day": 1,
+                                                                     "recipients": ["intl@example.com"], "sections": ["지표"]}})
+expect("월간은 저장 거절", "error" in monthly)
+late = admin.saveReportSettings(BOSS, {"dept": "D01", "settings": {"period": "semester", "day": 61,
+                                                                  "recipients": ["intl@example.com"], "sections": ["지표"]}})
+expect("발행일 61은 거절(0~60)", "error" in late)
+bad = admin.saveReportSettings(BOSS, {"dept": "D01", "settings": {"period": "semester", "day": 1,
                                                                  "recipients": ["intl@example.com", "잘못된주소"], "sections": ["지표"]}})
 expect("이메일 형식 검사", "error" in bad and "잘못된주소" in bad["error"])
-good = admin.saveReportSettings(BOSS, {"dept": "D01", "settings": {"period": "monthly", "day": 1,
+good = admin.saveReportSettings(BOSS, {"dept": "D01", "settings": {"period": "semester", "day": 1,
                                                                   "recipients": ["intl@example.com", "boss@example.com"],
                                                                   "sections": ["지표", "프로그램 순위", "개선 제안"]}})
-expect("설정 저장 → 다음 발행 12/1", good == {"ok": True, "nextIssueAt": "2026-12-01"})
+expect("설정 저장 → 다음 발행 2027-03-01(학기 종료 1일 뒤)", good == {"ok": True, "nextIssueAt": "2027-03-01"})
 store._cache.clear()   # 서버를 껐다 켠 것처럼 메모리를 비우고 파일에서 다시 읽는다
 s = admin.getReportSettings(BOSS, {"dept": "D01"})
-expect("새로고침해도 설정 유지", s["recipients"] == ["intl@example.com", "boss@example.com"] and s["nextIssueAt"] == "2026-12-01")
+expect("새로고침해도 설정 유지", s["recipients"] == ["intl@example.com", "boss@example.com"] and s["nextIssueAt"] == "2027-03-01")
 
 r = admin.issueReport(BOSS, {"dept": "D01", "period": SEM})
 expect("지금 발행 → html·요약", r["reportId"] and "<article" in r["html"] and "국제교류팀" in r["html"] and r["summary"])
@@ -133,19 +139,27 @@ expect("부서 담당자는 다른 부서 리포트를 못 엶", admin.getIssued
 expect("부서 담당자 받은 리포트 목록은 자기 부서만", admin.listIssuedReports(DEPT, {"dept": "D01"})["reports"] == [])
 
 # 예정일이 지나면 호출할 때 자동 발행(스케줄러 없음)
-clock[0] = datetime(2026, 12, 1, 9, 0, tzinfo=rf.KST)
+clock[0] = datetime(2027, 3, 1, 9, 0, tzinfo=rf.KST)
 h = admin.listIssuedReports(BOSS, {"dept": "D01"})["reports"]
-expect("12/1이 되면 자동 발행 1건(지난달 2026-11)", len(h) == 2 and h[0]["mode"] == "auto" and h[0]["period"] == {"type": "month", "value": "2026-11"})
+expect("3/1이 되면 자동 발행 1건(지난 학기 2026-2)", len(h) == 2 and h[0]["mode"] == "auto" and h[0]["period"] == SEM)
 h = admin.listIssuedReports(BOSS, {"dept": "D01"})["reports"]
 expect("같은 날 다시 불러도 또 발행하지 않음", len(h) == 2)
-expect("다음 예정은 1/1", admin.getReportSettings(BOSS, {"dept": "D01"})["nextIssueAt"] == "2027-01-01")
+expect("다음 예정은 9/1", admin.getReportSettings(BOSS, {"dept": "D01"})["nextIssueAt"] == "2027-09-01")
+
+# [11/27] 서버에 남은 옛 monthly 설정은 읽을 때 semester로 본다(저장값은 안 건드림)
+old = {"period": "monthly", "day": 15, "recipients": ["intl@example.com"], "sections": ["지표"],
+       "saved": True, "savedAt": clock[0].isoformat(), "by": BOSS}
+store.load("reportSettings", {})["D02"] = old
+s = admin.getReportSettings(BOSS, {"dept": "D02"})
+expect("옛 monthly 저장값 → semester로 읽힘", s["period"] == "semester" and s["day"] == 15 and s["nextIssueAt"] == "2027-03-15"
+       and old["period"] == "monthly")
 
 # ── 6. 리포트 HTML은 글자를 escape ──────────────────────────────────────
 evil = "<script>alert(1)</script>"
 admin.USAGE["questions"] += [{"id": f"X{i}", "at": f"2026-10-0{i}T10:00:00+09:00", "colreg_no": "H0100", "crs_nm": "<img src=x onerror=alert(1)>",
                               "프로그램명": "마르부르크필립스대학교", "칸": "생활", "status": "hold", "질문": evil,
                               "운영부서코드": "D01"} for i in range(1, 10)]   # 9건 — 가장 큰 묶음이라 리포트 맨 앞에 실림
-admin.saveReportSettings(BOSS, {"dept": "D01", "settings": {"period": "monthly", "day": 1, "recipients": ["a@example.com"],
+admin.saveReportSettings(BOSS, {"dept": "D01", "settings": {"period": "semester", "day": 1, "recipients": ["a@example.com"],
                                                            "sections": admin.SECTIONS}})
 r = admin.issueReport(BOSS, {"dept": "D01", "period": SEM})
 expect("XSS 글자는 escape(<script> 없음)", "<script>" not in r["html"] and "&lt;script&gt;" in r["html"] and "<img" not in r["html"])

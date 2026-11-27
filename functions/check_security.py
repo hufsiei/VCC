@@ -196,7 +196,7 @@ def check_xss():
     admin.USAGE["questions"] += [{"id": f"XSS{i}", "at": f"2026-10-1{i}T10:00:00+09:00", "colreg_no": "H0100", "crs_nm": evil,
                                   "프로그램명": "마르부르크필립스대학교", "칸": "생활", "status": "hold", "질문": evil,
                                   "운영부서코드": "D01"} for i in range(9)]
-    admin.saveReportSettings("staff01", {"dept": "D01", "settings": {"period": "monthly", "day": 1,
+    admin.saveReportSettings("staff01", {"dept": "D01", "settings": {"period": "semester", "day": 1,
                                                                     "recipients": ["intl@example.com"], "sections": admin.SECTIONS}})
     html = admin.issueReport("staff01", {"dept": "D01", "period": {"type": "semester", "value": "2026-2"}}).get("html", "")
     raw = "<script" in html.lower() or "<img" in html.lower()   # escape되면 &lt;img … onerror=로 남는다(글자라 안전)

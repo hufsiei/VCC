@@ -5,8 +5,8 @@ import { getReportSettings, saveReportSettings, issueReport, listIssuedReports, 
 import { el, icon, statusLabel, fmt, toast, drawIcons, errorBox } from "./ui.js";
 
 const SECTIONS = ["지표", "프로그램 순위", "미답변 질문", "개선 제안", "신고 진술"]; // functions/admin.py SECTIONS
-const PERIOD_NAME = { monthly: "월간", semester: "학기당" };
-const DAY_RANGE = { monthly: [1, 28], semester: [0, 60] }; // 서버 saveReportSettings와 같은 범위
+const PERIOD_NAME = "학기당"; // [11/27] 주기는 학기당 하나
+const [DAY_MIN, DAY_MAX] = [0, 60]; // 학기 종료 후 n일. 서버 saveReportSettings와 같은 범위
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/; // 서버 EMAIL과 같은 규칙
 const MAX_RECIPIENTS = 10;
 // 미리보기 iframe 안에서 읽을 스타일: 토큰(style.css) + 리포트 모양(report.css)
@@ -61,8 +61,8 @@ export async function loadReport(panel, ctx, isCurrent) {
 function settingsBlock(s, ctx, preview, reloadHistory) {
   // 화면에서 고치는 값. 저장한 값(saved)과 다르면 「지금 발행」을 막는다(발행은 서버에 저장된 설정을 쓰므로)
   const form = {
-    period: s.period === "semester" ? "semester" : "monthly",
-    day: Number.isFinite(s.day) ? s.day : 1,
+    period: "semester",
+    day: Number.isFinite(s.day) ? Math.min(Math.max(s.day, DAY_MIN), DAY_MAX) : 1,
     recipients: Array.isArray(s.recipients) ? [...s.recipients] : [],
     sections: Array.isArray(s.sections) ? SECTIONS.filter((x) => s.sections.includes(x)) : [...SECTIONS],
   };
@@ -70,29 +70,17 @@ function settingsBlock(s, ctx, preview, reloadHistory) {
   let everSaved = !!s.nextIssueAt; // 서버는 저장한 적 있는 설정에만 nextIssueAt을 준다
   const dirty = () => JSON.stringify(form) !== saved;
 
-  // 주기: 세그먼트(7-①과 같은 부품)
-  const periodBtns = ["monthly", "semester"].map((p) => {
-    const b = el("button", { className: "segment__btn", text: PERIOD_NAME[p], attrs: { type: "button", role: "radio", "data-period": p } });
-    b.addEventListener("click", () => {
-      if (form.period === p) return;
-      form.period = p;
-      const [lo, hi] = DAY_RANGE[p];
-      form.day = Math.min(Math.max(form.day, lo), hi);
-      dayInput.value = form.day;
-      paint();
-    });
-    return b;
-  });
-  const periodField = el("div", { className: "field" }, [
-    el("p", { className: "field__label", text: "주기", attrs: { id: "rptPeriodLabel" } }),
-    el("div", { className: "segment report-segment", attrs: { role: "radiogroup", "aria-labelledby": "rptPeriodLabel" } }, periodBtns),
+  // 주기: 고를 것이 없어 「주기 학기당」 글자 한 줄
+  const periodField = el("div", { className: "field report-period" }, [
+    el("span", { className: "field__label", text: "주기" }),
+    el("span", { className: "field__label", text: PERIOD_NAME }),
   ]);
 
-  // 발행일: 월간 = 매월 n일(1~28) / 학기당 = 학기 종료 후 n일(0~60)
-  const dayInput = el("input", { className: "input report-day", attrs: { id: "rptDay", type: "number", inputmode: "numeric", value: form.day } });
-  const dayBefore = el("span", { className: "report-day__text" });
-  const dayAfter = el("span", { className: "report-day__text" });
-  const dayHint = el("p", { className: "block__note" });
+  // 발행일: 학기 종료 후 n일(0~60)
+  const dayInput = el("input", { className: "input report-day", attrs: { id: "rptDay", type: "number", inputmode: "numeric", min: DAY_MIN, max: DAY_MAX, value: form.day } });
+  const dayBefore = el("span", { className: "report-day__text", text: "학기 종료 후" });
+  const dayAfter = el("span", { className: "report-day__text", text: "일" });
+  const dayHint = el("p", { className: "block__note", text: `학기 종료일(2월 말·8월 말)에서 ${DAY_MIN}~${DAY_MAX}일 뒤. 지난 학기 집계를 보내요.` });
   const dayError = fieldError();
   dayInput.addEventListener("input", () => { form.day = Number(dayInput.value); setError(dayInput, dayError, ""); paint(); });
   const dayField = el("div", { className: "field" }, [
@@ -156,13 +144,12 @@ function settingsBlock(s, ctx, preview, reloadHistory) {
     nextShown = nextIssueAt;
     nextLine.replaceChildren(...[
       nextIssueAt
-        ? statusLabel("info", "calendar", `다음 발행 예정: ${nextIssueAt} (${PERIOD_NAME[savedPeriod()]})`)
+        ? statusLabel("info", "calendar", `다음 발행 예정: ${nextIssueAt} (${PERIOD_NAME})`)
         : statusLabel("neutral", "calendar", "설정을 저장하면 다음 발행 예정일이 정해져요"),
       lastIssuedAt ? el("span", { className: "block__note", text: `마지막 발행 ${timeText(lastIssuedAt)}` }) : null,
     ].filter(Boolean));
     drawIcons();
   };
-  const savedPeriod = () => JSON.parse(saved).period;
   let lastIssuedAt = s.lastIssuedAt;
   showNext(s.nextIssueAt, lastIssuedAt);
 
@@ -210,9 +197,8 @@ function settingsBlock(s, ctx, preview, reloadHistory) {
   });
   function validate() {
     let ok = true;
-    const [lo, hi] = DAY_RANGE[form.period];
-    if (!Number.isInteger(Number(form.day)) || form.day < lo || form.day > hi || dayInput.value === "") {
-      setError(dayInput, dayError, `발행일은 ${lo}~${hi} 사이 숫자로 적어 주세요`);
+    if (!Number.isInteger(Number(form.day)) || form.day < DAY_MIN || form.day > DAY_MAX || dayInput.value === "") {
+      setError(dayInput, dayError, `발행일은 ${DAY_MIN}~${DAY_MAX} 사이 숫자로 적어 주세요`);
       ok = false;
     }
     if (!form.recipients.length) {
@@ -228,20 +214,6 @@ function settingsBlock(s, ctx, preview, reloadHistory) {
 
   // 화면 다시 칠하기(값 → 표시)
   function paint() {
-    for (const b of periodBtns) {
-      const on = b.dataset.period === form.period;
-      b.setAttribute("aria-checked", String(on));
-      b.setAttribute("aria-selected", String(on)); // .segment__btn 모양은 aria-selected로 칠한다
-    }
-    const [lo, hi] = DAY_RANGE[form.period];
-    dayInput.min = lo;
-    dayInput.max = hi;
-    dayBefore.textContent = form.period === "monthly" ? "매월" : "학기 종료 후";
-    dayAfter.textContent = "일";
-    dayHint.textContent = form.period === "monthly"
-      ? `${lo}~${hi}일 중에서 골라요. 지난달 집계를 보내요.`
-      : `학기 종료일(2월 말·8월 말)에서 ${lo}~${hi}일 뒤. 지난 학기 집계를 보내요.`;
-
     recList.replaceChildren(...form.recipients.map((r, i) => {
       const del = el("button", { className: "btn btn--text", text: "빼기", attrs: { type: "button", "aria-label": `${r} 빼기` } });
       del.addEventListener("click", () => { form.recipients.splice(i, 1); paint(); recInput.focus(); });

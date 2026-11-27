@@ -13,7 +13,6 @@
 #   시연 중 새로 생긴 보류·규정 질문은 pendingNew로만 센다(「새 질문 N건 — 다음 집계 때 제안 생성」).
 # 리포트 요약은 issueReport 때 AI 1회(suggest.ai_summary, 실패하면 템플릿). 그래서 issueReport는 local_fn의 AI_ROUTES에 든다.
 # 리포트는 서버 함수가 불릴 때 예정일이 지났으면 그 자리에서 자동 발행한다(스케줄러 없음, PRD 5-4).
-import calendar
 import hashlib
 import html
 import json
@@ -384,12 +383,14 @@ def setSuggestionStatus(me, p):
 # ---------- 탭3 리포트 발행 ----------
 def _default_settings(dept):
     mail = (DEPT_BY_CODE.get(dept) or {}).get("대표메일(가상)")
-    return {"period": "monthly", "day": 1, "recipients": [mail] if mail else [], "sections": list(SECTIONS),
+    return {"period": "semester", "day": 1, "recipients": [mail] if mail else [], "sections": list(SECTIONS),
             "saved": False, "savedAt": None}
 
 
 def _settings(dept):
-    return store.load("reportSettings", {}).get(dept) or _default_settings(dept)
+    """[11/27] 주기는 학기당뿐. 옛 "monthly" 저장값은 지우지 않고 읽을 때 semester로 본다."""
+    s = store.load("reportSettings", {}).get(dept) or _default_settings(dept)
+    return dict(s, period="semester")
 
 
 def _last_issued(dept):
@@ -398,17 +399,10 @@ def _last_issued(dept):
 
 
 def _next_issue(dept, s):
-    """다음 발행 예정일(YYYY-MM-DD). 월간 = 매월 day일, 학기당 = 학기 끝(2월 말·8월 말) 뒤 day일.
+    """다음 발행 예정일(YYYY-MM-DD) = 학기 끝(2월 말·8월 말) 뒤 day일.
     기준 = 마지막 발행 시각, 없으면 설정 저장 시각(그 뒤 첫 예정일)."""
     base = (_last_issued(dept) or s.get("savedAt") or now())[:10]
     b = date.fromisoformat(base)
-    if s["period"] == "monthly":
-        y, m = b.year, b.month
-        for _ in range(13):
-            d = date(y, m, min(s["day"], calendar.monthrange(y, m)[1]))
-            if d > b:
-                return d.isoformat()
-            y, m = y + (m == 12), m % 12 + 1
     for y in (b.year - 1, b.year, b.year + 1):
         for end in (date(y, 3, 1) - timedelta(days=1), date(y, 8, 31)):
             d = end + timedelta(days=s["day"])
@@ -418,13 +412,13 @@ def _next_issue(dept, s):
 
 
 def _auto_issue(dept):
-    """예정일이 지났으면 이번에 발행한다(저장된 설정이 있을 때만). 지난 기간(전월·전 학기)을 집계."""
+    """예정일이 지났으면 이번에 발행한다(저장된 설정이 있을 때만). 전 학기를 집계."""
     s = _settings(dept)
     if not s.get("saved"):
         return
     due = _next_issue(dept, s)
     if due and due <= now()[:10]:
-        cur = _parse_period({"type": "month" if s["period"] == "monthly" else "semester"})[2]
+        cur = _parse_period({"type": "semester"})[2]
         _issue(dept, _previous(cur), "auto")
 
 
@@ -447,14 +441,13 @@ def saveReportSettings(me, p):
     if role != "총괄":
         return {"error": "리포트 설정은 총괄 관리자만 바꿀 수 있어요"}
     s = p.get("settings") or {}
-    period = s.get("period")
-    if period not in ("monthly", "semester"):
+    if s.get("period") != "semester":
         return {"error": "주기를 확인해 주세요"}
     try:
         day = int(s.get("day"))
     except (TypeError, ValueError):
         return {"error": "발행일을 확인해 주세요"}
-    if not (1 <= day <= 28 if period == "monthly" else 0 <= day <= 60):
+    if not 0 <= day <= 60:
         return {"error": "발행일을 확인해 주세요"}
     recipients = [str(r).strip() for r in (s.get("recipients") or []) if str(r).strip()]
     bad = [r for r in recipients if not EMAIL.match(r)]
@@ -466,7 +459,7 @@ def saveReportSettings(me, p):
     if not sections:
         return {"error": "포함 항목을 하나 이상 골라 주세요"}
     with store.lock():
-        new = {"period": period, "day": day, "recipients": recipients, "sections": sections,
+        new = {"period": "semester", "day": day, "recipients": recipients, "sections": sections,
                "saved": True, "savedAt": now(), "by": me}
         store.load("reportSettings", {})[dept] = new
         store.save("reportSettings")

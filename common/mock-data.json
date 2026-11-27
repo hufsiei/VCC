@@ -2439,7 +2439,7 @@
   "getReportSettings": {
     "ALL": {
       "dept": "ALL",
-      "period": "monthly",
+      "period": "semester",
       "day": 1,
       "recipients": [],
       "sections": [
@@ -2454,7 +2454,7 @@
     },
     "D01": {
       "dept": "D01",
-      "period": "monthly",
+      "period": "semester",
       "day": 1,
       "recipients": [
         "intl@example.com"
@@ -2472,7 +2472,7 @@
   },
   "saveReportSettings": {
     "ok": true,
-    "nextIssueAt": "2026-12-01"
+    "nextIssueAt": "2027-03-01"
   },
   "issueReport": {
     "reportId": "R-0001",
