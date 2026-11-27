@@ -18,8 +18,10 @@
   .note-search__clear .icon { color: var(--color-text-muted); }
   /* 검색창 기본 지우기 버튼은 숨기고(브라우저마다 모양이 달라서) 우리 × 버튼만 쓴다 */
   .note-search input::-webkit-search-cancel-button { display: none; }
-  .filter-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
-  .filter-row .choice-chip { font-size: var(--font-size-secondary); cursor: pointer; }
+  /* [11/27] 필터 칩 압축: 글자 13px·좌우 12px·간격 6px. 높이(터치 영역)는 44px 그대로. 가로 스크롤은 쓰지 않는다 */
+  .filter-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .filter-row .choice-chip { gap: var(--space-xs); padding: 0 12px; font-size: 13px; cursor: pointer; }
+  .filter-row .choice-chip .icon { width: 16px; height: 16px; }
   .note-count { margin-top: var(--space-lg); font-size: var(--font-size-secondary); color: var(--color-text-muted); }
   .note-list { display: flex; flex-direction: column; gap: 12px; margin-top: var(--space-sm); }
   .note-skeleton { height: 168px; }

@@ -351,13 +351,28 @@ function renderRegionChips(base) {
   const nations = currentRegion ? countBy(inRegion(base, currentRegion), (n) => n.country) : [];
   if (currentGroup && !nations.some(([name]) => name === currentGroup)) currentGroup = "";
 
-  const regionChip = (value, text) => filterChip(text, currentRegion === value, () => {
+  // 칩 줄이 바뀌어 누른 칩이 사라지므로 포커스는 새 줄의 해당 칩으로 옮긴다
+  const pickRegion = (value, focusText) => {
     currentRegion = value;
     currentGroup = "";
     renderList();
-  });
+    const next = [...groupEl.children].find((c) => c.textContent.startsWith(focusText));
+    if (next) next.focus();
+  };
+  const regionChip = (value, text) => filterChip(text, currentRegion === value, () => pickRegion(value, value || text));
+  let chips = [];
+  if (currentRegion) {
+    // 권역을 고르면 1단 줄은 「유럽 ×」 한 칩으로 접는다. ×를 누르면 권역 목록으로
+    const name = currentRegion;
+    const picked = el("button", { className: "choice-chip", attrs: { type: "button", "aria-pressed": "true", "aria-label": `${name} 선택 해제` } },
+      [el("span", { text: name }), icon("x")]);
+    picked.addEventListener("click", () => pickRegion("", name));
+    chips = [picked];
+  } else if (regions.length) {
+    chips = [regionChip("", "권역 전체"), ...regions.map(([name, count]) => regionChip(name, `${name} ${count}`))];
+  }
   groupEl.setAttribute("aria-label", "권역 필터");
-  fillRow(groupEl, regions.length ? [regionChip("", "권역 전체"), ...regions.map(([name, count]) => regionChip(name, `${name} ${count}`))] : []);
+  fillRow(groupEl, chips);
 
   const nationChip = (value, text) => filterChip(text, currentGroup === value, () => {
     currentGroup = value;
