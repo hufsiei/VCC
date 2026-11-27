@@ -515,11 +515,13 @@ function officialCheckBox(check) {
 
 // [#331-1 → 11/27 #393 미리 결정 A] 질문함에 담긴 질문이 언제·어떻게 답을 받는지 두 줄 안내(디자인 규칙 6-1 질문함 안내).
 // 기한 약속(「N일 안에」)·전달 인원 숫자는 쓰지 않는다 — 선배 참여가 자발적이라 지킬 수 없음.
-function inboxNote() {
+// [Q-122] noteId가 없으면 프로그램을 못 정한 보류라 「이 프로그램」이라고 하지 않는다
+function inboxNote(res) {
+  const who = res.noteId ? "이 프로그램을" : "프로그램을 고르면 그 프로그램을";
   return el("div", { className: "inbox-note" }, [
     icon("info"),
     el("div", { className: "inbox-note__text" }, [
-      el("p", { text: "이 프로그램을 다녀온 선배가 BOO와 인터뷰할 때 이 질문을 먼저 물어봐요. 선배가 답하면 알림으로 알려 드려요. 언제 답이 올지는 정해져 있지 않아요." }),
+      el("p", { text: `${who} 다녀온 선배가 BOO와 인터뷰할 때 이 질문을 먼저 물어봐요. 선배가 답하면 알림으로 알려 드려요. 언제 답이 올지는 정해져 있지 않아요.` }),
       el("p", { text: "빨리 듣고 싶으면 닮은선배에게 쪽지를 요청해 보세요. 7일 안에 답이 없으면 다른 선배에게 보낼 수 있어요." }),
     ]),
   ]);
@@ -551,7 +553,7 @@ function renderAnswer(res, question) {
           : null,
       ]),
       officialCheckBox(res.officialCheck),
-      res.questionId ? inboxNote() : null,
+      res.questionId ? inboxNote(res) : null,
       el("span", { className: "msg__time", text: timeText() }),
     );
     return msg;
@@ -566,7 +568,7 @@ function renderAnswer(res, question) {
         statusLabel("info", "info", "공식 안내"),
         ...officialLinks(res.officialUrl, res.officialPhone),
       ]),
-      res.questionId ? inboxNote() : null,
+      res.questionId ? inboxNote(res) : null,
       el("span", { className: "msg__time", text: timeText() }),
     );
     return msg;
