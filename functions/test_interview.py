@@ -515,9 +515,43 @@ s9 = nxt(a8)
 U9b = "업무보다 배운 게 커요. 메일 쓰는 법을 익혔어요."
 WRITE[U9b] = {"반응": "메일 쓰는 법을 익히셨군요.", "칸": "지원동기", "더묻기": True, "질문": "메일은 어떤 상황에서 가장 많이 썼어요?"}
 s9b = nxt([ans(s0, U1), ans(s1, U9b)])
-expect("옮긴 칸의 첫 답이 아니면 꼬리 없음, 꼬리 글을 다른 질문 자리에 안 씀", not s9b.get("followUp")
-       and s9b.get("heard", {}).get("section") == "지원동기" and s9b.get("section") == "지원·선발"
-       and s9b.get("question") == interview.base_question(TH, "지원·선발"))
+# [Q-116] 전에는 비게 된 지원·선발의 기본 질문(방금 물은 질문의 원문)을 그대로 다시 물었다 → 그 칸은 넘기고 다음 칸
+expect("옮긴 칸의 첫 답이 아니면 꼬리 없음, 꼬리 글을 다른 질문 자리에 안 씀, 방금 질문 원문 안 되풀이", not s9b.get("followUp")
+       and s9b.get("heard", {}).get("section") == "지원동기" and s9b.get("section") == "근무조건"
+       and s9b.get("question") == interview.base_question(TH, "근무조건"))
+
+# [Q-116] S05 재현 — 「지원·선발」 질문에 다른 칸(배운점) 이야기 → 옮겨진 뒤 방금 질문 원문을 다시 묻지 않는다
+def _asked_set(items):
+    return {tell_chat._qn(a.get("question")) for a in items} | {tell_chat._qn(interview._unwrap(a.get("question") or "")) for a in items}
+UM = "선발보다 배운 게 기억나요. 마감 전에 미리 확인하는 습관이 생겼어요."
+WRITE[UM] = {"반응": "미리 확인하는 습관이 생기셨군요.", "칸": "배운점", "더묻기": False, "질문": None}
+TELL_CALLS.clear()
+m1_in = [ans(s0, U1), ans(s1, UM)]
+m1 = nxt(m1_in)
+expect("S05: 옮겨진 뒤 다음 질문 ≠ 방금 질문(화면 글·원문 모두)", m1.get("heard") == {"kind": "답", "section": "배운점"}
+       and tell_chat._qn(m1.get("question")) not in _asked_set(m1_in)
+       and tell_chat._qn(m1.get("question")) != tell_chat._qn(interview.base_question(TH, "지원·선발")))
+expect("S05: 비게 된 칸(지원·선발)은 넘기고 다음 칸(근무조건) 기본 질문, 진행은 채운 칸만",
+       m1.get("section") == "근무조건" and m1.get("question") == interview.base_question(TH, "근무조건")
+       and m1["progress"]["filled"] == 2 and TELL_CALLS == ["말판정", "대화쓰기"])
+expect("S05: 넘긴 칸이 판정 기록에 남음",
+       any(v.get("p") == "지원·선발" for v in store.load("tellChat", {}).get(f"{S2}|{TH}", {}).get("said", {}).values()))
+UM2 = "주 3일 출근했어요."
+WRITE[UM2] = {"반응": "주 3일 출근하셨군요.", "칸": "근무조건", "더묻기": False, "질문": None}
+m2_in = m1_in + [ans(m1, UM2)]
+m2 = nxt(m2_in)
+expect("S05 다음 턴: 넘긴 칸 기본 질문을 다시 꺼내지 않음(되풀이 0)", not m2.get("done")
+       and tell_chat._qn(m2.get("question")) not in _asked_set(m2_in) and m2.get("section") != "지원·선발")
+TELL_CALLS.clear()
+m2b = nxt(m2_in)
+expect("S05 다음 턴 다시 부름: 같은 응답, AI 안 부름", m2b == m2 and not TELL_CALLS)
+expect("S05: 요약 입력에서 옮긴 답은 배운점 그대로",
+       any(a.get("section") == "배운점" and a.get("answer") == UM for a in tell_chat.for_summary(S2, TH, m2_in)))
+expect("_repeats: 끝·후배 질문·말머리 다시묻기는 되풀이로 안 봄, 물은 질문은 봄",
+       not tell_chat._repeats({"done": True, "question": "x요?"}, {"x요"})
+       and not tell_chat._repeats({"junior": True, "question": "x요?"}, {"x요"})
+       and not tell_chat._repeats({"retry": True, "question": "x요?"}, {"x요"})
+       and tell_chat._repeats({"question": "x요?"}, {"x요"}) and not tell_chat._repeats({"question": "y요?"}, {"x요"}))
 U9c = "업무보다 배운 게 커요. 보고 메일 쓰는 법을 익혔어요."
 WRITE[U9c] = dict(WRITE[U9b], 칸="근무조건")
 s9c = nxt([ans(s0, U1), ans(s1, U9c)])
