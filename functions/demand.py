@@ -27,7 +27,6 @@ FIELDS = ["국제교류", "현장실습", "비교과"]
 UNSURE = "잘 모르겠어요"
 NOT_YET = "아직 정하지 않았어요"
 FIELD_LABEL = {"국제교류": "교환학생", "현장실습": "현장실습", "비교과": "비교과"}   # 관심 라벨 앞부분(PRD 시연 「교환학생·독일」)
-DETAIL_LABEL = {"1회성": "1회성 특강"}
 KIND_BY_FIELD = {"국제교류": "교환", "현장실습": "인턴", "비교과": "비교과"}
 EXPLORE = [   # 「잘 모르겠어요」 → BOO가 먼저 고민을 묻고 분야(·분류)를 정해 준다
     {"label": "외국에서 살아 보기", "field": "국제교류"},
@@ -46,6 +45,7 @@ QUESTIONS = {
     "program": "궁금한 프로그램을 골라 주세요. 아직 정하지 않았어도 괜찮아요.",
     "section": "이 프로그램에서 무엇이 가장 궁금해요?",
     "sectionNotYet": "프로그램은 나중에 정해도 돼요. {i}에 대해 무엇이 가장 궁금해요?",   # 프로그램 「아직 정하지 않았어요」
+    "sectionFromQuestion": "방금 질문은 어느 내용에 가까워요?",   # [11/27] 보류 질문에서 시작: 궁금한 것은 이미 말했으니 칸만 고른다
     "when": "언제쯤 해 보려고 해요?",
     "situation": "지금 어느 정도 준비됐어요? 선배가 답할 때 참고할 수 있게 지금 상황을 적어 주세요.",
     "question": "{s}에 대해 무엇이 궁금해요? 선배에게 묻고 싶은 것을 한 문장으로 적어 주세요.",
@@ -119,7 +119,7 @@ def locked(me):
 def label_of(field, detail=None):
     if field not in FIELD_LABEL:
         return None
-    return FIELD_LABEL[field] + (f"·{DETAIL_LABEL.get(detail, detail)}" if detail else "")
+    return FIELD_LABEL[field] + (f"·{detail}" if detail else "")
 
 
 def _program_field(program):
@@ -163,7 +163,7 @@ _history = None
 
 
 def _values(col, cell):
-    """한 학생의 한 열 → 값 집합. 비교과는 「1회성(4), 진로·취업 교육과정(1)」·「A / B」처럼 여럿이 한 칸에 있다."""
+    """한 학생의 한 열 → 값 집합. 비교과는 「창업 활동(4), 진로·취업 교육과정(1)」·「A / B」처럼 여럿이 한 칸에 있다."""
     if not cell:
         return set()
     if col == "비교과 유형":
@@ -221,6 +221,13 @@ def _sections(field, program):
 #   (askboo 「아르바이트·취업 등은 보고서에 칸이 없으므로 hold」)만 여기서 덧붙인다. 시연 0:40 「학기 중 현지 인턴 병행」 → 생활
 #   (들려주기 문단분류가 같은 질문에 고르는 칸과 같다 — test_interview.py).
 HOLD_TOPICS_EXCHANGE = [(r"인턴|아르바이트|알바|일자리|병행|현지\s*취업", "생활")]
+# [11/27 #384 B2] 현장실습 주제어 → 칸. 위에서부터 첫 번째. 「합격했는데 진로에 도움 되나」는 배운점이라 지원·선발이 맨 뒤다.
+TOPICS_INTERN = [
+    (r"지원\s*(동기|이유|계기)|왜\s*지원", "지원동기"),
+    (r"진로|배운|배우|배울|배웠|성장|남는|경력|커리어|스펙|취업", "배운점"),
+    (r"업무|직무|담당|맡|(무슨|어떤|하는)\s*일", "업무내용"),
+    (r"지원|선발|면접|서류|자소서|자기소개서|경쟁률|뽑|합격", "지원·선발"),
+]
 
 
 def guess_section(question, program):
@@ -231,8 +238,10 @@ def guess_section(question, program):
     if notes._kind(program) in ("교환", "파견"):
         found = [askboo.SECTION_BY_ITEM.get(n) for pat, nums in askboo.TOPICS_EXCHANGE if re.search(pat, text) for n in nums]
         found += [s for pat, s in HOLD_TOPICS_EXCHANGE if re.search(pat, text)]
-    else:
+    else:                                   # 비교과는 아래에서 틀(활동내용·배운점)에 있는 것만 남는다
         found = ["근무조건"] if askboo.INTERVIEW_ONLY_INTERN.search(text) else []
+        if notes._kind(program) == "인턴":
+            found += [s for pat, s in TOPICS_INTERN if re.search(pat, text)]
     return next((s for s in found if s in names), None)
 
 
@@ -287,13 +296,18 @@ def next_step(s, me=None):
         return _step(s, "field", question=QUESTIONS["field"], options=FIELDS + [UNSURE])
     if "detail" not in s:
         return _step(s, "detail", question=QUESTIONS["detail"][field],
-                     options=[{"value": d, "label": DETAIL_LABEL.get(d, d)} for d in _details(me, field)] + [{"value": None, "label": NOT_YET}])
+                     options=[{"value": d, "label": d} for d in _details(me, field)] + [{"value": None, "label": NOT_YET}])
     if "program" not in s:
         return _step(s, "program", question=QUESTIONS["program"],
                      options=_programs(me, field, s.get("detail")) + [NOT_YET])
     sections = _sections(field, s.get("program"))
     if s.get("section") not in sections:
-        q = QUESTIONS["section"] if s.get("program") else             QUESTIONS["sectionNotYet"].replace("{i}", label_of(field, s.get("detail")))
+        if s.get("fromQuestionId"):
+            q = QUESTIONS["sectionFromQuestion"]
+        elif s.get("program"):
+            q = QUESTIONS["section"]
+        else:
+            q = QUESTIONS["sectionNotYet"].replace("{i}", label_of(field, s.get("detail")))
         return _step(s, "section", question=q, options=sections)
     if s.get("when") not in WHEN:
         return _step(s, "when", question=QUESTIONS["when"], options=WHEN)

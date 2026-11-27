@@ -233,7 +233,7 @@ TRY = ["H0002", "H0004"]
 extra = copy.deepcopy(SEED)
 for i, who in enumerate(TRY, 1):
     extra["questions"].append({"id": f"Q-009{i}", "colreg_no": who, "status": "hold"})
-    extra["demands"].append({"id": f"R-009{i}", "owner": who, "detail": "1회성"})   # #376 전의 옛 유형 이름
+    extra["demands"].append({"id": f"R-009{i}", "owner": who, "detail": "진로·취업 교육과정"})
     extra["noteLines"].append({"noteId": NX, "owner": who, "text": f"{who} 문장"})
     extra["tellChat"][f"{who}|마르부르크"] = {"owner": who}
 new = {name: v for name, v, _, _ in rr.plan(DEMO + TRY, lambda n, d: copy.deepcopy(extra.get(n, d)))}
