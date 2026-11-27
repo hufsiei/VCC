@@ -288,7 +288,7 @@ def chips_for(program, section, question):
 # ── interviewNext ─────────────────────────────────────────────────────
 def interviewNext(me, payload):
     program = (payload.get("program") or "").strip()
-    if not program:
+    if not program or program not in askboo.PROGRAMS:   # [작업 38] 목록 밖 이름은 거절 — tellChat 키가 안 생기게
         return {"error": "들려줄 경험을 먼저 골라 주세요"}
     # [v2 작업 90] 이어 쓰기: 내 경험노트가 있으면 그 칸·질문을 이미 한 것으로 친다
     mid, mine = find_my_note(me, program)
