@@ -545,7 +545,7 @@ function emptyEvidence(message, button, reportName = "보고서") {
     el("div", { className: "evidence__head" }, [
       el("span", { className: "evidence__summary" }, [
         icon("sparkles"),
-        el("span", {}, ["근거 ", el("span", { className: "evidence__num", text: "0" }), `건 · ${reportName} – · 선배 인터뷰 – · 최근 –`]),
+        el("span", {}, ["근거 ", el("span", { className: "evidence__num", text: "0" }), `건 · ${reportName} 0 · 선배 인터뷰 0 · 최근 –`]),
       ]),
     ]),
     el("div", { className: "evidence__empty-body" }, [el("p", { text: message }), button || null]),
@@ -553,42 +553,27 @@ function emptyEvidence(message, button, reportName = "보고서") {
 }
 
 // lines: 칸 문장, sources: getNote.sources, reportName: 「보고서」 또는 「현장실습후기」
+// [11/27 작업 122] 펼치기 없는 머리줄 하나. 「보고서」·「선배 인터뷰」 수는 문장 수가 아니라 작성한 사람(문서) 수(docCount, #324), 없으면 0
 function evidenceBlock(lines, sources, reportName) {
   const items = lines.map((l) => ({ line: l, src: sources[l.sourceId] || {} }));
-  const reports = items.filter((i) => i.src.docType && i.src.docType !== "인터뷰").length;
-  const interviews = items.filter((i) => i.src.docType === "인터뷰").length;
+  const people = (match) => docCount(items.filter((i) => match(i.src.docType)).map((i) => i.line.sourceId));
+  const reports = people((type) => type && type !== "인터뷰");
+  const interviews = people((type) => type === "인터뷰");
   const latest = items.map((i) => i.src.semester).filter(Boolean).sort((a, b) => semesterKey(b) - semesterKey(a))[0];
-  const num = (n) => (n > 0 ? el("span", { className: "evidence__num", text: n }) : DASH);
+  const num = (n) => el("span", { className: "evidence__num", text: n });
 
   // 근거 적음 라벨(6-1 v4.3): 1~2건이면 고정 문구 「선배 1명의 경험이에요」(lines.length로 판단, spec)
   // [11/26 #295] 문장 수 ≠ 선배 수(서버에 사람 수 없음)라 「선배 2명」으로 세지 않는다
   const few = lines.length <= 2 ? statusLabel("neutral", "user", "선배 1명의 경험이에요") : null;
 
-  return el("details", { className: "evidence" }, [
-    el("summary", { className: "evidence__head" }, [
+  return el("div", { className: "evidence" }, [
+    el("div", { className: "evidence__head" }, [
       el("span", { className: "evidence__summary" }, [
         icon("sparkles"),
         el("span", {}, ["근거 ", num(lines.length), `건 · ${reportName} `, num(reports), " · 선배 인터뷰 ", num(interviews), ` · 최근 ${semesterText(latest)}`]),
       ]),
-      el("span", { className: "evidence__side" }, [
-        few,
-        el("span", { className: "evidence__toggle" }, [
-          el("span", { className: "evidence__toggle-closed", text: "펼치기" }),
-          el("span", { className: "evidence__toggle-open", text: "접기" }),
-          icon("chevron-down"),
-        ]),
-      ]),
+      few ? el("span", { className: "evidence__side" }, [few]) : null,
     ]),
-    // 출처 한 줄: 종류 | 연도만(v4.3). 자동 분류 문장은 끝에 「자동 분류」
-    el("ul", { className: "evidence__list" }, items
-      .slice()
-      .sort((a, b) => semesterKey(b.src.semester) - semesterKey(a.src.semester))
-      .map((i) => el("li", { className: "evidence__item" }, [
-        DOC_LABEL[i.src.docType] || orDash(i.src.docType),
-        " ", el("span", { className: "evidence__sep", text: "|" }), " ",
-        yearOf(i.src.semester),
-        i.line.autoClassified ? statusLabel("neutral", null, "자동 분류") : null,
-      ]))),
   ]);
 }
 
@@ -630,7 +615,7 @@ function lineCard(line, src, { quote = false } = {}) {
 
 // ---------------------------------------------------------------------------
 // 5-1. 칸별 요약(작업 78, spec getNote [v2] summary·[11/23] newLines·[11/26 칸유형])
-//   소제목 → (비용 칸 stats 한 줄 + 분포 띠) → 요약 개조식(문장마다 한 줄 + 출처 연도 + 「보고서 N건」, official이면 「개인 경험」)
+//   소제목 → (비용 칸 stats 한 줄 + 분포 띠) → 요약 개조식(문장마다 한 줄 + 「출처 연도 (선배 N명)」, official이면 「개인 경험」)
 //   → 「새로 더해진 선배 이야기 N건」. 생활·지원 칸은 summary[].topic이 있으면 소주제 라벨로 묶는다.
 //   [11/26 #321] 한 문단으로 이어 쓰던 것을 개조식으로 바꿈(국제처 피드백 「그래서 얼마인거지?」).
 //   [11/25 #266] 「원문 N건 보기」 접기는 없앴다 — 근거는 요약 문장 끝 출처, 신고는 요약 문장에(5-2 신고 풍선).
@@ -675,16 +660,19 @@ const TOPIC_ORDER = { 생활: ["주거", "교통", "음식", "행정", "사람"]
 // R149-1-1·R149-1-3은 1명. 한 선배의 보고서와 인터뷰는 이을 칸이 없어 따로 센다
 const docCount = (ids) => new Set((ids || []).map((id) => String(id).split("-")[0]).filter(Boolean)).size;
 
-// 요약 문장 한 줄: 문장 + (출처 연도 · 「선배 N명」 · 「개인 경험」)
+// 요약 문장 한 줄: 문장 + (「보고서 2025, 2026 (선배 N명)」 · 「개인 경험」)
 function summaryItem(item, sources, reportName) {
   const from = summarySourceText(item, sources, reportName);
   const count = docCount(item.sources);
   return el("li", { className: "summary__item" }, [
     summarySentence(item),
     el("span", { className: "summary__meta" }, [
-      from ? el("span", { className: "summary__from", text: from }) : null,
-      // 이 문장을 받치는 선배(문서) 수 — 코드 집계라 AI 표시색이 아닌 중립색. [11/26 #324] 「보고서 N건」 → 「선배 N명」
-      count ? el("span", { className: "summary__count", text: `선배 ${count}명` }) : null,
+      // [11/27 작업 122] 출처와 이 문장을 받치는 선배(문서) 수를 같은 작은 글씨 한 줄로(알약 없음)
+      from || count ? el("span", { className: "summary__from" }, [
+        from || null,
+        from && count ? " " : null,
+        count ? el("span", { className: "summary__count", text: from ? `(선배 ${count}명)` : `선배 ${count}명` }) : null,
+      ]) : null,
       // 규정에 닿는 요약 문장(official) — 칸 문장과 같은 중립 라벨 「개인 경험」(디자인 규칙 8-1)
       item.official ? statusLabel("neutral", "user", "개인 경험") : null,
     ]),
