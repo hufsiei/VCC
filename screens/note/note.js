@@ -2,7 +2,7 @@
 // 기준: docs/design-rules.md 7-③·5-2·5-5·6-1~6-5·8절(해봤노트 상세), docs/spec-v1.md 4장 listNotes·getNote·scrapNote·reportStatement
 // 규칙: 데이터는 common/data.js 함수로만, 화면 글은 textContent로만(innerHTML 금지), 색은 style.css 변수만.
 
-import { currentUser, logout, listNotes, getNote, scrapNote, saveQuestion, reportStatement } from "../../common/data.js";
+import { currentUser, listNotes, getNote, scrapNote, saveQuestion, reportStatement } from "../../common/data.js";
 
 // ---------------------------------------------------------------------------
 // 0. 로그인 확인
@@ -11,13 +11,6 @@ import { currentUser, logout, listNotes, getNote, scrapNote, saveQuestion, repor
 const me = currentUser();
 if (!me) location.replace("../login/");
 if (me && me.status === "직원") document.getElementById("consoleBtn").hidden = false;
-// 헤더 왼쪽 로그아웃(11/26, 디자인 규칙 5-1) — 인터BOO와 같은 동작. 이 탭의 다른 기록은 건드리지 않는다
-document.getElementById("logoutBtn").addEventListener("click", () => {
-  if (confirm("로그아웃할까요?")) {
-    logout();
-    location.replace("../login/");
-  }
-});
 
 // 노트 종류(type) → 분야(3-3). 교환·파견은 국제교류, 인턴은 현장실습
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
@@ -931,14 +924,19 @@ function renderDetail() {
   renderSection(panel);
 }
 
-// 최근에 본 노트(PR #232 원우 요청): 닮은선배 탭이 추천 기준 노트로 쓴다(senior.js pickBaseNotes).
-// 이 탭의 sessionStorage에만, 사람별, 최근이 앞, 5개까지(두 창 시연이 섞이지 않게)
-function rememberViewed(id) {
+// 최근에 본 노트(PR #232 원우 요청): 닮은선배 탭이 관심 경험의 세부 활동 칩으로 쓴다(senior.js collectActivities).
+// 이 탭의 sessionStorage에만, 사람별, 최근이 앞, 30개까지(두 창 시연이 섞이지 않게)
+// 11/27: [{ id, at(ISO), from }] — from = "search"(검색어가 있는 목록에서 연 노트) | "view". 검색어만 친 것은 남기지 않는다(활동이 아님).
+//        예전 모양(id 문자열)이 섞여 있어도 읽고, 새로 쓸 때 이 모양으로 바꾼다.
+const VIEWED_MAX = 30;
+let openFrom = "view"; // 목록 카드를 누를 때 정한다(openDetail). 주소로 바로 들어온 상세는 "view"
+function rememberViewed(id, from = "view") {
   if (!me || !id) return;
   const key = `viewedNotes:${me.colreg_no}`;
   try {
     const old = JSON.parse(sessionStorage.getItem(key) || "[]");
-    const list = [id, ...(Array.isArray(old) ? old : []).filter((x) => x !== id)].slice(0, 5);
+    const prev = (Array.isArray(old) ? old : []).map((x) => (typeof x === "string" ? { id: x } : x)).filter((x) => x && x.id && x.id !== id);
+    const list = [{ id, at: new Date().toISOString(), from }, ...prev].slice(0, VIEWED_MAX);
     sessionStorage.setItem(key, JSON.stringify(list));
   } catch {
     // 저장 공간이 막혀 있으면 기억하지 않는다
@@ -955,7 +953,8 @@ async function loadDetail(id) {
     const res = await getNote(id);
     if (!res || res.error || !Array.isArray(res.sections)) throw new Error((res && res.error) || "노트 없음");
     detailNote = res;
-    rememberViewed(id);
+    rememberViewed(id, openFrom);
+    openFrom = "view";
     renderDetail();
   } catch (err) {
     console.error(err);
@@ -987,6 +986,7 @@ function showDetail(id) {
 function openDetail(id) {
   listScrollY = window.scrollY;
   cameFromList = true;
+  openFrom = currentQuery.trim() ? "search" : "view"; // 검색 결과에서 연 노트는 닮은선배 활동 칩의 「검색」 이력
   history.pushState({ noteId: id }, "", `?id=${encodeURIComponent(id)}`);
   showDetail(id);
 }

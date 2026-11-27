@@ -3,7 +3,7 @@
 // 규칙: 데이터는 common/data.js 함수로만, 화면 글은 textContent로만(innerHTML 금지), 색은 style.css 변수만.
 
 import {
-  currentUser, logout, getMe, askBoo, interviewNext, summarizeInterview,
+  currentUser, getMe, askBoo, interviewNext, summarizeInterview,
   saveInterviewDraft, getInterviewDraft, demandNext, saveDemand,
 } from "../../common/data.js";
 
@@ -1528,17 +1528,10 @@ laterBtn.addEventListener("click", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 8. 헤더 — 직원 계정이면 콘솔 버튼, 왼쪽은 로그아웃(11/26: 햄버거 → log-out 좌우 반전, 디자인 규칙 5-1)
+// 8. 헤더 — 직원 계정이면 콘솔 버튼(11/27: 왼쪽 로그아웃 버튼 삭제, 디자인 규칙 5-1)
 // ---------------------------------------------------------------------------
 
 if (me && me.status === "직원") document.getElementById("consoleBtn").hidden = false;
-document.getElementById("logoutBtn").addEventListener("click", () => {
-  if (confirm("로그아웃할까요?")) {
-    try { sessionStorage.removeItem(KEEP_KEY); } catch { /* 보존 없이 */ }
-    logout();
-    location.replace("../login/");
-  }
-});
 
 // ---------------------------------------------------------------------------
 // 9. 대화 보존 — 다른 메뉴에 갔다 와도 두 모드의 대화를 다시 그린다(spec 4장 saveInterviewDraft 1단계)

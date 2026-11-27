@@ -518,3 +518,17 @@ export const issueReport = (dept, period) => call("issueReport", { dept, period 
 export const listIssuedReports = (dept) => call("listIssuedReports", { dept });
 // 이력 「열기」. html은 iframe srcdoc(sandbox)로만 보여 준다 — innerHTML 금지
 export const getIssuedReport = (reportId) => call("getIssuedReport", { reportId });
+
+// ── 후속 개발 및 확장방안(11/27, 민지 — 헤더 ⓘ 안내 시트) ──
+// 팀원이 고치는 Markdown 원문 screens/info/roadmap.md를 글자 그대로 받는다(서버 함수 아님 · mock/서버 구분 없음).
+// cache: "no-cache" — 파일을 고치고 새로고침하면 바로 새 글이 보이게. 그리는 쪽(screens/info/info.js)이 textContent로만 그린다.
+// → { text } | { error }
+export const getRoadmap = async () => {
+  try {
+    const res = await fetch(new URL("../screens/info/roadmap.md", import.meta.url), { cache: "no-cache" });
+    if (!res.ok) return { error: `안내 파일을 찾지 못했어요(${res.status})` };
+    return { text: await res.text() };
+  } catch (e) {
+    return { error: "안내 파일을 불러오지 못했어요: " + e.message };
+  }
+};
