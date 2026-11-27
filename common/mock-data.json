@@ -1039,6 +1039,7 @@
       {
         "threadId": "T-0002",
         "role": "senior",
+        "program": "마르부르크필립스대학교",
         "withId": "H0102",
         "nickname": "조용한 고래",
         "askerInfo": {
@@ -1062,6 +1063,7 @@
       {
         "threadId": "T-0001",
         "role": "asker",
+        "program": "마르부르크필립스대학교",
         "withId": "H0469",
         "nickname": "독일어과 선배 A",
         "myNickname": "용감한 수달",
@@ -1085,6 +1087,7 @@
       {
         "threadId": "T-0003",
         "role": "asker",
+        "program": null,
         "withId": "H0241",
         "nickname": "독일어과 선배 B",
         "myNickname": "느긋한 판다",
@@ -1128,7 +1131,8 @@
         "askedAt": "2026-11-18T09:00:00+09:00",
         "program": null,
         "type": null,
-        "section": null
+        "section": null,
+        "noteId": null
       },
       {
         "questionId": "Q-0001",
@@ -1144,6 +1148,7 @@
         "questionId": "Q-0002",
         "text": "마르부르크 교환학생도 장학금 받을 수 있어요?",
         "status": "official",
+        "noteId": "N-marburg",
         "askedAt": "2026-11-18T10:00:00+09:00",
         "program": "마르부르크필립스대학교",
         "type": "교환",

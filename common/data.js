@@ -453,10 +453,17 @@ export const saveQuestion = (noteId, section) => call("saveQuestion", { noteId, 
 // [11/25 작업 33] reason(사유, 100자까지)은 꼭 넣는다 — 비면 { error: "신고 사유를 적어 주세요" }. 신고된 요약 문장은 다음 getNote부터 빠진다
 export const reportStatement = (lineId, reason) => call("reportStatement", { lineId, reason });
 // more=true면 3명씩 더해 최대 9명. 응답의 hasMore가 false면 「비슷한 선배를 모두 보여드렸어요」(spec 4장)
-export const recommendSeniors = (noteId, more) => call("recommendSeniors", more ? { noteId, more: true } : { noteId });
+// [11/27] 선배별 기준 노트를 기억해 두고 sendMessage에 붙인다 → 서버가 요청의 기준 프로그램으로 저장(getMessages.program)
+const seniorNote = new Map();
+export const recommendSeniors = async (noteId, more) => {
+  const res = await call("recommendSeniors", more ? { noteId, more: true } : { noteId });
+  for (const s of (res && res.seniors) || []) seniorNote.set(s.studentId, noteId);
+  return res;
+};
 export const checkMessage = (text) => call("checkMessage", { text });
 export const previewNickname = (to) => call("previewNickname", { to });
-export const sendMessage = (to, text) => call("sendMessage", { to, text });
+export const sendMessage = (to, text, noteId = seniorNote.get(to)) =>
+  call("sendMessage", noteId ? { to, text, noteId } : { to, text });
 // [11/23] 그냥 부르면 목록만(읽음으로 바꾸지 않음). 대화창을 열 때는 getMessages(threadId) → 그 대화만 읽음
 export const getMessages = (read) => call("getMessages", read ? { read } : {});
 export const respondRequest = (threadId, accept) => call("respondRequest", { threadId, accept });
@@ -466,6 +473,7 @@ export const cancelRequest = (threadId) => call("respondRequest", { threadId, ca
 // [11/23] 쪽지 대화 ⋮ 메뉴 신고·차단. reason만 → 신고, block: true → 차단(양쪽 다 더 못 보냄, 상대에게 알림 없음). 둘 다 가능
 export const reportThread = (threadId, reason, block = false) => call("reportThread", { threadId, reason, block });
 // [11/26 작업 117] questions[]마다 program · type(교환|파견|인턴|비교과) · section — 없으면 null. program이 null이면 선배에게 전달되지 않은 질문
+// [11/27] questions[].noteId도 늘 있음(program의 해봤노트, 없으면 null) · getMessages 대화마다 program(요청의 기준 프로그램, 없으면 null)
 export const getInbox = () => call("getInbox");
 // [v2 작업 91] 내 보관함 질문 상세의 「질문 삭제」·「질문 고치기」. 본인 hold 질문만(answered·official·남의 것은 { error })
 //   deleteQuestion → { ok, questionId, status: "deleted" } (목록에서 빠짐) · updateQuestion → { ok, questionId, text, editedAt } | { error, reason? }

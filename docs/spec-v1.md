@@ -464,8 +464,8 @@ payload `{text}`. 연락처·학번은 코드(정규식), 비방은 AI 판정. *
 ```
 reason: `연락처` | `학번` | `비방`
 
-### sendMessage(to, text)
-payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청이 된다. **[11/26 상대 값]** `to`는 `recommendSeniors.studentId` 또는 `getMessages.withId`(불투명 값) 그대로 — 학번·다른 사람에게 나간 값·엉터리 값이면 `{ "error": "받는 사람과 내용을 확인해 주세요" }`(대화를 만들지 않음). `previewNickname(to)`도 같고, 틀리면 `{ "error": "받는 선배가 없어요" }`.
+### sendMessage(to, text, noteId?)
+payload `{to, text, noteId?}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청이 된다. **[11/26 상대 값]** `to`는 `recommendSeniors.studentId` 또는 `getMessages.withId`(불투명 값) 그대로 — 학번·다른 사람에게 나간 값·엉터리 값이면 `{ "error": "받는 사람과 내용을 확인해 주세요" }`(대화를 만들지 않음). `previewNickname(to)`도 같고, 틀리면 `{ "error": "받는 선배가 없어요" }`.
 **요청 한도(11/18):** 같은 선배에게 열린 대화가 이미 있으면 새 요청을 만들지 않고 그 대화에 붙인다(선배 한 명당 요청 1건). 보낸 사람이 **수락 전(`status: "waiting"`)인 요청을 3건** 가지고 있으면 `{ "ok": false, "reason": "한도", "message": "답을 기다리는 쪽지가 3건이에요. 기다리는 요청을 취소하거나 선배가 답하면 더 보낼 수 있어요." }`. 닮은선배 추천 수를 제한하지 않는 대신 쪽지는 여기서 막는다.
 **[11/23 차단]** 차단된 대화(누가 차단했든)에는 양쪽 모두 `{ "ok": false, "reason": "차단", "message": "더 이어 갈 수 없는 대화예요" }`. 한 쌍에 대화는 하나이므로 차단당한 사람이 새 요청을 보내도 같은 응답이다.
 **[11/20] 받는 한도:** 받는 선배의 수락 대기 요청이 이미 **5건**이면 `{ "ok": false, "reason": "선배한도", "message": "지금은 이 선배에게 요청이 많아요. 질문함에 남기면 선배 인터뷰 때 함께 물어볼게요." }`. 인기 선배에게 쪽지가 몰리지 않게 하고, 같은 질문은 질문함 → 인터뷰(작업 74) → 해봤노트로 한 번에 답하게 한다. 「당분간 쪽지 쉬기」 스위치는 P1.
@@ -476,6 +476,7 @@ payload `{to, text}`. `to`는 상대 studentId. 첫 메시지는 쪽지 신청�
 **[11/23 추천] 추천 제외:** 추천받기를 끈 선배에게 **새 요청·다시 요청**을 보내면 `{ "ok": false, "reason": "추천 제외", "message": "이 선배는 지금 쪽지 요청을 받지 않아요." }`. 이미 수락한 대화는 막지 않는다.
 **[11/22 열림] 잠김:** 선배 추천이 잠긴 사람의 **새 요청·다시 요청**은 `{ "ok": false, "reason": "잠김", "message": "경험을 들려주거나 궁금한 것을 정리하면 선배 추천이 열려요", "recommend": {…} }`. 이미 열린 대화에 이어 쓰기와 받은 선배의 답장은 막지 않는다.
 대화 상태 `status`: `waiting`(수락 대기) | `accepted` | `declined` | `cancelled` | `expired`. 한도에 세는 것은 `waiting`만이다. 기존 `accepted: true|false`는 `status`로 대신한다.
+**[11/27 기준 프로그램]** `noteId`(선택) = 이 요청을 보낸 닮은선배 목록의 기준 노트. **새 요청·다시 요청**일 때 서버가 그 프로그램명을 대화에 저장하고 `getMessages`가 `program`으로 돌려준다. 보낸 사람이 그 `noteId`로 받은 추천 목록(`shownSeniors`)에 그 선배가 있을 때만 저장한다(아무 값이나 붙일 수 없게). 없거나 맞지 않아도 쪽지는 그대로 보내고 `program`은 `null`(다시 요청이면 전 값 유지). 이미 열린 대화에 덧붙이기·답장은 `program`을 바꾸지 않는다. 응답 모양은 그대로. 화면은 `noteId`를 따로 넘기지 않아도 된다 — `common/data.js`가 `recommendSeniors` 응답의 선배별 `noteId`를 기억했다가 `sendMessage`에 붙인다.
 첫 메시지일 때 서버가 이 대화에서 쓸 보낸 사람 닉네임(`myNickname`, 형용사 + 동물)을 만든다. 화면은 요청 시트를 열 때 `previewNickname(to)`로 같은 값을 미리 받아 「선배에게는 '용감한 수달'로 보여요」를 보여 준다.
 ```json
 { "ok": true, "threadId": "T-0001", "myNickname": "용감한 수달", "at": "2026-11-20T10:00:00+09:00" }
@@ -494,15 +495,16 @@ payload `{to}`. 이 선배에게 보낼 대화의 내 닉네임을 정해 돌려
 ```json
 { "threads": [
   { "threadId": "T-0001", "role": "asker", "withId": "p3f9c1a07b2e4d815", "nickname": "독일어과 선배 A", "myNickname": "용감한 수달",
-    "status": "accepted", "requestedAt": "2026-11-20T10:00:00+09:00", "unread": 1,
+    "status": "accepted", "requestedAt": "2026-11-20T10:00:00+09:00", "unread": 1, "program": "마르부르크필립스대학교",
     "messages": [ { "from": "me", "text": "...", "at": "..." }, { "from": "them", "text": "...", "at": "..." } ] },
   { "threadId": "T-0002", "role": "senior", "withId": "p5c7d0b13e9a2f468", "nickname": "조용한 고래",
     "askerInfo": { "학년": 2, "관심": ["교환학생·독일"], "시기": "다음 학기" },
-    "status": "waiting", "requestedAt": "2026-11-21T09:00:00+09:00", "unread": 1,
+    "status": "waiting", "requestedAt": "2026-11-21T09:00:00+09:00", "unread": 1, "program": null,
     "messages": [ { "from": "them", "text": "...", "at": "..." } ] } ],
   "waitingCount": 1, "waitingLimit": 3 }
 ```
 `waitingCount`는 내가 asker로 보낸 `waiting` 요청 수. 화면은 `waitingCount >= waitingLimit`이면 「쪽지 요청」 버튼 대신 안내를 보인다(디자인 규칙 ④·⑤). `cancelled`·`expired` 대화는 asker에게만 보이고(선배 목록에서는 사라짐), 보낸 글은 남는다.
+**[11/27 기준 프로그램]** 모든 대화에 `program`이 있다(asker·senior 같은 값) — 요청을 보낼 때의 닮은선배 기준 프로그램명(sendMessage `noteId`). 11/27 전의 대화나 기준 없이 보낸 요청은 `null`. 화면은 `null`이면 프로그램 줄을 두지 않는다.
 **[11/24 retryAt]** asker의 `cancelled` 대화에 취소 뒤 7일이 지나지 않았으면 `retryAt`(다시 보낼 수 있는 시각, ISO KST, 취소 시각 + 7일)이 붙는다. 7일이 지나면 필드가 없어지고 바로 다시 요청할 수 있다(같은 대화가 `waiting`으로 다시 열림). 닮은선배 카드의 `retryAt`(recommendSeniors)과 같은 값이다.
 **[11/23 차단]** `status: "blocked"`인 대화는 양쪽 목록에 남고 `blockedByMe`(내가 차단했는지)가 붙는다. 화면은 입력창 대신 차단한 쪽에 「차단한 대화예요」, 차단당한 쪽에 「더 이어 갈 수 없는 대화예요」를 보인다(누가 차단했는지 상대에게 말하지 않음).
 
@@ -532,7 +534,7 @@ payload `{threadId, reason?, block?}`. 쪽지 대화 ⋮ 메뉴의 신고·차�
 ```json
 { "myNotes": [ { "id": "M-0001", "program": "마르부르크필립스대학교", "type": "교환", "noteId": "N-marburg",
                  "share": "partial", "filled": 4, "total": 7, "sharedLines": 3, "editedLines": 0, "updatedAt": "..." } ],   // [11/22] 최근에 요약한 것이 위
-  "questions": [ { "questionId": "Q-0001", "text": "...", "status": "hold", "askedAt": "...", "program": null, "type": null, "section": null },
+  "questions": [ { "questionId": "Q-0001", "text": "...", "status": "hold", "askedAt": "...", "program": null, "type": null, "section": null, "noteId": null },
                  { "questionId": "Q-0002", "text": "...", "status": "answered", "noteId": "N-marburg", "answeredAt": "...",
                    "program": "마르부르크필립스대학교", "type": "교환", "section": "생활" } ],
   "scraps": [ { "noteId": "N-marburg", "program": "마르부르크필립스대학교" } ],   // [11/22] scrapNote로 켠 노트, 최근이 위
@@ -543,6 +545,8 @@ payload `{threadId, reason?, block?}`. 쪽지 대화 ⋮ 메뉴의 신고·차�
 **[11/19]** 질문 `status`는 `hold`(미답변) | `answered` | `official`. 화면은 `answered`에 「선배가 답했어요」 라벨 + 해봤노트 링크(**[v2]** 「후배 질문」 칸이 없으므로 질문 상세의 「선배의 답」 Q·A가 주 화면, 노트 링크는 보조). (이전 예시의 `waiting`은 쓰지 않는다.) **[v2]** `deleted`는 목록에 나오지 않는다. 카드·상세의 「더 들려주기」(`myNotes` 카드, `../talk/?mode=tell&program=…`)는 비활성 「자소서용 요약 보기」 자리에 둔다. `total`은 「후배 질문」 칸을 뺀 칸 수.
 
 **[11/26 작업 117] 질문의 프로그램**: `questions[]`에는 늘 `program` · `type` · `section` 세 필드가 있다(없는 값은 `null`). `program` = 질문함 행의 프로그램명. `type` = `교환` | `파견` | `인턴` | `비교과`(그 프로그램 해봤노트 카드 `listNotes`의 `type`과 같은 값, `program`이 없거나 프로그램 목록에 없으면 `null`). `section` = 질문의 칸 이름. **`program`이 `null`인 질문은 어느 선배에게도 전달되지 않는다**(들려주기 후배 질문은 같은 프로그램 것만 고른다) → 화면은 전달됐다고 쓰지 않는다. 질문 상세용 함수는 따로 없고 상세도 이 값을 쓴다.
+
+**[11/27 질문의 노트]** `questions[]`에는 늘 `noteId`도 있다. 질문함 행에 저장된 노트가 있으면 그 값(`answered`는 답이 실린 노트), 없으면 `program`의 해봤노트 id, `program`이 없거나 프로그램 목록에 없으면 `null`. 화면은 이 값으로 「닮은선배 보기」(`../senior/?noteId=`)의 기준 노트를 정한다. `noteId`가 있어도 그 노트에 문장이 있다는 뜻은 아니다(`getNote`가 `error`일 수 있음) — 「해봤노트 보기」는 `answered`에만 둔다.
 
 ### deleteQuestion(questionId) · updateQuestion(questionId, text) [v2]
 내 보관함 질문 상세의 「질문 삭제」·「질문 고치기」. **본인 질문이고 `status: "hold"`일 때만**. `answered`는 `{ "error": "선배가 답한 질문은 지울 수 없어요" }`(deleteQuestion) / `{ "error": "선배가 답한 질문은 고칠 수 없어요" }`(updateQuestion), `official`은 `{ "error": "공식 안내 질문은 지울 수 없어요" }` / `{ "error": "공식 안내 질문은 고칠 수 없어요" }`, 남의 것·없는 것·이미 지운 것은 `{ "error": "볼 수 없는 기록이에요" }`.
@@ -656,7 +660,7 @@ login(id, pw) · getMe() · askBoo(question, history = []) · setRecommendable(o
 interviewNext(program, answers) · summarizeInterview(program, transcript, append = false) · saveConsent(draftId, edits)   // append [v2]
 deleteQuestion(questionId) · updateQuestion(questionId, text) · saveInterviewDraft(program, answers) · getInterviewDraft(program)   // [v2] 질문 삭제·고치기 · 미완성 초안(P1-여건 79)
 listNotes(filter) · getNote(id) · scrapNote(noteId, scrap = true) · saveQuestion(noteId, section) · reportStatement(lineId, reason)   // scrapNote·saveQuestion [11/22]
-recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text) · getMessages(read?) · respondRequest(threadId, accept) · cancelRequest(threadId) · reportThread(threadId, reason, block = false)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85) · reportThread [11/23 차단] · getMessages(threadId) = 그 대화만 읽음 [11/23 읽음]
+recommendSeniors(noteId, more) · checkMessage(text) · previewNickname(to) · sendMessage(to, text, noteId?) · getMessages(read?) · respondRequest(threadId, accept) · cancelRequest(threadId) · reportThread(threadId, reason, block = false)   // cancelRequest = respondRequest {threadId, cancel: true} (작업 85) · reportThread [11/23 차단] · getMessages(threadId) = 그 대화만 읽음 [11/23 읽음]
 getInbox() · getMyNote(id) · updateMyNote(id, changed) · getDeptReport(dept)   // getMyNote [11/22] · updateMyNote [11/23 고치기]
 demandNext(state = {}) · saveDemand(state)   // [11/22 열림] 궁금한 것 정리하기 → 선배 추천 열림. 열림 상태는 getMe().recommend
 getDepartments() · getAdminOverview(dept, period) · getAdminSuggestions(dept, period) · setSuggestionStatus(id, status)

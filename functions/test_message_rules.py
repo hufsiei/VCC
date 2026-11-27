@@ -189,6 +189,39 @@ expect("남의 대화 취소 → error", "error" in respondRequest(pool[1], {"th
 expect("없는 대화 → error", "error" in respondRequest(JUNIOR, {"threadId": "T-없음", "cancel": True}))
 expect("수락된 대화 취소 → reason 상태", respondRequest(pool[0], {"threadId": t_ok, "cancel": True}).get("reason") == "상태")
 
+# ── 9-2. [11/27] 요청의 기준 프로그램 ─────────────────────────────────────
+import notes
+
+PROG = notes.NOTES[MARBURG]["program"]
+P1, P2, P3 = "H0011", "H0012", "H0013"
+later(8)
+getMessages(JUNIOR, {})
+
+
+def send_from(me, to, note_id):
+    return sendMessage(me, {"to": to, "text": HELLO, "noteId": note_id})["threadId"]
+
+
+S1 = recommendSeniors(P1, {"noteId": MARBURG})["seniors"][0]["studentId"]   # 실제 추천 카드의 선배
+t1 = send_from(P1, S1, MARBURG)
+expect("추천 목록에서 보낸 요청: program 저장, 보낸 사람·선배 같은 값",
+       thread(P1, t1)["program"] == PROG and thread(S1, t1)["program"] == PROG)
+send(P1, S1, "하나 더요.")
+send_from(P1, S1, "N-없음")
+expect("덧붙이기는 program을 바꾸지 않음", thread(P1, t1)["program"] == PROG)
+respondRequest(P1, {"threadId": t1, "cancel": True})
+later(7)
+send(P1, S1)
+expect("noteId 없이 다시 요청: 전 값 유지", thread(P1, t1)["program"] == PROG)
+t2 = send(P2, S1)["threadId"]
+expect("noteId 없는 요청: program null", "program" in thread(P2, t2) and thread(P2, t2)["program"] is None)
+t3 = send_from(P3, S1, MARBURG)
+expect("추천받은 적 없는 noteId: 보내지되 program null", thread(P3, t3)["program"] is None)
+store.load("messages", {})[t3].pop("program", None)
+expect("program 키 없는 대화(옛 기록): null", thread(P3, t3)["program"] is None)
+no_note = next((p for p in notes.PROGRAMS if p not in notes.ID_BY_PROGRAM), None)
+expect("노트 없는 프로그램의 id도 프로그램명으로 푼다", no_note is None or rf._program_of(notes.note_id(no_note)) == no_note)
+
 # ── 10. login·getMe 응답 모양 ────────────────────────────────────────────
 store.save = lambda name: None   # sessions 기록을 남기지 않는다
 store._cache["sessions"] = {}
