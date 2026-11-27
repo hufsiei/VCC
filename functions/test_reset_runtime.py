@@ -6,6 +6,7 @@ import copy
 import io
 import json
 import os
+import re
 import runpy
 import sys
 import tempfile
@@ -32,9 +33,11 @@ def expect(name, cond):
 
 SEED = {
     "messages": {
-        "T-0001": {"asker": J1, "senior": S1, "askerNickname": "용감한 수달", "status": "accepted", "messages": []},
+        "T-0001": {"asker": J1, "senior": S1, "askerNickname": "용감한 수달", "status": "accepted", "messages": [],
+                   "program": "마르부르크"},   # #379 쪽지 기준 프로그램 — 대화째 지워지면 함께 없어진다
         "T-0002": {"asker": OTHER, "senior": S2, "askerNickname": "느긋한 판다", "status": "waiting", "messages": []},  # 섞인 대화
-        "T-0003": {"asker": OTHER, "senior": OTHER2, "askerNickname": "조용한 고래", "status": "accepted", "messages": [{"from": OTHER, "text": "안녕"}]},
+        "T-0003": {"asker": OTHER, "senior": OTHER2, "askerNickname": "조용한 고래", "status": "accepted", "messages": [{"from": OTHER, "text": "안녕"}],
+                   "program": "마르부르크"},
     },
     "nicknames": {J1: {S1: "A", S2: "B"}, OTHER: {S2: "A", OTHER2: "B"}},
     "pendingNicknames": {f"{S1}|{J1}": "수줍은 토끼", f"{S2}|{OTHER}": "x", f"{OTHER2}|{OTHER}": "밝은 여우"},
@@ -66,6 +69,8 @@ SEED = {
     "sessions": {"tok1": {"me": J1, "exp": 1}, "tok2": {"me": "staff01", "exp": 1}, "tok3": {"me": OTHER, "exp": 1}},
     "interviewDrafts": {f"{S2}|마르부르크": {"owner": S2}, f"{OTHER2}|마르부르크": {"owner": OTHER2}},
     "scraps": {J1: [NM], OTHER: [NM]},
+    "tellChat": {f"{S1}|마르부르크": {"owner": S1}, f"{OTHER2}|마르부르크": {"owner": OTHER2}},   # 작업 110
+    "loginFails": {J1: {"since": 1, "fails": 5, "until": 2}, OTHER: {"since": 1, "fails": 1, "until": 0}},
     "reportSettings": {"D04": {"by": "staff01"}},
     "issuedReports": [{"reportId": "R-0009", "dept": "D04"}],
     "reportHtml": {"R-0009": "<p/>"},
@@ -127,6 +132,8 @@ def check_after(r, tag):
     expect(f"{tag} 로그인: 시연 계정 토큰만 지움", list(r("sessions")) == ["tok3"])
     expect(f"{tag} 인터뷰 초안: 다른 계정 것만", list(r("interviewDrafts")) == [f"{OTHER2}|마르부르크"])
     expect(f"{tag} 스크랩: 다른 계정 것만", r("scraps") == {OTHER: [NM]})
+    expect(f"{tag} 대화형 인터뷰 판정: 다른 계정 것만", list(r("tellChat")) == [f"{OTHER2}|마르부르크"])
+    expect(f"{tag} 로그인 실패 기록: 다른 계정 것만", list(r("loginFails")) == [OTHER])
     for name in ("askLog", "counters", "reportSettings", "issuedReports", "reportHtml", "suggestionStatus", "mystery"):
         expect(f"{tag} {name} 건드리지 않음", r(name) == SEED[name])
 
@@ -220,6 +227,37 @@ m = nread("messages")
 expect("ncp: 그사이 생긴 다른 계정 대화 T-0004 남음", "T-0004" in m)
 nread_wo_late = lambda name: ({k: v for k, v in nread(name).items() if k != "T-0004"} if name == "messages" else nread(name))
 check_after(nread_wo_late, "ncp")
+
+# ── 5. 12/3 초기화 목록(시연 계정 + H0002·H0004, 11/26 결정 A): 시험 계정 기록도 지우고 나머지는 남김 ──────
+TRY = ["H0002", "H0004"]
+extra = copy.deepcopy(SEED)
+for i, who in enumerate(TRY, 1):
+    extra["questions"].append({"id": f"Q-009{i}", "colreg_no": who, "status": "hold"})
+    extra["demands"].append({"id": f"R-009{i}", "owner": who, "detail": "1회성"})   # #376 전의 옛 유형 이름
+    extra["noteLines"].append({"noteId": NX, "owner": who, "text": f"{who} 문장"})
+    extra["tellChat"][f"{who}|마르부르크"] = {"owner": who}
+new = {name: v for name, v, _, _ in rr.plan(DEMO + TRY, lambda n, d: copy.deepcopy(extra.get(n, d)))}
+expect("12/3 목록: H0002·H0004 질문·옛 수요 기록 지움, 다른 계정 남음",
+       [q["id"] for q in new["questions"]] == ["Q-0002"] and new["demands"] == [{"id": "R-0002", "owner": OTHER}])
+expect("12/3 목록: H0002·H0004 공개 문장·대화형 판정 지움, 다른 계정 남음",
+       [x["owner"] for x in new["noteLines"]] == [OTHER2, OTHER2] and list(new["tellChat"]) == [f"{OTHER2}|마르부르크"])
+
+# ── 6. 서버 코드가 쓰는 runtime 이름은 모두 초기화 규칙(HANDLED)이나 남기는 목록(UNTOUCHED)에 있다 ──────
+used, unknown = {"counters"}, []   # counters는 store.next_id가 쓴다
+for path in sorted(Path(rr.__file__).parent.glob("*.py")):
+    if path.name.startswith(("test_", "eval_", "check_")) or path.name in ("store.py", "reset_runtime.py"):
+        continue
+    src = path.read_text(encoding="utf-8")
+    consts = dict(re.findall(r'^([A-Z_]+)\s*=\s*"(\w+)"', src, re.M))
+    for arg in re.findall(r'\bstore\.(?:load|save)\(\s*([^,)\s]+)', src):
+        name = arg[1:-1] if arg[0] in "\"'" else consts.get(arg)
+        if name:
+            used.add(name)
+        else:
+            unknown.append(f"{path.name}: {arg}")
+expect(f"runtime 이름을 모두 읽어 냄 {unknown or ''}", not unknown)
+missing = sorted(used - rr.HANDLED - set(rr.UNTOUCHED))
+expect(f"초기화 규칙에 없는 runtime 기록 없음 {missing or ''}", not missing)
 
 print("\n" + (f"FAIL {len(fails)}건" if fails else "모두 통과"))
 sys.exit(1 if fails else 0)
