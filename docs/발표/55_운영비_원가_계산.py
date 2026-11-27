@@ -10,7 +10,8 @@ LOG = sys.argv[1] if len(sys.argv) > 1 else "C:/dev/VCC/functions/logs/ai-calls.
 
 # ── 가정 (문서 2절) ─────────────────────────────────────────────
 KRW = 1400                 # 원/$
-Q_USD = 0.0328             # 질문 1건 Claude 원가, A안 측정(Q-51, 11/26), 캐시 적중 21%
+Q_USD = 0.0324             # 질문 1건 Claude 원가, 88 재측정 A안(11/27, 커밋 a832597, #413), 캐시 적중 19%
+CACHE_HIT = 19             # 위 측정의 캐시 적중률(%)
 Q_HCX = 0.01               # 질문 1건 HCX 호출 수(A안: 고르기는 거의 안 부름)
 Q_PER_JUNIOR = 10          # 후배 1인당 연 질문 수(미리 결정)
 IV_PER_SENIOR = (1, 2)     # 선배 1인당 연 인터뷰 수(하한, 상한)
@@ -93,7 +94,7 @@ ivl, ivh = il * iv_usd["하한"] * KRW, ih * iv_usd["상한"] * KRW
 print(f"  질문 2배: ₩{2 * ql * Q_USD * KRW + ivl:,.0f}~₩{2 * qh * Q_USD * KRW + ivh:,.0f}")
 T = full["tok"] / full["n"]                       # 답쓰기-전문 1건 입력(캐시 포함) 토큰
 d1 = T * 0.01 * (PRICE["sonnet"][2] - PRICE["sonnet"][3]) / 1e6   # 적중 1%p당 절감 $
-q50 = Q_USD - d1 * (50 - 21)
-print(f"  캐시 적중 50%: 답쓰기-전문 입력 {T:,.0f}토큰/건 기준 1%p당 -${d1:.5f} → 질문 ${q50:.4f}(₩{q50 * KRW:.0f}), "
+q50 = Q_USD - d1 * (50 - CACHE_HIT)
+print(f"  캐시 적중 {CACHE_HIT}% → 50%: 답쓰기-전문 입력 {T:,.0f}토큰/건 기준 1%p당 -${d1:.5f} → 질문 ${q50:.4f}(₩{q50 * KRW:.0f}), "
       f"₩{ql * q50 * KRW + ivl:,.0f}~₩{qh * q50 * KRW + ivh:,.0f}")
 print(f"  단가 1.5배: ₩{lo * 1.5:,.0f}~₩{hi * 1.5:,.0f} · 단가 0.5배: ₩{lo * 0.5:,.0f}~₩{hi * 0.5:,.0f}")
