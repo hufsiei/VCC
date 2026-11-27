@@ -119,6 +119,9 @@ expect("저장 → 열림(by ask, unlocked)", s1.get("ok") and s1["recommend"]["
 q = next(q for q in store.load("questions", []) if q["id"] == s1["questionIds"][0])
 expect("질문함에 hold로 저장(프로그램·칸·시기·수요)", q["status"] == "hold" and q["프로그램명"] == MARBURG
        and q["칸"] == "학점" and q["시기"] == "다음 학기" and q["수요"] is True)
+expect("프로그램을 정하면 응답 noteId = 그 해봤노트(getInbox와 같은 값)",
+       s1.get("noteId") == "N-marburg" == next(c for c in rf.getInbox(JUNIOR, {})["questions"]
+                                               if c["questionId"] == s1["questionIds"][0])["noteId"])
 d = store.load("demands", [])[-1]
 expect("demands에 상황·바라는 것 원문 보관", d["owner"] == JUNIOR and d["situation"] == answers["situation"])
 s2 = saveDemand(JUNIOR, {"state": done_state, "consent": True})
@@ -223,7 +226,8 @@ bare2 = rf.add_question(OTHER, "해외 경험은 무엇부터 준비해야 할�
 r, _ = walk(OTHER, {"_start": {"fromQuestionId": bare2}, "field": "국제교류", "detail": "독일",
                     "program": demand.NOT_YET, "section": "비용", "when": "1년 뒤",
                     "situation": "1학년이라 아직 정한 것이 없어요", "hope": "넓게 알아보고 싶은 마음", "more": None})
-saveDemand(OTHER, {"state": r["state"], "consent": True})
+saved = saveDemand(OTHER, {"state": r["state"], "consent": True})
+expect("「아직 정하지 않았어요」면 응답 noteId는 null", saved.get("ok") and "noteId" in saved and saved["noteId"] is None)
 card = next(q for q in rf.getInbox(OTHER, {})["questions"] if q["questionId"] == bare2)
 expect("「아직 정하지 않았어요」면 program·type은 null, 고른 칸만",
        (card["program"], card["type"], card["section"]) == (None, None, "비용"))

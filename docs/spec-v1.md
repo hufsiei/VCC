@@ -625,9 +625,11 @@ payload `{id, changed: [{section, index, text}]}` — `index`는 `getMyNote`의 
 payload `{state, consent: true}`. 서버가 같은 규칙으로 다시 검사한다. 끝나지 않았으면 `{ "ok": false, "message": "아직 정리가 끝나지 않았어요", "next": {demandNext 응답} }`.
 저장: 질문 문장(가장 궁금한 것 + 더 궁금한 것)을 **질문함에 `hold`로**(`프로그램명`·`칸`·`시기`·`수요: true`) — 다음 그 프로그램 선배의 들려주기가 후배 질문으로 먼저 묻고(작업 74, **[v2]** `junior: true`), 콘솔 수요 현황에도 합산된다. `fromQuestionId`로 시작했으면 그 질문 행에 맥락만 붙인다(질문함이 늘지 않음). **[11/26 작업 117]** 그 행에 프로그램이 없었고 정리하면서 프로그램을 골랐으면 `프로그램명`도 채운다(이미 있으면 바꾸지 않는다). 상황·바라는 것은 `runtime/demands.json`에만 둔다(선배에게 보내지 않음, 부서 집계는 P1).
 ```json
-{ "ok": true, "demandId": "R-0001", "questionIds": ["Q-0003"],
+{ "ok": true, "demandId": "R-0001", "questionIds": ["Q-0003"], "noteId": "N-marburg",
   "recommend": { "ready": true, "by": "ask", "need": 3, "talk": { "answered": 0, "shared": 0 }, "ask": true }, "unlocked": true }
 ```
+- **[11/27 #384 B3] `noteId`**: 이번에 정리한 프로그램의 해봤노트 id. 프로그램을 「아직 정하지 않았어요」로 두었으면 `null`. 찾는 규칙은 `getInbox` `questions[].noteId`(#379)와 같다. 화면은 이 값으로 「닮은선배 보기」(`../senior/?noteId=`)를 연다 — 이전 노트 기준 선배가 나오지 않게. `null`이면 `noteId` 없이 지금처럼.
+
 `unlocked: true`면 이번에 처음 열린 것 → 토스트 「선배 추천이 열렸어요」 + 「닮은선배 보기」.
 
 ### reportStatement(lineId, reason)
