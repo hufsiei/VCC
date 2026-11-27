@@ -505,8 +505,9 @@ def _answer(me, payload, save, trace=None):
             if found:
                 found.pop("_route", None)
                 return found
-            return _hold(me, question, programs[0] if programs else None, plan["칸"], save, why="탐색 결과 없음",
-                         place=_place(country or plan["나라"], programs), want=want, history=history)
+            return _hold(me, question, _lead(question, programs), plan["칸"], save, why="탐색 결과 없음",
+                         place=_place(country or plan["나라"], programs) or _type_place(question, programs),
+                         want=want, history=history)
         if not programs and plan["분야"] and plan["제외"]:
             # 「코트라 말고 무역 인턴」처럼 제외하고 남는 프로그램이 없으면 그 분야 노트 목록으로
             found = _explore(plan, [], country or plan["나라"], question)
@@ -521,7 +522,10 @@ def _answer(me, payload, save, trace=None):
         return _hold(me, question, None, None, save, why="프로그램 없음", want=want, history=history)
     # [11/26 Q-38] 나라로 여러 학교를 잡았으면 보류 문구를 나라 단위로(「독일 해봤노트에는 …」).
     #   programs[0]은 근거가 가장 많은 학교일 뿐이라 학교 이름으로 말하면 그 학교만 본 것처럼 읽힌다(실서버 「독일 학비 알려줘」)
-    place = _place(country, programs)
+    # [작업 35 A1] 직군·기관유형 사전으로만 업체 둘 이상을 잡았으면 유형어로(「스타트업 현장실습 해봤노트에는 …」),
+    #   질문함에도 업체 없이(lead None). 「스타트업 여행사 인턴」이 사전 첫 업체 스텔로랩스로 담긴 일(H0001)
+    place = _place(country, programs) or _type_place(question, programs)
+    lead = _lead(question, programs)
 
     # ①″ [11/23] 사람을 찾는 질문이나 나라만 말한 질문인데 주제어가 없으면 → 해봤노트 카드로 안내(AI 없음)
     if not plan and not has_topic(question) and (PERSON_RE.search(question) or country):
@@ -542,18 +546,18 @@ def _answer(me, payload, save, trace=None):
     cands, section, why = extract(effective if effective == question else f"{question} {effective}", programs,
                                   section_hint=plan["칸"] if plan else None)
     if not cands:
-        return _hold(me, question, programs[0], section, save, why=why, place=place, want=want)
+        return _hold(me, question, lead, section, save, why=why, place=place, want=want)
 
     # ④ 고르기 (HCX)
     picked, why = pick(effective, cands)
     if not picked:
-        return _hold(me, question, programs[0], section, save, why=why, place=place, want=want)
+        return _hold(me, question, lead, section, save, why=why, place=place, want=want)
 
     # ⑤ 답쓰기 + ⑥ 검증 (v2) → 다 버려지면 v1 원문 인용
     # [11/24 작업 87] 답쓰기가 {"답":[]}(근거가 질문에 안 맞음)를 내면 원문을 답처럼 보여 주지 않고 보류한다
     out = compose(effective, picked, on_empty=EMPTY_ANSWER)
     if out is EMPTY_ANSWER:
-        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음", place=place, want=want)
+        return _hold(me, question, lead, section, save, why="답쓰기 근거 없음", place=place, want=want)
     if out is None:
         out = fallback_lines(picked)
     out["noteId"] = notes.note_id(picked[0]["program"])
@@ -566,11 +570,12 @@ def _answer_full(me, question, effective, programs, plan, save, place=None, spec
     spec: [작업 35] _overlap_start가 미리 시작한 답쓰기. 프로그램·근거 글이 같으면 그 결과를 쓴다."""
     paras, why = full_evidence(effective if effective == question else f"{question} {effective}", programs)
     section = "근무조건" if why.startswith("인터뷰로만") else (plan["칸"] if plan else None)
+    lead = _lead(question, programs)   # [작업 35 A1] 유형으로만 잡혔으면 None
     if not paras:
-        return _hold(me, question, programs[0], section, save, why=why, place=place, want=want)
+        return _hold(me, question, lead, section, save, why=why, place=place, want=want)
     out, quotes = compose_full(effective, paras, written=_overlap_take(spec, programs, paras))
     if out is EMPTY_ANSWER:
-        return _hold(me, question, programs[0], section, save, why="답쓰기 근거 없음", place=place, want=want)
+        return _hold(me, question, lead, section, save, why="답쓰기 근거 없음", place=place, want=want)
     if out is None:
         if not quotes:          # 답쓰기 호출·형식 실패 → 옛 길
             return None
@@ -971,22 +976,60 @@ def match_programs(question):
     #      단 질문에 "약칭제외" 말(목록에 없는 권역·탐방)이 있으면 약칭은 보지 않는다(함정 33 「아시아 권역」은 보류).
     #      "직군"·"기관유형"은 질문에 인턴 문맥 말(인턴·현장실습 등)이 있을 때만 본다
     #   ② 겹치는 키워드는 긴 것만 남기고, 긴 키워드의 업체부터 담는다
+    found = [n for n, _, _ in _intern_hits(q)]
+    if found:
+        return found[:3]
+    # [11/26 작업 106] 비교과 줄임말·부분 이름(「직무탐색 교육」「GAT」「국정원 설명회」) — 위 대조가 모두 0개일 때만
+    return extra_loose(question)
+
+
+def _intern_hits(q):
+    """match_programs의 인턴 사전 대조(q는 _norm한 질문). [(업체명, 키워드, 묶음)] — 담는 순서 그대로, 업체마다 한 번.
+    [작업 35 A1] 어느 키워드·묶음(약칭·직군·기관유형)으로 잡혔는지를 _type_place가 본다."""
     kw = INTERN_KEYWORDS if isinstance(INTERN_KEYWORDS, dict) else {}
     groups = []
     if not any(_norm(b) and _norm(b) in q for b in kw.get("약칭제외", [])):
         groups.append("약칭")
     if any(_norm(c) and _norm(c) in q for c in kw.get("문맥", [])):
         groups += ["직군", "기관유형"]
-    hits = [(_norm(w), names) for g in groups
+    hits = [(_norm(w), names, g) for g in groups
             for w, names in (kw.get(g) or {}).items() if _norm(w) and _norm(w) in q]
-    hits = [(t, names) for t, names in hits if not any(t != t2 and t in t2 for t2, _ in hits)]
-    for t, names in sorted(hits, key=lambda h: -len(h[0])):
-        names = [names] if isinstance(names, str) else list(names)
-        found += [n for n in names if n in PROGRAMS and n not in found]
-    if found:
-        return found[:3]
-    # [11/26 작업 106] 비교과 줄임말·부분 이름(「직무탐색 교육」「GAT」「국정원 설명회」) — 위 대조가 모두 0개일 때만
-    return extra_loose(question)
+    hits = [(t, names, g) for t, names, g in hits if not any(t != t2 and t in t2 for t2, _, _ in hits)]
+    out, seen = [], set()
+    for t, names, g in sorted(hits, key=lambda h: -len(h[0])):
+        for n in [names] if isinstance(names, str) else list(names):
+            if n in PROGRAMS and n not in seen:
+                seen.add(n)
+                out.append((n, t, g))
+    return out
+
+
+# 유형어를 보류 문구에 쓸 때 떼는 꼬리(「무역인턴」 → 무역, 「온라인으로하는」 → 온라인) — 뒤에 「현장실습」을 붙이므로
+_TYPE_TAIL = re.compile(r"(현장실습|인턴|관련|쪽|으로하는)$")
+
+
+def _type_place(question, programs):
+    """[작업 35 A1] 보류 문구에 쓸 유형어(「스타트업 현장실습」) — 이름·약칭으로 부르지 않고 직군·기관유형 사전으로만 잡힌
+    업체가 둘 이상일 때만. 아니면 None. 이때 보류는 업체 하나의 이름·노트 링크를 쓰지 않고 질문함에도 업체 없이 담는다
+    (H0001 「스타트업 여행사 인턴」이 스텔로랩스로 담긴 일). 하나뿐이면(「네덜란드 인턴」) 그 업체가 곧 그 유형이라 지금처럼."""
+    q = _norm(fix_names(question))
+    if len(programs) < 2 or any(t in q and (not a or _alias_ok(t, q)) for t, _, a in _TERMS):
+        return None
+    typed = {n: t for n, t, g in _intern_hits(q) if g != "약칭"}
+    if not all(p in typed for p in programs):
+        return None
+    words = []
+    for p in programs:
+        w = _TYPE_TAIL.sub("", typed[p])
+        w = w.upper() if w.isascii() else w
+        if w and w not in words:
+            words.append(w)
+    return "·".join(words) + " 현장실습" if words else "현장실습"
+
+
+def _lead(question, programs):
+    """보류·공식 안내에서 질문함에 담고 문구·노트 링크에 쓸 프로그램: programs[0], 유형으로만 잡혔으면 None."""
+    return None if not programs or _type_place(question, programs) else programs[0]
 
 
 # ── [11/26 작업 106] 비교과 이름 넓은 대조 (코드, AI 없음) ─────────────────────
@@ -2390,10 +2433,11 @@ def _contact(dept):
 def _official(me, question, programs, save, want=True):
     """[작업 116] 관문(_save)에 걸리면 질문함에 담지 않는다(questionId None) — 공식 안내 문구는 그대로."""
     dept = _dept(question, programs)
-    qid, _ = _save(me, question, programs[0] if programs else None, None, "official", save, want=want)
+    lead = _lead(question, programs)   # [작업 35 A1] 유형으로만 잡은 업체는 질문함에 담지 않는다
+    qid, _ = _save(me, question, lead, None, "official", save, want=want)
     contact = _contact(dept)
     out = {"status": "official", "lines": [], "sources": {}, "questionId": qid, "suggestSenior": False,
-           "_program": programs[0] if programs else None,
+           "_program": lead,
            "officialUrl": dept.get("공식안내URL", ""),
            "message": f"학교 규정에 관한 질문이라 {dept.get('부서명', '담당 부서')} 공식 안내에서 정확한 내용을 확인해 주세요."
                       + (f" {contact}" if contact else "")}
@@ -2462,11 +2506,13 @@ def _place(country, programs):
 def _hold(me, question, program, section, save, why="", place=None, want=True, history=None):
     """place: [Q-38] 나라 단위 보류(「독일 해봤노트에는 …」). 이때 한 학교 노트 링크(noteId)는 주지 않는다.
     질문함에는 지금처럼 program(근거가 가장 많은 학교)으로 담는다.
+    [작업 35 A1] 유형 단위 보류(「스타트업 현장실습 해봤노트에는 …」)는 program None + place — 질문함에 업체 없이 담고
+    앞 턴 프로그램도 이어받지 않는다(유형을 물은 말이라).
     [작업 116] want·관문: 알고 싶은 말이 아니거나 연락처·비방이 들면 담지 않고 chat 문구(_not_saved)로 돌려준다.
     history: 질문에서 프로그램을 못 정했으면 바로 앞 턴의 프로그램으로 담는다(_saved_program, 못 정하면 None).
     문구·noteId는 이번에 찾은 program으로만 정한다(앞 턴 프로그램의 노트를 찾아본 것이 아니므로)."""
     saved, saved_section = program, section
-    if not program and history:
+    if not program and history and not place:
         saved = _saved_program(question, history)
         if saved and not section:
             from demand import guess_section   # demand → runtime_fns → askboo로 이어지므로 쓸 때 불러온다
@@ -2476,10 +2522,10 @@ def _hold(me, question, program, section, save, why="", place=None, want=True, h
         return _not_saved(blocked, program)
     if why == "담기":
         message = HOLD_SAVED
-    elif not program:
-        message = HOLD_NO_PROGRAM
     elif place:
         message = HOLD_NO_TOPIC.format(program=place)
+    elif not program:
+        message = HOLD_NO_PROGRAM
     elif evidence_count(program):     # 노트는 있는데 이 내용만 없다 → 그 노트로 갈 수 있게 noteId도 준다
         message = HOLD_NO_TOPIC.format(program=program)
     elif is_extra(program):           # [작업 106] 근거 0 비교과 — 「없어요」만 말하지 않고 코드가 가진 사실부터(AI 없음)
