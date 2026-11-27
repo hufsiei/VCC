@@ -233,6 +233,9 @@ def _alias_ok(t, q):
 #   ③ 자모(초성·중성·종성)로 풀어 편집 거리가 그 이름 자모 수의 30% 이하이고 3 이하. 글자 수 차이는 1까지.
 #   ④ 덩어리가 이미 어떤 이름·별칭·나라·도시로 시작하면 보지 않는다(정확한 대조가 먼저).
 #   ⑤ 가장 가까운 후보가 서로 다른 프로그램 둘이면(동점) 고치지 않는다.
+#   ⑥ [11/27 작업 88 D-6 A] 질문 쪽에 기관 꼬리말(재단·센터·연구원·회 …)이 고치는 자리에 걸치거나 바로 뒤에 붙어 있고,
+#      이름의 같은 자리 글자와 다르면 다른 기관으로 보고 고치지 않는다. 52번 「국제언어교류진흥재단」 → 「…진흥원」을 막는다.
+#      꼬리말 안의 오타(재딴·연구쇼)는 꼬리말이 아니라서 그대로 고친다. 고친 이름 뒤 조사·「인턴·현장실습」·「대학교」는 그대로 둔다.
 # 맞으면 그 자리를 이름으로 바꾼 글을 대조에만 쓴다(질문 원문·저장·AI 입력은 그대로).
 def _jamo(s):
     out = []
@@ -271,6 +274,31 @@ def _fuzzy_skip():
     return _FUZZY_SKIP
 
 
+# ⑥ 기관 꼬리말. 학교 꼬리말(대학교·대학·학교·대학원)은 고치는 자리 안에서만 본다(「마브루크대학교」처럼 이름 뒤에 붙는 건 정상).
+ORG_TAILS = ("재단", "진흥원", "진흥회", "연구원", "연구소", "개발원", "교육원", "문화원", "센터", "공사", "공단",
+             "협회", "학회", "협의회", "위원회", "기구", "사무소", "포럼", "연합회", "연맹", "조합", "은행", "그룹",
+             "법인", "대사관", "학원", "원", "회", "단")
+SCHOOL_TAILS = ("대학원", "대학교", "대학", "학교")
+
+
+def _other_org(run, t, n):
+    """run[:n]을 이름 t로 고칠 때, 질문 쪽 꼬리말이 t의 같은 자리와 다르면 True(다른 기관)."""
+    k = next((i for i, (a, b) in enumerate(zip(run, t)) if a != b), min(len(run), len(t), n))   # 처음 달라지는 자리
+    for x in ORG_TAILS + SCHOOL_TAILS:
+        p = run.find(x)
+        while p != -1:
+            # 고치는 자리(k 이후)에 걸치고, 고치는 글 안에서 시작하거나(여러 글자 기관 꼬리말은) 바로 뒤에서 시작
+            inside = p < n or (p == n and len(x) > 1 and x not in SCHOOL_TAILS)
+            same = t[p:p + len(x)] == x or (p + len(x) == n and t.endswith(x))   # 같은 자리(글자 수가 밀리면 끝 맞춤)
+            if x in ("대학교", "대학", "학교"):   # 대·대학·대학교는 같은 학교 꼬리(「밀라노대」 ↔ 「밀라노대학교」)
+                d = p - (x == "학교")
+                same = same or t[d:d + 1] == "대"
+            if p + len(x) > k and inside and not same:
+                return True
+            p = run.find(x, p + 1)
+    return False
+
+
 def fix_names(text):
     """질문 속 학교 이름 오타를 프로그램명·별칭으로 바꾼 글(대조용). 고칠 것이 없으면 그대로."""
     if not text:
@@ -292,7 +320,9 @@ def fix_names(text):
         if len({b[3] for b in best if b[:2] == best[0][:2]}) > 1:   # ⑤
             continue
         _, _, t, _, n = best[0]
-        out += [text[last:m.start()], t]
+        if _other_org(run, t, n):   # ⑥
+            continue
+        out +=[text[last:m.start()], t]
         last = m.start() + n
     return "".join(out) + text[last:] if out else text
 
