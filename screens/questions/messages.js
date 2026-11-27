@@ -162,6 +162,12 @@ const askerInfoText = (info) => {
   return parts.join(" · ");
 };
 const threadQuery = (t) => `thread=${encodeURIComponent(t.threadId)}`;
+// [#379 Q-97] 어느 프로그램의 닮은선배 목록에서 보낸 요청인지(getMessages program). 없으면(null) 줄을 두지 않는다
+function programLine(t) {
+  const program = typeof t.program === "string" ? t.program.trim() : "";
+  if (!program) return null;
+  return el("p", { className: "sub", text: t.role === "senior" ? `${program} 경험으로 받은 요청` : `${program} 추천 선배` });
+}
 
 function threadRow(t, { muted = false } = {}) {
   const last = lastMessage(t);
@@ -174,6 +180,7 @@ function threadRow(t, { muted = false } = {}) {
         unread > 0 ? el("span", { className: "count-badge", text: unread, attrs: { "aria-label": `안 읽은 쪽지 ${unread}개` } }) : null,
         STATUS_LABEL[t.status] && t.status !== "accepted" ? STATUS_LABEL[t.status]() : null,
       ]),
+      programLine(t),
       last ? el("p", { className: "thread-row__last", text: `${last.from === "me" ? "나: " : ""}${last.text}` }) : null,
       el("span", { className: "thread-row__time", text: shortTime((last && last.at) || t.requestedAt) }),
     ]),
@@ -198,6 +205,7 @@ function requestCard(t) {
       el("div", {}, [
         el("p", { className: "request-card__who", text: t.nickname || "후배" }),
         el("p", { className: "sub", text: askerInfoText(t.askerInfo) }),
+        programLine(t),
       ]),
     ]),
     first ? el("p", { className: "request-card__text", text: first.text }) : null,
@@ -388,6 +396,8 @@ function renderThreadTop(t) {
   const items = [];
   if (t.role === "asker" && t.myNickname) items.push(statusLabel("info", "info", `선배에게는 '${t.myNickname}'${josaRo(t.myNickname)} 보여요`));
   if (t.role === "senior" && t.askerInfo) items.push(el("p", { className: "sub", text: askerInfoText(t.askerInfo) }));
+  const program = programLine(t);
+  if (program) items.push(program);
   if (STATUS_LABEL[t.status] && t.status !== "accepted") items.push(STATUS_LABEL[t.status]());
   threadTop.replaceChildren(el("div", { className: "thread-top" }, items));
 }
