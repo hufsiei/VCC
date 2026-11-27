@@ -42,7 +42,7 @@ import notes
 import store
 import tell_chat
 from ai import callAI, load_prompt
-from runtime_fns import drop_interview_draft, find_my_note, save_my_note
+from runtime_fns import drop_interview_draft, find_my_note, question_for, save_my_note
 
 QUESTION_SECTION = notes.QUESTION_SECTION   # [v2] 없어진 칸 — 옛 화면·옛 transcript가 보내면 질문의 칸으로 옮긴다
 LAST_SECTION = "배운점"
@@ -178,11 +178,11 @@ def _question_row(program, qid=None, asked=None):
         rows = list(store.load("questions", []))
     if qid:
         q = next((q for q in rows if q.get("id") == qid), None)
-        if q and q.get("프로그램명") == program:
+        if question_for(q, program):   # [Q-109] 후보 업체로 받은 질문도
             return q
     if asked:
         for q in reversed(rows):
-            if q.get("프로그램명") == program and askboo._norm(q.get("질문")) == asked:
+            if question_for(q, program) and askboo._norm(q.get("질문")) == asked:
                 return q
     return None
 
@@ -421,10 +421,11 @@ def _next_step(me, program, payload, prior, follow=True, passed=frozenset()):
 
 
 def junior_questions(me, program):
-    """같은 프로그램의 미답변(hold) 질문, 최근순 최대 3개. 본인이 한 질문은 뺀다."""
+    """같은 프로그램의 미답변(hold) 질문, 최근순 최대 3개. 본인이 한 질문은 뺀다.
+    [Q-109] 프로그램 없이 후보 업체로 담긴 질문(「스타트업 인턴 …」)은 후보 업체 선배 모두에게(question_for)."""
     with store.lock():
         rows = list(store.load("questions", []))
-    rows = [q for q in rows if q.get("프로그램명") == program and q.get("status") == "hold"
+    rows = [q for q in rows if question_for(q, program) and q.get("status") == "hold"
             and q.get("colreg_no") != me and (q.get("질문") or "").strip()]
     rows.sort(key=lambda q: q.get("at") or "", reverse=True)
     return rows[:MAX_JUNIOR]

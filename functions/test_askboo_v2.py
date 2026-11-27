@@ -285,9 +285,13 @@ saved_rows = []
 _orig_save = askboo._save
 
 
-def _spy_save(me, question, program, section, status, save, want=True):
+saved_cands = []   # [Q-109] 질문함에 넘긴 후보 업체
+
+
+def _spy_save(me, question, program, section, status, save, want=True, candidates=None):
     saved_rows.append((program, status))
-    return _orig_save(me, question, program, section, status, save, want=want)
+    saved_cands.append(candidates)
+    return _orig_save(me, question, program, section, status, save, want=want, candidates=candidates)
 
 
 askboo._save = _spy_save
@@ -305,9 +309,36 @@ for flag in (None, "1"):
     expect(f"A1 {tag}: noteId 없음", "noteId" not in res, res.get("noteId"))
     expect(f"A1 {tag}: 질문함에 업체 없이", saved_rows == [(None, "hold")], saved_rows)
     expect(f"A1 {tag}: 업체 근거로 답을 찾는 것은 그대로(답쓰기 호출)", "답쓰기" in [c[0] for c in calls], [c[0] for c in calls])
+    # [Q-109] 후보 업체: 유형어로 잡히는 업체 전부(3곳에서 자르지 않음 — 여행사도). 응답은 후보가 없던 #395와 같다
+    cand = saved_cands[-1] or {}
+    expect(f"Q-109 {tag}: 질문함 후보 = 스타트업 + 여행사 업체 전부",
+           cand.get("label") == "스타트업·여행사 현장실습" and len(cand.get("programs") or []) == 7
+           and set(TYPED) <= set(cand["programs"]) and "온세계여행사" in cand["programs"], cand)
+    _tc = askboo._type_candidates
+    askboo._type_candidates = lambda *a, **k: None   # #395 동작(후보 없음)
+    base, _ = run(H0001_Q, [{"question": "이중전공 선택에 도움 되는 비교과", "status": "hold", "program": ""}],
+                  plan=INTERN_PLAN, answer={"답": []})
+    askboo._type_candidates = _tc
+    expect(f"Q-109 {tag}: askBoo 응답·status·문구는 후보 없을 때와 같음", res == base, (res, base))
 os.environ.pop("VCC_ASK_FULL", None)
 if _old_full is not None:
     os.environ["VCC_ASK_FULL"] = _old_full
+
+# [Q-109] 「말고」로 뺀 업체는 후보에서 뺀다 · 담기 칩도 후보 · 이름 부른 질문은 후보 없음
+saved_cands.clear()
+res, _ = run("스타트업 인턴 하면서 힘들었던 점 있어요?", [{"question": f"{TYPED[0]} 말고 다른 스타트업은요?", "status": "notes", "program": ""}],
+             plan=dict(INTERN_PLAN, 정리된질문="스타트업 인턴에서 힘들었던 점"), answer={"답": []})
+cand = saved_cands[-1] if saved_cands else None
+expect("Q-109: 앞 턴 「말고」로 뺀 업체는 후보에 없음", res["status"] == "hold" and cand and len(cand["programs"]) == 3
+       and TYPED[0] not in cand["programs"], (res.get("status"), cand))
+saved_cands.clear()
+askboo.callAI = make_fake(plan=None)
+res = askboo.askBoo("H0143", {"question": "스타트업 인턴 하면 뭘 배워요?", "force": "hold"}, save=False)
+expect("Q-109: 담기 칩(유형 질문) → 문구 그대로 + 후보 업체", res["message"] == askboo.HOLD_SAVED and "noteId" not in res
+       and (saved_cands[-1] or {}).get("label") == "스타트업 현장실습" and len(saved_cands[-1]["programs"]) == 4, (res, saved_cands))
+saved_cands.clear()
+res = askboo.askBoo("H0143", {"question": f"{TYPED[0]} 인턴 하면 뭘 배워요?", "force": "hold"}, save=False)
+expect("Q-109: 담기 칩(이름 부른 질문) → 후보 없음", saved_cands == [None], saved_cands)
 
 # 앞 턴에 업체가 있어도 유형을 물은 보류는 이어받지 않는다
 saved_rows.clear()

@@ -412,7 +412,8 @@
 | questions[].status | 글자 | `hold`(미답변) · `answered`(답변 도착) · `official`(규정 질문 → 화면 「공식 안내」) |
 | questions[].askedAt / answeredAt | 글자 | 질문 시각 / 답한 시각(answered) |
 | questions[].noteId [11/27] | 글자 또는 null | 늘 있음. 답이 된 노트(answered)·담은 노트, 없으면 `program`의 해봤노트 id, `program`이 없거나 목록에 없으면 null |
-| questions[].program / type / section [11/26] | 글자 또는 null | 프로그램명 / `교환`·`파견`·`인턴`·`비교과`(해봤노트 카드 `type`과 같음) / 칸 이름. 늘 있고 없으면 null. `program`이 null이면 선배에게 전달되지 않은 질문 |
+| questions[].program / type / section [11/26] | 글자 또는 null | 프로그램명 / `교환`·`파견`·`인턴`·`비교과`(해봤노트 카드 `type`과 같음) / 칸 이름. 늘 있고 없으면 null. `program`이 null이면 선배에게 전달되지 않은 질문(`candidates`가 있으면 예외) |
+| questions[].candidates [11/27 Q-109] | 객체 또는 null | 늘 있음. 업체 유형으로만 잡혀 보류된 질문의 `{label: "스타트업·여행사 현장실습", programs: [업체명…]}` — `program`이 null이어도 `programs` 업체 선배 모두에게 전달됨. 그 밖은 null |
 | scraps[].noteId / program | 글자 | scrapNote로 켠 노트, 최근 것이 위 |
 | alerts[].text / questionId / noteId / at | 글자 | 알림 문구, 관련 질문·노트, 시각 |
 

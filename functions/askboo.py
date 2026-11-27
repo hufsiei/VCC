@@ -389,7 +389,9 @@ def _answer(me, payload, save, trace=None):
         if program:   # [Q-44] 칸까지 남긴다 — 「궁금한 것 정리하기」가 분야부터 다시 묻지 않게(못 정하면 None)
             from demand import guess_section   # demand → runtime_fns → askboo로 이어지므로 쓸 때 불러온다
             section = guess_section(question, program)
-        return _hold(me, question, program, section, save, why="담기")   # [작업 116] 관문은 _save에서(궁금 판단은 안 함 — 칩으로 직접 담음)
+        # [Q-109] 업체를 못 정했고 유형으로만 잡히면(「스타트업 인턴 …」) 후보 업체 선배 모두에게 — 문구는 HOLD_SAVED 그대로
+        cands = None if program else _type_candidates(question, carried_exclusions(question, history))
+        return _hold(me, question, program, section, save, why="담기", place=(cands or {}).get("label"), candidates=cands)   # [작업 116] 관문은 _save에서(궁금 판단은 안 함 — 칩으로 직접 담음)
 
     want = wants_to_know(question)   # [작업 116] 질문정리 전·실패 때의 「알고 싶은 말」. 질문정리가 되면 그 「궁금」으로 바꾼다
     # [11/24 작업 87] 앞 턴(과 이번 말)에서 「○○ 말고」로 뺀 프로그램 — 이번 말이 그 이름을 다시 부르지 않으면 계속 뺀다
@@ -507,7 +509,7 @@ def _answer(me, payload, save, trace=None):
                 return found
             return _hold(me, question, _lead(question, programs), plan["칸"], save, why="탐색 결과 없음",
                          place=_place(country or plan["나라"], programs) or _type_place(question, programs),
-                         want=want, history=history)
+                         want=want, history=history, candidates=_type_candidates(question, plan["제외"]))
         if not programs and plan["분야"] and plan["제외"]:
             # 「코트라 말고 무역 인턴」처럼 제외하고 남는 프로그램이 없으면 그 분야 노트 목록으로
             found = _explore(plan, [], country or plan["나라"], question)
@@ -526,6 +528,8 @@ def _answer(me, payload, save, trace=None):
     #   질문함에도 업체 없이(lead None). 「스타트업 여행사 인턴」이 사전 첫 업체 스텔로랩스로 담긴 일(H0001)
     place = _place(country, programs) or _type_place(question, programs)
     lead = _lead(question, programs)
+    # [Q-109] 유형 보류의 후보 업체(질문함에 남겨 그 업체 선배 모두가 받음). 앞 턴·이번 말·질문정리에서 뺀 업체는 뺀다
+    tcands = _type_candidates(question, plan["제외"] if plan else excluded)
 
     # ①″ [11/23] 사람을 찾는 질문이나 나라만 말한 질문인데 주제어가 없으면 → 해봤노트 카드로 안내(AI 없음)
     if not plan and not has_topic(question) and (PERSON_RE.search(question) or country):
@@ -537,7 +541,7 @@ def _answer(me, payload, save, trace=None):
     #     답쓰기가 실패(형식·호출)하면 None → 아래 옛 길(추출 → 고르기 → 답쓰기 → 원문 인용) 그대로
     if ask_full():
         trace["route"] = (trace.get("route") or "") + "·전문"
-        found = _answer_full(me, question, effective, programs, plan, save, place, spec, want=want)
+        found = _answer_full(me, question, effective, programs, plan, save, place, spec, want=want, candidates=tcands)
         if found is not None:
             return found
         trace["route"] += "→옛 길"
@@ -546,18 +550,18 @@ def _answer(me, payload, save, trace=None):
     cands, section, why = extract(effective if effective == question else f"{question} {effective}", programs,
                                   section_hint=plan["칸"] if plan else None)
     if not cands:
-        return _hold(me, question, lead, section, save, why=why, place=place, want=want)
+        return _hold(me, question, lead, section, save, why=why, place=place, want=want, candidates=tcands)
 
     # ④ 고르기 (HCX)
     picked, why = pick(effective, cands)
     if not picked:
-        return _hold(me, question, lead, section, save, why=why, place=place, want=want)
+        return _hold(me, question, lead, section, save, why=why, place=place, want=want, candidates=tcands)
 
     # ⑤ 답쓰기 + ⑥ 검증 (v2) → 다 버려지면 v1 원문 인용
     # [11/24 작업 87] 답쓰기가 {"답":[]}(근거가 질문에 안 맞음)를 내면 원문을 답처럼 보여 주지 않고 보류한다
     out = compose(effective, picked, on_empty=EMPTY_ANSWER)
     if out is EMPTY_ANSWER:
-        return _hold(me, question, lead, section, save, why="답쓰기 근거 없음", place=place, want=want)
+        return _hold(me, question, lead, section, save, why="답쓰기 근거 없음", place=place, want=want, candidates=tcands)
     if out is None:
         out = fallback_lines(picked)
     out["noteId"] = notes.note_id(picked[0]["program"])
@@ -565,17 +569,17 @@ def _answer(me, payload, save, trace=None):
     return out
 
 
-def _answer_full(me, question, effective, programs, plan, save, place=None, spec=None, want=True):
+def _answer_full(me, question, effective, programs, plan, save, place=None, spec=None, want=True, candidates=None):
     """[11/26 A안] 전문 길. 돌려주는 값: 응답 사전, 또는 None(답쓰기 실패 — 부르는 쪽이 옛 길로).
     spec: [작업 35] _overlap_start가 미리 시작한 답쓰기. 프로그램·근거 글이 같으면 그 결과를 쓴다."""
     paras, why = full_evidence(effective if effective == question else f"{question} {effective}", programs)
     section = "근무조건" if why.startswith("인터뷰로만") else (plan["칸"] if plan else None)
     lead = _lead(question, programs)   # [작업 35 A1] 유형으로만 잡혔으면 None
     if not paras:
-        return _hold(me, question, lead, section, save, why=why, place=place, want=want)
+        return _hold(me, question, lead, section, save, why=why, place=place, want=want, candidates=candidates)
     out, quotes = compose_full(effective, paras, written=_overlap_take(spec, programs, paras))
     if out is EMPTY_ANSWER:
-        return _hold(me, question, lead, section, save, why="답쓰기 근거 없음", place=place, want=want)
+        return _hold(me, question, lead, section, save, why="답쓰기 근거 없음", place=place, want=want, candidates=candidates)
     if out is None:
         if not quotes:          # 답쓰기 호출·형식 실패 → 옛 길
             return None
@@ -1025,6 +1029,15 @@ def _type_place(question, programs):
         if w and w not in words:
             words.append(w)
     return "·".join(words) + " 현장실습" if words else "현장실습"
+
+
+def _type_candidates(question, excluded=()):
+    """[Q-109] 유형 보류 질문을 받을 후보 업체 — 질문의 직군·기관유형 키워드로 잡히는 업체 전부(match_programs의 3곳 자르기 전).
+    {"label": 유형어, "programs": [...]} 또는 None(유형 보류가 아님). 「말고」로 뺀 업체는 뺀다."""
+    q = _norm(fix_names(question))
+    found = [n for n, _, g in _intern_hits(q) if g != "약칭" and n not in excluded]
+    place = _type_place(question, found)
+    return {"label": place, "programs": found} if place else None
 
 
 def _lead(question, programs):
@@ -2503,7 +2516,7 @@ def _place(country, programs):
     return country if country and len(programs) > 1 else None
 
 
-def _hold(me, question, program, section, save, why="", place=None, want=True, history=None):
+def _hold(me, question, program, section, save, why="", place=None, want=True, history=None, candidates=None):
     """place: [Q-38] 나라 단위 보류(「독일 해봤노트에는 …」). 이때 한 학교 노트 링크(noteId)는 주지 않는다.
     질문함에는 지금처럼 program(근거가 가장 많은 학교)으로 담는다.
     [작업 35 A1] 유형 단위 보류(「스타트업 현장실습 해봤노트에는 …」)는 program None + place — 질문함에 업체 없이 담고
@@ -2517,7 +2530,10 @@ def _hold(me, question, program, section, save, why="", place=None, want=True, h
         if saved and not section:
             from demand import guess_section   # demand → runtime_fns → askboo로 이어지므로 쓸 때 불러온다
             saved_section = guess_section(question, saved)
-    qid, blocked = _save(me, question, saved, saved_section, "hold", save, want=want)
+    # [Q-109] 유형 단위 보류(program None + place)는 질문함 행에 후보 업체(candidates, _type_candidates)를 남겨
+    #   그 업체 선배 모두가 받게 한다. 응답에는 나가지 않는다
+    cands = candidates if place and not program else None
+    qid, blocked = _save(me, question, saved, saved_section, "hold", save, want=want, candidates=cands)
     if blocked:
         return _not_saved(blocked, program)
     if why == "담기":
@@ -2541,14 +2557,14 @@ def _hold(me, question, program, section, save, why="", place=None, want=True, h
     return out
 
 
-def _save(me, question, program, section, status, save, want=True):
+def _save(me, question, program, section, status, save, want=True, candidates=None):
     """질문함에 담는 입구 한 곳. 돌려주는 값: (questionId 또는 None, 담지 않은 이유 문구 또는 None).
     [작업 116] 관문(_gate)은 save=False(평가)여도 코드 규칙까지는 같게 본다 — 비방 AI 판정만 실제로 담을 때."""
     blocked = _gate(me, question, save, want)
     if blocked or not save:
         return None, blocked
     from runtime_fns import add_question
-    return add_question(me, question, program=program, section=section, status=status), None
+    return add_question(me, question, program=program, section=section, status=status, candidates=candidates), None
 
 
 def _gate(me, question, save, want=True):
