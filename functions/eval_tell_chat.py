@@ -380,7 +380,9 @@ def grade_turn(turn, asked_step, new, answers, calls):
 
     jj = judge[-1].get("json") if judge else None
     fallback = None
-    if not (judge and judge[-1].get("ok") and isinstance(jj, dict) and jj.get("종류") in tell_chat.KINDS):
+    parse = getattr(tell_chat, "parse_judge", None)   # [Q-131] 코드가 받아 준 출력(6종 밖 + 궁금)은 폴백이 아니다
+    judged = parse(jj) if parse else (jj if isinstance(jj, dict) and jj.get("종류") in tell_chat.KINDS else None)
+    if not (judge and judge[-1].get("ok") and judged):
         fallback = "말판정 실패"
     elif kind != "그만":
         w = write[-1].get("json") if write else None
