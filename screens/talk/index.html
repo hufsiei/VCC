@@ -88,6 +88,17 @@
   .to-top:focus-visible { outline: none; box-shadow: var(--focus-ring); }
   .to-top .icon { width: 20px; height: 20px; }
   #viewMain .page-title:focus { outline: none; } /* 「맨 위로」 뒤 포커스 자리(눈에 보이는 테두리 없음) */
+  /* [#357] 「꼭 확인」 안내: 코드 고정 문구라 정보색(3-4), AI 색 아님 */
+  .official-check { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); padding: 12px var(--space-md); border-radius: var(--radius-card); background: var(--status-info-bg); }
+  .official-check__text { font-size: var(--font-size-secondary); color: var(--color-text); }
+  .official-check .evidence-after { margin-top: 0; }
+  .evidence-after a[href^="tel:"] { gap: var(--space-xs); }
+  .evidence-after a[href^="tel:"] .icon { width: 16px; height: 16px; }
+  /* [#331-1] 질문함 안내 한 줄 */
+  .inbox-note { display: flex; align-items: flex-start; gap: var(--space-xs); font-size: var(--font-size-secondary); color: var(--color-text-muted); }
+  .inbox-note .icon { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+  /* [#364] 기다림 안내: 점 세 개 옆 */
+  .msg__bubble .typing + .status-label { margin-left: var(--space-sm); vertical-align: middle; }
 </style>
 </head>
 <body>
