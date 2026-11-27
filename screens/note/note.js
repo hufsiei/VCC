@@ -163,19 +163,18 @@ function noteCover(note, { link = true } = {}) {
     scrapButton(note),
   ]);
 
-  // 메타 줄: 근거 N건 · 최근 학기 · ★ 만족도 (비교과는 · 이수 N명 추가)
+  // 메타 줄: 근거 N건 · 최근 학기 (비교과만 · ★ 만족도 · 이수 N명 — 만족도 데이터가 비교과에만 있다)
   const count = Number.isFinite(note.evidenceCount) ? note.evidenceCount : 0;
   const dot = () => el("span", { text: "·", attrs: { "aria-hidden": "true" } });
-  const star = el("span", { className: "note-card__star", attrs: { "aria-label": `만족도 ${orDash(note.satisfaction)}` } },
-    [icon("star"), el("span", { text: orDash(note.satisfaction) })]);
   const meta = el("p", { className: "note-card__meta" }, [
     el("span", { text: `근거 ${count}건` }), dot(),
-    el("span", { text: `최근 ${semesterText(note.lastSemester)}` }), dot(),
-    star,
+    el("span", { text: `최근 ${semesterText(note.lastSemester)}` }),
   ]);
   if (note.type === "비교과") {
+    const star = el("span", { className: "note-card__star", attrs: { "aria-label": `만족도 ${orDash(note.satisfaction)}` } },
+      [icon("star"), el("span", { text: orDash(note.satisfaction) })]);
     const done = note.completedCount === null || note.completedCount === undefined ? DASH : `${note.completedCount}명`;
-    meta.append(dot(), el("span", { text: `이수 ${done}` }));
+    meta.append(dot(), star, dot(), el("span", { text: `이수 ${done}` }));
   }
 
   const bodyChildren = [
