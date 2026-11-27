@@ -513,9 +513,16 @@ function officialCheckBox(check) {
   ]);
 }
 
-// [#331-1] 질문함에 담긴 질문은 선배 인터뷰 질문 — 부서가 답하는 창구로 오해하지 않게
+// [#331-1 → 11/27 #393 미리 결정 A] 질문함에 담긴 질문이 언제·어떻게 답을 받는지 두 줄 안내(디자인 규칙 6-1 질문함 안내).
+// 기한 약속(「N일 안에」)·전달 인원 숫자는 쓰지 않는다 — 선배 참여가 자발적이라 지킬 수 없음.
 function inboxNote() {
-  return el("p", { className: "inbox-note" }, [icon("info"), "질문함은 선배 인터뷰 때 묻는 질문이에요. 부서가 답하는 창구는 아니에요."]);
+  return el("div", { className: "inbox-note" }, [
+    icon("info"),
+    el("div", { className: "inbox-note__text" }, [
+      el("p", { text: "이 프로그램을 다녀온 선배가 BOO와 인터뷰할 때 이 질문을 먼저 물어봐요. 선배가 답하면 알림으로 알려 드려요. 언제 답이 올지는 정해져 있지 않아요." }),
+      el("p", { text: "빨리 듣고 싶으면 닮은선배에게 쪽지를 요청해 보세요. 7일 안에 답이 없으면 다른 선배에게 보낼 수 있어요." }),
+    ]),
+  ]);
 }
 
 function renderAnswer(res, question) {
@@ -540,7 +547,7 @@ function renderAnswer(res, question) {
         // [작업 92] 보류된 내 질문 → 궁금한 것 정리하기(질문·프로그램·칸은 미리 채워짐, spec demandNext fromQuestionId)
         res.questionId ? holdDemandButton(res.questionId) : null,
         res.suggestSenior !== false
-          ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } })
+          ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: seniorHref(res.noteId) } }) // #384 B3
           : null,
       ]),
       officialCheckBox(res.officialCheck),
@@ -625,6 +632,8 @@ function renderAnswer(res, question) {
 }
 
 const noteHref = (noteId) => `../note/?id=${encodeURIComponent(noteId)}`;
+// 닮은선배 — noteId가 있으면 그 해봤노트 기준 추천(senior.js 주소 ?noteId=), 없으면(null) 기본 목록
+const seniorHref = (noteId) => (noteId ? `../senior/?noteId=${encodeURIComponent(noteId)}` : "../senior/");
 
 // notes 응답의 노트 카드(공통 부품 .note-card): 분야 띠 · 노트명 · 근거 N건, 누르면 해봤노트 상세.
 // 분야 띠는 해봤노트 화면(note.js noteCover)과 같은 규칙: CATEGORY[type] 띠 + 「교환학생 · 독일」(#173 type).
@@ -1020,7 +1029,7 @@ function demandSentMessage(out) {
   appendAll(body,
     el("p", { className: "msg__bubble", text: "선배와 담당 부서에 전했어요. 질문은 질문함에 담겨 있고, 선배가 경험을 들려줄 때 이 질문을 먼저 물어볼게요." }),
     ready ? statusLabel("success", "check", "선배 추천이 열렸어요") : null,
-    ready ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: "../senior/" } }) : null,
+    ready ? el("a", { className: "btn btn--secondary btn--block", text: "닮은선배 보기", attrs: { href: seniorHref(out.noteId) } }) : null, // #390 saveDemand noteId
     el("span", { className: "msg__time", text: timeText() }),
   );
   return msg;
