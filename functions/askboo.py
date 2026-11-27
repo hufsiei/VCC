@@ -428,6 +428,11 @@ def _answer(me, payload, save, trace=None):
     if found:
         trace["route"] = "용어"
         return found
+    # [11/27 Q-121] 학사 질문(전공 선택·수강신청·졸업요건·휴학 등, 프로그램 문맥 없음) → 범위 밖 고정 문구. AI·질문함 없음
+    found = academic_scope(question, history)
+    if found:
+        trace["route"] = "학사 범위 밖"
+        return found
 
     want = wants_to_know(question)   # [작업 116] 질문정리 전·실패 때의 「알고 싶은 말」. 질문정리가 되면 그 「궁금」으로 바꾼다
     # [11/24 작업 87] 앞 턴(과 이번 말)에서 「○○ 말고」로 뺀 프로그램 — 이번 말이 그 이름을 다시 부르지 않으면 계속 뺀다
@@ -2535,6 +2540,38 @@ def term_definition(question):
     texts[0] = f"[{TERM_LABEL}] {texts[0]}"
     return {"status": "ok", "sources": {}, "suggestSenior": False,
             "lines": [{"text": t, "cites": [], "lineId": f"L-G-{i}"} for i, t in enumerate(texts, 1)]}
+
+
+# ── [11/27 Q-121] 학사 질문은 서비스 범위 밖 ──────────────────────────────
+# 「이중전공 선택에 대한건 안알랴줌?」이 「해봤노트를 찾지 못했어요. 질문함에 담아 두었어요」로 선배 질문함에 담긴 일(11/27 공개 서버).
+# 전공 선택·수강신청·졸업요건·휴학 같은 외대 학사는 해봤노트 범위(국제교류·현장실습·비교과) 밖이라 근거를 찾지 않고,
+# 질문함에도 담지 않고 고정 문구(status "chat")로 답한다. VCC_ASK_CHAT=1이어도 이 문구는 AI가 다시 쓰지 않는다.
+# 프로그램·나라·학교 이름이나 국제교류·현장실습·비교과 말이 함께 있으면(「교환학생 학점 인정」「마르부르크 수강신청」
+# 「파견 중에 휴학하면」) 그 프로그램 이야기라 지금 길 그대로. 앞 대화가 프로그램 이야기였어도 그대로(「수강신청은요?」).
+ACADEMIC_RE = re.compile(
+    r"이중\s*전공|부\s*전공|복수\s*전공|주\s*전공|연계\s*전공|융합\s*전공|(?<![가-힣])전과(?!목)|전공\s*(을|를)?\s*(선택|변경|바꾸|바꿀|고르|골라|정하|정할)"
+    r"|수강\s*신청|수강\s*정정|시간표|폐강|재수강"
+    r"|졸업\s*(요건|학점|조건|인증|논문|시험|사정|유예)|졸업하려면|조기\s*졸업|이수\s*(학점|요건|체계)|(전공|교양)\s*(필수|학점)"
+    r"|휴학|복학|자퇴|재입학|학사\s*경고|학고|성적\s*(정정|이의|공개|확인|평가\s*방식)|학점\s*포기")
+ACADEMIC_CONTEXT_RE = re.compile(
+    r"교환|파견|국제\s*교류|해외|유학|어학\s*연수|7\s*\+\s*1|아너스|버디|탄뎀|특교원|현지|거기|그\s*(학교|대학)"
+    r"|현장\s*실습|인턴|실습|비교과|특강|튜터링|멘토링|공모전|프로그램|(?<!외)(?<!우리\s)(?<!우리)(?<!본)대학(?!원)")
+ACADEMIC_MESSAGE = ("지금은 전공 선택·수강신청 같은 학사 안내는 하지 않아요. 장기 확장 방안으로 고려하고 있는 기능이에요. "
+                    "국제교류·현장실습·비교과 프로그램에 대해 물어봐 주세요.")
+
+
+def _academic_context(text):
+    return bool(ACADEMIC_CONTEXT_RE.search(text) or match_programs(text) or match_country(text)[0])
+
+
+def academic_scope(question, history=()):
+    """학사 질문(프로그램 문맥 없음)이면 status "chat" 고정 문구, 아니면 None. AI·질문함 없음."""
+    if not ACADEMIC_RE.search(question) or _academic_context(question):
+        return None
+    if any(h.get("program") or _academic_context(h.get("question") or "") for h in history):
+        return None
+    return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "message": ACADEMIC_MESSAGE,
+            "chips": [{"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": None}}]}
 
 
 # ── 응답 만들기 ───────────────────────────────────────────────────────

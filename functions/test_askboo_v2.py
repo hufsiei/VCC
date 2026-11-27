@@ -1095,6 +1095,25 @@ res, _ = run("NCS 특강 뭐 있어?", [], plan=None)
 expect("비회귀: 이름에 있는 약어(NCS)는 문구 앞에 안내를 붙이지 않음", res["status"] == "notes"
        and "찾지 못했어요" not in res["message"] and "특강 비교과는" in res["message"], res.get("message"))
 
+# ── [11/27 Q-121] 학사 질문은 범위 밖 고정 문구 (공개 서버 「이중전공 선택에 대한건 안알랴줌?」이 질문함에 담김) ──
+for q in ("이중전공 선택에 대한건 안알랴줌?", "수강신청 언제 해요?", "졸업요건 몇 학점이에요?", "휴학하려면 어떻게 해요?"):
+    res, row, names = run_save(q, plan=P("경험질문", q=q))
+    expect(f"학사 → chat 고정 문구·질문함 0·AI 0: 「{q}」", res["status"] == "chat" and res["message"] == askboo.ACADEMIC_MESSAGE
+           and row is None and names == [] and not has_save_chip(res) and "questionId" not in res, (res, names))
+os.environ["VCC_ASK_CHAT"] = "1"
+res, row, names = run_save("부전공 하는 게 좋아요?", chat={"message": "AI가 쓴 말"})
+os.environ.pop("VCC_ASK_CHAT")
+expect("VCC_ASK_CHAT=1이어도 학사 문구는 고정(대화응답 안 부름)", res["message"] == askboo.ACADEMIC_MESSAGE and names == [] and row is None,
+       (res, names))
+for q in ("교환학생 학점 인정 돼요?", "현장실습 학점 몇 학점 인정돼요?", "마르부르크 수강신청은 어떻게 해요?", "파견 중에 휴학하면 어떻게 돼요?",
+          "남스웨덴공과대학교 수강신청 어떻게 해요?", "비교과 하면 졸업요건 채워져요?", "인턴 하려면 휴학해야 해요?", "이전과 비교하면 어때요?"):
+    expect(f"학사 아님(지금 길 그대로): 「{q}」", askboo.academic_scope(q) is None)
+expect("앞 대화가 프로그램 이야기면 「수강신청은요?」도 지금 길 그대로",
+       askboo.academic_scope("수강신청은 어떻게 했어요?", turn(PROGRAM)) is None
+       and askboo.academic_scope("수강신청은요?", [{"question": "교환 가고 싶어요", "status": "chat", "program": ""}]) is None)
+res, _ = run("교환학생 학점 인정 돼요?", [], plan=None)
+expect("「교환학생 학점 인정」 응답은 학사 문구가 아님", res.get("message") != askboo.ACADEMIC_MESSAGE, res)
+
 # ── 정리 ──────────────────────────────────────────────────────────────
 print()
 print("실패 %d개" % len(fails) if fails else "전부 통과")
