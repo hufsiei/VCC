@@ -10,6 +10,11 @@
 #   5 가상 데이터  data/에 실제 학번 모양(20으로 시작하는 9자리) 0건, 메일은 example.com·noreply만
 #   6 토큰         토큰 없이·X-User 헤더만·가짜 토큰으로 부르면 「로그인이 필요해요」
 #   7 공개 저장소  11/20 이후 커밋 작성자 메일이 noreply인지, GitHub secret scanning·push protection 상태
+#   8 새 AI 경로   (11/27 작업 38) 대화형 들려주기(VCC_TELL_CHAT)·물어보기 대화(VCC_ASK_CHAT)·쪽지 program을 가짜 AI로 끝까지 돌려
+#                  callAI로만 부름(직접 호출 0) · callAI 입구가 연락처·메일·학번·URL을 가림 · 요청마다 한도를 먼저 셈 ·
+#                  tellChat에 말 원문 없음·남에게 안 보임·7일 지나면 지움 · 쪽지 응답에 상대 학번 없음 ·
+#                  점검 중 생긴 기록이 모두 초기화(reset_runtime) 대상
+#                  (화면 textContent는 2번이 screens·common 전체를 본다 — 새 화면 코드도 자동으로 들어온다)
 # .env 값은 대조에만 쓰고 출력하지 않는다. 하나라도 「실패」면 종료코드 1.
 import json
 import re
@@ -18,6 +23,7 @@ import sys
 import tempfile
 import threading
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
@@ -30,10 +36,20 @@ store.RUNTIME = Path(tempfile.mkdtemp()) / "runtime"     # 실제 data/runtime�
 # 서버 코드는 `from ai import callAI`로 이름을 복사해 가므로 callAI만 바꾸면 빠진다 → 맨 아래 call_hcx·call_claude도 막는다.
 import ai
 AI_CALLS = []
+ORIG_CALL_AI = ai.callAI    # 8번 마스킹 검사가 진짜 입구(가리기)만 쓴다 — 아래 하위 호출은 가짜로 바꿔 둔 채
+# 8번(새 AI 경로, 11/27): 요청마다 한도(limits.check)를 먼저 셌는지 본다. 서버는 요청 하나를 스레드 하나로 돌린다
+_REQ = threading.local()
+AI_UNLIMITED = []           # 서버 요청 안에서 한도를 세기 전에 AI를 부르려 한 작업명
+FAKE_JSON = {}              # 작업명 → 가짜 json(8번이 새 경로를 끝까지 지나가게). 비어 있으면 모두 실패로 돌려준다
 
 
 def _blocked_call_ai(작업명, *a, **k):
     AI_CALLS.append(작업명)
+    if threading.current_thread() is not threading.main_thread() and not getattr(_REQ, "limited", False):
+        AI_UNLIMITED.append(작업명)
+    if 작업명 in FAKE_JSON:
+        j = FAKE_JSON[작업명]
+        return {"ok": True, "text": json.dumps(j, ensure_ascii=False), "json": j, "model": "점검"}
     return {"ok": False, "text": "", "json": None, "model": "점검", "error": "점검 중 AI 차단"}
 
 
@@ -45,6 +61,17 @@ def _blocked_leaf(*a, **k):
 ai.callAI = _blocked_call_ai
 ai.call_hcx = _blocked_leaf
 ai.call_claude = _blocked_leaf
+
+import limits
+_orig_limits_check = limits.check
+
+
+def _counted_check(me, *a, **k):
+    _REQ.limited = True
+    return _orig_limits_check(me, *a, **k)
+
+
+limits.check = _counted_check   # local_fn·main·runtime_fns 모두 limits.check(모듈 속성)로 부른다
 AI_LOG = paths.LOGS / "ai-calls.jsonl"
 AI_LOG_BEFORE = AI_LOG.read_text(encoding="utf-8").count("\n") if AI_LOG.exists() else 0
 
@@ -270,6 +297,174 @@ def check_secrets():
     add(5, "data/의 메일은 가상 주소만", not real, f"{len(mails)}개 모두 example 주소" if not real else "확인: " + ", ".join(real[:5]))
 
 
+# ---------- 8: 새 AI 경로 (11/27 작업 38 — 110 대화형 들려주기 · 119 물어보기 대화 · #379 쪽지 program) ----------
+KST = timezone(timedelta(hours=9))
+PII_SAMPLE ="연락은 010-1234-5678, hong.gildong@gmail.com, 학번 202312345, https://open.kakao.com/o/abc 로 주세요"
+PII_RAW = ("010-1234-5678", "hong.gildong@gmail.com", "202312345", "open.kakao.com")
+
+
+def _direct_ai_calls():
+    """functions/ 안에서 ai.py 밖이 AI를 직접 부르는 곳(모델 호출 함수·SDK·CLOVA 주소). 이 파일의 글자는 조각으로 써서 안 걸린다."""
+    rx = re.compile("|".join([r"\bcall_" + r"hcx\s*\(", r"\bcall_" + r"claude\s*\(", r"import\s+anth" + "ropic",
+                              r"from\s+anth" + "ropic", r"messages\." + r"create\s*\(", "chat-" + "completions"]))
+    # 예외(1차 점검 C-2): 배포 경로 1회 점검용 콘솔 붙여넣기 액션 — 고정 문구만 보내고 사용자 글이 없다. 새 예외는 이유와 함께 여기에
+    allowed = {"cloud/clova_once.py"}
+    hits = []
+    for f in sorted((ROOT / "functions").rglob("*.py")):
+        rel = f.relative_to(ROOT / "functions")
+        if f.name == "ai.py" or rel.as_posix() in allowed or "lib" in rel.parts:
+            continue
+        for i, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            if rx.search(line) and not line.lstrip().startswith("#"):
+                hits.append(f"{f.relative_to(ROOT).as_posix()}:{i}")
+    return hits
+
+
+def _mask_at_entry():
+    """진짜 callAI 입구에 연락처·메일·학번·URL을 넣고, 모델 호출 직전에 받은 글에 원문이 남았는지 본다(HCX·Claude 길 둘 다)."""
+    from mask import find
+    seen = []
+
+    def grab(messages, system, *a):
+        seen.append(json.dumps({"m": messages, "s": system}, ensure_ascii=False))
+        return '{"ok": true}', {}
+    old_log = ai.LOG_FILE
+    ai.LOG_FILE = Path(tempfile.mkdtemp()) / "ai-calls.jsonl"   # 실제 로그에 점검 줄을 남기지 않는다
+    ai.call_hcx, ai.call_claude = grab, grab
+    try:
+        for 작업 in ("말판정", "대화쓰기"):
+            ORIG_CALL_AI(작업, [{"role": "user", "content": PII_SAMPLE}], system="선배 말: " + PII_SAMPLE)
+    finally:
+        ai.call_hcx, ai.call_claude, ai.LOG_FILE = _blocked_leaf, _blocked_leaf, old_log
+    left = [r for r in PII_RAW if any(r in s for s in seen)]
+    shaped = sum(1 for s in seen if find(s))
+    return len(seen) == 2 and not left and not shaped, left, shaped
+
+
+def check_new_paths():
+    import os
+    import askboo
+    import notes
+    import reset_runtime
+    import runtime_fns
+    import sessions
+    import tell_chat
+
+    hits = _direct_ai_calls()
+    add(8, "AI는 callAI로만(ai.py 밖 직접 호출 0)", not hits, "0건" if not hits else "직접 호출: " + ", ".join(hits[:5]))
+    ok, left, shaped = _mask_at_entry()
+    add(8, "callAI 입구가 연락처·메일·학번·URL을 가림", ok,
+        "HCX·Claude 길 모두 원문 0건" if ok else f"남음: {', '.join(left) or '-'} · 모양 {shaped}건")
+
+    P = "마르부르크필립스대학교"
+    senior, junior, other = "H0469", "H0143", "H0745"
+    tok = {u: sessions.issue(u) for u in (senior, junior, other)}
+    srv, base = start_server()
+    old_env = {k: os.environ.get(k) for k in ("VCC_TELL_CHAT", "VCC_ASK_CHAT")}
+    try:
+        # ── 110 대화형 들려주기: 가짜 말판정·대화쓰기로 한 턴씩(궁금 → 질문함, 연락처 궁금 → 안 담김) ──
+        os.environ["VCC_TELL_CHAT"] = "1"
+        FAKE_JSON.update({"쪽지검사": {"ok": True},
+                          "말판정": {"종류": "답", "궁금": "현지 기숙사 신청은 언제 하나요?"}})
+        s0 = call(base, "interviewNext", {"program": P, "answers": []}, tok[senior])
+        FAKE_JSON["대화쓰기"] = {"반응": "좋은 기억이네요.", "칸": s0.get("section"), "더묻기": False, "질문": None}
+        said1 = "기숙사는 조용해서 좋았어요. 제 번호는 010-1234-5678이에요. 현지 기숙사 신청은 언제 하나요?"
+        a1 = [{"question": s0.get("question"), "section": s0.get("section"), "answer": said1}]
+        n_ai = len(AI_CALLS)
+        s1 = call(base, "interviewNext", {"program": P, "answers": a1}, tok[senior])
+        tried = AI_CALLS[n_ai:]
+        FAKE_JSON["말판정"] = {"종류": "답", "궁금": "제 번호 010-1234-5678로 연락 주세요"}
+        a2 = a1 + [{"question": s1.get("question"), "section": s1.get("section"), "answer": "제 번호 010-1234-5678로 연락 주세요"}]
+        s2 = call(base, "interviewNext", {"program": P, "answers": a2}, tok[senior])
+        ran = "말판정" in tried and "대화쓰기" in tried and "heard" in s1
+        add(8, "대화형 들려주기가 가짜 AI로 한 턴을 지남", ran,
+            f"말판정·대화쓰기 지남 · heard {s1.get('heard')}" if ran else f"안 지남: 시도 {tried} · 응답 {sorted(s1)[:8]}")
+
+        rows = store.load("tellChat", {})
+        rec = rows.get(f"{senior}|{P}") or {}
+        dumped = json.dumps(rec, ensure_ascii=False)
+        raw_left = [x for x in ("010-1234-5678", "기숙사는 조용해서") if x in dumped]
+        add(8, "tellChat에 선배 말 원문·연락처 없음(해시만)", bool(rec) and not raw_left and rec.get("owner") == senior,
+            f"기록 1건 · 칸 {sorted(rec)}" if rec and not raw_left else ("기록이 안 생김" if not rec else "원문 남음: " + ", ".join(raw_left)))
+        planned = {c[0]: c[2] for c in reset_runtime.plan([senior], store.load)}
+        add(8, "tellChat·궁금 질문이 12/3 초기화(--only) 대상", bool(planned.get("tellChat")) and bool(planned.get("questions")),
+            f"tellChat {planned.get('tellChat', 0)}건 · 질문 {planned.get('questions', 0)}건 지울 목록에 듦"
+            if planned.get("tellChat") and planned.get("questions") else f"지울 목록: {planned}")
+
+        held = [q for q in store.load("questions", []) if q.get("colreg_no") == senior]
+        bad_held = [q["id"] for q in held if "010-1234-5678" in (q.get("질문") or "")]
+        good = [q for q in held if q.get("id") == s1.get("heldQuestionId")]
+        add(8, "궁금 → 내 질문함(관문: 연락처 담긴 궁금은 안 담김)",
+            bool(good) and not bad_held and "heldQuestionId" not in s2 and good[0].get("프로그램명") == P,
+            f"담음 {good[0]['id']}(hold, {P}) · 연락처 궁금 안 담김" if good and not bad_held and "heldQuestionId" not in s2
+            else f"담긴 것 {[q.get('id') for q in held]} · s2 heldQuestionId {s2.get('heldQuestionId')}")
+
+        their = call(base, "getInbox", {}, tok[other])
+        theirs = json.dumps(their, ensure_ascii=False)
+        peek = tell_chat.load(other, P)
+        sneak = bool(good) and good[0]["id"] in theirs
+        add(8, "남의 tellChat·궁금 질문 안 보임", not sneak and not peek["said"] and not peek["asked"],
+            "다른 계정 질문함·판정 기록에 없음" if not sneak and not peek["said"] else "다른 계정에 보임")
+
+        old = (datetime.now(KST) - timedelta(days=tell_chat.KEEP_DAYS + 1)).isoformat(timespec="seconds")
+        with store.lock():
+            store.load("tellChat", {})[f"{senior}|{P}"]["at"] = old
+        tell_chat.save(junior, P, {"said": {}, "asked": {}, "last": None})   # 아무 저장이나 오래된 기록을 지운다
+        gone = f"{senior}|{P}" not in store.load("tellChat", {})
+        tell_chat.drop(junior, P)
+        add(8, f"tellChat 보관기간 {tell_chat.KEEP_DAYS}일 지나면 지움", gone, "8일 된 기록 지워짐" if gone else "8일 된 기록이 남음")
+
+        os.environ["VCC_TELL_CHAT"] = "0"
+        n_ai = len(AI_CALLS)
+        call(base, "interviewNext", {"program": P, "answers": a1}, tok[other])
+        off = [c for c in AI_CALLS[n_ai:] if c in ("말판정", "대화쓰기")]
+        add(8, "VCC_TELL_CHAT 끄면 말판정·대화쓰기 안 부름", not off, "0건" if not off else f"{len(off)}건")
+
+        # ── 119 물어보기 대화 응답(VCC_ASK_CHAT): 인사말은 질문함에 안 담김. 병합 전이면 플래그는 아무것도 안 바꾼다 ──
+        os.environ["VCC_ASK_CHAT"] = "1"
+        FAKE_JSON["대화응답"] = {"message": "반가워요. 연락은 010-1234-5678로 주세요."}
+        before = len([q for q in store.load("questions", []) if q.get("colreg_no") == junior])
+        r = call(base, "askBoo", {"question": "안녕 BOO 고마워"}, tok[junior])
+        after = len([q for q in store.load("questions", []) if q.get("colreg_no") == junior])
+        merged = "VCC_ASK_CHAT" in (ROOT / "functions" / "askboo.py").read_text(encoding="utf-8")
+        # askLog(초기화 대상 아님, 사람 칸 없음)에 남는 message도 본다 — 119 뒤에는 AI가 쓴 글이 이 칸에 들어간다
+        last_log = (store.load("askLog", []) or [{}])[-1]
+        leak = "010-1234-5678" in json.dumps([r, last_log.get("message")], ensure_ascii=False)
+        add(8, "물어보기 대화(VCC_ASK_CHAT): 질문함 안 담음·대화에 없는 연락처 버림", before == after and not leak,
+            (f"status {r.get('status')} · 질문함 그대로" + ("" if merged else " · 참고: 119 병합 전(플래그 코드 없음) — 병합 뒤 다시 돌린다"))
+            if before == after and not leak else f"질문함 {before}→{after} · 연락처 응답에 남음 {leak}")
+
+        # ── #379 쪽지 program: 보낸 사람이 그 노트 추천에서 받은 선배일 때만, 응답에 상대 학번 없음 ──
+        target = "H0241"
+        store.load("demands", []).append({"id": "R-H0143-8", "owner": junior})
+        store.load("shownSeniors", {}).setdefault(junior, {})[notes.note_id(P)] = {"ids": [target]}
+        sent = call(base, "sendMessage", {"to": runtime_fns.peer_ref(junior, target), "noteId": notes.note_id(P),
+                                          "text": "기숙사 준비가 궁금해요."}, tok[junior])
+        threads = call(base, "getMessages", {}, tok[junior]).get("threads", [])
+        t = next((x for x in threads if x.get("threadId") == sent.get("threadId")), {})
+        forged = runtime_fns._request_program(junior, target, notes.note_id("없는 프로그램"))
+        add(8, "쪽지 program은 받은 추천의 노트만", t.get("program") == P and forged is None,
+            f"{P} 저장 · 추천 안 받은 노트 → 없음" if t.get("program") == P and forged is None
+            else f"program {t.get('program')!r} · 위조 {forged!r} · {sent.get('reason') or sent.get('error') or ''}")
+        ids_out = sorted(set(re.findall(r"H\d{4}", json.dumps(threads, ensure_ascii=False))) - {junior})
+        add(8, "쪽지 응답에 상대 학번 없음", not ids_out, "0건" if not ids_out else "보임: " + ", ".join(ids_out))
+    finally:
+        srv.shutdown()
+        FAKE_JSON.clear()
+        for k, v in old_env.items():
+            os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+
+    add(8, "서버 요청은 AI 전에 한도(분당 10·일 100)를 셈", not AI_UNLIMITED,
+        "한도 밖 AI 시도 0건" if not AI_UNLIMITED else "한도 안 세고 부름: " + ", ".join(sorted(set(AI_UNLIMITED))))
+    # 점검 중 생긴 기록(임시 runtime)이 모두 초기화 도구의 규칙 안인지 — 새 기록 이름이 생기면 여기서 걸린다
+    names = sorted(p.stem for p in store.RUNTIME.glob("*.json")) if store.RUNTIME.exists() else []
+    names = sorted(set(names) | set(getattr(store, "_cache", {}) or {}))   # 저장 전 메모리에만 있는 기록도
+    known = reset_runtime.HANDLED | set(reset_runtime.UNTOUCHED)
+    loose = [n for n in names if n not in known]
+    add(8, "점검 중 생긴 기록이 모두 초기화 규칙 안", not loose,
+        f"기록 {len(names)}종 · reset_runtime 규칙 밖 0" if not loose else "규칙 밖: " + ", ".join(loose))
+
+
 # ---------- 7: 공개 저장소 ----------
 def check_public_repo():
     # 기준: noreply 규칙을 넣은 커밋(a49e5d4, PR #73) 다음부터. 그 전 커밋은 기록을 고칠 수 없어 개수만 알린다.
@@ -293,7 +488,7 @@ def check_public_repo():
 
 
 def main():
-    for step in (check_access_and_tokens, check_xss, check_secrets, check_public_repo):
+    for step in (check_access_and_tokens, check_xss, check_secrets, check_public_repo, check_new_paths):
         try:
             step()
         except Exception as e:   # 한 항목이 깨져도 나머지는 본다
