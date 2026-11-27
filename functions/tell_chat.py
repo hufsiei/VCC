@@ -23,6 +23,8 @@
 #        질문의 뜻·왜 묻는지 되묻는 말은 담지 않는다(말판정이 궁금 null). 궁금 글이 선배 말 그대로가 아니면 말 전체(짧을 때만).
 #        [Q-114] 궁금 글이 지시어뿐이면(「나도 그게 궁금했는데」) 「(BOO 질문) 선배 말」로 담는다. 담은 턴이 부족·되물음이면
 #        반응 없이 HELD_TEXT + 다시 묻는 질문만. 부족·되물음·딴얘기 반응에 평가 말(_EVAL)이 들면 버린다.
+#   [Q-131] ① 뒤 코드 바로잡기(fix_kind): 부호뿐 → 되물음, 「다 말했어요」·「남들도 궁금해할 것」 → 부족, 짧은 「모르겠어요」 → 모름.
+#        종류가 6종 밖이어도 궁금 글이 있으면 되물음(parse_judge). 「누가 보낸 질문이냐」는 담지 않는다(_META).
 # 실패: 말판정이 실패하면 지금처럼 답으로 보고 고정 질문(반응 없음). 대화쓰기가 실패하면 고정 질문 + 고정 반응.
 # 응답(제안 — spec·화면 미반영): 지금 필드 그대로 + reaction(반응 글) · heard {kind, section}(방금 말을 어떻게 봤는지)
 #        · heldQuestionId(질문함에 담은 질문) · stopped(그만). 화면이 reaction을 질문 말풍선 앞에 그리면 된다.
@@ -62,7 +64,8 @@ _ASK_END = re.compile(r"(요|까)\?$|주세요\.?$")   # 「…들려주세요.�
 _FEATURE = re.compile(r"질문함|요약|저장")   # 화면 기능을 말하는 반응은 버린다(담았는지·정리되는지는 코드가 붙인다)
 # [Q-114] 부족·되물음·딴얘기 반응에 선배의 이해·질문 난이도·말의 부족함을 평가하는 말이 들면 버린다
 # (11/27 시험: 「나도 그게 궁금했는데」 → 「질문이 조금 어려웠을 수 있어요. …여쭤본 거예요.」 — 무시당하는 느낌)
-_EVAL = re.compile(r"어려[웠우워]|어렵|헷갈|이해|쉽게\s*말(하면|씀)|다시\s*말(해|하면|씀드리)|무슨\s*말인지|부족|모호|애매"
+# [Q-131] 「(제가) 써 드리기 어려워요」처럼 BOO 자신이 못 하는 일을 말하는 「~기 어려워요」는 평가 말이 아니다(S08 반응 버림 3건)
+_EVAL = re.compile(r"어려[웠우]|(?<!기)(?<!기\s)어려워|어렵|헷갈|이해|쉽게\s*말(하면|씀)|다시\s*말(해|하면|씀드리)|무슨\s*말인지|부족|모호|애매"
                    r"|질문이\s*(조금|좀|너무)?\s*(길|막연|추상)")
 NO_REACTION_HELD = {"부족", "되물음"}   # [Q-114] 질문함에 담은 턴은 반응 없이 HELD_TEXT + 다시 묻는 질문만(말풍선 겹침)
 # [Q-114] 궁금 글이 지시어뿐인지 볼 때 빼는 말(지시어·궁금 표현·맞장구). 남는 낱말이 없으면 BOO 질문을 함께 담는다
@@ -72,7 +75,22 @@ _FILLER = re.compile(r"^(나|저|저희|우리)(도|는|가)?$|궁금|알(려|�
 MAX_HELD_ASK = 60      # 지시어 궁금에 함께 담는 BOO 질문 글자 수(넘으면 말줄임)
 # ⑥ 질문의 뜻·왜 묻는지·예를 들어 달라는 말은 궁금으로 담지 않는다 — 말판정이 궁금을 붙여도 코드가 한 번 더 거른다
 # (실제 호출 11/26: 「각오라는 게 무슨 뜻이에요? 예를 들어 주세요.」를 HCX가 궁금으로 냄)
-_META = re.compile(r"뜻|무슨\s*(말|의미)|의미(가|를|예요|에요)|왜\s*(물어|묻|여쭤)|어디에\s*(쓰|써)|예를\s*들|예시")
+# [Q-131] 후배 질문을 누가 보냈는지 묻는 말도 서비스에 대한 되물음이라 담지 않는다(S22 「이 질문은 누가 보낸 거예요?」)
+_META = re.compile(r"뜻|무슨\s*(말|의미)|의미(가|를|예요|에요)|왜\s*(물어|묻|여쭤)|어디에\s*(쓰|써)|예를\s*들|예시"
+                   r"|누가\s*(보낸|보냈|물어|물은|물었|남긴|남겼|올린|올렸|쓴|썼)")
+# [Q-131] 말판정이 「답」이라 해도 코드가 바로잡는 말(11/27 측정 S20·S23·S26·S28). 말 전체가 이 모양일 때만 —
+# 숫자가 있거나 뒤에 내용이 이어지면(「전에 말했듯이 비쌌어요」「주 5일이요」) 그대로 둔다. 판정은 _qn(띄어쓰기·부호 뺌) 글로 본다.
+_PUNCT_ONLY = re.compile(r"[\s?？!.~…·]+")
+_NO_CONTENT = re.compile(
+    r"(제가|저는?)?(지난번에?|저번에?|전에|아까|이미|앞에서|예전에)(다|전부|모두|거의)?(말|얘기|이야기)"
+    r"(했|한|해|드렸|드린)(는데요?|은데요?|던데요?|잖아요|어요|요|죠|습니다|거든요|(것|거)같(은데|아|네)요?)?"
+    r"|(후배|후배들|다른사람|다른사람들|사람들|다들|애들|학생들|다른학생들)(도|이|은|는|이나|들도)?(이런|그런|이|그)?"
+    r"(거|것|게|걸|부분)?(많이|진짜|정말|꽤|좀|다|되게)?(궁금해할|궁금해하실|궁금할|궁금해하|알고싶어할|물어볼|물어보실)"
+    r"(것같아요|거같아요|텐데요?|듯해요|겠죠|겠어요|거예요|걸요|더라고요|던데요|죠|요|수도있어요|수있어요)?")
+_DONT_KNOW_END = ("모르겠어요", "모르겠네요", "모르겠습니다", "모르겠는데요", "몰라요", "모릅니다",
+                  "기억이안나요", "기억안나요", "기억이안나네요", "기억이잘안나요", "기억이안납니다")
+_CONTRAST = re.compile(r"는데|은데|지만|였고|었고|했고|봤고|았고")   # 앞에 다른 내용이 있는 말(「…봤는데 질문은 기억이 안 나요」)
+MAX_DONT_KNOW = 30     # 「모르겠어요」로 바로잡는 말의 글자 수 상한(부호·띄어쓰기 뺀 글)
 
 
 def enabled():
@@ -319,12 +337,44 @@ def judge(section, question, said, before=None):
     import interview as iv
     ctx = f"BOO: {before.get('question') or ''} / 선배: {before.get('answer') or '(건너뜀)'}" if before else "(없음)"
     r = iv._call("말판정", f"칸: {section or '–'}\n질문: {question}\n앞 대화: {ctx}\n선배가 방금 한 말: {said}\n출력:")
-    j = r.get("json") if r.get("ok") else None
-    if not isinstance(j, dict) or j.get("종류") not in KINDS:
+    got = parse_judge(r.get("json") if r.get("ok") else None)
+    return fix_kind(*got, said) if got else None
+
+
+def parse_judge(j):
+    """말판정 JSON → (종류, 궁금 또는 None) 또는 None(형식 오류).
+    [Q-131] 종류가 6종 밖인데 궁금 글이 있으면(S25 {"종류":"궁금",…}) 되물음으로 받는다 — 폴백하면 질문함을 놓친다."""
+    if not isinstance(j, dict):
         return None
     c = j.get("궁금")
     c = c.strip() if isinstance(c, str) else ""
-    return j["종류"], (c if c and c.lower() != "null" else None)
+    c = c if c and c.lower() != "null" else None
+    kind = j.get("종류")
+    if kind not in KINDS:
+        if not c:
+            return None
+        kind = "되물음"
+    return kind, c
+
+
+def fix_kind(kind, curious, said):
+    """[Q-131] 말판정 결과를 코드가 바로잡는다 — 말 전체가 정해진 모양일 때만(정상 답을 덮지 않게).
+    부호뿐(「?」) → 되물음(물음표가 없으면 부족), 「지난번에 다 말했어요」·「후배들도 궁금해할 것 같아요」 → 부족,
+    짧은 「…모르겠어요」(앞에 다른 내용·숫자 없음) → 모름."""
+    s = (said or "").strip()
+    if s and _PUNCT_ONLY.fullmatch(s):
+        return ("되물음" if ("?" in s or "？" in s) else "부족"), None
+    if kind != "답":
+        return kind, curious
+    n = _qn(s)
+    if not n or re.search(r"\d", n):
+        return kind, curious
+    if _NO_CONTENT.fullmatch(n):
+        return "부족", curious
+    end = next((e for e in _DONT_KNOW_END if n.endswith(e)), None)
+    if end and len(n) <= MAX_DONT_KNOW and not _CONTRAST.search(n[:-len(end)]):
+        return "모름", curious
+    return kind, curious
 
 
 def bare_deictic(text):
