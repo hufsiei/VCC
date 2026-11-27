@@ -5,9 +5,10 @@
 #                                   .env의 NCP_OS_BUCKET·NCP_OS_ACCESS_KEY·NCP_OS_SECRET_KEY를 쓴다. 액션은 요청마다 새로 읽으므로 재배포 필요 없음.
 #   --dry                           (전부 지우기) 지울 파일 이름만 보여 주고 지우지 않는다.
 #
-# [작업 39, 11/25] 시연 계정만 초기화:
-#   python reset_runtime.py --ncp --only H0143,H0469,H0241,staff01,staff02          무엇을 몇 건 지울지만 보여 준다(기본 = 보기만)
-#   python reset_runtime.py --ncp --only H0143,H0469,H0241,staff01,staff02 --yes    실제로 지운다
+# [작업 39, 11/25] 시연 계정만 초기화(12/3·12/8은 시연 계정 + 시험 계정 H0002·H0004 — 11/26 결정 A):
+#   python reset_runtime.py --ncp --only H0143,H0469,H0241,staff01,staff02,H0002,H0004          보기만(기본)
+#   python reset_runtime.py --ncp --only H0143,H0469,H0241,staff01,staff02,H0002,H0004 --yes    실제로 지운다
+#   새 runtime 기록을 만들면 HANDLED(plan에 규칙) 아니면 UNTOUCHED에 넣는다 — test_reset_runtime.py가 대조한다.
 #   그 계정이 들어간 기록만 지우고 다른 계정(미리 시험 인터뷰 등)의 기록은 남긴다. 파일별 규칙은 아래 RULES.
 #   · 쪽지 대화는 한쪽이라도 시연 계정이면 대화째 지운다(섞인 대화) — 시연 계정이 처음 상태에서 다시 요청할 수 있게.
 #     그 대화의 알림·대화 신고·미리 정한 닉네임도 함께 지운다. 상대(다른 계정)의 다른 기록은 남는다.
