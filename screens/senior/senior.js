@@ -9,7 +9,7 @@
 // 주소: ?senior=B(프로필). 예전 주소 ?view=messages·?thread=T-0001은 내 보관함 · 쪽지 탭으로 넘긴다.
 
 import {
-  currentUser, logout, getMe, getInbox, listNotes, recommendSeniors,
+  currentUser, getMe, getInbox, listNotes, recommendSeniors,
   getMessages, previewNickname, checkMessage, sendMessage,
 } from "../../common/data.js";
 import { rememberRequest, localRequests, forgetRequests, unreadOf } from "../questions/bell.js";
@@ -28,19 +28,10 @@ if (!me) location.replace("../login/");
   }
 }
 if (me && me.status === "직원") document.getElementById("consoleBtn").hidden = false;
-// 헤더 왼쪽 로그아웃(11/26, 디자인 규칙 5-1) — 인터BOO와 같은 동작. 이 탭의 다른 기록은 건드리지 않는다
-document.getElementById("logoutBtn").addEventListener("click", () => {
-  if (confirm("로그아웃할까요?")) {
-    logout();
-    location.replace("../login/");
-  }
-});
 
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };
-const KIND_NAME = { 교환: "교환학생", 파견: "파견", 인턴: "인턴", 비교과: "" };
 const LOCK_TEXT = "경험을 들려주거나 궁금한 것을 정리하면 선배 추천이 열려요";
-const MAX_BASE = 4;   // 기준 노트 칩은 최대 4개
 const MIN_TEXT = 5;   // 쪽지 첫 문장 최소 글자 수(빈 인사만 보내지 않게)
 
 // ---------------------------------------------------------------------------
@@ -89,10 +80,6 @@ function errorBox(onRetry) {
   ]);
 }
 
-const noteLabel = (note) => {
-  const kind = KIND_NAME[note.type] ?? "";
-  return note.country ? [kind, note.country].filter(Boolean).join("·") : (kind || CATEGORY_NAME[CATEGORY[note.type]] || "");
-};
 // 「로/으로」: 마지막 글자에 받침이 있고 그 받침이 ㄹ이 아니면 「으로」(수달 → 수달로, 고래 → 고래로, 곰 → 곰으로)
 function josaRo(word) {
   const code = String(word || "").trim().slice(-1).charCodeAt(0) - 0xac00;
@@ -109,54 +96,74 @@ const letterOf = (s) => String(s.nickname || "").trim().split(/\s+/).pop() || ""
 
 const listArea = document.getElementById("listArea");
 let notesById = new Map();
-let baseIds = [];
-let currentNoteId = null;
+let currentCat = null;          // 고른 분야(global | practice | extra). 처음에는 아무것도 고르지 않는다(11/27)
+let currentNoteId = null;       // 고른 세부 활동(노트 id). 분야만 골라서는 정해지지 않는다
+let activities = [];            // 내 활동 이력(모든 분야, 최근이 앞) — [{ id, at }]
+let activityError = false;      // 활동 이력을 만들 데이터(노트 목록·질문함)를 받지 못했음
+let locked = null;              // 선배 추천이 잠겨 있으면 getMe.recommend(열릴 때까지 목록 대신 잠김 안내)
 let profile = null;
 let seniorsRes = null;          // 마지막 recommendSeniors 응답
 let threads = [];               // getMessages.threads(내가 보낸 것·받은 것 모두)
 let threadsByWith = new Map();  // 선배(studentId) → 내가 보낸(asker) 대화 — 버튼 상태용
 let waitingCount = 0;
 let waitingLimit = 3;
+let loadSeq = 0;                // 추천 요청 번호 — 늦게 온 옛 응답은 버린다(8절 loadSeniors)
 
 // ---------------------------------------------------------------------------
-// 3. 기준 노트 정하기 (11/23 미리님 결정)
-//    주소 ?noteId= → 최근에 본 해봤노트(이 탭) → getInbox: ① 질문함 최근 질문의 noteId(궁금한 것 정리하기로 전한 질문도 포함) → ② 최근 스크랩
-//    → ③ 둘 다 없으면 「관심 경험을 골라 주세요」 + 「해봤노트 둘러보기」. 후보가 여럿이면 위에 프로그램 칩.
+// 3. 관심 경험 — 분야 칩 3개 → 그 분야의 세부 활동 칩(가로 스크롤) → 고른 활동의 경험자 추천 (11/27)
+//    세부 활동 = 내 이력 세 가지를 노트 id로 합친 것(같은 노트는 한 번, 이름이 비슷해도 id가 다르면 다른 활동):
+//      ① 해봤노트에서 연 노트 ② 해봤노트 검색으로 찾아 연 노트 — note.js rememberViewed(이 탭 sessionStorage, 사람별, 시각 포함)
+//      ③ 관심 등록 = getInbox 질문함 질문의 noteId(궁금한 것 정리하기 포함) + 스크랩(서버에 사람별로 저장)
+//    정렬: 시각이 있는 기록(열람·검색·질문)은 활동별 가장 최근 시각 ↓, 시각이 없는 스크랩·예전 열람 기록은 그 뒤에 원래 순서(최근이 위)대로.
+//    검색어만 치고 노트를 열지 않은 것은 활동이 아니므로 칩으로 만들지 않는다.
+//    주소 ?noteId=(해봤노트·질문함의 「닮은선배 보기」)로 들어오면 그 활동의 분야와 활동을 골라 둔 채 시작한다.
+//    추천은 고른 활동(노트 → 프로그램)을 실제로 경험한 선배만 — 서버 recommendSeniors(score.py, 기존 정렬 그대로).
 // ---------------------------------------------------------------------------
 
 const timeOf = (q) => String(q.answeredAt || q.askedAt || "");
+const CAT_ORDER = ["global", "practice", "extra"];
 
-// 해봤노트 상세에서 최근에 본 노트(note.js rememberViewed — 이 탭 sessionStorage, 최근이 앞). askBoo 질문에는 noteId가 없어서(PR #232)
+// 해봤노트 상세에서 연 노트(note.js rememberViewed): [{ id, at, from: "view" | "search" }]. 예전 모양(id 문자열 목록, 최근이 앞)도 읽는다
 function viewedNotes() {
   try {
     const list = JSON.parse(sessionStorage.getItem(`viewedNotes:${me ? me.colreg_no : ""}`) || "[]");
-    return Array.isArray(list) ? list.filter((x) => typeof x === "string") : [];
+    if (!Array.isArray(list)) return [];
+    return list.map((x) => (typeof x === "string" ? { id: x, at: "" } : x))
+      .filter((x) => x && typeof x.id === "string").map((x) => ({ id: x.id, at: typeof x.at === "string" ? x.at : "" }));
   } catch {
     return [];
   }
 }
 
-function pickBaseNotes(inbox, fromUrl) {
-  const ids = [];
-  const add = (id) => { if (id && !ids.includes(id)) ids.push(id); };
-  add(fromUrl);
-  for (const id of viewedNotes()) add(id);
-  const questions = ((inbox && inbox.questions) || []).filter((q) => q.noteId).slice()
-    .sort((a, b) => timeOf(b).localeCompare(timeOf(a)));
-  for (const q of questions) add(q.noteId);
-  for (const s of (inbox && inbox.scraps) || []) add(s.noteId); // 스크랩은 최근이 위(spec)
-  return ids.slice(0, MAX_BASE);
+function collectActivities(inbox, fromUrl) {
+  const timed = new Map();   // id → 가장 최근 시각(ms)
+  const order = [];          // 시각이 없는 기록의 순서(예전 열람 기록·스크랩)
+  const add = (id, at) => {
+    if (!id) return;
+    const t = at ? Date.parse(at) : NaN;
+    if (Number.isNaN(t)) { if (!order.includes(id)) order.push(id); return; }
+    if (!timed.has(id) || timed.get(id) < t) timed.set(id, t);
+  };
+  if (fromUrl) add(fromUrl, new Date().toISOString()); // 방금 「닮은선배 보기」로 고른 활동이 맨 앞
+  for (const v of viewedNotes()) add(v.id, v.at);
+  for (const q of (inbox && inbox.questions) || []) if (q.noteId) add(q.noteId, timeOf(q));
+  for (const s of (inbox && inbox.scraps) || []) add(s.noteId, "");
+  const sorted = [...timed.entries()].sort((a, b) => b[1] - a[1]).map(([id, t]) => ({ id, at: new Date(t).toISOString() }));
+  const rest = order.filter((id) => !timed.has(id)).map((id) => ({ id, at: "" }));
+  return [...sorted, ...rest].filter((a) => notesById.has(a.id)); // 노트 목록에 없는 id(지워진 노트 등)는 뺀다
 }
 
-// --- 「나의 프로필 요약」(SOFT BLUE): 학과·학년·관심 경험(분야 태그). 이름·학번은 쓰지 않는다 ---
+const activitiesOf = (cat) => activities.filter((a) => CATEGORY[notesById.get(a.id).type] === cat);
+
+// --- 「나의 프로필 요약」(SOFT BLUE): 학과·학년·이중전공 / 관심 경험: 분야 칩 3개 / 세부 활동 칩(분야를 골랐을 때만). 이름·학번은 쓰지 않는다 ---
 function renderProfile() {
   const box = document.getElementById("profileBox");
   if (!profile) { box.replaceChildren(); return; }
-  const note = notesById.get(currentNoteId);
-  const cat = note ? CATEGORY[note.type] : null;
-  const interest = note
-    ? [el("span", { className: `category-tag cat-${cat}`, text: CATEGORY_NAME[cat] }), el("span", { text: `${noteLabel(note)} · ${note.program}` })]
-    : [el("span", { className: "sub", text: "아직 정하지 않았어요" })];
+  const catChips = CAT_ORDER.map((cat) => {
+    const chip = el("button", { className: "choice-chip interest-chip", text: CATEGORY_NAME[cat], attrs: { type: "button", "aria-pressed": String(cat === currentCat) } });
+    chip.addEventListener("click", () => selectCategory(cat));
+    return chip;
+  });
   box.replaceChildren(el("div", { className: "profile-card" }, [
     el("span", { className: "profile-card__title", text: "나의 프로필 요약" }),
     el("div", { className: "profile-card__line" }, [
@@ -164,37 +171,124 @@ function renderProfile() {
       el("span", { text: Number.isFinite(profile.regst_grad) ? `${profile.regst_grad}학년` : "" }),
       profile.dbl_mjr_nm ? el("span", { className: "sub", text: `이중전공 ${profile.dbl_mjr_nm}` }) : null,
     ]),
-    el("div", { className: "profile-card__line" }, [el("span", { className: "sub", text: "관심 경험" }), ...interest]),
+    el("div", { className: "profile-card__line interest-row", attrs: { role: "group", "aria-label": "관심 경험 분야" } }, [
+      el("span", { className: "interest-row__label", text: "관심 경험:" }),
+      ...catChips,
+    ]),
+    currentCat ? activityRow() : null,
   ]));
+  drawIcons();
+  if (currentCat) updateArrows();
 }
 
-function renderBaseChips() {
-  const box = document.getElementById("baseChips");
-  box.hidden = baseIds.length < 2;
-  box.replaceChildren(...baseIds.map((id) => {
-    const note = notesById.get(id);
-    const chip = el("button", {
-      className: "choice-chip",
-      text: note ? note.program : id,
-      attrs: { type: "button", "aria-pressed": String(id === currentNoteId) },
+// 세부 활동 줄: [‹] 칩 목록(가로 스크롤, 줄바꿈 없음) [›]. 화살표는 마우스가 있는 PC에서만(CSS), 넘칠 때만 보인다
+// 스크롤(스와이프·화살표)은 보이는 위치만 바꾸고, 칩을 눌러야(클릭) 활동이 바뀐다
+function activityRow() {
+  const list = activitiesOf(currentCat);
+  if (activityError && !list.length) {
+    // 데이터 없음과 구분: 못 받은 것이면 오류 라벨 + 다시 시도(6-5)
+    const retry = el("button", { className: "btn btn--outline", text: "다시 시도", attrs: { type: "button" } });
+    retry.addEventListener("click", start);
+    return el("div", { className: "activity-state" }, [
+      statusLabel("error", "circle-alert", "활동 목록을 불러오지 못했어요"),
+      retry,
+    ]);
+  }
+  if (!list.length) {
+    return el("div", { className: "activity-state" }, [
+      el("p", { className: "activity-state__text", text: "아직 확인한 활동이 없어요." }),
+      el("a", { className: "link-more", text: "해봤노트 둘러보기 ›", attrs: { href: "../note/" } }),
+    ]);
+  }
+  const track = el("div", { className: "activity-track", attrs: { id: "activityTrack", role: "group", "aria-label": `${CATEGORY_NAME[currentCat]} 세부 활동` } },
+    list.map((a) => {
+      const name = notesById.get(a.id).program;
+      // 긴 이름은 칩 최대 너비에서 말줄임 — 전체 이름은 title(PC 마우스 올림)·aria-label(화면 읽기)로
+      return el("button", {
+        className: "choice-chip activity-chip",
+        attrs: { type: "button", "aria-pressed": String(a.id === currentNoteId), title: name, "aria-label": name, "data-id": a.id },
+      }, [el("span", { className: "activity-chip__text", text: name })]);
+    }));
+  // 스와이프하다 손을 뗀 것은 누른 것으로 치지 않는다(8px 넘게 움직였거나 목록이 밀렸으면 클릭 무시)
+  let downX = null;
+  let downScroll = 0;
+  track.addEventListener("pointerdown", (e) => { downX = e.clientX; downScroll = track.scrollLeft; });
+  track.addEventListener("click", (e) => {
+    const chip = e.target.closest(".activity-chip");
+    const moved = downX !== null && e.detail > 0 && (Math.abs(e.clientX - downX) > 8 || Math.abs(track.scrollLeft - downScroll) > 8);
+    downX = null;
+    if (!chip || moved) return;
+    selectActivity(chip.dataset.id);
+  });
+  track.addEventListener("scroll", updateArrows, { passive: true });
+  const arrow = (dir) => {
+    const b = el("button", { className: "icon-btn activity-arrow", attrs: { type: "button", "data-dir": dir, "aria-label": dir < 0 ? "이전 활동 보기" : "다음 활동 보기", "aria-controls": "activityTrack" } },
+      [icon(dir < 0 ? "chevron-left" : "chevron-right")]);
+    b.addEventListener("click", () => {
+      const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      track.scrollBy({ left: dir * Math.max(track.clientWidth * 0.8, 120), behavior: smooth ? "smooth" : "auto" });
     });
-    chip.addEventListener("click", () => {
-      if (id === currentNoteId) return;
-      selectNote(id);
-    });
-    return chip;
-  }));
+    return b;
+  };
+  return el("div", { className: "activity-row" }, [arrow(-1), track, arrow(1)]);
 }
 
-function selectNote(id) {
+// 화살표: 맨 앞이면 ‹ 비활성, 맨 끝이면 › 비활성, 칩이 다 보이면 둘 다 숨김
+function updateArrows() {
+  const track = document.getElementById("activityTrack");
+  if (!track) return;
+  const row = track.parentElement;
+  const max = track.scrollWidth - track.clientWidth;
+  const overflow = max > 1;
+  for (const b of row.querySelectorAll(".activity-arrow")) {
+    b.hidden = !overflow;
+    b.disabled = Number(b.dataset.dir) < 0 ? track.scrollLeft <= 1 : track.scrollLeft >= max - 1;
+  }
+}
+window.addEventListener("resize", updateArrows);
+
+// 분야를 바꾸면: 고른 활동·추천 목록을 비우고, 활동 목록은 맨 앞(왼쪽)부터
+function selectCategory(cat) {
+  if (cat === currentCat) return;
+  currentCat = cat;
+  currentNoteId = null;
+  loadSeq += 1;                 // 불러오는 중이던 추천 응답은 버린다
+  seniorsRes = null;
+  setNoteInUrl(null);
+  renderProfile();
+  renderListArea();
+}
+
+// 같은 분야 안에서 다른 활동을 고르면 그 활동 기준으로 다시 추천. 이미 고른 칩을 다시 눌러도 그대로
+function selectActivity(id) {
+  if (!id || id === currentNoteId) return;
+  const before = document.getElementById("activityTrack");
+  const keep = before ? before.scrollLeft : 0;
   currentNoteId = id;
-  // 주소에도 남겨 새로고침·뒤로가기에서 같은 노트(해봤노트의 「닮은선배 보기」와 같은 모양)
+  setNoteInUrl(id);
+  renderProfile();
+  const track = document.getElementById("activityTrack");
+  if (track) { track.scrollLeft = keep; updateArrows(); } // 다시 그려도 보던 위치 그대로
+  renderListArea();
+}
+
+// 주소에도 남겨 새로고침·뒤로가기에서 같은 활동(해봤노트의 「닮은선배 보기」와 같은 모양)
+function setNoteInUrl(id) {
   const url = new URL(location.href);
-  url.searchParams.set("noteId", id);
+  if (id) url.searchParams.set("noteId", id);
+  else url.searchParams.delete("noteId");
   for (const k of ["senior", "view", "thread"]) url.searchParams.delete(k);
   history.replaceState(null, "", url.pathname + url.search);
-  renderBaseChips();
-  renderProfile();
+}
+
+// 목록 자리: 잠김이면 잠김 안내, 활동을 골랐을 때만 추천 제목·카드, 그 밖에는 비워 둔다
+function renderListArea() {
+  if (locked) { renderLocked(locked); return; }
+  if (!currentNoteId) {
+    listArea.setAttribute("aria-busy", "false");
+    listArea.replaceChildren();
+    return;
+  }
   loadSeniors(false);
 }
 
@@ -336,7 +430,8 @@ function experienceTags(note) {
   return el("div", { className: "tag-row" }, [el("span", { className: `category-tag cat-${cat}`, text: CATEGORY_NAME[cat] }), el("span", { className: "sub", text: note.program })]);
 }
 
-function seniorCard(s, note) {
+// 카드 = 아바타·표시명 → 추천 이유 1줄 → 일치 칩 → 버튼. 분야·활동명 줄은 11/27에 뺐다(위 「나의 프로필 요약」에서 고른 활동이 보이므로)
+function seniorCard(s) {
   const profileBtn = el("button", { className: "btn btn--outline", text: "프로필 보기", attrs: { type: "button" } });
   profileBtn.addEventListener("click", () => go(`senior=${encodeURIComponent(letterOf(s))}`));
 
@@ -345,7 +440,6 @@ function seniorCard(s, note) {
       el("span", { className: "avatar", attrs: { "aria-hidden": "true" } }, [icon("user")]),
       el("h3", { className: "senior-card__name", text: s.nickname || "선배" }),
     ]),
-    experienceTags(note),
     // 추천 이유 1줄(추천이 만든 것 → MINT 표시) — 문장은 서버가 준 그대로 잇는다
     el("p", { className: "senior-card__reason" }, [
       el("span", { className: "ai-mark", attrs: { "aria-hidden": "true" } }, [icon("sparkles")]),
@@ -358,7 +452,6 @@ function seniorCard(s, note) {
 
 function renderList(res) {
   seniorsRes = res;
-  const note = notesById.get(currentNoteId);
   const seniors = res.seniors || [];
   const head = el("div", { className: "list-head" }, [
     el("h2", { className: "section-title", text: `추천 선배 ${seniors.length}명` }), // N = 실제 카드 수(7-④)
@@ -371,12 +464,12 @@ function renderList(res) {
   if (!seniors.length) {
     children.push(el("div", { className: "state-box" }, [
       el("img", { className: "boo-illust", attrs: { src: "../../assets/boo-portrait.png", alt: "BOO" } }),
-      el("p", { className: "state-box__title", text: "아직 이 경험을 한 선배가 없어요" }),
+      el("p", { className: "state-box__title", text: "아직 해당 활동을 경험한 선배가 없어요" }),
       el("p", { className: "sub", text: "궁금한 점은 질문함에 남기면 선배 인터뷰 때 먼저 물어볼게요." }),
       el("a", { className: "btn btn--secondary", text: "BOO에게 물어보기", attrs: { href: "../talk/?mode=ask" } }),
     ]));
   } else {
-    children.push(el("div", { className: "senior-list" }, seniors.map((s) => seniorCard(s, note))));
+    children.push(el("div", { className: "senior-list" }, seniors.map((s) => seniorCard(s))));
     if (res.hasMore) {
       const more = el("button", { className: "btn btn--secondary btn--block list-more", text: "선배 더 보기", attrs: { type: "button" } });
       more.addEventListener("click", () => loadSeniors(true, more));
@@ -396,7 +489,6 @@ function renderLocked(recommend) {
   const talk = (recommend && recommend.talk) || {};
   const need = (recommend && recommend.need) || 3;
   const progress = Number.isFinite(talk.answered) ? `들려주기 답변 ${Math.min(talk.answered, need)}/${need}` : null;
-  document.getElementById("baseChips").hidden = true;
   listArea.setAttribute("aria-busy", "false");
   listArea.replaceChildren(el("div", { className: "state-box" }, [
     icon("lock"),
@@ -412,22 +504,9 @@ function renderLocked(recommend) {
   drawIcons();
 }
 
-// --- 기준 노트가 없을 때(③) ---
-function renderNoBase() {
-  listArea.setAttribute("aria-busy", "false");
-  listArea.replaceChildren(el("div", { className: "state-box" }, [
-    el("img", { className: "boo-illust", attrs: { src: "../../assets/boo-portrait.png", alt: "BOO" } }),
-    el("p", { className: "state-box__title", text: "관심 경험을 골라 주세요" }),
-    el("p", { className: "sub", text: "해봤노트에서 궁금한 경험을 고르면 그 경험을 해본 선배를 추천해요." }),
-    el("a", { className: "btn btn--secondary", text: "해봤노트 둘러보기", attrs: { href: "../note/" } }),
-  ]));
-  drawIcons();
-}
-
-// 요청마다 번호를 붙인다. 불러오는 중에 다른 프로그램 칩을 누르면 새 요청을 바로 보내고,
-// 늦게 도착한 옛 응답(번호가 다르거나 기준 노트가 바뀐 것)은 그리지 않고 버린다.
+// 요청마다 번호를 붙인다. 불러오는 중에 다른 활동·분야 칩을 누르면 새 요청을 바로 보내고,
+// 늦게 도착한 옛 응답(번호가 다르거나 고른 활동이 바뀐 것)은 그리지 않고 버린다.
 let loading = false;
-let loadSeq = 0;
 async function loadSeniors(more, moreBtn) {
   if (!currentNoteId) return;
   if (more && loading) return; // 「선배 더 보기」는 불러오는 중에 다시 누르지 않게
@@ -445,7 +524,7 @@ async function loadSeniors(more, moreBtn) {
   try {
     const res = await recommendSeniors(noteId, more);
     if (isStale()) return; // 그 사이 다른 칩을 눌렀음 — 새 요청의 응답만 그린다
-    if (res && res.locked) renderLocked(res.recommend);
+    if (res && res.locked) { locked = res.recommend || {}; renderLocked(locked); }
     else if (!res || res.error || !Array.isArray(res.seniors)) throw new Error((res && res.error) || "추천 없음");
     else renderList(res);
   } catch (err) {
@@ -728,37 +807,39 @@ sheet.addEventListener("keydown", (e) => {
 });
 
 // ---------------------------------------------------------------------------
-// 9. 시작 — getMe(프로필·열림 상태) + getInbox(기준 노트) + listNotes(프로그램 이름·분야) + getMessages(요청 상태)
+// 9. 시작 — getMe(프로필·열림 상태) + getInbox(관심 등록: 질문함·스크랩) + listNotes(활동 이름·분야) + getMessages(요청 상태)
 // ---------------------------------------------------------------------------
 
 async function start() {
-  listArea.replaceChildren(...skeletons(2));
   const p = new URLSearchParams(location.search);
+  listArea.setAttribute("aria-busy", "true");
+  listArea.replaceChildren(...skeletons(2));
   try {
+    let inboxFailed = false;
+    let notesFailed = false;
     const [meInfo, inbox, list] = await Promise.all([
       getMe(),
-      getInbox().catch(() => null),
-      listNotes({}).catch(() => ({ notes: [] })),
+      getInbox().then((r) => { if (!r || r.error) throw new Error((r && r.error) || "보관함 없음"); return r; })
+        .catch((err) => { console.error(err); inboxFailed = true; return null; }),
+      listNotes({}).then((r) => { if (!r || r.error || !Array.isArray(r.notes)) throw new Error((r && r.error) || "노트 없음"); return r; })
+        .catch((err) => { console.error(err); notesFailed = true; return { notes: [] }; }),
       loadThreads(),
     ]);
     if (!meInfo || meInfo.error) throw new Error((meInfo && meInfo.error) || "내 정보 없음");
     profile = meInfo;
-    notesById = new Map(((list && list.notes) || []).map((n) => [n.id, n]));
-    baseIds = pickBaseNotes(inbox, p.get("noteId"));
-    currentNoteId = baseIds[0] || null;
-    renderProfile();
-
+    notesById = new Map(list.notes.map((n) => [n.id, n]));
+    activityError = notesFailed || inboxFailed;
+    activities = collectActivities(inbox, p.get("noteId"));
     // 열림 상태는 getMe.recommend가 먼저 알려 준다(서버도 recommendSeniors에서 막음)
-    if (meInfo.recommend && meInfo.recommend.ready === false) {
-      renderLocked(meInfo.recommend);
-      return;
-    }
-    if (!currentNoteId) {
-      renderNoBase();
-      return;
-    }
-    renderBaseChips();
-    loadSeniors(false);
+    locked = meInfo.recommend && meInfo.recommend.ready === false ? meInfo.recommend : null;
+
+    // 처음에는 분야·활동 모두 고르지 않은 상태. 「닮은선배 보기」(?noteId=)로 왔으면 그 활동을 골라 둔다
+    const fromUrl = notesById.get(p.get("noteId"));
+    currentCat = fromUrl ? CATEGORY[fromUrl.type] : null;
+    currentNoteId = fromUrl ? fromUrl.id : null;
+    if (!fromUrl && p.has("noteId")) setNoteInUrl(null);
+    renderProfile();
+    renderListArea();
   } catch (err) {
     console.error(err);
     listArea.setAttribute("aria-busy", "false");

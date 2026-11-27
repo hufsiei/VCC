@@ -12,15 +12,28 @@
   .senior-top__actions .btn { min-height: 44px; font-size: var(--font-size-secondary); }
 
   /* 「나의 프로필 요약」 — SOFT BLUE 카드(7-④) */
-  .profile-card { display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-md); border-radius: var(--radius-card); background: var(--color-soft-blue); }
+  .profile-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: var(--space-md); border-radius: var(--radius-card); background: var(--color-soft-blue); }
   .profile-card__title { font-size: var(--font-size-caption); font-weight: 600; color: var(--color-text-muted); }
   .profile-card__line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
   .profile-card__dept { font-weight: 600; color: var(--color-heading); }
 
-  /* 기준 노트(프로그램) 칩 — 후보가 여럿일 때만 */
-  .base-chips { display: flex; gap: var(--space-sm); margin: 0 calc(-1 * var(--page-gutter)); padding: 0 var(--page-gutter); overflow-x: auto; scrollbar-width: none; }
-  .base-chips::-webkit-scrollbar { display: none; }
-  .base-chips .choice-chip { flex: none; font-size: var(--font-size-secondary); cursor: pointer; }
+  /* 관심 경험: [국제교류] [현장실습] [비교과] (11/27) — 키워드 칩(5-6), 하나만 고름. 390px에서 한 줄에 들어가게 좌우 여백 12px */
+  .interest-row { gap: 6px; }
+  .interest-row__label { margin-right: 2px; font-size: var(--font-size-secondary); color: var(--color-text-muted); }
+  .interest-chip { padding: 0 12px; }
+
+  /* 세부 활동 칩 줄(11/27): 칩은 글자 길이만큼, 줄바꿈 없이 가로 스크롤 — 스크롤은 이 줄 안에서만(카드·화면 폭은 그대로) */
+  .activity-row { display: flex; align-items: center; gap: var(--space-xs); min-width: 0; }
+  .activity-track { flex: 1; min-width: 0; display: flex; gap: var(--space-sm); padding: 2px; margin: -2px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .activity-track::-webkit-scrollbar { display: none; }
+  .activity-chip { flex: none; max-width: 220px; }
+  .activity-chip__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 좌우 화살표: 마우스가 있는 PC에서만, 칩이 넘칠 때만(JS가 hidden을 정함). 칩 목록 밖 양 끝에 있어 칩을 가리지 않는다 */
+  .activity-arrow { flex: none; display: none; }
+  .activity-arrow:disabled { color: var(--color-text-disabled); cursor: default; }
+  @media (hover: hover) and (pointer: fine) { .activity-arrow:not([hidden]) { display: inline-flex; } }
+  .activity-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); }
+  .activity-state__text { font-size: var(--font-size-secondary); }
 
   .list-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-top: var(--space-lg); }
   .senior-list { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
@@ -72,7 +85,6 @@
   <!-- ===== 1단계: 닮은선배 (메인 헤더 + 하단 탭) ===== -->
   <section id="viewSenior" class="has-tabbar">
     <header class="header">
-      <button class="icon-btn" id="logoutBtn" type="button" aria-label="로그아웃"><i data-lucide="log-out" class="icon icon--mirror"></i></button>
       <a class="header__brand" href="../talk/">
         <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
         외대人사이드
@@ -80,6 +92,8 @@
       <div class="header__actions">
         <!-- 직원 계정일 때만 보임(5-1): PC 관리자 콘솔을 새 탭으로 -->
         <a class="icon-btn" id="consoleBtn" href="../admin/" target="_blank" rel="noopener" aria-label="관리자 콘솔" hidden><i data-lucide="chart-column" class="icon"></i></a>
+        <!-- 후속 개발 및 확장방안(11/27): 누르면 screens/info/roadmap.md를 시트로 — screens/info/info.js -->
+        <button class="icon-btn icon-btn--muted" id="infoBtn" type="button" aria-label="후속 개발 및 확장방안" aria-haspopup="dialog"><i data-lucide="info" class="icon"></i></button>
         <a class="icon-btn" id="bellBtn" href="../questions/#alerts" aria-label="알림"><i data-lucide="bell" class="icon"></i><span class="icon-btn__dot" id="bellDot" hidden></span></a>
       </div>
     </header>
@@ -102,8 +116,8 @@
         <div class="senior-top__actions">
           <a class="btn btn--outline" id="myMessagesBtn" href="../questions/?tab=messages"><i data-lucide="mail" class="icon"></i>내 쪽지</a>
         </div>
+        <!-- 나의 프로필 요약: 학과·학년 / 관심 경험 분야 칩 / 세부 활동 칩(가로 스크롤) — senior.js renderProfile -->
         <div id="profileBox"></div>
-        <div class="base-chips" id="baseChips" role="group" aria-label="기준 프로그램" hidden></div>
       </div>
 
       <div id="listArea" aria-busy="true"></div>
@@ -166,5 +180,6 @@
 <script type="module" src="./senior.js"></script>
 <!-- 헤더 종의 새 소식 점(안 읽은 알림·쪽지, 11/24) — 내 보관함 폴더의 공통 모듈 -->
 <script type="module" src="../questions/bell.js"></script>
+<script type="module" src="../info/info.js"></script>
 </body>
 </html>
