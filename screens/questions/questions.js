@@ -7,7 +7,7 @@
 // 공개 동의 시트는 common/consent.js(작업 70, 11/22 common으로 옮김)를 쓴다: "open-consent"로 열고 "consent-saved"로 끝을 받는다.
 
 import {
-  currentUser, getInbox, getMyNote, getNote, listNotes, scrapNote, updateMyNote, getMe, setRecommendable,
+  currentUser, logout, getInbox, getMyNote, getNote, listNotes, scrapNote, updateMyNote, getMe, setRecommendable,
   deleteQuestion, updateQuestion,
 } from "../../common/data.js";
 import { isUnread, markSeen, refreshBell, onBell, unreadOf, threadHasNews } from "./bell.js";
@@ -20,6 +20,20 @@ import { setupMessages, renderMessagesTab, openThread, stopPolling, allThreads, 
 const me = currentUser();
 if (!me) location.replace("../login/");
 if (me && me.status === "직원") document.getElementById("consoleBtn").hidden = false;
+
+// 로그아웃(11/27 오후, 디자인 규칙 5-1·7-⑥) — 내 보관함 1단계 맨 아래. 확인 시트(5-10) 뒤 로그인 화면으로.
+// 인터BOO 대화 보존(talkKeep, spec saveInterviewDraft 1단계 「로그아웃하면 지운다」)도 지운다. 실서버 선택(vccServer)은 남긴다(시연 탭)
+document.getElementById("logoutBtn").addEventListener("click", () => openConfirm({
+  title: "로그아웃할까요?",
+  text: "이 탭에서 로그인이 끝나요. 다시 들어오려면 학번과 비밀번호를 입력해요.",
+  okText: "로그아웃",
+  danger: true,
+  onOk: () => {
+    if (me) sessionStorage.removeItem(`talkKeep:${me.colreg_no}`);
+    logout();
+    location.replace("../login/");
+  },
+}));
 
 const CATEGORY = { 교환: "global", 파견: "global", 인턴: "practice", 비교과: "extra" };
 const CATEGORY_NAME = { global: "국제교류", practice: "현장실습", extra: "비교과" };
