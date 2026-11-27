@@ -838,7 +838,13 @@ function renderSection(panel) {
   const children = [];
   const askBtn = () => askBoxButton(note.id, section.name);
   if (!lines.length) {
-    children.push(emptyEvidence("아직 이 항목을 경험한 선배의 이야기가 없어요.", askBtn(), reportName));
+    // [작업 123] 비교과는 후기 데이터가 없어(11/27 결정) 빈 칸에서 무엇을 할 수 있는지까지 말한다. 6-2 틀은 그대로
+    const emptyText = note.type === "비교과"
+      ? "아직 경험담이 없어요. 질문을 남기면 선배에게 전달돼요."
+      : "아직 이 항목을 경험한 선배의 이야기가 없어요.";
+    const empty = emptyEvidence(emptyText, askBtn(), reportName);
+    empty.querySelector("p").style.wordBreak = "keep-all"; // 390px에서 「전달돼 / 요」처럼 끊기지 않게
+    children.push(empty);
   } else {
     if (hasSummary(section)) children.push(...summaryBlock(section, sources, reportName));
     else children.push(...lines.map((l) => lineCard(l, sources[l.sourceId] || {}, { quote: section.name === LEARN_SECTION })));
