@@ -413,7 +413,7 @@ def _answer(me, payload, save, trace=None):
 
     # ①‴′ [11/26] 인원·순위 질문(「독일 7+1 가장 많이 간 대학교」) → 학적의 파견대학을 코드가 세어 답한다(AI 없음).
     #     비교(「어느 학교가 제일 많이」)보다 먼저 본다
-    found = rank(question, programs, country, excluded)
+    found = rank(question, programs, country, excluded, me)
     if found:
         trace["route"] = "인원"
         return found
@@ -1606,9 +1606,15 @@ def timing(question, history, programs, country, excluded=()):
 # 노트가 없는 학교는 인원만 말하고, 카드는 노트가 있는 학교를 인원 많은 순으로. 사람 칸(학번 등)은 세기만 하고 내보내지 않는다.
 # 유형 묶음(미리 11/26): 「파견학생」이 들어간 유형(학과·우수입학·국제 파견학생)과 아너스 파견 = 7+1 파견.
 # 단 「아너스」를 콕 집어 물으면 아너스 파견만 센다.
-ABROAD = [(s["파견대학"], s.get("해외경험 유형") or "") for s in _json("students.json", []) if s.get("파견대학")]
+# [Q-90 11/27] 한 줄 = (파견대학, 해외경험 유형, 파견국가, crs_nm). 학과는 「우리 과」 셈에만 쓰고 문구·기록에는 넣지 않는다.
+#   시험이 (학교, 유형) 두 칸으로 바꿔 넣어도 돌게 rank는 뒤 칸을 없으면 빈 값으로 본다
+_STUDENTS = _json("students.json", [])
+ABROAD = [(s["파견대학"], s.get("해외경험 유형") or "", s.get("파견국가") or "", s.get("crs_nm") or "")
+          for s in _STUDENTS if s.get("파견대학")]
+MY_DEPT = {s["colreg_no"]: s["crs_nm"] for s in _STUDENTS
+           if s.get("colreg_no") and s.get("crs_nm") and s["crs_nm"] != "전체"}   # 직원 행(전체)은 학과 없음
 KIND_ORDER = ("교환학생", "7+1 파견", "자비유학생")
-KIND_WORDS = (("7+1 파견", re.compile(r"7\s*\+\s*1|파견\s*학생|학과\s*파견|우수\s*입학|국제\s*파견")),
+KIND_WORDS = (("7+1 파견", re.compile(r"7\s*\+\s*1|파견\s*학생|학과\s*파견|우수\s*입학|국제\s*파견|파견\s*으로")),
               ("교환학생", re.compile(r"교환")), ("자비유학생", re.compile(r"자비")), ("아너스 파견", re.compile(r"아너스")))
 # 「가는 곳」을 묻는 말만 본다 — 「가장 많이 한 일」「주말에 많이 가는 곳」「대학 순위」「인기 있는 음식」「한 반 인원」은 아니다
 RANK_RE = re.compile(r"(가장|제일|젤)\s*많이\s*(가|갔|간|다녀|보내|뽑|파견|선택|지원)"
@@ -1622,6 +1628,34 @@ RANK_NOT_RE = re.compile(r"여행|관광|맛집|식당|음식|카페|마트|도�
 # 학교 하나를 부른 질문은 인원만 묻는 말이어야 한다(「마르부르크에서 가장 많이 간 곳」은 그 학교 안 이야기)
 RANK_ONE_RE = re.compile(r"몇\s*명|인원|(사람|학생|선배)\s*(수|이\s*몇)")
 RANK_TOP = 3   # 문구에 말하는 학교 수(나머지는 「모두 n곳」으로)
+# [Q-90] 「우리 과에서 …」 → 묻는 사람(me)의 학적 crs_nm이 같은 선배만 센다. 로그인 학생이 아니면 세지 않고 안내
+DEPT_RE = re.compile(r"우리\s*(과|학과|전공|학부)|같은\s*(과|학과|전공|학부)|내\s*(학과|전공)")
+# [Q-90] 「어느 나라·국가」를 물으면 학교 대신 파견국가로 묶는다(나라 하나를 부른 질문은 학교로)
+BY_NATION_RE = re.compile(r"국가|나라")
+# [Q-90] 권역 → 나라. 나라 이름도 학교 이름도 없을 때만 본다. 데이터에 없는 나라가 끼어 있어도 셀 것이 없을 뿐이다.
+#   러시아는 유럽에 넣지 않는다(11/27 미리) — 「유럽 교환」을 묻는 학생은 대개 EU권을 떠올리고, 러시아는 「러시아·중앙아시아」로 따로 묻게
+REGIONS = (
+    ("동남아시아", r"동남\s*아(시아)?", ("싱가포르", "베트남", "태국", "인도네시아", "말레이시아", "필리핀", "미얀마", "캄보디아", "라오스")),
+    ("유럽", r"유럽", ("프랑스", "이탈리아", "독일", "포르투갈", "스페인", "스웨덴", "벨기에", "네덜란드", "덴마크", "아일랜드",
+                     "체코", "영국", "오스트리아", "스위스", "핀란드", "노르웨이", "폴란드", "헝가리", "그리스", "루마니아",
+                     "불가리아", "세르비아", "크로아티아", "슬로바키아", "슬로베니아", "우크라이나", "튀르키예", "터키")),
+    ("러시아·중앙아시아", r"중앙\s*아시아|러시아\s*권|독립\s*국가\s*연합|CIS", ("러시아", "카자흐스탄", "우즈베키스탄", "키르기스스탄", "몽골")),
+    ("아시아", r"(?<!동남)(?<!중앙)(?<!중앙\s)아시아", ("일본", "중국", "대만", "홍콩", "싱가포르", "베트남", "태국", "인도네시아",
+                                                 "말레이시아", "필리핀", "인도", "몽골", "카자흐스탄", "우즈베키스탄")),
+    ("북미", r"북미|북\s*아메리카", ("미국", "캐나다")),
+    ("중남미", r"중남미|남미|라틴\s*아메리카|중미", ("브라질", "멕시코", "아르헨티나", "칠레", "콜롬비아", "페루", "쿠바")),
+    ("중동", r"중동", ("아랍에미리트", "사우디아라비아", "이란", "이스라엘", "요르단", "이집트", "카타르")),
+    ("아프리카", r"아프리카", ("남아프리카공화국", "케냐", "탄자니아", "나이지리아", "모로코", "에티오피아", "이집트")),
+    ("오세아니아", r"오세아니아|대양주", ("호주", "뉴질랜드")),
+)
+
+
+def match_region(question):
+    """[Q-90] 질문의 권역 이름 → (권역, 나라 묶음). 없으면 (None, ())."""
+    for label, pattern, nations in REGIONS:
+        if re.search(pattern, question, re.I):
+            return label, nations
+    return None, ()
 
 
 def kind_group(kind):
@@ -1629,38 +1663,76 @@ def kind_group(kind):
     return "7+1 파견" if "파견학생" in kind or kind == "아너스 파견" else kind
 
 
-def rank(question, programs, country, excluded=()):
+def rank(question, programs, country, excluded=(), me=None):
     """「독일 7+1 가장 많이 간 대학교?」「마르부르크 몇 명 갔어요?」 → 학적의 파견 인원을 세어 말하고 노트 카드(status "notes").
-    나라나 학교를 질문에서 알 수 없으면 None(전국 순위는 나라 이름을 놓쳤을 때 엉뚱한 답이 되므로 하지 않는다)."""
+    나라나 학교를 질문에서 알 수 없으면 None(전국 순위는 나라 이름을 놓쳤을 때 엉뚱한 답이 되므로 하지 않는다).
+    [Q-90] 범위를 더 받는다: 권역(「유럽 지역에서 교환 인기 대학」 → REGIONS의 나라 묶음), 우리 과(「우리 과에서 파견으로 제일 많이
+    가는 국가」 → me의 학적 crs_nm이 같은 선배만, 학과는 문구·기록에 넣지 않음), 「국가·나라」를 물으면 파견국가로 묶어 센다.
+    유형을 하나 골라 물었으면 같은 곳의 다른 유형까지 합친 인원을 괄호로 함께 말한다(「… 40명(7+1 파견까지 45명)」)."""
     if not RANK_RE.search(question) or has_topic(question) or RANK_NOT_RE.search(question) \
             or _field_of(question) == "현장실습":
         return None
-    scope = [p for p in (COUNTRIES.get(country, []) if country else programs)
-             if PROGRAMS.get(p, {}).get("분야") == "국제교류" and p not in excluded]
-    if not scope or (len(scope) == 1 and not RANK_ONE_RE.search(question)):
-        return None
     from collections import Counter
+    chip = [{"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": "국제교류", "exclude": list(excluded)}}]
+
+    def chat(message):
+        return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "message": message, "chips": chip}
+
+    region, nations = (None, ()) if country or programs else match_region(question)
+    dept_asked = bool(DEPT_RE.search(question))
+    dept = MY_DEPT.get(me) if dept_asked else None
+    if dept_asked and not dept:   # 비로그인·직원 계정 — 누구의 과인지 모르니 세지 않는다
+        return chat("「우리 과」는 학생 계정으로 로그인했을 때 그 학과 선배만 세어 알려 드려요. "
+                    "나라 이름을 넣어 물어보셔도 돼요(예: 「독일에서 제일 많이 간 대학교는?」).")
+    base = [p for c in nations for p in COUNTRIES.get(c, [])] if region else \
+        (COUNTRIES.get(country, []) if country else programs)
+    scope = [p for p in base if PROGRAMS.get(p, {}).get("분야") == "국제교류" and p not in excluded]
+    if dept and not country and not region and not programs:
+        scope = None   # 우리 과 전체 — 학교·나라 제한 없음
+    elif not scope and region:   # 권역은 알아들었는데 그 권역에 교환·파견 학교가 없다(「아프리카」) — 0명이라고 말한다
+        return chat(f"{region} 지역으로 교환·파견 다녀온 선배는 아직 없어요. 다른 지역이나 나라로 물어봐 주세요.")
+    elif not scope or (len(scope) == 1 and not dept and not region and not RANK_ONE_RE.search(question)):
+        return None
+    by_nation = bool(BY_NATION_RE.search(question)) and not country and (scope is None or len(scope) > 1)
     kinds = [k for k, rx in KIND_WORDS if rx.search(question)]
     honors = "아너스 파견" in kinds
     if honors:   # 「아너스 파견학생」의 「파견학생」으로 7+1 전체를 세지 않는다
         kinds = [k for k in kinds if k != "7+1 파견"]
-    counts = {}
-    for school, kind in ABROAD:
+    counts, every, schools = {}, {}, Counter()   # counts: 고른 유형만 · every: 모든 유형(괄호 참고용) · schools: 카드 순서
+    for row in ABROAD:
+        school, kind = row[0], row[1]
+        nation = row[2] if len(row) > 2 and row[2] else PROGRAMS.get(school, {}).get("세부") or ""
+        if (scope is not None and school not in scope) or school in excluded \
+                or (dept and (row[3] if len(row) > 3 else "") != dept):
+            continue
         k = kind if honors and kind == "아너스 파견" else kind_group(kind)
-        if school in scope and (not kinds or k in kinds):
-            counts.setdefault(school, Counter())[k] += 1
-    order = sorted(counts, key=lambda n: (-sum(counts[n].values()), -evidence_count(n), n))
+        key = nation if by_nation else school
+        every.setdefault(key, Counter())[k] += 1
+        if not kinds or k in kinds:
+            counts.setdefault(key, Counter())[k] += 1
+            schools[school] += 1
+    order = sorted(counts, key=lambda n: (-sum(counts[n].values()), -(0 if by_nation else evidence_count(n)), n))
     kind_label = "·".join(kinds) if kinds else "교환·파견"
-    if country:
-        where = f"{country} {kind_label}"
-    elif len(scope) == 1:
+    one = scope is not None and len(scope) == 1 and not region   # 권역에 학교가 하나뿐이면 이름을 말한다
+    if country or region:
+        where = f"{country or region} {kind_label}"
+    elif one:
         where = f"{scope[0]} {kind_label}" if kinds else scope[0]
     else:
         where = kind_label
+    if dept:
+        where = f"우리 과 {where}"
+    unit = "나라" if by_nation else "곳"
 
     def num(n):   # 「6명(교환학생 4·7+1 파견 2)」 — 유형을 골라 물었거나 한 유형뿐이면 괄호 없음
         c = counts[n]
-        part = "·".join(f"{k} {c[k]}" for k in KIND_ORDER if c[k]) if not kinds and len(c) > 1 else ""
+        if not kinds:
+            part = "·".join(f"{k} {c[k]}" for k in KIND_ORDER if c[k]) if len(c) > 1 else ""
+        elif len(kinds) == 1 and not honors:   # [Q-90] 고른 유형 밖 인원도 참고로 — 「40명(7+1 파견까지 45명)」
+            others = [k for k in KIND_ORDER if k not in kinds and every[n][k]]
+            part = f"{'·'.join(others)}까지 {sum(every[n].values())}명" if others else ""
+        else:
+            part = ""
         return f"{sum(c.values())}명" + (f"({part})" if part else "")
 
     def say(n):
@@ -1668,27 +1740,30 @@ def rank(question, programs, country, excluded=()):
 
     if not order:
         message = f"{where} 다녀온 선배는 아직 없어요."
-    elif len(scope) == 1:
+        rest = Counter()
+        for c in every.values():
+            rest.update(c)
+        if kinds and not honors and rest:   # 고른 유형은 0명이어도 다른 유형은 있으면 참고로(「7+1 파견까지 보면 1명이에요」)
+            message += f" {'·'.join(k for k in KIND_ORDER if rest[k])}까지 보면 {sum(rest.values())}명이에요."
+    elif one:
         message = f"{where} 다녀온 선배는 {num(order[0])}이에요."
     elif len(order) == 1:
-        top = order
         message = f"{where} 다녀온 선배는 {say(order[0])}이에요."
     else:
         total = lambda n: sum(counts[n].values())   # noqa: E731
         top = order[:RANK_TOP]
         while len(top) < min(len(order), MAX_NOTES) and total(order[len(top)]) == total(top[-1]):
             top.append(order[len(top)])   # 3등과 같은 인원이면 함께 말한다(5곳까지)
-        message = (f"{where} 다녀온 선배는 {len(order)}곳 {sum(map(total, order))}명이에요. "
-                   f"많이 간 곳은 {' · '.join(say(n) for n in top)} 순이에요.")
-        missing = [n for n in top if not evidence_count(n)]
+        message = (f"{where} 다녀온 선배는 {len(order)}{'개 나라' if by_nation else '곳'} {sum(map(total, order))}명이에요. "
+                   f"많이 간 {unit}{_josa('은는', unit)} {' · '.join(say(n) for n in top)} 순이에요.")
+        missing = [] if by_nation else [n for n in top if not evidence_count(n)]
         if missing:
             message += f" {', '.join(missing)}{_josa('은는', missing[-1])} 아직 해봤노트가 없어요."
     # 카드: 인원 많은 순, 노트 없는 학교는 빼고. 인원이 0명이면 그 나라 노트를 근거 많은 순으로
-    found = _notes(order or sorted(scope, key=evidence_count, reverse=True), country)
+    cards = sorted(schools, key=lambda n: (-schools[n], -evidence_count(n), n)) if by_nation else order
+    found = _notes(cards or sorted(scope or [], key=evidence_count, reverse=True), country or region)
     if not found:
-        return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "message": message,
-                "chips": [{"label": "해봤노트 둘러보기", "action": "notes",
-                           "payload": {"field": "국제교류", "exclude": list(excluded)}}]}
+        return chat(message)
     found["message"] = message + (" 많이 간 학교 노트부터 보여 드려요." if order and len(found["notes"]) > 1 else "")
     return found
 

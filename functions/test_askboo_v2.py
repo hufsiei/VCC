@@ -497,6 +497,41 @@ hits = [q for q in ("마르부르크에서 가장 많이 한 일은?", "마르�
         if askboo.rank(q, *(lambda c: (c[1] or askboo.match_programs(q), c[0]))(askboo.match_country(q)))]
 expect("학교 인원이 아닌 「많이·인기·순위」는 인원 답을 하지 않음", hits == [], hits)
 
+# [Q-90 11/27] 범위 확장: 우리 과(me의 crs_nm) · 국가로 묶기 · 권역 · 고른 유형 밖 인원 참고
+res, calls = run("우리 과에서 파견으로 제일 많이 가는 국가는 어디야?", [])   # H0143 = 독일어과
+expect("우리 과 + 「파견으로」 → 같은 과 7+1 파견을 나라로 셈(AI 없음)", res["status"] == "notes" and calls == []
+       and res["message"].startswith("우리 과 7+1 파견 다녀온 선배는 독일 12명(교환학생·자비유학생까지 28명)"), res.get("message"))
+expect("우리 과 답에 학과 이름을 쓰지 않음(askLog에 남는 문구)", "독일어과" not in res["message"], res.get("message"))
+expect("「파견으로」는 7+1 파견", [k for k, rx in askboo.KIND_WORDS if rx.search("파견으로 제일 많이 가는")] == ["7+1 파견"])
+res = askboo.askBoo("H0004", {"question": "우리 과에서 파견으로 제일 많이 가는 국가는 어디야?"}, save=False)
+expect("다른 학생은 그 학생 과로(나라 여럿이면 순위)", res["message"].startswith("우리 과 7+1 파견 다녀온 선배는 2개 나라")
+       and "많이 간 나라는 프랑스" in res["message"], res.get("message"))
+for who in (None, "staff01", "없는학번"):
+    res = askboo.askBoo(who, {"question": "우리 과에서 파견으로 제일 많이 가는 국가는 어디야?"}, save=False)
+    expect(f"학과를 모르면(me={who}) 세지 않고 안내", res["status"] == "chat" and res["message"].startswith("「우리 과」는 학생 계정으로"),
+           res.get("message"))
+res, calls = run("유럽 지역에서 교환 인기 대학은?", [])
+expect("권역(유럽) → 그 나라들 교환학생 학교 순위", res["status"] == "notes" and calls == []
+       and res["message"].startswith("유럽 교환학생 다녀온 선배는") and "많이 간 곳은 밀라노대학교 14명(7+1 파견까지 19명)" in res["message"],
+       res.get("message"))
+expect("유럽에 러시아는 넣지 않음", "러시아" not in {r[0]: r[2] for r in askboo.REGIONS}["유럽"]
+       and not any(askboo.PROGRAMS[c["program"]].get("세부") == "러시아" for c in res["notes"]))
+res, _ = run("유럽에서 교환 제일 많이 가는 나라는?", [])
+expect("권역 + 「나라」 → 나라로 묶음, 괄호에 파견까지 합친 인원", "많이 간 나라는 프랑스 64명(7+1 파견·자비유학생까지 106명)" in res["message"],
+       res.get("message"))
+res, calls = run("아프리카 지역에서 교환 인기 대학은?", [])
+expect("학교 없는 권역 → 0명 안내(chat, AI 없음)", res["status"] == "chat" and calls == []
+       and res["message"].startswith("아프리카 지역으로 교환·파견 다녀온 선배는 아직 없어요"), res.get("message"))
+_saved = askboo.ABROAD
+askboo.ABROAD = [("싱가폴경영대학교", "학과 파견학생", "싱가포르", "")]
+res, _ = run("동남아 교환 제일 많이 간 학교?", [])
+expect("권역 학교 하나 + 고른 유형 0명 → 다른 유형 인원을 참고로",
+       res["message"].startswith("동남아시아 교환학생 다녀온 선배는 아직 없어요. 7+1 파견까지 보면 1명"), res.get("message"))
+askboo.ABROAD = _saved
+expect("나라 이름이 있으면 권역보다 나라",
+       askboo.rank("독일 유럽 교환 제일 많이 간 학교", askboo.COUNTRIES["독일"], "독일")["message"].startswith("독일 교환학생"))
+expect("권역·나라·학교·우리 과 모두 없으면 지금처럼 답하지 않음", askboo.rank("교환 제일 많이 간 학교?", [], None, me="H0143") is None)
+
 # 걸리면 안 되는 것
 res, calls = run("교환학생 선발 기준이 뭐예요?", H_EX)
 expect("「선발 기준」은 후속이 아니라 공식 안내", res["status"] == "official", res.get("status"))
