@@ -194,5 +194,24 @@ save_my_note("H0022", EXTRA, "D-id", NOTE, NOTE, asked=["앞으로 바뀔지 모
 _, steps_id = run_as("H0022", EXTRA)
 expect("문구가 바뀐 뒤에도 다시 묻지 않음(askedDepth 번호)", depth_ids(steps_id) == ["비교과-2"])
 
+# 8) [작업 111 후속] 초안은 대화형 화면이 붙인 reaction·kind·heardSection을 남긴다(길이 상한), 없으면 모양 그대로
+import tell_chat
+from runtime_fns import MAX_DRAFT_LABEL, MAX_DRAFT_REACTION, getInterviewDraft, saveInterviewDraft
+
+plain = {"section": "생활", "question": "어땠어요?", "answer": "좋았어요."}
+saveInterviewDraft(SENIOR, {"program": PROGRAM, "answers": [plain]})
+expect("플래그 끔 초안 모양 그대로", getInterviewDraft(SENIOR, {"program": PROGRAM})["answers"] == [plain])
+longest = "가" * tell_chat.MAX_REACTION + " " + tell_chat.HELD_TEXT
+chat = {**plain, "reaction": longest, "kind": "답", "heardSection": "비용"}
+saveInterviewDraft(SENIOR, {"program": PROGRAM, "answers": [chat, {**plain, "extra": 1}]})
+got = getInterviewDraft(SENIOR, {"program": PROGRAM})["answers"]
+expect("reaction·kind·heardSection 저장·불러오기 그대로(질문함 안내까지 붙은 긴 반응)", got == [chat, plain])
+saveInterviewDraft(SENIOR, {"program": PROGRAM, "answers": [
+    {**plain, "reaction": "가" * 500, "kind": "나" * 500, "heardSection": "다" * 500}]})
+cut = getInterviewDraft(SENIOR, {"program": PROGRAM})["answers"][0]
+expect("세 필드는 길이 상한으로 자름", [len(cut[k]) for k in ("reaction", "kind", "heardSection")]
+       == [MAX_DRAFT_REACTION, MAX_DRAFT_LABEL, MAX_DRAFT_LABEL])
+expect("초안은 본인만", getInterviewDraft(JUNIOR, {"program": PROGRAM}) == {"answers": []})
+
 print(f"\n{len(fails)}건 실패" if fails else "\n모두 통과")
 sys.exit(1 if fails else 0)

@@ -950,7 +950,11 @@ def getInbox(me, p):
 DRAFT_DAYS = 7
 MAX_DRAFT_ANSWERS = 30     # interview.MAX_TRANSCRIPT와 같은 상한
 MAX_DRAFT_CHARS = 1000     # 답 하나(interview.MAX_ANSWER와 같음)
-DRAFT_KEYS = ("section", "question", "answer", "questionId", "asked", "junior", "skipped")
+DRAFT_KEYS = ("section", "question", "answer", "questionId", "asked", "junior", "skipped",
+              "reaction", "kind", "heardSection")   # 뒤 셋은 대화형 들려주기(작업 111) 화면이 붙인다
+# reaction = 검증 한도 120자(tell_chat.MAX_REACTION) + 뒤에 코드가 붙이는 질문함 안내(" " + HELD_TEXT)
+MAX_DRAFT_REACTION = 144
+MAX_DRAFT_LABEL = 20       # kind·heardSection(말 종류·칸 이름)
 
 
 def _draft_key(me, program):
@@ -974,6 +978,9 @@ def _clean_draft_answers(items):
         for k in ("section", "question", "answer", "questionId", "asked"):
             if k in a:
                 a[k] = str(a[k])[:MAX_DRAFT_CHARS]
+        for k, cap in (("reaction", MAX_DRAFT_REACTION), ("kind", MAX_DRAFT_LABEL), ("heardSection", MAX_DRAFT_LABEL)):
+            if k in a:
+                a[k] = str(a[k])[:cap]
         out.append(a)
     return out[:MAX_DRAFT_ANSWERS]
 
