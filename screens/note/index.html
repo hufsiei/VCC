@@ -22,6 +22,11 @@
   .filter-row { display: flex; flex-wrap: wrap; gap: 6px; }
   .filter-row .choice-chip { gap: var(--space-xs); padding: 0 12px; font-size: 13px; cursor: pointer; }
   .filter-row .choice-chip .icon { width: 16px; height: 16px; }
+  /* 분야 아래 2단 칩(권역·나라·기관 유형): 12px · 보이는 높이 32px, 터치 영역은 ::after로 위아래 6px씩 넓혀 44px.
+     줄 간격 12px라 위아래 칩의 터치 영역이 겹치지 않는다(11/27 #382-2 A안) */
+  #groupChips, #groupChips + .filter-row { gap: 12px 6px; }
+  #groupChips .choice-chip, #groupChips + .filter-row .choice-chip { position: relative; min-height: 32px; padding: 0 10px; font-size: 12px; }
+  #groupChips .choice-chip::after, #groupChips + .filter-row .choice-chip::after { content: ""; position: absolute; inset: -6px 0; }
   .note-count { margin-top: var(--space-lg); font-size: var(--font-size-secondary); color: var(--color-text-muted); }
   .note-list { display: flex; flex-direction: column; gap: 12px; margin-top: var(--space-sm); }
   .note-skeleton { height: 168px; }
