@@ -357,7 +357,9 @@ function pickMock(m, name, p) {
       if (!next.done) return { ok: false, message: "아직 정리가 끝나지 않았어요", next };
       const before = mockReady();
       sessionStorage.setItem("mockUnlocked", "1");
-      return { ok: true, demandId: "R-0001", questionIds: [p.state && p.state.fromQuestionId ? p.state.fromQuestionId : "Q-0003"], recommend: mockStatus(), unlocked: !before };
+      // [11/27] noteId: mock은 노트 id를 마르부르크만 안다(다른 프로그램·미정은 null)
+      const noteId = next.state.program === m.getMyNote.program ? m.getMyNote.noteId : null;
+      return { ok: true, demandId: "R-0001", questionIds: [p.state && p.state.fromQuestionId ? p.state.fromQuestionId : "Q-0003"], noteId, recommend: mockStatus(), unlocked: !before };
     }
     case "getAdminOverview":
     case "getAdminSuggestions":
@@ -500,7 +502,7 @@ export const updateMyNote = (id, changed) => call("updateMyNote", { id, changed 
 //   demandNext(state) → { done:false, step, question, options?, examples?, retry?, canSkip?, progress:{answered, need}, state } | { done:true, summary, state, progress }
 //   물어보기에서 보류된 질문으로 시작: demandNext({ fromQuestionId: questionId })
 export const demandNext = (state = {}) => call("demandNext", { state });
-export const saveDemand = (state) => call("saveDemand", { state, consent: true }); // → { ok, demandId, questionIds, recommend, unlocked }
+export const saveDemand = (state) => call("saveDemand", { state, consent: true }); // → { ok, demandId, questionIds, noteId(정한 프로그램의 해봤노트, 미정이면 null), recommend, unlocked }
 export const getDeptReport = (dept) => call("getDeptReport", { dept });
 
 // ── 관리자 콘솔(직원 계정 전용, PRD 7장·작업 66) ──

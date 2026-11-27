@@ -372,7 +372,7 @@ def saveDemand(me, p):
     if not nxt.get("done") or valid_count(s) < NEED:
         return {"ok": False, "message": "아직 정리가 끝나지 않았어요", "next": nxt}
 
-    from runtime_fns import add_question, now   # runtime_fns가 이 파일을 불러오므로 여기서
+    from runtime_fns import _question_context, add_question, now   # runtime_fns가 이 파일을 불러오므로 여기서
     before = recommend_status(me)["ready"]
     texts = [s["question"]] + [m for m in s.get("more", []) if not answer_problem(m)]
     qids = []
@@ -404,7 +404,10 @@ def saveDemand(me, p):
         })
         store.save("demands")
         status = recommend_status(me)
-    return {"ok": True, "demandId": did, "questionIds": qids, "recommend": status, "unlocked": status["ready"] and not before}
+    # [11/27 #384 B3] 「닮은선배 보기」의 기준 노트 — getInbox 질문 카드와 같은 규칙. 프로그램 미정이면 None
+    nid = _question_context({"프로그램명": s.get("program")})["noteId"]
+    return {"ok": True, "demandId": did, "questionIds": qids, "noteId": nid,
+            "recommend": status, "unlocked": status["ready"] and not before}
 
 
 ROUTES = {"demandNext": demandNext, "saveDemand": saveDemand}
