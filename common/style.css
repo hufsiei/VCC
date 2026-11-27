@@ -1111,7 +1111,11 @@ body.sheet-open { overflow: hidden; }
 .md-body .md-h2 { margin-top: var(--space-sm); font-size: var(--font-size-body); font-weight: 700; line-height: 1.4; color: var(--color-heading); }
 .md-body .md-h3 { font-size: var(--font-size-secondary); font-weight: 600; line-height: 1.45; color: var(--color-heading); }
 .md-body > :first-child { margin-top: 0; }
-.md-body ul, .md-body ol { display: flex; flex-direction: column; gap: var(--space-xs); padding-left: 20px; }
+.md-body ul, .md-body ol { padding-left: 20px; } /* 공통 초기화(ul·ol list-style: none)를 여기서만 되살린다. flex로 두면 점·번호가 사라져 간격은 li + li */
+.md-body ul { list-style: disc; }
+.md-body ol { list-style: decimal; }
+.md-body li ul { list-style: circle; }
+.md-body li + li { margin-top: var(--space-xs); }
 .md-body li ul, .md-body li ol { margin-top: var(--space-xs); }
 .md-body li::marker { color: var(--color-text-muted); }
 .md-body strong { font-weight: 700; color: var(--color-heading); }
