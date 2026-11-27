@@ -591,18 +591,33 @@ def recommendSeniors(me, p):
 
 
 # ---------- 질문함·내 경험노트·동의·신고 ----------
-def add_question(me, text, program=None, section=None, status="hold", note_id=None):
-    """askBoo(작업 18)가 부른다. 모양은 사용 로그 질문 행과 같게(PRD 6-3) → 콘솔 집계에 합산."""
+def add_question(me, text, program=None, section=None, status="hold", note_id=None, candidates=None):
+    """askBoo(작업 18)가 부른다. 모양은 사용 로그 질문 행과 같게(PRD 6-3) → 콘솔 집계에 합산.
+    candidates: [작업 35 A1 후속, Q-109] 업체 유형으로만 잡힌 보류 질문의 후보 {"label", "programs"} —
+    행에 「후보유형」「후보프로그램명」으로 남기고, 프로그램이 없는 동안 그 업체 선배 모두가 들려주기에서 받는다(question_for)."""
     with store.lock():
         qid = store.next_id("Q")
         s = student(me)
-        store.load("questions", []).append({
+        row = {
             "id": qid, "at": now(), "colreg_no": me, "crs_nm": s.get("crs_nm"), "regst_grad": s.get("regst_grad"),
             "프로그램명": program, "칸": section, "status": status, "질문": text, "noteId": note_id,
             "운영부서코드": None,   # 작업 66에서 programs.json으로 채움
-        })
+        }
+        if candidates and not program and candidates.get("programs"):
+            row.update({"후보유형": candidates.get("label"), "후보프로그램명": list(candidates["programs"])})
+        store.load("questions", []).append(row)
         store.save("questions")
         return qid
+
+
+def question_for(q, program):
+    """[Q-109] 이 질문함 행이 그 프로그램 선배에게 가는 질문인가: 프로그램명이 같거나, 프로그램명이 없고 후보 업체에 들었으면.
+    들려주기 후배 질문(interview.junior_questions)·답 연결(_question_row·publish_lines)이 같은 기준을 쓴다."""
+    if not q or not program:
+        return False
+    if q.get("프로그램명"):
+        return q["프로그램명"] == program
+    return program in (q.get("후보프로그램명") or [])
 
 
 def find_my_note(me, program):
@@ -746,7 +761,7 @@ def publish_lines(me, program, my_note_id, passing):
         def real_question(qid):
             # 같은 프로그램·남이 한·질문함(hold/answered) 질문만. 화면이 보낸 questionId를 그대로 믿지 않는다.
             q = questions.get(qid)
-            return bool(q) and q.get("프로그램명") == program and q.get("colreg_no") != me \
+            return question_for(q, program) and q.get("colreg_no") != me \
                 and q.get("status") in ("hold", "answered")
 
         rows = store.load("noteLines", [])
@@ -778,7 +793,7 @@ def publish_lines(me, program, my_note_id, passing):
         for qid in dict.fromkeys(r["answersQuestionId"] for r in fresh if r.get("answersQuestionId")):
             q = questions[qid]
             if q["status"] == "hold":
-                q.update(status="answered", noteId=nid, answeredAt=at)
+                q.update(status="answered", noteId=nid, answeredAt=at)   # [Q-109] 후보 업체 질문도 프로그램명은 비워 둔다(다른 후보 선배 답도 연결)
             if qid not in prev_q:   # 같은 선배가 다시 동의해도 알림은 한 번. 다른 선배가 답하면 또 알린다(A가 쌓임)
                 _alert(q["colreg_no"], f"내 질문에 선배가 답했어요 · {program} 해봤노트", questionId=qid, noteId=nid)
                 answered.append(qid)
@@ -903,10 +918,13 @@ def _question_context(q):
     program = q.get("프로그램명") or None
     section = q.get("칸")
     known = program in notes.PROGRAMS
+    cands = [p for p in (q.get("후보프로그램명") or []) if p in notes.PROGRAMS] if not program else []
     return {"program": program, "type": _card_type(program) if known else None,
             "section": section if section and section != notes.QUESTION_SECTION else None,
             # [11/27] 저장된 노트가 먼저, 없으면 프로그램의 노트(닮은선배 기준 노트)
-            "noteId": q.get("noteId") or (notes.note_id(program) if known else None)}
+            "noteId": q.get("noteId") or (notes.note_id(program) if known else None),
+            # [Q-109] 프로그램 없이 후보 업체 선배들에게 가는 질문(유형으로만 잡힌 보류). 없으면 null
+            "candidates": {"label": q.get("후보유형") or "", "programs": cands} if cands else None}
 
 
 def getInbox(me, p):

@@ -1132,7 +1132,8 @@
         "program": null,
         "type": null,
         "section": null,
-        "noteId": null
+        "noteId": null,
+        "candidates": null
       },
       {
         "questionId": "Q-0001",
@@ -1142,7 +1143,8 @@
         "answeredAt": "2026-11-19T15:00:00+09:00",
         "program": "마르부르크필립스대학교",
         "type": "교환",
-        "section": "생활"
+        "section": "생활",
+        "candidates": null
       },
       {
         "questionId": "Q-0002",
@@ -1152,7 +1154,8 @@
         "askedAt": "2026-11-18T10:00:00+09:00",
         "program": "마르부르크필립스대학교",
         "type": "교환",
-        "section": null
+        "section": null,
+        "candidates": null
       }
     ],
     "scraps": [
