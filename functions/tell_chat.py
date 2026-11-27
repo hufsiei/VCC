@@ -6,7 +6,8 @@
 # 한 턴(interviewNext 한 번) — 선배가 새 말을 보냈을 때:
 #   ① AI(말판정, HCX): 방금 말 → 종류 6종(답·부족·되물음·딴얘기·모름·그만) + 궁금(경험·프로그램에 대해 알고 싶은 것).
 #   ② 코드: 무엇을 물을지는 지금 코드(interview._next_step, 충분판정·꼬리질문은 끔)가 정한다 — 후배 질문 먼저·칸 진행·끝 조건 그대로.
-#        「답」만 answers로 센다(다른 칸 이야기면 ③의 칸으로 옮김). 부족·되물음·딴얘기는 없던 말로 치고 같은 질문을 다시 묻는다
+#        「답」만 answers로 센다(다른 칸 이야기면 ③의 칸으로 옮김 — [Q-116] 옮겨서 방금 칸의 질문이 원문 그대로
+#        다음 질문이 되면 그 칸은 넘긴다: 같은 질문 되풀이 0). 부족·되물음·딴얘기는 없던 말로 치고 같은 질문을 다시 묻는다
 #        (같은 질문에 MAX_REASK번 넘게 이어지면 넘긴다). 모름은 그 질문을 넘긴다(후배 질문은 건너뛰기와 같게 hold로 남음).
 #        그만이면 done(stopped).
 #   ③ AI(대화쓰기, Sonnet): 이번 대화 전체 + 지난 노트 문장 + 남은 칸·후배 질문·깊이 질문 후보 + ②의 다음 질문
@@ -158,6 +159,8 @@ def _resolve(items, mem):
                 passed.add(a["section"])   # 기본 질문·배운점은 건너뛰기가 없어 칸으로 넘긴다(깊이·후배 질문은 skipped로 넘어감)
         elif said and said.get("s"):
             a["section"] = said["s"]
+            if said.get("p"):
+                passed.add(said["p"])   # [Q-116] 옮기면서 넘긴 칸(next_step의 left)
         out.append(a)
     return out, passed, reask
 
@@ -223,11 +226,16 @@ def next_step(me, program, payload, prior, mine=None):
     source = content + " " + ALLOW
     asked = {_qn(a.get("question")) for a in items} | {_qn(cur.get("question"))}
 
-    moved = None
+    moved = left = None
     if w and eff == "답" and not junior and w.get("칸") in iv.sections_of(program) and w.get("칸") != section:
         moved = w["칸"]
         answers = prev + [{**cur, "section": moved}]
         plan2 = plan_with(answers, passed)
+        if _repeats(plan2, asked):
+            # [Q-116] 옮겨서 방금 칸이 다시 비면 코드가 방금 질문을 원문 그대로 다시 고른다(S05) — 그 칸은 넘기고 다음 차례로.
+            # 넘긴 칸은 판정 기록(p)에 남겨 다음 턴에도 기본 질문으로 다시 묻지 않는다(깊이 질문 차례는 그대로)
+            left = plan2.get("section")
+            plan2 = plan_with(answers, passed | {left})
         if (plan2.get("section"), plan2.get("question")) != (plan.get("section"), plan.get("question")) \
                 and w.get("더묻기") is not True:
             w = {**w, "질문": None}   # 다음 질문이 바뀌었으면 다듬은 글은 버리고 새 질문 원문(꼬리 질문은 방금 답에 대한 것이라 그대로)
@@ -254,8 +262,17 @@ def next_step(me, program, payload, prior, mine=None):
     if text:
         step["reaction"] = text
     step["heard"] = {"kind": eff, "section": final_sec if eff == "답" else None}
-    rec = {"k": eff, **({"s": moved} if moved else {})}
+    rec = {"k": eff, **({"s": moved} if moved else {}), **({"p": left} if left else {})}
     return _remember(me, program, mem, last, turn, rec, step, held)
+
+
+def _repeats(step, asked):
+    """[Q-116] 다음 질문이 이번 대화에서 이미 물은 질문(원문·화면 글)과 같은가. 끝·후배 질문·말머리 다시묻기는 아님."""
+    import interview as iv
+    if step.get("done") or step.get("junior") or step.get("retry"):
+        return False
+    q = step.get("question") or ""
+    return bool(q) and (_qn(q) in asked or _qn(iv._unwrap(q)) in asked)
 
 
 def _remember(me, program, mem, last, turn, rec, step, held):
