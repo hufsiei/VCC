@@ -90,9 +90,12 @@ def _key(me, program):
 
 
 def load(me, program):
+    from runtime_fns import _days_since
     with store.lock():
         rec = store.load(STORE, {}).get(_key(me, program))
-    rec = rec if isinstance(rec, dict) and rec.get("owner") == me else {}
+    ok = (isinstance(rec, dict) and rec.get("owner") == me
+          and rec.get("at") and _days_since(rec.get("at")) < KEEP_DAYS)
+    rec = rec if ok else {}   # [작업 38] 7일 지난 기록은 빈 기록(save의 정리와 같은 기준)
     return {"said": dict(rec.get("said") or {}), "asked": dict(rec.get("asked") or {}), "last": rec.get("last")}
 
 

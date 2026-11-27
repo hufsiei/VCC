@@ -556,6 +556,19 @@ expect("요약 입력: 다듬은 질문은 원래 질문으로", any("질문: " 
        and not any(WRITE[U1]["질문"] in c for c in SUM_IN))
 expect("요약 뒤 판정 기록 지움", f"{S2}|{TH}" not in store.load("tellChat", {}))
 
+# [작업 38] 7일 지난 기록은 빈 기록, 목록 밖 program은 거절
+from datetime import datetime, timedelta
+tell_chat.save(S2, TH, {"said": {"지원": "x"}, "asked": {"지원": "q"}, "last": None})
+expect("새 tellChat 기록은 load됨", tell_chat.load(S2, TH)["said"] == {"지원": "x"})
+with store.lock():
+    _rows = store.load("tellChat", {})
+    _rows[f"{S2}|{TH}"]["at"] = (datetime.fromisoformat(_rows[f"{S2}|{TH}"]["at"]) - timedelta(days=8)).isoformat()
+    store.save("tellChat")
+expect("8일 된 tellChat 기록은 빈 기록", tell_chat.load(S2, TH)["said"] == {})
+tell_chat.drop(S2, TH)
+expect("목록 밖 program은 거절", "error" in interview.interviewNext(S2, {"program": "없는학교XYZ", "answers": []}))
+expect("목록 밖 program은 tellChat 키 없음", f"{S2}|없는학교XYZ" not in store.load("tellChat", {}))
+
 os.environ.pop(tell_chat.FLAG, None)
 interview.askboo.callAI = saved_askboo_call
 interview.callAI = lambda *a, **k: {"ok": False, "text": "", "json": None, "model": "fake", "error": "x"}
