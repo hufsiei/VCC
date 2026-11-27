@@ -5,7 +5,8 @@
 # [v2, 11/24 작업 87] 지금 4+1단계 위에 두 단계를 더했다. 가드레일(프로그램 범위 안 근거·사후 검증·보류→질문함)은 그대로.
 #   ①  AI(질문정리, Sonnet): 최근 대화(history 4턴) + 이번 질문 → {의도, 분야, 나라, 프로그램후보, 제외, 칸, 정리된질문}.
 #        코드가 프로그램 이름을 programs.json과 대조해 없는 이름은 버린다. 실패하면 아래 v1 경로(정규식 대조) 그대로.
-#   ②  코드: 의도별 분기 — 대화 → status "chat"(고정 문구 + 칩, AI 없음, 질문함 저장 없음) / 탐색·사람찾기 → "notes" /
+#   ②  코드: 의도별 분기 — 대화 → status "chat"(고정 문구 + 칩, AI 없음, 질문함 저장 없음 — [작업 119] 플래그
+#        VCC_ASK_CHAT=1이면 message만 대화응답(Sonnet), 검증 탈락·실패면 고정 문구) / 탐색·사람찾기 → "notes" /
 #        규정 → "official" / 경험질문 → 아래 ③. 「제외」 프로그램은 후보에서 뺀다.
 #   ⑤  AI(답쓰기, Sonnet): 정리된 질문 + 고른 문장(번호·출처·연도·선배 표시) → {"답":[{"text","근거":[번호]}]} 2~4문장.
 #   ⑥  코드 + AI(답검사, Opus): 문장마다 인용한 근거 원문과 대조(숫자·영문·고유명사·수량 + 답검사 — 전하는 말투 허용). 근거 번호 없는 문장·
@@ -352,7 +353,8 @@ def _log_answer(question, out, program=None, trace=None, prev=None):
                "lines": [{"text": ln.get("text", ""), "cites": list(ln.get("cites") or [ln.get("sourceId")]),
                           **({"fallback": True} if ln.get("fallback") else {})} for ln in out.get("lines") or []],
                "programs": list(dict.fromkeys(p for p in programs if p)), "noteId": out.get("noteId"),
-               "message": out.get("message"),
+               # [작업 119] 대화응답(AI)이 쓴 글은 질문 글처럼 가린다. 코드 고정 문구(공식 안내의 담당 부서 전화 등)는 그대로
+               "message": mask.mask(out.get("message")) if trace.get("aiMessage") else out.get("message"),
                "route": trace.get("route"), "intent": plan.get("의도"), "field": plan.get("분야"), "section": plan.get("칸"),
                "asked": mask.mask(asked) if asked and asked != question else None,
                "prev": {"question": mask.mask(prev["question"]), "status": prev.get("status") or "",
@@ -497,7 +499,7 @@ def _answer(me, payload, save, trace=None):
         if plan["제외"]:
             programs = [p for p in programs if p not in plan["제외"]]
         if plan["의도"] == "대화":
-            return _chat(plan, history)
+            return _chat(plan, history, question, trace)
         if plan["의도"] in ("탐색", "사람찾기"):
             found = _explore(plan, programs, country or plan["나라"], question)
             if found:
@@ -707,8 +709,10 @@ ALL_SECTIONS = {s for f in notes.FRAMES.values() for s in f.get("칸", [])} | se
 FIELD_NOUN = {"국제교류": "교환·파견 해봤노트", "현장실습": "현장실습 해봤노트", "비교과": "비교과 해봤노트"}
 
 
-def _chat(plan, history):
-    """status "chat": AI가 쓰지 않는 고정 문구 + 칩. 질문함에 저장하지 않는다(답할 질문이 아님)."""
+def _chat(plan, history, question="", trace=None):
+    """status "chat": AI가 쓰지 않는 고정 문구 + 칩. 질문함에 저장하지 않는다(답할 질문이 아님).
+    [작업 119] 플래그 VCC_ASK_CHAT=1이면 message만 대화응답(Sonnet)이 쓴다(chat_message — 검증에 걸리거나 실패하면 이 고정 문구).
+    칩·저장 안 함은 그대로 코드가 정한다."""
     # [11/24] 문구는 바로 앞 턴이 실제로 보여 준 것을 따른다. 예전에는 「제외」를 먼저 봐서, ③이 이미 다른 노트 목록을
     #   보여 준 뒤에도 ④가 「아까는 KOTRA … 이야기였어요」라고 했다(캡처 ④). 뺀 프로그램은 「빼고 보고 있어요」로만 말한다.
     last = history[-1] if history else None
@@ -745,7 +749,85 @@ def _chat(plan, history):
         chips.append({"label": "해봤노트 둘러보기", "action": "notes", "payload": {"field": field}})
     if plan.get("궁금"):   # [작업 116] 알고 싶은 것이 있는 말에만(욕·혼잣말·「?」에는 칩 없음)
         chips.append({"label": "질문함에 담기", "action": "save", "payload": {"question": plan["정리된질문"]}})
+    if ask_chat() and question:
+        written = chat_message(question, history, plan, program, field, message)
+        if trace is not None:
+            trace["route"] = (trace.get("route") or "") + ("·대화응답" if written else "·대화응답 탈락")
+            trace["aiMessage"] = bool(written)   # askLog에 남길 때 mask(_log_answer)
+        message = written or message
     return {"status": "chat", "lines": [], "sources": {}, "suggestSenior": False, "message": message, "chips": chips}
+
+
+# ── [작업 119] 대화 응답 (플래그 VCC_ASK_CHAT=1, 기본 꺼짐) ─────────────────
+# HCX 원칙 v3 10절 · spec 4장 [11/27 대화형]. 근거 번호를 받는 「답」이 아니라서 새 사실이 들어가면 버리는 검증을 쓴다.
+MAX_CHAT_CHARS = 120      # 프롬프트는 100자 안 — 조금 넘친 것까지는 받는다
+MAX_CHAT_SENTENCES = 2    # 한두 문장
+_CHAT_END = re.compile(r"(요|죠|까)[.!?~]*$")   # 문장마다 해요체
+# 화면 기능이 한 일(담기·저장·알림)은 코드가 칩으로 정한다 — AI가 「질문함에 담았어요」라고 하면 거짓이 된다
+_CHAT_FEATURE = re.compile(r"질문함|저장|담아|담았|담을|담겼|알림|알려\s*드릴|알려\s*드려")
+# 선배 경험을 전하는 말(「조용했대요」「좋았다고 해요」「후기에 따르면」) — 근거 없이 경험 내용을 말하지 않는다
+_CHAT_HEARSAY = re.compile(r"(했|였|었|았|겠)(대요|다고|다더라|더라고|더래)|더라고요|후기(에|를|로)\s*(보면|따르면|의하면)"
+                           r"|들었어요|(라|다)고\s*(하더라|들었|하던데|해요|하네요)")
+_CHAT_BAD = re.compile(r"[\[\]{}<>]|https?://|www\.|@")   # 가림 표시([연락처])·링크·메일 조각
+
+
+def ask_chat():
+    """플래그 VCC_ASK_CHAT=1이면 대화 응답을 AI가 쓴다. 부를 때마다 읽는다(측정 스크립트가 환경변수로 켬/끔을 바꿔 돌린다)."""
+    return os.environ.get("VCC_ASK_CHAT", "0").strip() == "1"
+
+
+def chat_input(question, history, plan, program, field, fixed):
+    """대화응답 입력. 최근 대화는 질문 문장·결과·프로그램 이름만(BOO 답 원문·사람 칸은 넣지 않는다 — PRD 9-2)."""
+    lines = [f"{i}. 후배: {h['question']} → BOO: {STATUS_WORD.get(h['status'], h['status'] or '?')}"
+             + (f" ({h['program']})" if h["program"] else "") for i, h in enumerate(history, 1)]
+    excl = ", ".join(plan.get("제외") or []) or "(없음)"
+    return ("이전 대화:" + ("\n" + "\n".join(lines) if lines else " (없음)") + "\n"
+            f"앞 답의 프로그램: {program or '(없음)'}\n분야: {field or '(모름)'}\n뺀 프로그램: {excl}\n"
+            f"기본 문구: {fixed}\n이번 말: {question}\n출력:")
+
+
+def chat_source(question, history, plan, program, fixed):
+    """대화 응답이 써도 되는 숫자·영문·이름의 출처: 이번 말·앞 대화(질문·프로그램)·뺀 프로그램·기본 문구."""
+    parts = [question, fixed, program or "", "BOO 해봤노트", *(plan.get("제외") or [])]
+    for h in history:
+        parts += [h["question"], h["program"]]
+    return "\n".join(p for p in parts if p)
+
+
+def check_chat(text, source):
+    """해요체 1~2문장, 120자 안, 근거 밖 숫자·영문·고유명사 없음, 경험 전하는 말·화면 기능 말 없음.
+    통과하면 다듬은 글, 아니면 None. AI를 부르지 않는다."""
+    if not isinstance(text, str):
+        return None
+    t = " ".join(text.split())
+    if not t or len(t) > MAX_CHAT_CHARS or _CHAT_FEATURE.search(t) or _CHAT_HEARSAY.search(t) or _CHAT_BAD.search(t):
+        return None
+    parts = [x for x in re.split(r"(?<=[.!?~])\s+", t) if x]
+    if len(parts) > MAX_CHAT_SENTENCES or not all(_CHAT_END.search(x) for x in parts):
+        return None
+    if any(p.split(" ")[0] in ("숫자", "영문", "고유명사") for p in verify(t, source)):
+        return None
+    # 이름 목록에 없는 학교(「하이델베르크대학교」)·별칭·오타로 부른 프로그램·나라도 앞 대화에 나온 것만
+    src_n = _norm(source)
+    if any(_norm(s) not in src_n for s in re.findall(r"(\S+?)(?:대학교|대학)", t)) \
+            or set(match_programs(t)) - set(match_programs(source)) - {n for n in PROGRAMS if _norm(n) in src_n} \
+            or any(c in t and c not in source for c in COUNTRIES):
+        return None
+    return t
+
+
+def chat_message(question, history, plan, program, field, fixed):
+    """대화응답(Sonnet) → 검증을 통과한 message 또는 None(호출·형식 실패·탈락 — 부르는 쪽이 고정 문구)."""
+    try:
+        system, shots = load_prompt("대화응답")
+        r = callAI("대화응답", shots + [{"role": "user", "content": chat_input(question, history, plan, program, field, fixed)}],
+                   system=system)
+    except Exception:   # 시험용 가짜 callAI가 모르는 작업이어도 고정 문구로
+        return None
+    j = r.get("json") if r.get("ok") else None
+    if not isinstance(j, dict):
+        return None
+    return check_chat(j.get("message"), chat_source(question, history, plan, program, fixed))
 
 
 def _kinds():

@@ -420,19 +420,42 @@ def check_new_paths():
         off = [c for c in AI_CALLS[n_ai:] if c in ("말판정", "대화쓰기")]
         add(8, "VCC_TELL_CHAT 끄면 말판정·대화쓰기 안 부름", not off, "0건" if not off else f"{len(off)}건")
 
-        # ── 119 물어보기 대화 응답(VCC_ASK_CHAT): 인사말은 질문함에 안 담김. 병합 전이면 플래그는 아무것도 안 바꾼다 ──
+        # ── 119 물어보기 대화 응답(VCC_ASK_CHAT): 가짜 질문정리(의도 대화)로 대화응답 길까지 지나간다.
+        #    인사말은 질문함에 안 담김 · 대화에 없는 연락처를 쓴 AI 글은 버림 · 통과한 AI 글은 askLog에 mask를 거쳐 남음 ──
         os.environ["VCC_ASK_CHAT"] = "1"
+        hi = "안녕 BOO 고마워"
+        FAKE_JSON["질문정리"] = {"의도": "대화", "분야": None, "나라": None, "프로그램후보": [], "제외": [], "칸": None,
+                             "궁금": False, "정리된질문": hi}
         FAKE_JSON["대화응답"] = {"message": "반가워요. 연락은 010-1234-5678로 주세요."}
         before = len([q for q in store.load("questions", []) if q.get("colreg_no") == junior])
-        r = call(base, "askBoo", {"question": "안녕 BOO 고마워"}, tok[junior])
+        n_ai = len(AI_CALLS)
+        r = call(base, "askBoo", {"question": hi}, tok[junior])
+        tried = AI_CALLS[n_ai:]
         after = len([q for q in store.load("questions", []) if q.get("colreg_no") == junior])
-        merged = "VCC_ASK_CHAT" in (ROOT / "functions" / "askboo.py").read_text(encoding="utf-8")
-        # askLog(초기화 대상 아님, 사람 칸 없음)에 남는 message도 본다 — 119 뒤에는 AI가 쓴 글이 이 칸에 들어간다
+        # askLog(초기화 대상 아님, 사람 칸 없음)에 남는 message도 본다 — AI가 쓴 글이 이 칸에 들어간다
         last_log = (store.load("askLog", []) or [{}])[-1]
         leak = "010-1234-5678" in json.dumps([r, last_log.get("message")], ensure_ascii=False)
-        add(8, "물어보기 대화(VCC_ASK_CHAT): 질문함 안 담음·대화에 없는 연락처 버림", before == after and not leak,
-            (f"status {r.get('status')} · 질문함 그대로" + ("" if merged else " · 참고: 119 병합 전(플래그 코드 없음) — 병합 뒤 다시 돌린다"))
-            if before == after and not leak else f"질문함 {before}→{after} · 연락처 응답에 남음 {leak}")
+        dropped = r.get("status") == "chat" and "대화응답" in tried and r.get("message") != FAKE_JSON["대화응답"]["message"]
+        add(8, "물어보기 대화(VCC_ASK_CHAT): 질문함 안 담음·대화에 없는 연락처 쓴 AI 글 버림",
+            before == after and not leak and dropped,
+            f"대화응답 지남 · 고정 문구로 · 질문함 그대로" if before == after and not leak and dropped
+            else f"질문함 {before}→{after} · 연락처 남음 {leak} · 시도 {tried} · status {r.get('status')}")
+        # 통과한 AI 글에 학번이 섞여 있어도(검증은 숫자를 대화에서 찾으므로 이번 말에 있으면 통과) askLog에는 가린 글
+        said = "안녕 H0143 고마워"
+        FAKE_JSON["질문정리"]["정리된질문"] = said
+        FAKE_JSON["대화응답"] = {"message": "H0143 님 반가워요. 궁금한 걸 물어봐 주세요."}
+        r2 = call(base, "askBoo", {"question": said}, tok[junior])
+        log2 = (store.load("askLog", []) or [{}])[-1]
+        masked = r2.get("message") == FAKE_JSON["대화응답"]["message"] and "H0143" not in (log2.get("message") or "") \
+            and log2.get("message")
+        add(8, "물어보기 대화 askLog message는 mask를 거침", bool(masked),
+            "응답은 AI 글 · 기록은 학번 가림" if masked else f"응답 {r2.get('message')!r} · 기록 {log2.get('message')!r}")
+        FAKE_JSON.pop("질문정리", None)
+        os.environ["VCC_ASK_CHAT"] = "0"
+        n_ai = len(AI_CALLS)
+        call(base, "askBoo", {"question": hi}, tok[junior])
+        off = [c for c in AI_CALLS[n_ai:] if c == "대화응답"]
+        add(8, "VCC_ASK_CHAT 끄면 대화응답 안 부름", not off, "0건" if not off else f"{len(off)}건")
 
         # ── #379 쪽지 program: 보낸 사람이 그 노트 추천에서 받은 선배일 때만, 응답에 상대 학번 없음 ──
         target = "H0241"
