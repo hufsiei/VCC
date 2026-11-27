@@ -30,9 +30,10 @@ def ok(obj):
 FAIL = {"ok": False, "text": "", "json": None, "model": "fake", "error": "x"}
 
 
-def make_fake(plan=None, answer=None, match=True, pick=(1, 2), slander=False):
+def make_fake(plan=None, answer=None, match=True, pick=(1, 2), slander=False, chat=None):
     """작업명별 가짜 응답. plan=None이면 질문정리 실패, answer=None이면 답쓰기 실패.
-    slander: [작업 116] 질문함 관문의 쪽지검사(HCX) 판정 — True면 비방."""
+    slander: [작업 116] 질문함 관문의 쪽지검사(HCX) 판정 — True면 비방.
+    chat: [작업 119] 대화응답의 json(None이면 호출 실패)."""
     calls = []
 
     def fake(작업명, messages, system=None):
@@ -50,6 +51,8 @@ def make_fake(plan=None, answer=None, match=True, pick=(1, 2), slander=False):
         if 작업명 == "변환":
             src = re.search(r"근거: (.*)\n출력", messages[-1]["content"], re.S).group(1)
             return ok({"1": src})
+        if 작업명 == "대화응답":
+            return ok(chat) if chat is not None else FAIL
         raise KeyError(작업명)   # test_notes.py의 가짜처럼 모르는 작업은 예외 — 코드가 폴백해야 한다
     fake.calls = calls
     return fake
@@ -841,6 +844,92 @@ res, _ = run("리옹에 있는 학교 물가 어때요?", [], plan=None)
 expect("학교를 말하면 주제와 상관없이 고르기", res["status"] == "notes" and "어느 학교인지" in res["message"], res.get("message"))
 res, _ = run("일본 도쿄 한달 생활비 얼마예요?", [], plan=None)
 expect("도시 학교 0개(도쿄)는 지금처럼 「0개예요」", res["status"] == "notes" and "도쿄에 있는 학교 해봤노트는 0개" in res["message"], res.get("message"))
+
+# ── [작업 119] 대화 응답(VCC_ASK_CHAT) ─────────────────────────────────
+import os  # noqa: E402
+
+_old_flag = os.environ.pop("VCC_ASK_CHAT", None)
+CHAT_PLAN = {"의도": "대화", "분야": None, "나라": None, "프로그램후보": [], "제외": [], "칸": None, "궁금": False}
+H_MAR = [{"question": "마르부르크 생활비 얼마예요?", "status": "ok", "program": PROGRAM}]
+CASES = [("안녕 BOO 반가워", [], CHAT_PLAN), ("와 생각보다 싸네", H_MAR, CHAT_PLAN),
+         ("이건 아까도 한 얘기잖아", H_KOTRA, dict(CHAT_PLAN, 분야="현장실습", 제외=[KOTRA])),
+         ("고마워", [{"question": "독일 기숙사 어때요?", "status": "hold", "program": ""}], dict(CHAT_PLAN, 궁금=True))]
+fixed = {}
+for q, h, plan in CASES:
+    res, calls = run(q, h, plan=dict(plan, 정리된질문=q), chat={"message": "반가워요. 궁금한 걸 물어봐 주세요."})
+    fixed[q] = res
+    expect(f"플래그 끔: 대화응답 안 부름·고정 문구: {q}", [c[0] for c in calls] == ["질문정리"] and res["status"] == "chat", calls)
+
+os.environ["VCC_ASK_CHAT"] = "1"
+GOOD = "반가워요! 마르부르크필립스대학교 기숙사나 수업처럼 더 궁금한 게 있으면 물어봐 주세요."
+for q, h, plan in CASES:
+    msg = GOOD if h == H_MAR else "반가워요. 궁금한 학교나 기관이 있으면 편하게 물어봐 주세요."
+    res, calls = run(q, h, plan=dict(plan, 정리된질문=q), chat={"message": msg})
+    off = fixed[q]
+    expect(f"플래그 켬: message만 AI, 칩·모양 그대로: {q}", res["message"] == msg and res["chips"] == off["chips"]
+           and sorted(res) == sorted(off) and "questionId" not in res and [c[0] for c in calls] == ["질문정리", "대화응답"],
+           (res.get("message"), [c[0] for c in calls]))
+_, calls = run("와 생각보다 싸네", H_MAR, plan=dict(CHAT_PLAN, 정리된질문="x"), chat={"message": GOOD})
+sent = calls[-1][1]
+expect("대화응답 입력: 이번 말·앞 질문·프로그램·기본 문구", all(s in sent for s in ("이번 말: 와 생각보다 싸네", "후배: 마르부르크 생활비 얼마예요?",
+                                                       f"앞 답의 프로그램: {PROGRAM}", "기본 문구: 아까는")), sent)
+
+# 탈락 → 고정 문구(지금 응답과 같음)
+BAD = {"새 숫자": "한 달 생활비는 보통 800유로 정도예요.",
+       "연락처": "반가워요. 연락은 010-1234-5678로 주세요.",
+       "새 영문": "반가워요. DAAD 장학금도 알아보세요.",
+       "앞 대화에 없는 학교": "반가워요. 하이델베르크대학교도 물어봐 주세요.",
+       "경험 전하기": "마르부르크필립스대학교 기숙사는 조용했대요.",
+       "경험 전하기2": "선배들이 수업이 어렵다고 하더라고요.",
+       "화면 기능": "질문함에 담아 둘게요. 선배가 답하면 알려 드릴게요.",
+       "반말": "그래 반가워. 뭐든 물어봐.",
+       "세 문장": "반가워요. 저도 좋아요. 궁금한 걸 물어봐 주세요.",
+       "너무 김": "반가워요. " + "궁금한 게 있으면 언제든지 편하게 물어봐 주세요 " * 5 + "주세요.",
+       "앞 대화에 없는 나라": "반가워요. 일본 교환도 물어봐 주세요.",
+       "가림 표시": "반가워요. [연락처]로 연락 주세요.",
+       "빈 글": "", "글 아님": 3}
+for why, msg in BAD.items():
+    res, calls = run("와 생각보다 싸네", H_MAR, plan=dict(CHAT_PLAN, 정리된질문="x"), chat={"message": msg})
+    expect(f"탈락({why}) → 고정 문구", res["message"] == fixed["와 생각보다 싸네"]["message"], res.get("message"))
+for why, kw in (("호출 실패", {"chat": None}), ("키 다름", {"chat": {"문구": GOOD}})):
+    res, _ = run("와 생각보다 싸네", H_MAR, plan=dict(CHAT_PLAN, 정리된질문="x"), **kw)
+    expect(f"{why} → 고정 문구", res["message"] == fixed["와 생각보다 싸네"]["message"], res.get("message"))
+res, _ = run("이건 아까도 한 얘기잖아", H_KOTRA, plan=dict(CHAT_PLAN, 분야="현장실습", 제외=[KOTRA], 정리된질문="x"),
+             chat={"message": "KOTRA 해외무역관(유럽 권역)은 빼고 볼게요. 궁금한 업무를 적어 주세요."})
+expect("앞 대화에 나온 프로그램 이름(영문 포함)은 써도 됨", res["message"].startswith("KOTRA"), res.get("message"))
+
+# 다른 chat(유무 질문·v1·질문함 관문)은 플래그를 켜도 고정 문구, 대화응답 안 부름
+res, calls = run("아예 데이터가 없나요?", H_KOTRA, plan=dict(CHAT_PLAN, 분야="현장실습", 정리된질문="x"), chat={"message": "AI 글이에요."})
+expect("유무 질문 chat은 대화응답 안 부름", res["status"] == "chat" and "대화응답" not in [c[0] for c in calls], [c[0] for c in calls])
+res, calls = run("안녕 BOO 반가워", [], plan=None, chat={"message": "AI 글이에요."})
+expect("질문정리 실패(v1)면 대화응답 안 부름", "대화응답" not in [c[0] for c in calls], [c[0] for c in calls])
+
+# 기록: route에 대화응답 표시, askLog message는 mask
+logged = []
+askboo._log_answer = lambda q, out, program=None, trace=None, prev=None: logged.append((trace or {}).get("route"))
+for msg, want in ((GOOD, "질문정리·대화응답"), ("800유로예요.", "질문정리·대화응답 탈락")):
+    askboo.callAI = make_fake(plan=dict(CHAT_PLAN, 정리된질문="x"), chat={"message": msg})
+    askboo.askBoo("H0143", {"question": "와 생각보다 싸네", "history": H_MAR}, save=True)
+    expect(f"기록 route = {want}", logged[-1:] == [want], logged[-1:])
+askboo._log_answer = _orig
+import store  # noqa: E402
+
+_saved = (store.lock, store.load, store.save)
+_box = {}
+store.load = lambda name, default=None: _box.setdefault(name, default if default is not None else [])
+store.save = lambda name: None
+try:
+    askboo._log_answer("안녕", {"status": "chat", "message": "연락은 010-1234-5678로 주세요."}, trace={"aiMessage": True})
+    askboo._log_answer("휴학", {"status": "official", "message": "국제교류팀(02-2173-2063)에 문의해 주세요."})
+finally:
+    store.lock, store.load, store.save = _saved
+row, row2 = (_box.get("askLog") or [{}, {}])[-2:]
+expect("askLog: AI가 쓴 message는 mask(연락처 가림)", "010-1234-5678" not in (row.get("message") or "") and row.get("message"), row)
+expect("askLog: 코드 고정 문구(담당 부서 전화)는 그대로", row2.get("message") == "국제교류팀(02-2173-2063)에 문의해 주세요.", row2)
+
+os.environ.pop("VCC_ASK_CHAT", None)
+if _old_flag is not None:
+    os.environ["VCC_ASK_CHAT"] = _old_flag
 
 # ── 정리 ──────────────────────────────────────────────────────────────
 print()
