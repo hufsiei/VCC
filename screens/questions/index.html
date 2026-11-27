@@ -153,6 +153,10 @@
   .check-warn { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); }
   .check-warn[hidden] { display: none; }
   .check-warn__text { font-size: var(--font-size-secondary); }
+  /* 로그아웃(11/27 오후): 가운데, 작은 알약형(높이 44px·14px·최소 폭 200px) 위험 버튼(.btn--danger) */
+  .logout-row { display: flex; justify-content: center; margin-top: var(--space-xl); }
+  .logout-row .btn { min-width: 200px; min-height: 44px; height: 44px; padding: 0 var(--space-lg); border-radius: var(--radius-pill); font-size: var(--font-size-secondary); }
+  .logout-row .btn .icon { width: 16px; height: 16px; }
 </style>
 </head>
 <body>
@@ -161,6 +165,8 @@
   <!-- ===== 1단계: 내 보관함 (메인 헤더 + 하단 탭) ===== -->
   <section id="viewInbox" class="has-tabbar">
     <header class="header">
+      <!-- 후속 개발 및 확장방안(11/27, 11/27 오후 헤더 왼쪽으로): 누르면 screens/info/roadmap.md를 시트로 — screens/info/info.js -->
+      <button class="icon-btn icon-btn--muted" id="infoBtn" type="button" aria-label="후속 개발 및 확장방안" aria-haspopup="dialog"><i data-lucide="info" class="icon"></i></button>
       <a class="header__brand" href="../talk/">
         <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
         외대人사이드
@@ -168,8 +174,6 @@
       <div class="header__actions">
         <!-- 직원 계정일 때만 보임(5-1): PC 관리자 콘솔을 새 탭으로 -->
         <a class="icon-btn" id="consoleBtn" href="../admin/" target="_blank" rel="noopener" aria-label="관리자 콘솔" hidden><i data-lucide="chart-column" class="icon"></i></a>
-        <!-- 후속 개발 및 확장방안(11/27): 누르면 screens/info/roadmap.md를 시트로 — screens/info/info.js -->
-        <button class="icon-btn icon-btn--muted" id="infoBtn" type="button" aria-label="후속 개발 및 확장방안" aria-haspopup="dialog"><i data-lucide="info" class="icon"></i></button>
         <a class="icon-btn" id="bellBtn" href="#alerts" aria-label="알림"><i data-lucide="bell" class="icon"></i><span class="icon-btn__dot" id="bellDot" hidden></span></a>
       </div>
     </header>
@@ -197,6 +201,11 @@
       </div>
 
       <div class="tab-panel" id="tabPanel" role="tabpanel" aria-busy="true"></div>
+
+      <!-- 로그아웃(11/27 오후, 5-1·7-⑥): 내 보관함 1단계 맨 아래 한 곳만. 작은 알약형 위험 버튼, 누르면 확인 시트 -->
+      <div class="logout-row">
+        <button class="btn btn--danger" id="logoutBtn" type="button"><i data-lucide="log-out" class="icon"></i>로그아웃</button>
+      </div>
     </main>
 
     <!-- 하단 탭(5-3) — 1단계 화면에만 -->

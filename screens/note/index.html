@@ -169,6 +169,8 @@
   <!-- ===== 1단계: 해봤노트 목록 (메인 헤더 + 하단 탭) ===== -->
   <section id="viewList" class="has-tabbar">
     <header class="header">
+      <!-- 후속 개발 및 확장방안(11/27, 11/27 오후 헤더 왼쪽으로): 누르면 screens/info/roadmap.md를 시트로 — screens/info/info.js -->
+      <button class="icon-btn icon-btn--muted" id="infoBtn" type="button" aria-label="후속 개발 및 확장방안" aria-haspopup="dialog"><i data-lucide="info" class="icon"></i></button>
       <a class="header__brand" href="../talk/">
         <img class="header__symbol" src="../../assets/hufs-symbol.gif" alt="HUFS 심벌">
         외대人사이드
@@ -176,8 +178,6 @@
       <div class="header__actions">
         <!-- 직원 계정일 때만 보임(5-1): PC 관리자 콘솔을 새 탭으로 -->
         <a class="icon-btn" id="consoleBtn" href="../admin/" target="_blank" rel="noopener" aria-label="관리자 콘솔" hidden><i data-lucide="chart-column" class="icon"></i></a>
-        <!-- 후속 개발 및 확장방안(11/27): 누르면 screens/info/roadmap.md를 시트로 — screens/info/info.js -->
-        <button class="icon-btn icon-btn--muted" id="infoBtn" type="button" aria-label="후속 개발 및 확장방안" aria-haspopup="dialog"><i data-lucide="info" class="icon"></i></button>
         <a class="icon-btn" id="bellBtn" href="../questions/#alerts" aria-label="알림"><i data-lucide="bell" class="icon"></i><span class="icon-btn__dot" id="bellDot" hidden></span></a>
       </div>
     </header>
