@@ -1,0 +1,2744 @@
+{
+ "설명": "작업 112 일반화 확인(Q-135) — #429에서 고친 판정이 처음 보는 말에도 맞는지. 상황 15개는 측정상황.json의 30개와 다른 새 문장. 기대값은 측정 전에 정함. 실행: cd functions && python -X utf8 -c \"import sys,eval_tell_chat as ev; ev.N_CASES=15; sys.exit(ev.main(['--cases','../docs/조사/112_대화형인터뷰_측정/일반화_1127.json','--runs','2','--dry']))\"",
+ "기대값_뜻": {
+  "종류": "heard.kind가 이 중 하나(코드가 MAX_REASK로 바꾼 뒤의 값). 판정 정확 기준에 든다",
+  "칸": "종류가 답일 때 heard.section(없으면 안 봄). 판정 정확 기준에 든다",
+  "질문함": "heldQuestionId가 생겨야 하나. false인데 담기면 기준 5(궁금하지 않은 말이 담김) 위반",
+  "질문함글": "질문함에 담긴 글에 들어 있어야 할 말들",
+  "다시묻기": "같은 칸을 다른 말로 다시 묻나(질문 글이 방금 질문과 달라야 함). 후배 질문 차례는 원문 그대로라 안 봄",
+  "반응": "담음문구만 — 반응이 tell_chat.HELD_TEXT 하나뿐(Q-114: 담은 턴이 부족·되물음이면 반응 없이)",
+  "안물을칸": "물은 질문·다음 질문의 칸이 이 칸들이 아님(지난 노트에 있는 칸)",
+  "후배질문차례": "이 턴에서 물은 질문이 후배 질문(junior)",
+  "끝": "응답이 done",
+  "넘김": "다음 질문이 방금 질문의 칸이 아님(또는 끝) — 모름·MAX_REASK 넘김"
+ },
+ "프로그램": {
+  "G": "교육혁신원 대동제 이벤트 Guardians(퀴즈 고득점을 위한 자료 업로드!)",
+  "M": "마르부르크필립스대학교",
+  "TH": "㈜트랜스허브코리아"
+ },
+ "상황": [
+  {
+   "id": "G01",
+   "묶음": "숫자딴소리",
+   "이름": "학년을 말함",
+   "프로그램": "G",
+   "방금질문": {
+    "칸": "활동내용",
+    "질문": "@기본"
+   },
+   "턴": [
+    {
+     "말": "저 3학년이에요",
+     "기대": {
+      "종류": [
+       "딴얘기",
+       "부족"
+      ],
+      "질문함": false,
+      "다시묻기": true
+     }
+    }
+   ]
+  },
+  {
+   "id": "G02",
+   "묶음": "숫자딴소리",
+   "이름": "수업 있어 나중에",
+   "프로그램": "TH",
+   "턴": [
+    {
+     "말": "10시에 수업 있어서 나중에 할게요",
+     "기대": {
+      "종류": [
+       "그만",
+       "딴얘기"
+      ],
+      "질문함": false
+     }
+    }
+   ]
+  },
+  {
+   "id": "G03",
+   "묶음": "숫자딴소리",
+   "이름": "2번 질문 다시 보기",
+   "프로그램": "M",
+   "턴": [
+    {
+     "말": "2번 질문 다시 보여 줘요",
+     "기대": {
+      "종류": [
+       "되물음",
+       "딴얘기"
+      ],
+      "질문함": false
+     }
+    }
+   ]
+  },
+  {
+   "id": "G04",
+   "묶음": "숫자딴소리",
+   "이름": "들은 숫자 + 저는 몰라요",
+   "프로그램": "TH",
+   "지난대화": [
+    {
+     "칸": "지원동기",
+     "질문": "@기본",
+     "답": "번역 실무를 겪어 보고 싶었어요."
+    }
+   ],
+   "방금질문": {
+    "칸": "지원·선발",
+    "질문": "@기본"
+   },
+   "턴": [
+    {
+     "말": "작년에 20명 지원했다던데 저는 몰라요",
+     "기대": {
+      "종류": [
+       "모름",
+       "부족"
+      ],
+      "질문함": false
+     }
+    }
+   ]
+  },
+  {
+   "id": "G05",
+   "묶음": "짧은답",
+   "이름": "네 2인실이요",
+   "프로그램": "M",
+   "방금질문": {
+    "칸": "생활",
+    "질문": "@기본"
+   },
+   "턴": [
+    {
+     "말": "네 2인실이요",
+     "기대": {
+      "종류": [
+       "답"
+      ],
+      "질문함": false,
+      "칸": "생활"
+     }
+    }
+   ]
+  },
+  {
+   "id": "G06",
+   "묶음": "짧은답",
+   "이름": "주 4일",
+   "프로그램": "TH",
+   "방금질문": {
+    "칸": "근무조건",
+    "질문": "@기본"
+   },
+   "턴": [
+    {
+     "말": "주 4일",
+     "기대": {
+      "종류": [
+       "답"
+      ],
+      "질문함": false,
+      "칸": "근무조건"
+     }
+    }
+   ]
+  },
+  {
+   "id": "G07",
+   "묶음": "짧은답",
+   "이름": "면접만 봤어요",
+   "프로그램": "TH",
+   "방금질문": {
+    "칸": "지원·선발",
+    "질문": "@기본"
+   },
+   "턴": [
+    {
+     "말": "면접만 봤어요",
+     "기대": {
+      "종류": [
+       "답"
+      ],
+      "질문함": false,
+      "칸": "지원·선발"
+     }
+    }
+   ]
+  },
+  {
+   "id": "G08",
+   "묶음": "말했음·모름",
+   "이름": "위에서 얘기드림",
+   "프로그램": "TH",
+   "지난대화": [
+    {
+     "칸": "지원동기",
+     "질문": "@기본",
+     "답": "번역 실무를 겪어 보고 싶었어요."
+    },
+    {
+     "칸": "지원·선발",
+     "질문": "@기본",
+     "답": "서류를 내고 면접을 봤어요."
+    }
+   ],
+   "방금질문": {
+    "칸": "업무내용",
+    "질문": "@기본"
+   },
+   "턴": [
+    {
+     "말": "그건 위에서 얘기드린 것 같은데",
+     "기대": {
+      "종류": [
+       "부족",
+       "모름",
+       "되물음"
+      ],
+      "질문함": false
+     }
+    }
+   ]
+  },
+  {
+   "id": "G09",
+   "묶음": "말했음·모름",
+   "이름": "딱히 생각나는 게 없음",
+   "프로그램": "G",
+   "방금질문": {
+    "칸": "활동내용",
+    "질문": "@기본"
+   },
+   "턴": [
+    {
+     "말": "글쎄요 딱히 생각나는 게 없네요",
+     "기대": {
+      "종류": [
+       "모름",
+       "부족"
+      ],
+      "질문함": false
+     }
+    }
+   ]
+  },
+  {
+   "id": "G10",
+   "묶음": "말했음·모름",
+   "이름": "아는 바가 없음",
+   "프로그램": "M",
+   "방금질문": {
+    "칸": "학점",
+    "질문": "@기본"
+   },
+   "턴": [
+    {
+     "말": "그쪽은 제가 아는 바가 없어요",
+     "기대": {
+      "종류": [
+       "모름"
+      ],
+      "질문함": false
+     }
+    }
+   ]
+  },
+  {
+   "id": "G11",
+   "묶음": "진짜궁금",
+   "이름": "환율·생활비가 알고 싶음",
+   "프로그램": "M",
+   "방금질문": {
+    "칸": "비용",
+    "질문": "@기본"
+   },
+   "턴": [
+    {
+     "말": "요즘 환율이면 거기 생활비가 얼마나 들지 저도 알고 싶네요",
+     "기대": {
+      "종류": [
+       "되물음",
+       "부족",
+       "딴얘기"
+      ],
+      "질문함": true,
+      "질문함글": [
+       "생활비"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "G12",
+   "묶음": "진짜궁금",
+   "이름": "모집 공고 시기를 물음",
+   "프로그램": "TH",
+   "턴": [
+    {
+     "말": "혹시 올해 모집 공고는 언제 올라오는지 아세요?",
+     "기대": {
+      "종류": [
+       "되물음"
+      ],
+      "질문함": true,
+      "질문함글": [
+       "모집 공고"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "G13",
+   "묶음": "서비스되물음",
+   "이름": "이름이 보이는지",
+   "프로그램": "G",
+   "방금질문": {
+    "칸": "활동내용",
+    "질문": "@기본"
+   },
+   "턴": [
+    {
+     "말": "제가 적은 거 후배한테 이름도 같이 보이나요?",
+     "기대": {
+      "종류": [
+       "되물음"
+      ],
+      "질문함": false,
+      "다시묻기": true
+     }
+    }
+   ]
+  },
+  {
+   "id": "G14",
+   "묶음": "서비스되물음",
+   "이름": "나갔다 와도 저장되는지",
+   "프로그램": "M",
+   "턴": [
+    {
+     "말": "이거 중간에 나갔다가 이어서 해도 저장돼요?",
+     "기대": {
+      "종류": [
+       "되물음"
+      ],
+      "질문함": false,
+      "다시묻기": true
+     }
+    }
+   ]
+  },
+  {
+   "id": "G15",
+   "묶음": "그만",
+   "이름": "이쯤에서 마침",
+   "프로그램": "G",
+   "지난대화": [
+    {
+     "칸": "활동내용",
+     "질문": "@기본",
+     "답": "자료를 올리고 퀴즈에 참여했어요."
+    }
+   ],
+   "방금질문": {
+    "칸": "배운점",
+    "질문": "@기본"
+   },
+   "턴": [
+    {
+     "말": "이쯤에서 마칠게요 수고하세요",
+     "기대": {
+      "종류": [
+       "그만"
+      ],
+      "질문함": false,
+      "끝": true
+     }
+    }
+   ]
+  }
+ ],
+ "측정": {
+  "코드_커밋": "829d1e3",
+  "실행_HEAD": "249798f (829d1e3 + 이 상황 파일)",
+  "회": 2
+ },
+ "estimate": {
+  "cases": 15,
+  "runs": 2,
+  "turns": 30,
+  "writers": {
+   "sonnet": {
+    "model": "claude-sonnet-5-5",
+    "judge_calls": 30,
+    "write_calls": 28,
+    "gate_calls": 4,
+    "write_tokens_each": [
+     3840,
+     90
+    ],
+    "usd": 0.24015240223463688,
+    "usd_per_turn": 0.008005080074487896,
+    "hcx_calls": 34,
+    "hcx_tokens": 55240
+   }
+  }
+ },
+ "results": {
+  "sonnet": {
+   "summary": {
+    "turns": 30,
+    "judge_acc": 0.8666666666666667,
+    "outside": 0,
+    "repeat": 0,
+    "fallback_rate": 0.03333333333333333,
+    "wrong_hold": 4,
+    "eval_word": 0,
+    "missed_hold": 0,
+    "turn_pass": 22,
+    "fallbacks": {
+     "질문 버림": 1
+    },
+    "ms_avg": 2095.3333333333335,
+    "ms_p90": 2833,
+    "ms_by_job": {
+     "말판정": 807,
+     "대화쓰기": 1339,
+     "쪽지검사": 458
+    },
+    "usd": 0.222112,
+    "usd_per_turn": 0.007403733333333333,
+    "hcx_tokens_per_turn": 1619.3333333333333,
+    "criteria": [
+     {
+      "name": "판정 정확",
+      "op": ">=",
+      "bar": 0.95,
+      "value": 0.8666666666666667,
+      "ok": false
+     },
+     {
+      "name": "대화 밖 숫자·이름",
+      "op": "==",
+      "bar": 0,
+      "value": 0,
+      "ok": true
+     },
+     {
+      "name": "같은 질문 되풀이",
+      "op": "==",
+      "bar": 0,
+      "value": 0,
+      "ok": true
+     },
+     {
+      "name": "폴백",
+      "op": "<=",
+      "bar": 0.2,
+      "value": 0.03333333333333333,
+      "ok": true
+     },
+     {
+      "name": "궁금하지 않은 말 담김",
+      "op": "==",
+      "bar": 0,
+      "value": 4,
+      "ok": false
+     },
+     {
+      "name": "반응 평가 말",
+      "op": "==",
+      "bar": 0,
+      "value": 0,
+      "ok": true
+     }
+    ],
+    "all_ok": false
+   },
+   "turns": [
+    {
+     "asked": {
+      "section": "활동내용",
+      "question": "교육혁신원 대동제 이벤트 Guardians에서는 어떤 활동을 했어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "답",
+      "section": "활동내용"
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "3학년이시군요.",
+     "next": {
+      "section": "배운점",
+      "question": "Guardians에서 직접 맡아서 한 활동은 어떤 거였어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "부족",
+      "궁금": null
+     },
+     "write": {
+      "반응": "3학년이시군요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "Guardians에서 직접 맡아서 한 활동은 어떤 거였어요?"
+     },
+     "kind_ok": false,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": false,
+      "질문함": true,
+      "다시묻기": false
+     },
+     "pass": false,
+     "usd": 0.008274,
+     "hcx_tokens": 1537,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 1049,
+       "ok": true,
+       "usage": {
+        "input": 1524,
+        "output": 13
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 5189,
+       "ok": true,
+       "usage": {
+        "input": 3802,
+        "output": 67,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G01",
+     "turn": 1,
+     "said": "저 3학년이에요",
+     "ms": 6244,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "지원동기",
+      "question": "트랜스허브코리아에 지원한 이유는 무엇이었어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "그만",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "알겠어요. 들려주셔서 고마워요. 아래 AI 요약을 누르면 지금까지 이야기가 정리돼요.",
+     "next": {
+      "section": null,
+      "question": "",
+      "followUp": false,
+      "done": true,
+      "junior": false
+     },
+     "judge": {
+      "종류": "그만",
+      "궁금": null
+     },
+     "write": null,
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.0,
+     "hcx_tokens": 1548,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 894,
+       "ok": true,
+       "usage": {
+        "input": 1535,
+        "output": 13
+       }
+      }
+     ],
+     "case": "G02",
+     "turn": 1,
+     "said": "10시에 수업 있어서 나중에 할게요",
+     "ms": 897,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "팁",
+      "question": "후배들이 마르부르크에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "되물음",
+      "section": null
+     },
+     "held": true,
+     "heldText": "2번 질문 다시 보여 줘요",
+     "reaction": "궁금하신 점은 내 질문함에 담아 두었어요.",
+     "next": {
+      "section": "팁",
+      "question": "마르부르크에 가기 전에 후배들이 꼭 알아 두면 좋을 점이 있을까요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "되물음",
+      "궁금": "2번 질문 다시 보여 줘요"
+     },
+     "write": {
+      "반응": "네, 다시 여쭤볼게요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "마르부르크에 가기 전에 후배들이 꼭 알아 두면 좋을 점이 있을까요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": true,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": false
+     },
+     "pass": false,
+     "usd": 0.008564,
+     "hcx_tokens": 1803,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 879,
+       "ok": true,
+       "usage": {
+        "input": 1533,
+        "output": 21
+       }
+      },
+      {
+       "작업": "쪽지검사",
+       "model": "HCX-005",
+       "ms": 374,
+       "ok": true,
+       "usage": {
+        "input": 243,
+        "output": 6
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1118,
+       "ok": true,
+       "usage": {
+        "input": 3862,
+        "output": 84,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G03",
+     "turn": 1,
+     "said": "2번 질문 다시 보여 줘요",
+     "ms": 2391,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "지원·선발",
+      "question": "지원부터 선발까지 어떤 순서로 진행됐어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "모름",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "괜찮아요, 모르시면 넘어갈게요.",
+     "next": {
+      "section": "근무조건",
+      "question": "그럼 근무 시간이나 근무 조건은 어땠어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "모름",
+      "궁금": null
+     },
+     "write": {
+      "반응": "괜찮아요, 모르시면 넘어갈게요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "그럼 근무 시간이나 근무 조건은 어땠어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.00855,
+     "hcx_tokens": 1579,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 630,
+       "ok": true,
+       "usage": {
+        "input": 1566,
+        "output": 13
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1009,
+       "ok": true,
+       "usage": {
+        "input": 3900,
+        "output": 75,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G04",
+     "turn": 1,
+     "said": "작년에 20명 지원했다던데 저는 몰라요",
+     "ms": 1645,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "생활",
+      "question": "기숙사나 현지 생활은 어땠어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "답",
+      "section": "생활"
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "2인실에서 지내셨군요.",
+     "next": {
+      "section": "생활",
+      "question": "2인실에서 지내면서 좋았던 점이나 불편했던 점은 어떤 게 있었어요?",
+      "followUp": true,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "답",
+      "궁금": null
+     },
+     "write": {
+      "반응": "2인실에서 지내셨군요.",
+      "칸": "생활",
+      "더묻기": true,
+      "질문": "2인실에서 지내면서 좋았던 점이나 불편했던 점은 어떤 게 있었어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.008564,
+     "hcx_tokens": 1535,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 726,
+       "ok": true,
+       "usage": {
+        "input": 1523,
+        "output": 12
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1077,
+       "ok": true,
+       "usage": {
+        "input": 3872,
+        "output": 82,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G05",
+     "turn": 1,
+     "said": "네 2인실이요",
+     "ms": 1809,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "근무조건",
+      "question": "근무 시간이나 근무 조건은 어땠어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "답",
+      "section": "근무조건"
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "주 4일 근무였군요.",
+     "next": {
+      "section": "근무조건",
+      "question": "주 4일 근무는 하루 일과가 어떻게 흘러갔어요?",
+      "followUp": true,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "답",
+      "궁금": null
+     },
+     "write": {
+      "반응": "주 4일 근무였군요.",
+      "칸": "근무조건",
+      "더묻기": true,
+      "질문": "주 4일 근무는 하루 일과가 어떻게 흘러갔어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.008362,
+     "hcx_tokens": 1538,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 595,
+       "ok": true,
+       "usage": {
+        "input": 1526,
+        "output": 12
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 850,
+       "ok": true,
+       "usage": {
+        "input": 3821,
+        "output": 72,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G06",
+     "turn": 1,
+     "said": "주 4일",
+     "ms": 1451,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "지원·선발",
+      "question": "지원부터 선발까지 어떤 순서로 진행됐어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "답",
+      "section": "지원·선발"
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "면접만 보고 선발되셨군요.",
+     "next": {
+      "section": "지원·선발",
+      "question": "면접에서는 주로 어떤 질문을 받았어요?",
+      "followUp": true,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "답",
+      "궁금": null
+     },
+     "write": {
+      "반응": "면접만 보고 선발되셨군요.",
+      "칸": "지원·선발",
+      "더묻기": true,
+      "질문": "면접에서는 주로 어떤 질문을 받았어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.008358,
+     "hcx_tokens": 1537,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 565,
+       "ok": true,
+       "usage": {
+        "input": 1525,
+        "output": 12
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 979,
+       "ok": true,
+       "usage": {
+        "input": 3829,
+        "output": 70,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G07",
+     "turn": 1,
+     "said": "면접만 봤어요",
+     "ms": 1549,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "업무내용",
+      "question": "트랜스허브코리아에서 주로 어떤 일을 하셨어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "부족",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "네, 다시 여쭤볼게요.",
+     "next": {
+      "section": "근무조건",
+      "question": "하루 일과 중에 가장 많은 시간을 쓴 일은 무엇이었어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "부족",
+      "궁금": null
+     },
+     "write": {
+      "반응": "네, 다시 여쭤볼게요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "하루 일과 중에 가장 많은 시간을 쓴 일은 무엇이었어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.008682,
+     "hcx_tokens": 1570,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 556,
+       "ok": true,
+       "usage": {
+        "input": 1557,
+        "output": 13
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1027,
+       "ok": true,
+       "usage": {
+        "input": 3951,
+        "output": 78,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G08",
+     "turn": 1,
+     "said": "그건 위에서 얘기드린 것 같은데",
+     "ms": 1587,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "활동내용",
+      "question": "교육혁신원 대동제 이벤트 Guardians에서는 어떤 활동을 했어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "부족",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "괜찮아요. 대략이어도 돼요.",
+     "next": {
+      "section": "활동내용",
+      "question": "그날 부스에서 맡았던 일이나 기억나는 장면이 있으면 하나만 들려주세요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "부족",
+      "궁금": null
+     },
+     "write": {
+      "반응": "괜찮아요. 대략이어도 돼요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "그날 부스에서 맡았던 일이나 기억나는 장면이 있으면 하나만 들려주세요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.00854,
+     "hcx_tokens": 1544,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 545,
+       "ok": true,
+       "usage": {
+        "input": 1531,
+        "output": 13
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1474,
+       "ok": true,
+       "usage": {
+        "input": 3835,
+        "output": 87,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G09",
+     "turn": 1,
+     "said": "글쎄요 딱히 생각나는 게 없네요",
+     "ms": 2024,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "학점",
+      "question": "마르부르크에서 들은 수업과 학점 인정은 어땠어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "모름",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "괜찮아요, 그럼 넘어갈게요.",
+     "next": {
+      "section": "팁",
+      "question": "후배들이 마르부르크에 대해 잘 모르거나 잘못 알고 있는 게 있다면 뭐가 있을까요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "모름",
+      "궁금": null
+     },
+     "write": {
+      "반응": "괜찮아요, 그럼 넘어갈게요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "후배들이 마르부르크에 대해 잘 모르거나 잘못 알고 있는 게 있다면 뭐가 있을까요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.008778,
+     "hcx_tokens": 1542,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 908,
+       "ok": true,
+       "usage": {
+        "input": 1529,
+        "output": 13
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1245,
+       "ok": true,
+       "usage": {
+        "input": 3899,
+        "output": 98,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G10",
+     "turn": 1,
+     "said": "그쪽은 제가 아는 바가 없어요",
+     "ms": 2158,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "비용",
+      "question": "마르부르크에서 한 달 생활비는 얼마나 들었어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "되물음",
+      "section": null
+     },
+     "held": true,
+     "heldText": "요즘 환율이면 거기 생활비가 얼마나 들지 저도 알고 싶네요",
+     "reaction": "궁금하신 점은 내 질문함에 담아 두었어요.",
+     "next": {
+      "section": "팁",
+      "question": "선배가 마르부르크에 계실 때는 한 달에 대략 얼마쯤 썼어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "되물음",
+      "궁금": "요즘 환율이면 거기 생활비가 얼마나 들지 저도 알고 싶네요"
+     },
+     "write": {
+      "반응": "그건 제가 알 수 없어요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "선배가 마르부르크에 계실 때는 한 달에 대략 얼마쯤 썼어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true,
+      "질문함글": true
+     },
+     "pass": true,
+     "usd": 0.008632,
+     "hcx_tokens": 1811,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 963,
+       "ok": true,
+       "usage": {
+        "input": 1530,
+        "output": 27
+       }
+      },
+      {
+       "작업": "쪽지검사",
+       "model": "HCX-005",
+       "ms": 569,
+       "ok": true,
+       "usage": {
+        "input": 248,
+        "output": 6
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 993,
+       "ok": true,
+       "usage": {
+        "input": 3916,
+        "output": 80,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G11",
+     "turn": 1,
+     "said": "요즘 환율이면 거기 생활비가 얼마나 들지 저도 알고 싶네요",
+     "ms": 2536,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "지원동기",
+      "question": "트랜스허브코리아에 지원한 이유는 무엇이었어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "되물음",
+      "section": null
+     },
+     "held": true,
+     "heldText": "혹시 올해 모집 공고는 언제 올라오는지 아세요?",
+     "reaction": "궁금하신 점은 내 질문함에 담아 두었어요.",
+     "next": {
+      "section": "지원동기",
+      "question": "트랜스허브코리아 인턴에 지원하게 된 계기가 무엇이었어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "되물음",
+      "궁금": "혹시 올해 모집 공고는 언제 올라오는지 아세요?"
+     },
+     "write": {
+      "반응": "그건 제가 알 수 없어요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "트랜스허브코리아 인턴에 지원하게 된 계기가 무엇이었어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true,
+      "질문함글": true
+     },
+     "pass": true,
+     "usd": 0.00849,
+     "hcx_tokens": 1812,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 963,
+       "ok": true,
+       "usage": {
+        "input": 1535,
+        "output": 26
+       }
+      },
+      {
+       "작업": "쪽지검사",
+       "model": "HCX-005",
+       "ms": 465,
+       "ok": true,
+       "usage": {
+        "input": 245,
+        "output": 6
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1004,
+       "ok": true,
+       "usage": {
+        "input": 3860,
+        "output": 77,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G12",
+     "turn": 1,
+     "said": "혹시 올해 모집 공고는 언제 올라오는지 아세요?",
+     "ms": 2441,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "활동내용",
+      "question": "교육혁신원 대동제 이벤트 Guardians에서는 어떤 활동을 했어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "되물음",
+      "section": null
+     },
+     "held": true,
+     "heldText": "제가 적은 거 후배한테 이름도 같이 보이나요?",
+     "reaction": "궁금하신 점은 내 질문함에 담아 두었어요.",
+     "next": {
+      "section": "활동내용",
+      "question": "Guardians에서 직접 맡아서 한 일이 뭐였어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "되물음",
+      "궁금": "제가 적은 거 후배한테 이름도 같이 보이나요?"
+     },
+     "write": {
+      "반응": "그건 제가 알 수 없어요. 공개할 문장은 선배가 직접 고르게 돼요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "Guardians에서 직접 맡아서 한 일이 뭐였어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": true,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": false,
+      "다시묻기": true
+     },
+     "pass": false,
+     "usd": 0.008622,
+     "hcx_tokens": 1818,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 1017,
+       "ok": true,
+       "usage": {
+        "input": 1534,
+        "output": 29
+       }
+      },
+      {
+       "작업": "쪽지검사",
+       "model": "HCX-005",
+       "ms": 468,
+       "ok": true,
+       "usage": {
+        "input": 249,
+        "output": 6
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1188,
+       "ok": true,
+       "usage": {
+        "input": 3841,
+        "output": 94,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G13",
+     "turn": 1,
+     "said": "제가 적은 거 후배한테 이름도 같이 보이나요?",
+     "ms": 2682,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "팁",
+      "question": "후배들이 마르부르크에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "딴얘기",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "그건 제가 알 수 없어요.",
+     "next": {
+      "section": "팁",
+      "question": "마르부르크에 가기 전에 알았으면 좋았겠다 싶은 게 있었어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "딴얘기",
+      "궁금": null
+     },
+     "write": {
+      "반응": "그건 제가 알 수 없어요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "마르부르크에 가기 전에 알았으면 좋았겠다 싶은 게 있었어요?"
+     },
+     "kind_ok": false,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": false,
+      "질문함": true,
+      "다시묻기": true
+     },
+     "pass": false,
+     "usd": 0.00854,
+     "hcx_tokens": 1552,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 615,
+       "ok": true,
+       "usage": {
+        "input": 1536,
+        "output": 16
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1025,
+       "ok": true,
+       "usage": {
+        "input": 3875,
+        "output": 79,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G14",
+     "turn": 1,
+     "said": "이거 중간에 나갔다가 이어서 해도 저장돼요?",
+     "ms": 1644,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "배운점",
+      "question": "이 경험에서 배운 점을 한 문장으로 들려주세요.",
+      "junior": false
+     },
+     "heard": {
+      "kind": "그만",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "알겠어요. 들려주셔서 고마워요. 아래 AI 요약을 누르면 지금까지 이야기가 정리돼요.",
+     "next": {
+      "section": null,
+      "question": "",
+      "followUp": false,
+      "done": true,
+      "junior": false
+     },
+     "judge": {
+      "종류": "그만",
+      "궁금": null
+     },
+     "write": null,
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true,
+      "끝": true
+     },
+     "pass": true,
+     "usd": 0.0,
+     "hcx_tokens": 1564,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 761,
+       "ok": true,
+       "usage": {
+        "input": 1551,
+        "output": 13
+       }
+      }
+     ],
+     "case": "G15",
+     "turn": 1,
+     "said": "이쯤에서 마칠게요 수고하세요",
+     "ms": 764,
+     "run": 1,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "활동내용",
+      "question": "교육혁신원 대동제 이벤트 Guardians에서는 어떤 활동을 했어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "답",
+      "section": "활동내용"
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "3학년이시군요.",
+     "next": {
+      "section": "배운점",
+      "question": "Guardians에서는 어떤 활동을 했는지 편하게 들려주세요.",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "부족",
+      "궁금": null
+     },
+     "write": {
+      "반응": "3학년이시군요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "Guardians에서는 어떤 활동을 했는지 편하게 들려주세요. 맡은 역할도 좋아요."
+     },
+     "kind_ok": false,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": "질문 버림",
+     "checks": {
+      "종류": false,
+      "질문함": true,
+      "다시묻기": false
+     },
+     "pass": false,
+     "usd": 0.008404,
+     "hcx_tokens": 1537,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 651,
+       "ok": true,
+       "usage": {
+        "input": 1524,
+        "output": 13
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1114,
+       "ok": true,
+       "usage": {
+        "input": 3802,
+        "output": 80,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G01",
+     "turn": 1,
+     "said": "저 3학년이에요",
+     "ms": 1771,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "지원동기",
+      "question": "트랜스허브코리아에 지원한 이유는 무엇이었어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "그만",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "알겠어요. 들려주셔서 고마워요. 아래 AI 요약을 누르면 지금까지 이야기가 정리돼요.",
+     "next": {
+      "section": null,
+      "question": "",
+      "followUp": false,
+      "done": true,
+      "junior": false
+     },
+     "judge": {
+      "종류": "그만",
+      "궁금": null
+     },
+     "write": null,
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.0,
+     "hcx_tokens": 1548,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 865,
+       "ok": true,
+       "usage": {
+        "input": 1535,
+        "output": 13
+       }
+      }
+     ],
+     "case": "G02",
+     "turn": 1,
+     "said": "10시에 수업 있어서 나중에 할게요",
+     "ms": 867,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "팁",
+      "question": "후배들이 마르부르크에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "되물음",
+      "section": null
+     },
+     "held": true,
+     "heldText": "2번 질문 다시 보여 줘요",
+     "reaction": "궁금하신 점은 내 질문함에 담아 두었어요.",
+     "next": {
+      "section": "팁",
+      "question": "마르부르크에 가려는 후배들이 잘못 알고 있는 점이 있다면 뭐가 있을까요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "되물음",
+      "궁금": "2번 질문 다시 보여 줘요"
+     },
+     "write": {
+      "반응": "네, 다시 여쭤볼게요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "마르부르크에 가려는 후배들이 잘못 알고 있는 점이 있다면 뭐가 있을까요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": true,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": false
+     },
+     "pass": false,
+     "usd": 0.008594,
+     "hcx_tokens": 1803,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 995,
+       "ok": true,
+       "usage": {
+        "input": 1533,
+        "output": 21
+       }
+      },
+      {
+       "작업": "쪽지검사",
+       "model": "HCX-005",
+       "ms": 414,
+       "ok": true,
+       "usage": {
+        "input": 243,
+        "output": 6
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 2232,
+       "ok": true,
+       "usage": {
+        "input": 3862,
+        "output": 87,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G03",
+     "turn": 1,
+     "said": "2번 질문 다시 보여 줘요",
+     "ms": 3649,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "지원·선발",
+      "question": "지원부터 선발까지 어떤 순서로 진행됐어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "모름",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "괜찮아요, 모르면 넘어가도 돼요.",
+     "next": {
+      "section": "근무조건",
+      "question": "인턴으로 일할 때 근무 시간이나 근무 조건은 어땠어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "모름",
+      "궁금": null
+     },
+     "write": {
+      "반응": "괜찮아요, 모르면 넘어가도 돼요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "인턴으로 일할 때 근무 시간이나 근무 조건은 어땠어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.00863,
+     "hcx_tokens": 1579,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 767,
+       "ok": true,
+       "usage": {
+        "input": 1566,
+        "output": 13
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 2680,
+       "ok": true,
+       "usage": {
+        "input": 3900,
+        "output": 83,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G04",
+     "turn": 1,
+     "said": "작년에 20명 지원했다던데 저는 몰라요",
+     "ms": 3451,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "생활",
+      "question": "기숙사나 현지 생활은 어땠어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "답",
+      "section": "생활"
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "2인실에서 지내셨군요.",
+     "next": {
+      "section": "생활",
+      "question": "2인실에서 지내면서 좋았던 점이나 불편했던 점은 어떤 게 있었어요?",
+      "followUp": true,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "답",
+      "궁금": null
+     },
+     "write": {
+      "반응": "2인실에서 지내셨군요.",
+      "칸": "생활",
+      "더묻기": true,
+      "질문": "2인실에서 지내면서 좋았던 점이나 불편했던 점은 어떤 게 있었어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.008564,
+     "hcx_tokens": 1535,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 1024,
+       "ok": true,
+       "usage": {
+        "input": 1523,
+        "output": 12
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1171,
+       "ok": true,
+       "usage": {
+        "input": 3872,
+        "output": 82,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G05",
+     "turn": 1,
+     "said": "네 2인실이요",
+     "ms": 2199,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "근무조건",
+      "question": "근무 시간이나 근무 조건은 어땠어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "답",
+      "section": "근무조건"
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "주 4일 근무였군요.",
+     "next": {
+      "section": "근무조건",
+      "question": "주 4일 근무는 하루 일과가 어떻게 흘러갔어요?",
+      "followUp": true,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "답",
+      "궁금": null
+     },
+     "write": {
+      "반응": "주 4일 근무였군요.",
+      "칸": "근무조건",
+      "더묻기": true,
+      "질문": "주 4일 근무는 하루 일과가 어떻게 흘러갔어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.008362,
+     "hcx_tokens": 1538,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 745,
+       "ok": true,
+       "usage": {
+        "input": 1526,
+        "output": 12
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 887,
+       "ok": true,
+       "usage": {
+        "input": 3821,
+        "output": 72,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G06",
+     "turn": 1,
+     "said": "주 4일",
+     "ms": 1636,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "지원·선발",
+      "question": "지원부터 선발까지 어떤 순서로 진행됐어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "답",
+      "section": "지원·선발"
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "면접만 보셨군요.",
+     "next": {
+      "section": "지원·선발",
+      "question": "면접에서는 주로 어떤 이야기를 나눴어요?",
+      "followUp": true,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "답",
+      "궁금": null
+     },
+     "write": {
+      "반응": "면접만 보셨군요.",
+      "칸": "지원·선발",
+      "더묻기": true,
+      "질문": "면접에서는 주로 어떤 이야기를 나눴어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.008328,
+     "hcx_tokens": 1537,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 951,
+       "ok": true,
+       "usage": {
+        "input": 1525,
+        "output": 12
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 933,
+       "ok": true,
+       "usage": {
+        "input": 3829,
+        "output": 67,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G07",
+     "turn": 1,
+     "said": "면접만 봤어요",
+     "ms": 1889,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "업무내용",
+      "question": "트랜스허브코리아에서 주로 어떤 일을 하셨어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "부족",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "네, 다시 여쭤볼게요.",
+     "next": {
+      "section": "근무조건",
+      "question": "하루 근무하면서 실제로 맡았던 일은 어떤 것들이었어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "부족",
+      "궁금": null
+     },
+     "write": {
+      "반응": "네, 다시 여쭤볼게요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "하루 근무하면서 실제로 맡았던 일은 어떤 것들이었어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.008662,
+     "hcx_tokens": 1570,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 719,
+       "ok": true,
+       "usage": {
+        "input": 1557,
+        "output": 13
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1016,
+       "ok": true,
+       "usage": {
+        "input": 3951,
+        "output": 76,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G08",
+     "turn": 1,
+     "said": "그건 위에서 얘기드린 것 같은데",
+     "ms": 1739,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "활동내용",
+      "question": "교육혁신원 대동제 이벤트 Guardians에서는 어떤 활동을 했어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "부족",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "괜찮아요. 대략이어도 돼요.",
+     "next": {
+      "section": "활동내용",
+      "question": "대동제 때 부스나 행사장에서 주로 어떤 일을 맡았어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "부족",
+      "궁금": null
+     },
+     "write": {
+      "반응": "괜찮아요. 대략이어도 돼요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "대동제 때 부스나 행사장에서 주로 어떤 일을 맡았어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.00846,
+     "hcx_tokens": 1544,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 655,
+       "ok": true,
+       "usage": {
+        "input": 1531,
+        "output": 13
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1109,
+       "ok": true,
+       "usage": {
+        "input": 3835,
+        "output": 79,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G09",
+     "turn": 1,
+     "said": "글쎄요 딱히 생각나는 게 없네요",
+     "ms": 1770,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "학점",
+      "question": "마르부르크에서 들은 수업과 학점 인정은 어땠어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "모름",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "괜찮아요. 그럼 넘어갈게요.",
+     "next": {
+      "section": "팁",
+      "question": "후배들이 마르부르크에 대해 잘 모르거나 잘못 알고 있는 게 있다면요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "모름",
+      "궁금": null
+     },
+     "write": {
+      "반응": "괜찮아요. 그럼 넘어갈게요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "후배들이 마르부르크에 대해 잘 모르거나 잘못 알고 있는 게 있다면요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true
+     },
+     "pass": true,
+     "usd": 0.008688,
+     "hcx_tokens": 1542,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 648,
+       "ok": true,
+       "usage": {
+        "input": 1529,
+        "output": 13
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1120,
+       "ok": true,
+       "usage": {
+        "input": 3899,
+        "output": 89,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G10",
+     "turn": 1,
+     "said": "그쪽은 제가 아는 바가 없어요",
+     "ms": 1775,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "비용",
+      "question": "마르부르크에서 한 달 생활비는 얼마나 들었어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "되물음",
+      "section": null
+     },
+     "held": true,
+     "heldText": "요즘 환율이면 거기 생활비가 얼마나 들지 저도 알고 싶네요",
+     "reaction": "궁금하신 점은 내 질문함에 담아 두었어요.",
+     "next": {
+      "section": "팁",
+      "question": "선배가 마르부르크에 계실 때는 한 달에 대략 얼마쯤 쓰셨어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "되물음",
+      "궁금": "요즘 환율이면 거기 생활비가 얼마나 들지 저도 알고 싶네요"
+     },
+     "write": {
+      "반응": "그건 제가 알 수 없어요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "선배가 마르부르크에 계실 때는 한 달에 대략 얼마쯤 쓰셨어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true,
+      "질문함글": true
+     },
+     "pass": true,
+     "usd": 0.008662,
+     "hcx_tokens": 1811,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 1036,
+       "ok": true,
+       "usage": {
+        "input": 1530,
+        "output": 27
+       }
+      },
+      {
+       "작업": "쪽지검사",
+       "model": "HCX-005",
+       "ms": 454,
+       "ok": true,
+       "usage": {
+        "input": 248,
+        "output": 6
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1093,
+       "ok": true,
+       "usage": {
+        "input": 3916,
+        "output": 83,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G11",
+     "turn": 1,
+     "said": "요즘 환율이면 거기 생활비가 얼마나 들지 저도 알고 싶네요",
+     "ms": 2592,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "지원동기",
+      "question": "트랜스허브코리아에 지원한 이유는 무엇이었어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "되물음",
+      "section": null
+     },
+     "held": true,
+     "heldText": "혹시 올해 모집 공고는 언제 올라오는지 아세요?",
+     "reaction": "궁금하신 점은 내 질문함에 담아 두었어요.",
+     "next": {
+      "section": "지원동기",
+      "question": "트랜스허브코리아 인턴에 지원하게 된 계기가 무엇이었어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "되물음",
+      "궁금": "혹시 올해 모집 공고는 언제 올라오는지 아세요?"
+     },
+     "write": {
+      "반응": "그건 제가 알 수 없어요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "트랜스허브코리아 인턴에 지원하게 된 계기가 무엇이었어요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true,
+      "질문함글": true
+     },
+     "pass": true,
+     "usd": 0.00849,
+     "hcx_tokens": 1812,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 964,
+       "ok": true,
+       "usage": {
+        "input": 1535,
+        "output": 26
+       }
+      },
+      {
+       "작업": "쪽지검사",
+       "model": "HCX-005",
+       "ms": 403,
+       "ok": true,
+       "usage": {
+        "input": 245,
+        "output": 6
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1086,
+       "ok": true,
+       "usage": {
+        "input": 3860,
+        "output": 77,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G12",
+     "turn": 1,
+     "said": "혹시 올해 모집 공고는 언제 올라오는지 아세요?",
+     "ms": 2462,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "활동내용",
+      "question": "교육혁신원 대동제 이벤트 Guardians에서는 어떤 활동을 했어요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "되물음",
+      "section": null
+     },
+     "held": true,
+     "heldText": "제가 적은 거 후배한테 이름도 같이 보이나요?",
+     "reaction": "궁금하신 점은 내 질문함에 담아 두었어요.",
+     "next": {
+      "section": "활동내용",
+      "question": "대동제 때 Guardians에서 맡은 일이 무엇이었는지 편하게 들려주실래요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "되물음",
+      "궁금": "제가 적은 거 후배한테 이름도 같이 보이나요?"
+     },
+     "write": {
+      "반응": "공개할 문장은 선배가 직접 고르는데, 이름이 어떻게 보이는지는 제가 알 수 없어요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "대동제 때 Guardians에서 맡은 일이 무엇이었는지 편하게 들려주실래요?"
+     },
+     "kind_ok": true,
+     "wrong_hold": true,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": false,
+      "다시묻기": true
+     },
+     "pass": false,
+     "usd": 0.008832,
+     "hcx_tokens": 1818,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 1106,
+       "ok": true,
+       "usage": {
+        "input": 1534,
+        "output": 29
+       }
+      },
+      {
+       "작업": "쪽지검사",
+       "model": "HCX-005",
+       "ms": 515,
+       "ok": true,
+       "usage": {
+        "input": 249,
+        "output": 6
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 1200,
+       "ok": true,
+       "usage": {
+        "input": 3841,
+        "output": 115,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G13",
+     "turn": 1,
+     "said": "제가 적은 거 후배한테 이름도 같이 보이나요?",
+     "ms": 2833,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "팁",
+      "question": "후배들이 마르부르크에 대해 잘 모르고 있는 것, 또는 잘못 알고 있는 게 있다면요?",
+      "junior": false
+     },
+     "heard": {
+      "kind": "딴얘기",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "그건 제가 알 수 없어요.",
+     "next": {
+      "section": "팁",
+      "question": "마르부르크에 가기 전에 알았다면 좋았을 점이 있어요?",
+      "followUp": false,
+      "done": false,
+      "junior": false
+     },
+     "judge": {
+      "종류": "딴얘기",
+      "궁금": null
+     },
+     "write": {
+      "반응": "그건 제가 알 수 없어요.",
+      "칸": null,
+      "더묻기": false,
+      "질문": "마르부르크에 가기 전에 알았다면 좋았을 점이 있어요?"
+     },
+     "kind_ok": false,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": false,
+      "질문함": true,
+      "다시묻기": true
+     },
+     "pass": false,
+     "usd": 0.00848,
+     "hcx_tokens": 1552,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 758,
+       "ok": true,
+       "usage": {
+        "input": 1536,
+        "output": 16
+       }
+      },
+      {
+       "작업": "대화쓰기",
+       "model": "claude-sonnet-5-5",
+       "ms": 984,
+       "ok": true,
+       "usage": {
+        "input": 3875,
+        "output": 73,
+        "cache_write": 0,
+        "cache_read": 0
+       }
+      }
+     ],
+     "case": "G14",
+     "turn": 1,
+     "said": "이거 중간에 나갔다가 이어서 해도 저장돼요?",
+     "ms": 1748,
+     "run": 2,
+     "writer": "sonnet"
+    },
+    {
+     "asked": {
+      "section": "배운점",
+      "question": "이 경험에서 배운 점을 한 문장으로 들려주세요.",
+      "junior": false
+     },
+     "heard": {
+      "kind": "그만",
+      "section": null
+     },
+     "held": false,
+     "heldText": null,
+     "reaction": "알겠어요. 들려주셔서 고마워요. 아래 AI 요약을 누르면 지금까지 이야기가 정리돼요.",
+     "next": {
+      "section": null,
+      "question": "",
+      "followUp": false,
+      "done": true,
+      "junior": false
+     },
+     "judge": {
+      "종류": "그만",
+      "궁금": null
+     },
+     "write": null,
+     "kind_ok": true,
+     "wrong_hold": false,
+     "missed_hold": false,
+     "outside": [],
+     "repeat": false,
+     "eval_word": false,
+     "fallback": null,
+     "checks": {
+      "종류": true,
+      "질문함": true,
+      "끝": true
+     },
+     "pass": true,
+     "usd": 0.0,
+     "hcx_tokens": 1564,
+     "calls": [
+      {
+       "작업": "말판정",
+       "model": "HCX-005",
+       "ms": 654,
+       "ok": true,
+       "usage": {
+        "input": 1551,
+        "output": 13
+       }
+      }
+     ],
+     "case": "G15",
+     "turn": 1,
+     "said": "이쯤에서 마칠게요 수고하세요",
+     "ms": 657,
+     "run": 2,
+     "writer": "sonnet"
+    }
+   ]
+  }
+ }
+}
