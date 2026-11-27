@@ -562,9 +562,8 @@ function evidenceBlock(lines, sources, reportName) {
   const latest = items.map((i) => i.src.semester).filter(Boolean).sort((a, b) => semesterKey(b) - semesterKey(a))[0];
   const num = (n) => el("span", { className: "evidence__num", text: n });
 
-  // 근거 적음 라벨(6-1 v4.3): 1~2건이면 고정 문구 「선배 1명의 경험이에요」(lines.length로 판단, spec)
-  // [11/26 #295] 문장 수 ≠ 선배 수(서버에 사람 수 없음)라 「선배 2명」으로 세지 않는다
-  const few = lines.length <= 2 ? statusLabel("neutral", "user", "선배 1명의 경험이에요") : null;
+  // 근거 적음 라벨: 이 칸을 쓴 사람(서로 다른 sourceId 앞부분)이 1명일 때만 — 머리줄 수와 같은 셈(11/27 미리 D-8)
+  const few = docCount(lines.map((l) => l.sourceId)) === 1 ? statusLabel("neutral", "user", "선배 1명의 경험이에요") : null;
 
   return el("div", { className: "evidence" }, [
     el("div", { className: "evidence__head" }, [
