@@ -272,6 +272,83 @@ expect("force hold 문구는 「담아 두었어요」(못 찾았어요 아님)"
 res = askboo.askBoo("H0143", {"question": "마르부르크 기숙사 어땠어요?", "force": "hold"}, save=False)
 expect("force hold는 프로그램이 있어도 같은 문구", res["status"] == "hold" and res["message"] == askboo.HOLD_SAVED, res["message"])
 
+# ── [작업 35 A1] 업체 유형으로만 잡힌 보류 — 업체 이름·노트 링크 없이, 질문함에도 업체 없이 ─────────
+#   H0001(11/27): 「스타트업 여행사 인턴십」 → 사전 첫 업체 스텔로랩스가 질문함·문구·노트 링크에 붙었다
+import os  # noqa: E402
+
+H0001_Q = "승무원이 꿈인데 스타트업 여행사 인턴십에 합격했어요. 진로에 도움이 될까요?"
+TYPED = askboo.match_programs(H0001_Q)
+INTERN_PLAN = {"의도": "경험질문", "분야": "현장실습", "나라": None, "프로그램후보": [], "제외": [], "칸": None,
+               "궁금": True, "정리된질문": "스타트업 여행사 인턴십이 승무원 진로에 도움이 되나요?"}
+expect("A1 전제: 「스타트업」 사전으로 업체 둘 이상", len(TYPED) >= 2 and all(askboo.PROGRAMS[p]["분야"] == "현장실습" for p in TYPED), TYPED)
+saved_rows = []
+_orig_save = askboo._save
+
+
+def _spy_save(me, question, program, section, status, save, want=True):
+    saved_rows.append((program, status))
+    return _orig_save(me, question, program, section, status, save, want=want)
+
+
+askboo._save = _spy_save
+_old_full = os.environ.pop("VCC_ASK_FULL", None)
+for flag in (None, "1"):
+    if flag:
+        os.environ["VCC_ASK_FULL"] = flag
+    tag = "전문 길" if flag else "옛 길"
+    saved_rows.clear()
+    res, calls = run(H0001_Q, [{"question": "이중전공 선택에 도움 되는 비교과", "status": "hold", "program": ""}],
+                     plan=INTERN_PLAN, answer={"답": []})
+    expect(f"A1 {tag}: H0001 질문 → hold", res["status"] == "hold", res)
+    expect(f"A1 {tag}: 문구에 업체 이름 없음 · 유형어로", not any(p in res["message"] for p in askboo.PROGRAMS)
+           and res["message"] == askboo.HOLD_NO_TOPIC.format(program="스타트업 현장실습"), res["message"])
+    expect(f"A1 {tag}: noteId 없음", "noteId" not in res, res.get("noteId"))
+    expect(f"A1 {tag}: 질문함에 업체 없이", saved_rows == [(None, "hold")], saved_rows)
+    expect(f"A1 {tag}: 업체 근거로 답을 찾는 것은 그대로(답쓰기 호출)", "답쓰기" in [c[0] for c in calls], [c[0] for c in calls])
+os.environ.pop("VCC_ASK_FULL", None)
+if _old_full is not None:
+    os.environ["VCC_ASK_FULL"] = _old_full
+
+# 앞 턴에 업체가 있어도 유형을 물은 보류는 이어받지 않는다
+saved_rows.clear()
+res, _ = run("스타트업 인턴 하면서 힘들었던 점 있어요?", [{"question": "x", "status": "ok", "program": TYPED[0]}],
+             plan=dict(INTERN_PLAN, 정리된질문="스타트업 인턴에서 힘들었던 점"), answer={"답": []})
+expect("A1: 앞 턴 업체를 이어받지 않음", res["status"] == "hold" and saved_rows == [(None, "hold")]
+       and TYPED[0] not in res["message"], (saved_rows, res.get("message")))
+
+# 회귀: 업체를 콕 집은 질문은 지금처럼(이름 문구 + noteId + 질문함에 그 업체)
+NAMED = TYPED[0]
+saved_rows.clear()
+res, _ = run(f"{NAMED} 인턴이 승무원 진로에 도움이 될까요?", [], plan=dict(INTERN_PLAN, 프로그램후보=[NAMED]), answer={"답": []})
+expect("A1 회귀: 이름으로 부른 업체 → 그 이름 문구", res["status"] == "hold" and res["message"].startswith(NAMED), res.get("message"))
+expect("A1 회귀: 이름으로 부른 업체 → noteId·질문함 그대로",
+       res.get("noteId") == askboo.notes.note_id(NAMED) and saved_rows == [(NAMED, "hold")], (res.get("noteId"), saved_rows))
+# 회귀: 약칭(코트라)은 부른 것 — 지금처럼 권역 첫 곳
+saved_rows.clear()
+res, _ = run("코트라 인턴이 승무원 진로에 도움이 될까요?", [], plan=INTERN_PLAN, answer={"답": []})
+expect("A1 회귀: 약칭 코트라 → KOTRA 문구·질문함", res["status"] == "hold" and res["message"].startswith("KOTRA")
+       and saved_rows and saved_rows[0][0].startswith("KOTRA"), (res.get("message"), saved_rows))
+# 회귀: 유형으로 잡혔어도 업체가 하나뿐이면(「네덜란드 인턴」) 그 업체가 곧 그 유형 — 지금처럼
+ONE = askboo.match_programs("네덜란드 인턴 승무원 진로에 도움 돼요?")
+expect("A1 회귀: 업체 하나뿐인 유형은 _type_place 없음", len(ONE) == 1 and askboo._type_place("네덜란드 인턴", ONE) is None
+       and askboo._lead("네덜란드 인턴", ONE) == ONE[0], ONE)
+# 유형어 다듬기 · 이름이 섞이면 유형 아님 · 나라 단위(Q-38)는 그대로
+for q, want in (("무역인턴 어때요?", "무역 현장실습"), ("NGO 인턴 어때요?", "NGO 현장실습"),
+                ("온라인으로 하는 인턴 어때요?", "온라인 현장실습"), ("무역쪽 회사 인턴", "무역 현장실습")):
+    got = askboo._type_place(q, askboo.match_programs(q))
+    expect(f"A1: 유형어 다듬기 {q} → {want}", got == want, got)
+expect("A1: 질문에 업체 이름이 있으면 유형 아님", askboo._type_place(f"{NAMED} 같은 스타트업 인턴", TYPED) is None)
+expect("A1: 학교(나라 대조)는 유형 아님", askboo._type_place("독일 교환 학비", askboo.match_country("독일")[1]) is None)
+# 공식 안내도 질문함에 업체 없이(문구는 원래 업체 이름 없음)
+saved_rows.clear()
+res, _ = run("스타트업 인턴 지원 자격이 뭐예요?", [], plan=None)
+expect("A1: 공식 안내 → 질문함에 업체 없이", res["status"] == "official" and saved_rows == [(None, "official")]
+       and not any(p in res["message"] for p in askboo.PROGRAMS), (res["status"], saved_rows))
+saved_rows.clear()
+res, _ = run(f"{NAMED} 인턴 지원 자격이 뭐예요?", [], plan=None)
+expect("A1 회귀: 이름 부른 공식 안내 → 질문함에 그 업체", res["status"] == "official" and saved_rows == [(NAMED, "official")], saved_rows)
+askboo._save = _orig_save
+
 # ── [11/26 Q-44] 「질문함에 담기」 저장에 프로그램·칸을 남긴다 ─────────────────
 import tempfile  # noqa: E402
 
