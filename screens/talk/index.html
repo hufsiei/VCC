@@ -94,9 +94,10 @@
   .official-check .evidence-after { margin-top: 0; }
   .evidence-after a[href^="tel:"] { gap: var(--space-xs); }
   .evidence-after a[href^="tel:"] .icon { width: 16px; height: 16px; }
-  /* [#331-1] 질문함 안내 한 줄 */
+  /* [#331-1 → 11/27 #393] 질문함 안내 두 줄 */
   .inbox-note { display: flex; align-items: flex-start; gap: var(--space-xs); font-size: var(--font-size-secondary); color: var(--color-text-muted); }
   .inbox-note .icon { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+  .inbox-note__text { display: flex; flex-direction: column; gap: var(--space-xs); min-width: 0; }
   /* [#364] 기다림 안내: 점 세 개 옆 */
   .msg__bubble .typing + .status-label { margin-left: var(--space-sm); vertical-align: middle; }
 </style>
