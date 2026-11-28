@@ -630,7 +630,7 @@ n_q = len(store.load("questions", []))
 r22 = nxt([ans(j0, US22)], program=PROGRAM)
 expect("S22: 되물음, 질문함에 안 담음", r22.get("heard", {}).get("kind") == "되물음" and "heldQuestionId" not in r22
        and len(store.load("questions", [])) == n_q)
-expect("S22: 반응(BOO 답)이 지워지지 않음 + 같은 후배 질문 다시", r22.get("reaction") == WRITE[US22]["반응"]
+expect("S22: 고정 답(Q-137) + 같은 후배 질문 다시", r22.get("reaction") == tell_chat.SERVICE_TEXT["보낸이_후배"]
        and r22.get("junior") and r22.get("questionId") == j0["questionId"])
 expect("S22: 누가 보냈는지 묻는 말은 _META", all(tell_chat._META.search(t) for t in (
     US22, "이거 누가 물어본 거예요?", "누가 남긴 질문이에요?")) and not tell_chat._META.search("내년에도 누가 뽑히는지 궁금해요"))
@@ -748,8 +748,9 @@ for gid, ug, react in (("G03", "2번 질문 다시 보여 줘요", "지금 질�
     WRITE[ug] = {"반응": react, "칸": None, "더묻기": False, "질문": None}
     n_q = len(store.load("questions", []))
     rg = nxt([ans(s0, ug)])
-    expect(f"{gid}: 되물음, 질문함에 안 담음, 반응(BOO 답) 그대로", rg.get("heard", {}).get("kind") == "되물음"
-           and "heldQuestionId" not in rg and len(store.load("questions", [])) == n_q and rg.get("reaction") == react)
+    want = tell_chat.SERVICE_TEXT["이름"] if gid == "G13" else react   # [Q-137] 이름 공개는 고정 답
+    expect(f"{gid}: 되물음, 질문함에 안 담음, 반응(BOO 답)", rg.get("heard", {}).get("kind") == "되물음"
+           and "heldQuestionId" not in rg and len(store.load("questions", [])) == n_q and rg.get("reaction") == want)
 expect("[Q-136] 질문함 기준(_META): 서비스·화면에 대한 말은 거름, 프로그램 궁금은 안 거름",
        all(tell_chat._META.search(t) for t in ("2번 질문 다시 보여 줘요", "제가 적은 거 후배한테 이름도 같이 보이나요?",
                                                "이거 중간에 나갔다가 이어서 해도 저장돼요?", "제 이름 나와요?"))
@@ -795,6 +796,53 @@ expect("8일 된 tellChat 기록은 빈 기록", tell_chat.load(S2, TH)["said"] 
 tell_chat.drop(S2, TH)
 expect("목록 밖 program은 거절", "error" in interview.interviewNext(S2, {"program": "없는학교XYZ", "answers": []}))
 expect("목록 밖 program은 tellChat 키 없음", f"{S2}|없는학교XYZ" not in store.load("tellChat", {}))
+
+# [Q-137] 서비스 질문 3종 — AI 없이 고정 답 + 같은 질문, 질문함·답에 안 들어감
+interview.callAI = tell_fake
+SQ = {"보낸이": ("누가 보냈어요?", "이 질문은 누가 보낸 거예요?", "「누가 보낸」 거예요?"),
+      "이름": ("제 이름 보여요?", "제가 적은 거 후배한테 이름도 같이 보이나요?", "혹시 내 학번도 나와요?"),
+      "저장": ("저장돼요?", "이거 중간에 나갔다가 이어서 해도 저장돼요?", "이거 자동으로 저장되나요?")}
+expect("[Q-137] 서비스 질문 3종 × 표현 3개", all(tell_chat.service_question(t) == k for k, ts in SQ.items() for t in ts))
+# 11/28 실제 HCX: 모름(「넘어갈게요」)·그만(인터뷰 끝)·질문함 담김으로 가던 표현
+expect("[Q-137] HCX가 틀리던 표현도 코드가 잡음", all(tell_chat.service_question(t) == k for t, k in (
+    ("이 질문 보낸 사람이 누구예요?", "보낸이"), ("후배들이 제가 누군지 알 수 있어요?", "이름"), ("익명으로 올라가는 거예요?", "이름"),
+    ("중간에 꺼도 날아가지 않아요?", "저장"), ("나중에 이어서 쓸 수 있어요?", "저장"))))
+expect("[Q-137] 경험 이야기·프로그램 궁금은 서비스 질문이 아님", not any(tell_chat.service_question(t) for t in (
+    "누가 보낸 메일을 보고 지원했어요", "수료증에 제 이름이 나와요", "자료는 공유 폴더에 저장했어요", "내년에도 누가 뽑히는지 궁금해요",
+    "학점도 같이 나오나요?", "저장 업무를 맡았어요", "담당자 이름도 같이 적어야 했어요", "내년에도 하나요?", "?")))
+expect("[Q-137] 고정 답에 숫자 없음", not any(_re.search(r"\d", v) for v in tell_chat.SERVICE_TEXT.values()))
+tell_chat.drop(S2, TH)
+q0 = nxt([])
+n_q = len(store.load("questions", []))
+turns = []
+for kind, said in (("보낸이_BOO", "누가 보냈어요?"), ("이름", "제 이름 보여요?"), ("저장", "저장돼요?")):
+    turns.append(ans(q0, said))
+    TELL_CALLS.clear()
+    r = nxt(list(turns))
+    expect(f"[Q-137] {kind}: AI 없이 고정 답 + 같은 질문, 진행 그대로", not TELL_CALLS
+           and r.get("reaction") == tell_chat.SERVICE_TEXT[kind] and r.get("question") == q0["question"]
+           and r.get("heard") == {"kind": "되물음", "section": None} and r["progress"] == q0["progress"]
+           and "heldQuestionId" not in r)
+expect("[Q-137] 질문함에 안 담고 요약에도 안 들어감", len(store.load("questions", [])) == n_q
+       and not tell_chat.for_summary(S2, TH, turns))
+UQ = "음 글쎄 그냥요"
+JUDGE[UQ] = {"종류": "부족", "궁금": None}
+r = nxt(turns + [ans(q0, UQ)])
+expect("[Q-137] 서비스 질문 3번 뒤 부족: 넘기지 않음(횟수에 안 셈)", r.get("heard", {}).get("kind") == "부족"
+       and r.get("section") == q0.get("section"))
+# 꼬리 질문에서 물어도 그 꼬리 질문 그대로
+tell_chat.drop(S2, TH)
+UF = "공고를 보고 바로 지원서를 냈어요."
+WRITE[UF] = {"반응": "바로 지원하셨군요.", "칸": None, "더묻기": True, "질문": "지원서는 어떻게 준비했어요?"}
+f1 = nxt([ans(q0, UF)])
+f2 = nxt([ans(q0, UF), ans(f1, "저장돼요?")])
+expect("[Q-137] 꼬리 질문에서 물으면 같은 꼬리 질문", f1.get("followUp") and f2.get("question") == f1["question"])
+# 후배 질문에서 「누가 보냈어요?」
+tell_chat.drop(S2, PROGRAM)
+k0 = nxt([], program=PROGRAM)
+k1 = nxt([ans(k0, "「이 질문은 누가 보낸 거예요?」")], program=PROGRAM)
+expect("[Q-137] 후배 질문: 후배가 남겼다는 답 + 같은 후배 질문", k1.get("reaction") == tell_chat.SERVICE_TEXT["보낸이_후배"]
+       and k1.get("junior") and k1.get("questionId") == k0["questionId"])
 
 os.environ.pop(tell_chat.FLAG, None)
 interview.askboo.callAI = saved_askboo_call

@@ -27,6 +27,8 @@
 #        「네?」 → 되물음(궁금 버림). 종류가 6종 밖이어도 궁금 글이 있으면 되물음(parse_judge).
 #   [Q-136] 「숫자 든 부족·딴얘기 → 답」은 뺐다(일반화 G01 「저 3학년이에요」를 답으로 바꿈, 맞게 바꾼 턴 0).
 #        질문함 기준: 이 경험·프로그램에 대한 궁금함만 담는다. BOO·서비스·화면에 대한 말은 _META 한 곳에서 거른다.
+#   [Q-137] 서비스 질문 3종(누가 보냈나·이름이 보이나·저장되나)은 말 전체가 그 물음일 때 ① 앞에서 코드가 잡는다:
+#        AI 없이 고정 답(SERVICE_TEXT) + 방금 질문 그대로. 되물음으로 남기되 MAX_REASK 횟수에는 넣지 않는다.
 # 실패: 말판정이 실패하면 지금처럼 답으로 보고 고정 질문(반응 없음). 대화쓰기가 실패하면 고정 질문 + 고정 반응.
 # 응답(제안 — spec·화면 미반영): 지금 필드 그대로 + reaction(반응 글) · heard {kind, section}(방금 말을 어떻게 봤는지)
 #        · heldQuestionId(질문함에 담은 질문) · stopped(그만). 화면이 reaction을 질문 말풍선 앞에 그리면 된다.
@@ -100,6 +102,41 @@ _CONTRAST = re.compile(r"는데|은데|지만|였고|었고|했고|봤고|았고
 MAX_DONT_KNOW = 30     # 「모르겠어요」로 바로잡는 말의 글자 수 상한(부호·띄어쓰기 뺀 글)
 # [Q-131 재측정] 「네?」처럼 감탄사 + 물음표뿐이면 되물음, 궁금 없음(재측정 S29: HCX가 궁금 「네?」를 내 질문함에 담김)
 _BARE_ASK = {"네", "예", "응", "뭐", "뭐요", "네에", "예에", "어", "음", "엥", "잉", "넹", "왜요", "무슨"}
+
+# [Q-137] 서비스 질문 3종의 고정 답. 숫자·이름을 넣지 않는다
+SERVICE_TEXT = {
+    "보낸이_후배": "같은 프로그램이 궁금한 후배가 남긴 질문이에요. 누가 보냈는지는 보여 드리지 않아요.",
+    "보낸이_BOO": "해봤노트를 채우려고 BOO가 여쭤보는 질문이에요.",
+    "이름": "후배에게 선배의 이름과 학번은 보이지 않아요.",
+    "저장": "답하실 때마다 임시로 저장돼서, 나갔다 와도 이어서 하실 수 있어요. 오래 지나면 지워져요.",
+}
+# 말 전체(_qn: 띄어쓰기·부호·낫표 뺌)가 이 모양일 때만 — 앞뒤에 경험 이야기가 붙으면 말판정에 맡긴다
+_LEAD = r"(근데|그런데|그럼|그러면|혹시|잠깐만요?|아|어|음)*"
+_SERVICE = (
+    ("보낸이", re.compile(
+        _LEAD + r"((이|그)?(질문|거|건|것)(은|는|을|를)?)?(대체|도대체)?(누가|어떤후배가|어느후배가)((이|그)?(질문|거)(을|를)?)?"
+        r"(보낸|보냈|보내신|물어본|물어봤|물은|물었|남긴|남겼|올린|올렸)(거|건|것|질문)?"
+        r"(이에요|예요|에요|이야|인가요|인지|가요|어요|나요|는지|죠|지요|야)?(궁금해요)?"
+        r"|" + _LEAD + r"((이|그)?질문(을|은)?)?(보낸|물어본|남긴)(사람|후배|분)(은|이|는)?누구(예요|에요|인가요|죠|야)?")),
+    ("이름", re.compile(
+        _LEAD + r"((이거|여기|제가(적은|쓴|말한)(거|것|글|내용))(에|은|는)?)?(후배(들)?(한테|에게)(도)?)?"
+        r"((제|내|저의)(이름|실명|학번)(이|은|는|도)?|(이름|실명|학번)도)(같이|함께)?(후배(들)?(한테|에게)(도)?)?"
+        r"(보여|보이|보여지|나와|나오|떠|뜨|공개되|공개돼)(요|나요|ㄹ까요|까요|는건가요|는거예요|는지|죠|는거죠)?"
+        r"|" + _LEAD + r"후배(들)?(이|은|는|한테)?(제가|내가|저인지)(누군지)?(알|알아볼)수(있어요|있나요|있어|있죠)"
+        r"|" + _LEAD + r"(이거|답은|제답은)?익명(이에요|인가요|이죠|이야|으로(올라가|보여|나가|나와|남아)(요|나요|는거예요|는건가요|죠))")),
+    ("저장", re.compile(
+        _LEAD + r"((이거|이건|지금|여기|대화|답|내용|제가(적은|쓴|말한)(거|것|내용))(은|는|도)?)?(중간에)?"
+        r"(나갔다가?(다시)?(들어와도|와도)?)?(이어서(해도|하면))?(자동(으로)?|임시)?저장(이)?"
+        r"(돼|되|됐|돼요|해|해주)(요|나요|어요|었나요|는건가요|는거예요|는거죠|죠|시나요|시는거예요|지)?"
+        r"|" + _LEAD + r"(중간에)?(꺼도|끄면|나가도|나가면|닫아도|닫으면)(안)?(날아가|없어지|없어져|사라지|사라져)(지않아|지않나|)(요|나요|죠)"
+        r"|" + _LEAD + r"(나중에|다음에)?(다시)?(들어와서)?이어서(쓸|할|답할|적을)수(도)?(있어요|있나요|있죠|있을까요)")),
+)
+
+
+def service_question(said):
+    """[Q-137] 말 전체가 서비스 질문이면 「보낸이」·「이름」·「저장」, 아니면 None."""
+    n = _qn(re.sub(r"[『』“”‘’？]", "", said or ""))
+    return next((k for k, p in _SERVICE if p.fullmatch(n)), None)
 
 
 def enabled():
@@ -175,7 +212,8 @@ def _resolve(items, mem):
         if orig:
             a["question"] = orig["q"]
         if kind in REASK_KINDS:
-            reask[_h(a.get("question"))] = reask.get(_h(a.get("question")), 0) + 1
+            if not (said or {}).get("qa"):   # [Q-137] 서비스 질문은 다시 물은 횟수에 넣지 않는다
+                reask[_h(a.get("question"))] = reask.get(_h(a.get("question")), 0) + 1
             continue
         if kind == "그만":
             continue
@@ -209,6 +247,10 @@ def next_step(me, program, payload, prior, mine=None):
     cached = mem.get("last") or {}
     if fresh and cached.get("key") == turn and isinstance(cached.get("step"), dict):
         return cached["step"]   # 같은 answers로 다시 부름(재시도·이어 하기) — AI를 다시 부르지 않는다
+
+    asks = service_question(last["answer"]) if fresh else None
+    if asks:   # [Q-137] AI 없이 고정 답 + 방금 질문 그대로
+        return _service_step(me, program, payload, prior, mem, items, turn, asks)
 
     if not fresh or _said_key(last) in mem["said"] or last.get("kind") in KINDS:
         answers, passed, _ = _resolve(items, mem)
@@ -291,6 +333,26 @@ def next_step(me, program, payload, prior, mine=None):
     step["heard"] = {"kind": eff, "section": final_sec if eff == "답" else None}
     rec = {"k": eff, **({"s": moved} if moved else {}), **({"p": left} if left else {})}
     return _remember(me, program, mem, last, turn, rec, step, held)
+
+
+def _service_step(me, program, payload, prior, mem, items, turn, asks):
+    """[Q-137] 직전 응답의 질문이 방금 질문이면 그대로(다듬은 글·꼬리 질문 유지), 아니면 코드가 고른 질문."""
+    import interview as iv
+    last = items[-1]
+    prev, passed, _ = _resolve(items[:-1], mem)
+    step = dict((mem.get("last") or {}).get("step") or {})
+    shown = step.get("asked") if step.get("junior") else step.get("question")
+    if step.get("done") or _qn(shown) != _qn(last.get("question")):
+        step = dict(iv._next_step(me, program, {**payload, "answers": prev}, prior, follow=False, passed=passed))
+    for k in ("reaction", "heard", "heldQuestionId", "resumed"):
+        step.pop(k, None)
+    if asks == "보낸이":
+        orig = (mem["asked"].get(_h(last.get("question"))) or {}).get("q") or last.get("question") or ""
+        junior = iv.is_junior(iv._place_all(program, iv._clean_answers(prev + [{**last, "question": orig}]))[-1])
+        asks = "보낸이_후배" if junior or orig.startswith(iv.JUNIOR_FOLLOW) and step.get("questionId") else "보낸이_BOO"
+    step["reaction"] = SERVICE_TEXT[asks]
+    step["heard"] = {"kind": "되물음", "section": None}
+    return _remember(me, program, mem, last, turn, {"k": "되물음", "qa": True}, step, None)
 
 
 def _repeats(step, asked):
